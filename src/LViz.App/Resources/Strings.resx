@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <!-- Application title / chrome -->
+  <data name="Title_App"><value>LViz</value></data>
+  <data name="Title_Settings"><value>Settings</value></data>
+  <data name="Tray_Tooltip"><value>LViz</value></data>
+  <data name="Tray_ShowLayers"><value>Show Layers</value></data>
+  <data name="Tray_Quit"><value>Quit</value></data>
+
+  <!-- Toolbar tooltips -->
+  <data name="Tooltip_Quit"><value>Quit</value></data>
+  <data name="Tooltip_Minimize"><value>Minimize</value></data>
+  <data name="Tooltip_LiveHighlighting"><value>Live tracking — key highlighting + auto layer switch</value></data>
+  <data name="Tooltip_AutoLayerSwitch"><value>Auto layer switch</value></data>
+  <data name="Tooltip_AlwaysOnTop"><value>Always on top</value></data>
+  <data name="Tooltip_OpenLogFolder"><value>Open log folder</value></data>
+  <data name="Tooltip_CopyDiagnostics"><value>Copy diagnostics to clipboard</value></data>
+  <data name="Tooltip_Help"><value>Help</value></data>
+  <data name="Tooltip_Settings"><value>Settings</value></data>
+  <data name="Tooltip_Refresh"><value>Reload keymap</value></data>
+  <data name="Tooltip_LoadLayout"><value>Load keymap…</value></data>
+  <data name="Tooltip_Keyboard"><value>Keyboard</value></data>
+  <data name="Tooltip_StackedLayout"><value>Toggle stacked layout</value></data>
+  <data name="Tooltip_ModifierStyle"><value>Modifier symbols: Mac / Windows</value></data>
+
+  <!-- Status messages -->
+  <data name="Status_Ready"><value>Ready</value></data>
+  <data name="Status_NoLayoutLoaded"><value>No keymap loaded — click the folder icon to open a ZMK .keymap file</value></data>
+  <data name="Status_Loaded"><value>Loaded {0} ({1} layers)</value></data>
+  <data name="Status_LoadErrorFormat"><value>Load failed: {0}</value></data>
+  <data name="Status_DiagnosticsCopied"><value>Diagnostics copied to clipboard</value></data>
+  <data name="Status_KeyboardSwitched"><value>Keyboard switched to {0}</value></data>
+  <data name="Status_KeyboardSwitchedUnloaded"><value>Keyboard switched to {0} — reload your layout</value></data>
+  <data name="Status_KeyboardHintFormat"><value>{0} · {1} keys</value></data>
+  <data name="Status_LayerSourceHintFormat"><value>via {0}</value></data>
+  <data name="Status_LoadKeyCountMismatch"><value>layout has {0} keys but {1} expects {2} — switch keyboard or load a matching JSON</value></data>
+  <data name="Status_AutoSwitchedKeyboard"><value>auto-switched to {0}</value></data>
+
+  <!-- Toasts -->
+  <data name="Toast_LoadFailedFormat"><value>Could not load {0}: {1}</value></data>
+
+  <!-- File picker -->
+  <data name="LoadDialog_Title"><value>Open ZMK keymap</value></data>
+  <data name="LoadDialog_FileType"><value>ZMK keymap</value></data>
+
+  <!-- Settings window -->
+  <data name="Settings_BackgroundOpacity"><value>Background opacity</value></data>
+  <data name="Settings_BackgroundOpacityHint"><value>How solid the dark fill behind the keyboard is — drop to 0 for a fully transparent overlay.</value></data>
+  <data name="Settings_PressHighlight"><value>Press highlight color</value></data>
+  <data name="Settings_PressHighlightHint"><value>Color of the dot that pops on each pressed key.</value></data>
+  <data name="Settings_ColorTrayIcon"><value>Color tray icon by active layer</value></data>
+  <data name="Settings_ColorTrayIconHint"><value>Tint the system tray icon with the active layer's color so you can read the layer at a glance when the window is hidden. Turn off if it clashes with your menu bar.</value></data>
+  <data name="Settings_GlobalHotkey"><value>Global show/hide hotkey</value></data>
+  <data name="Settings_GlobalHotkeyHint"><value>Press this key from anywhere to toggle the layer overlay. Whichever key you pick is excluded from the layer-key list below.</value></data>
+  <data name="Settings_Tab_General"><value>General</value></data>
+  <data name="Settings_Tab_Layers"><value>Layers</value></data>
+  <data name="Settings_Tab_AutoSwitch"><value>Auto-switch</value></data>
+  <data name="Settings_Tab_MouseLayer"><value>Mouse layer</value></data>
+  <data name="Settings_MouseLayer_Title"><value>Mouse-movement layer</value></data>
+  <data name="Settings_MouseLayer_Hint"><value>While the mouse is moving, push the chosen layer to the keyboard. When the mouse stays idle for the timeout below, revert. Requires the keyboard to be connected over Raw HID.</value></data>
+  <data name="Settings_MouseLayer_Enable"><value>Enable mouse-movement layer push</value></data>
+  <data name="Settings_MouseLayer_Layer"><value>Layer to push while moving:</value></data>
+  <data name="Settings_MouseLayer_IdleTimeout"><value>Idle timeout (ms):</value></data>
+  <data name="Settings_MouseLayer_EndlessTimeout"><value>Endless timeout (only exit via the options below)</value></data>
+  <data name="Settings_MouseLayer_EndlessTimeout_Hint"><value>When checked, the idle timeout is disabled and the mouse layer stays pushed until a transparent or empty key is pressed. At least one of the options below must remain enabled.</value></data>
+  <data name="Settings_MouseLayer_ExitOnTransparent"><value>Exit on transparent key press (&amp;trans)</value></data>
+  <data name="Settings_MouseLayer_ExitOnEmpty"><value>Exit on empty key press (&amp;none)</value></data>
+  <data name="Settings_MouseLayer_ExitOnTransparent_Hint"><value>While the mouse layer is pushed, pressing a key whose binding on the active layer matches an enabled option above reverts immediately. Move the mouse again to re-arm.</value></data>
+  <data name="Settings_AutoSwitch_Header"><value>App → layer rules</value></data>
+  <data name="Settings_AutoSwitch_Hint"><value>Rules are evaluated in order; the first whose match text is a case-insensitive substring of the focused app's process name wins. Editing rules persists immediately. When enabled, the matched layer is pushed to the keyboard on every focus change.</value></data>
+  <data name="Settings_AutoSwitch_Enable"><value>Enable auto-switch (push matched layer to keyboard on focus change)</value></data>
+  <data name="Settings_AutoSwitch_FallbackLabel"><value>When focus moves to an app with no rule:</value></data>
+  <data name="Settings_AutoSwitch_FallbackPrevious"><value>Restore previous layer</value></data>
+  <data name="Settings_AutoSwitch_FallbackBase"><value>Switch to base layer (0)</value></data>
+  <data name="Settings_AutoSwitch_ExitKeysLabel"><value>Exit key (double-tap to toggle):</value></data>
+  <data name="Settings_AutoSwitch_ExitKeysHint"><value>Pick one key on the keyboard. Double-tapping it while a rule layer is active falls back to the selected layer above; double-tapping again returns to the rule's layer. Best picked on a key whose binding emits no OS keystrokes.</value></data>
+  <data name="Settings_AutoSwitch_ExitOnTransparent"><value>Exit on transparent key press (&amp;trans)</value></data>
+  <data name="Settings_AutoSwitch_ExitOnEmpty"><value>Exit on empty key press (&amp;none)</value></data>
+  <data name="Settings_AutoSwitch_ExitOnTransparent_Hint"><value>While a rule layer is active, pressing a key whose binding on that layer matches an enabled option above falls back immediately. Double-tap the exit key to re-enter the rule.</value></data>
+  <data name="Settings_AutoSwitch_ExitKeysNone"><value>(none)</value></data>
+  <data name="Settings_AutoSwitch_PickExitKeys"><value>Pick key…</value></data>
+  <data name="Settings_AutoSwitch_ClearExitKeys"><value>Clear</value></data>
+  <data name="Settings_AutoSwitch_PickExitKeysTitle"><value>Pick exit key</value></data>
+  <data name="Settings_AutoSwitch_PickExitKeysHint"><value>Tap one key to set the auto-switch exit key. Tap the selected key to remove it. The chosen key will fire on a double-tap.</value></data>
+  <data name="Settings_AutoSwitch_PickExitKeysCandidates"><value>Good candidates: keys that emit no OS keystroke (e.g. a bare modifier like Shift/Ctrl, or any key bound to &amp;none) — that way double-tapping doesn't leak characters into the focused app.</value></data>
+  <data name="Settings_AutoSwitch_PickExitKeysSelection"><value>Selection:</value></data>
+  <data name="Settings_AutoSwitch_PickExitKeysOk"><value>OK</value></data>
+  <data name="Settings_AutoSwitch_PickExitKeysCancel"><value>Cancel</value></data>
+  <data name="Settings_AutoSwitch_ProcessMatch"><value>Process name contains</value></data>
+  <data name="Settings_AutoSwitch_Layer"><value>Layer</value></data>
+  <data name="Settings_AutoSwitch_Add"><value>Add rule</value></data>
+  <data name="Settings_AutoSwitch_Remove"><value>Remove</value></data>
+  <data name="Settings_AutoSwitch_MoveUp"><value>Move up</value></data>
+  <data name="Settings_AutoSwitch_MoveDown"><value>Move down</value></data>
+  <data name="Settings_AutoSwitch_Empty"><value>No rules yet. Add one above.</value></data>
+  <data name="Settings_AutoSwitch_WouldFireFormat"><value>Active app would trigger: {0}</value></data>
+  <data name="Settings_AutoSwitch_WouldFireNone"><value>Active app: no matching rule.</value></data>
+  <data name="Settings_AutoSwitch_PickProcess"><value>Pick…</value></data>
+  <data name="Settings_AutoSwitch_PickProcessEmpty"><value>(no running processes)</value></data>
+  <data name="Settings_AutoSwitch_PickProcessFilter"><value>Filter…</value></data>
+  <data name="Settings_AutoSwitch_LayerFormat"><value>{0} (L:{1})</value></data>
+  <data name="Settings_AutoSwitch_LayerInvalid"><value>(invalid layer)</value></data>
+  <data name="Settings_AutoSwitch_SectionEngine"><value>Engine</value></data>
+  <data name="Settings_AutoSwitch_SectionExitKey"><value>Exit key</value></data>
+  <data name="Settings_AutoSwitch_SectionRules"><value>Rules</value></data>
+  <data name="Settings_LayersFormat"><value>Layers — {0}</value></data>
+  <data name="Settings_LayersHint"><value>Customize each layer's display color.</value></data>
+  <data name="Settings_LayerColorsReset"><value>Reset</value></data>
+  <data name="Settings_Layout"><value>Layout</value></data>
+  <data name="Settings_TopHand"><value>Top hand</value></data>
+  <data name="Settings_CheckForUpdates"><value>Check for updates</value></data>
+  <data name="Settings_Checking"><value>Checking…</value></data>
+  <data name="Settings_UpToDate"><value>You're on the latest version.</value></data>
+  <data name="Settings_UpdateAvailable"><value>Update available: {0} — click to download.</value></data>
+  <data name="Settings_UpdateCheckFailed"><value>Could not check for updates.</value></data>
+</root>

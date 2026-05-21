@@ -1,0 +1,336 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LViz.App.ViewModels"
+        xmlns:views="using:LViz.App.Views"
+        xmlns:conv="using:LViz.App.Converters"
+        x:Class="LViz.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        x:Name="MainWin"
+        Title="{Binding [Title_App], Source={StaticResource Loc}}"
+        Width="1440" Height="680"
+        MinWidth="640" MinHeight="320"
+        TransparencyLevelHint="Transparent,AcrylicBlur,None"
+        Background="Transparent"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="0"
+        SystemDecorations="None"
+        Topmost="{Binding IsAlwaysOnTop}">
+
+    <Window.Resources>
+        <conv:HexColorToBrushConverter x:Key="HexToBrush" />
+    </Window.Resources>
+
+    <Window.Styles>
+        <!-- Shared toggle-button style: dim when off, fully opaque when .active. -->
+        <Style Selector="Button.toggle">
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+        <Style Selector="Button.toggle.active">
+            <Setter Property="Opacity" Value="1.0" />
+        </Style>
+        <!-- Layer-tab override: text labels on #2A2A3D need more contrast than icons
+             in the status bar. Inactive stays readable (0.65); active gets a
+             distinct raised-chip look via background + brighter border. -->
+        <Style Selector="Button.toggle.layerTab">
+            <Setter Property="Opacity" Value="0.65" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+        <Style Selector="Button.toggle.layerTab:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TabBg}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TabBorder}" />
+        </Style>
+        <Style Selector="Button.toggle.layerTab.active">
+            <Setter Property="Opacity" Value="1.0" />
+        </Style>
+        <Style Selector="Button.toggle.layerTab.active /template/ ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TabHoverBg}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TabHoverBorder}" />
+        </Style>
+        <Style Selector="Button.toggle.layerTab.active:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TabSelectedBg}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TabSelectedBorder}" />
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- Bars panel: Row 0 (top) or Row 2 (bottom), switched automatically.
+             Inner Grid swaps StatusBar/LayerTabs so the status bar is always at the outer edge. -->
+        <Grid x:Name="BarsPanel" Grid.Row="0" RowDefinitions="Auto,Auto">
+
+            <!-- Status bar (solid, also serves as drag handle) -->
+            <Border x:Name="StatusBar" Grid.Row="0" Background="{StaticResource BgBase}" Padding="12,8"
+                    CornerRadius="8,8,0,0">
+                <DockPanel>
+                    <Button x:Name="QuitButton" DockPanel.Dock="Left"
+                            Command="{Binding QuitCommand}"
+                            Focusable="False"
+                            Padding="6,4" Margin="0,0,4,0"
+                            VerticalAlignment="Center"
+                            ToolTip.Tip="{Binding [Tooltip_Quit], Source={StaticResource Loc}}">
+                        <PathIcon Width="12" Height="12"
+                                  Data="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12 5.7 16.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z" />
+                    </Button>
+                    <Button x:Name="MinimizeButton"
+                            DockPanel.Dock="Left"
+                            Focusable="False"
+                            Padding="6,4" Margin="0,0,8,0"
+                            VerticalAlignment="Center"
+                            ToolTip.Tip="{Binding [Tooltip_Minimize], Source={StaticResource Loc}}">
+                        <PathIcon Width="12" Height="12"
+                                  Data="M20 14H4v-2h16v2z" />
+                    </Button>
+
+                    <!-- Primary controls: keyboard picker, load JSON, info hover. Sit just after the chrome buttons. -->
+                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="4"
+                                VerticalAlignment="Center" Margin="0,0,8,0">
+                        <StackPanel.Styles>
+                            <Style Selector="StackPanel > Button">
+                                <Setter Property="Focusable" Value="False" />
+                            </Style>
+                        </StackPanel.Styles>
+
+                        <!-- Keyboard profile picker — switches the physical layout (GO60 / Glove80). -->
+                        <Button x:Name="KeyboardPickerButton"
+                                Padding="8,4"
+                                ToolTip.Tip="{Binding [Tooltip_Keyboard], Source={StaticResource Loc}}">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <PathIcon Width="14" Height="14"
+                                          Data="M20 5H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z" />
+                                <TextBlock Text="{Binding SelectedKeyboard.DisplayName}"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                            <Button.Flyout>
+                                <Flyout Placement="Bottom">
+                                    <ItemsControl ItemsSource="{Binding AvailableKeyboards}" Padding="2">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Command="{Binding DataContext.SelectKeyboardCommand, ElementName=MainWin}"
+                                                        CommandParameter="{Binding}"
+                                                        Padding="10,6"
+                                                        HorizontalAlignment="Stretch"
+                                                        HorizontalContentAlignment="Left"
+                                                        Background="Transparent">
+                                                    <Grid ColumnDefinitions="16,*">
+                                                        <TextBlock Grid.Column="0"
+                                                                   Text="✓"
+                                                                   VerticalAlignment="Center"
+                                                                   FontWeight="Bold">
+                                                            <TextBlock.IsVisible>
+                                                                <MultiBinding Converter="{x:Static conv:EqualityToBoolMultiConverter.Instance}">
+                                                                    <Binding Path="Id" />
+                                                                    <Binding Path="DataContext.SelectedKeyboard.Id" ElementName="MainWin" />
+                                                                </MultiBinding>
+                                                            </TextBlock.IsVisible>
+                                                        </TextBlock>
+                                                        <TextBlock Grid.Column="1"
+                                                                   VerticalAlignment="Center">
+                                                            <Run Text="{Binding DisplayName, Mode=OneWay}" />
+                                                            <Run Text=" — " Foreground="{StaticResource TextStatusBar}" />
+                                                            <Run Text="{Binding KeyCount, Mode=OneWay}" Foreground="{StaticResource TextStatusBar}" />
+                                                            <Run Text=" keys" Foreground="{StaticResource TextStatusBar}" />
+                                                        </TextBlock>
+                                                    </Grid>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+
+                        <!-- Load layout JSON -->
+                        <Button x:Name="LoadLayoutButton"
+                                Command="{Binding LoadLayoutCommand}"
+                                Padding="8,4"
+                                ToolTip.Tip="{Binding [Tooltip_LoadLayout], Source={StaticResource Loc}}">
+                            <PathIcon Width="14" Height="14"
+                                      Data="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+                        </Button>
+
+                        <!-- Loaded-layout info: icon-only, hover tooltip shows full "Loaded foo.json (N layers) · keyboard hint". -->
+                        <Button x:Name="InfoButton"
+                                Padding="8,4"
+                                ToolTip.Tip="{Binding LoadInfoTooltip}">
+                            <PathIcon Width="14" Height="14"
+                                      Data="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                        </Button>
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
+                                HorizontalAlignment="Right" Spacing="4">
+                        <StackPanel.Styles>
+                            <Style Selector="StackPanel > Button">
+                                <Setter Property="Focusable" Value="False" />
+                            </Style>
+                        </StackPanel.Styles>
+
+                        <!-- Live key highlighting — pulses a key cap when the firmware reports a press over HID -->
+                        <Button x:Name="LiveButton"
+                                Command="{Binding ToggleLiveHighlightingCommand}"
+                                Classes="toggle"
+                                Classes.active="{Binding IsLiveHighlightingEnabled}"
+                                Padding="8,4"
+                                ToolTip.Tip="{Binding [Tooltip_LiveHighlighting], Source={StaticResource Loc}}">
+                            <PathIcon Width="16" Height="16"
+                                      Data="M3 12h4l3-8 4 16 3-8h4" />
+                        </Button>
+
+
+                        <!-- Stacked / horizontal layout toggle -->
+                        <Button x:Name="StackedLayoutButton"
+                                Command="{Binding ToggleStackedLayoutCommand}"
+                                Classes="toggle"
+                                Classes.active="{Binding IsStackedLayout}"
+                                Padding="8,4"
+                                ToolTip.Tip="{Binding [Tooltip_StackedLayout], Source={StaticResource Loc}}">
+                            <PathIcon Width="14" Height="14"
+                                      Data="M4 2h16v8H4V2zm0 12h16v8H4v-8z" />
+                        </Button>
+
+                        <!-- Modifier symbol style: Apple icon = Mac (⌘ ⌥ ⌃ ⇪), Windows-logo icon = Windows (⊞ Alt Ctrl ⇧).
+                             Not a Classes="toggle" — both states are equally "on", the icon itself communicates state. -->
+                        <Button x:Name="ModifierStyleButton"
+                                Command="{Binding ToggleWindowsModifierStyleCommand}"
+                                Padding="8,4"
+                                ToolTip.Tip="{Binding [Tooltip_ModifierStyle], Source={StaticResource Loc}}">
+                            <PathIcon Width="14" Height="14"
+                                      Data="{Binding ModifierStyleIconData}" />
+                        </Button>
+
+                        <!-- Refresh loaded JSON from disk -->
+                        <Button x:Name="RefreshButton" Command="{Binding RefreshCommand}"
+                                Padding="8,4"
+                                IsVisible="{Binding HasLayoutLoaded}"
+                                ToolTip.Tip="{Binding [Tooltip_Refresh], Source={StaticResource Loc}}">
+                            <PathIcon Width="16" Height="16"
+                                      Data="M18.537 19.567A9.961 9.961 0 0 1 12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10c0 2.136-.67 4.116-1.81 5.74L17 12h3a8 8 0 1 0-2.46 5.77z" />
+                        </Button>
+
+                        <!-- Pin (always on top) -->
+                        <Button x:Name="PinButton"
+                                Command="{Binding TogglePinCommand}"
+                                Classes="toggle"
+                                Classes.active="{Binding IsAlwaysOnTop}"
+                                Padding="8,4"
+                                ToolTip.Tip="{Binding [Tooltip_AlwaysOnTop], Source={StaticResource Loc}}">
+                            <PathIcon Width="16" Height="16"
+                                      Data="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2z" />
+                        </Button>
+
+                        <!-- Settings (background opacity, press color, layer colors) -->
+                        <Button x:Name="SettingsButton" Command="{Binding OpenSettingsCommand}"
+                                Padding="8,4"
+                                ToolTip.Tip="{Binding [Tooltip_Settings], Source={StaticResource Loc}}">
+                            <PathIcon Width="14" Height="14"
+                                      Data="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
+                        </Button>
+
+                        <!-- Open log folder (diagnostic) -->
+                        <Button x:Name="OpenLogFolderButton" Command="{Binding OpenLogFolderCommand}"
+                                Padding="8,4"
+                                ToolTip.Tip="{Binding [Tooltip_OpenLogFolder], Source={StaticResource Loc}}">
+                            <PathIcon Width="14" Height="14"
+                                      Data="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+                        </Button>
+
+                        <!-- Copy diagnostics -->
+                        <Button x:Name="CopyDiagnosticsButton" Command="{Binding CopyDiagnosticsCommand}"
+                                Padding="8,4"
+                                ToolTip.Tip="{Binding [Tooltip_CopyDiagnostics], Source={StaticResource Loc}}">
+                            <PathIcon Width="14" Height="14"
+                                      Data="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" />
+                        </Button>
+                    </StackPanel>
+                    <!-- Fill child: transient/changing status only ("Switched to GO60", "Load error: …").
+                         The persistent loaded-info text lives in the InfoButton tooltip on the left. -->
+                    <TextBlock VerticalAlignment="Center"
+                               MinWidth="20"
+                               TextTrimming="CharacterEllipsis"
+                               Text="{Binding StatusMessage}"
+                               Foreground="{StaticResource Text}" />
+                </DockPanel>
+            </Border>
+
+            <!-- Layer tabs -->
+            <Border x:Name="LayerTabs" Grid.Row="1"
+                    Background="{Binding TabBackground, Converter={StaticResource HexToBrush}}"
+                    Padding="8,2">
+                <ItemsControl ItemsSource="{Binding Layers}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LayerViewModel">
+                            <Button Command="{Binding SelectCommand}"
+                                    MinWidth="48"
+                                    Classes="toggle layerTab"
+                                    Classes.active="{Binding IsSelected}"
+                                    HorizontalContentAlignment="Center"
+                                    Padding="8,4">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Border Width="10" Height="10" CornerRadius="5"
+                                            Background="{Binding TabColor, Converter={StaticResource HexToBrush}}" />
+                                    <TextBlock Text="{Binding DisplayName}"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+        </Grid>
+
+        <!-- Board visualization area -->
+        <Border Grid.Row="1" Padding="16"
+                Background="{Binding BoardBackground, Converter={StaticResource HexToBrush}}">
+            <views:BoardView DataContext="{Binding}" />
+        </Border>
+
+        <!-- Transient error toast: fades in/out via Opacity transition.
+             Stays in the layout when hidden so the fade-out animation can run;
+             IsHitTestVisible is gated on the same class so clicks pass through
+             to the board when the toast isn't shown. -->
+        <Border Grid.Row="1"
+                Classes.show="{Binding IsToastVisible}"
+                HorizontalAlignment="Center" VerticalAlignment="Top"
+                Margin="0,12,0,0"
+                Padding="16,10"
+                CornerRadius="6"
+                Background="{StaticResource ErrorBg}" BorderBrush="{StaticResource ErrorBorder}" BorderThickness="1"
+                MaxWidth="640">
+            <Border.Styles>
+                <Style Selector="Border">
+                    <Setter Property="Opacity" Value="0" />
+                    <Setter Property="IsHitTestVisible" Value="False" />
+                    <Setter Property="Transitions">
+                        <Transitions>
+                            <DoubleTransition Property="Opacity" Duration="0:0:0.25" />
+                        </Transitions>
+                    </Setter>
+                </Style>
+                <Style Selector="Border.show">
+                    <Setter Property="Opacity" Value="1" />
+                    <Setter Property="IsHitTestVisible" Value="True" />
+                </Style>
+            </Border.Styles>
+            <Button Command="{Binding DismissToastCommand}"
+                    Background="Transparent" BorderThickness="0"
+                    Padding="0" Cursor="Hand"
+                    Focusable="False">
+                <TextBlock Text="{Binding ToastMessage}"
+                           Foreground="{StaticResource ErrorText}"
+                           TextWrapping="Wrap"
+                           HorizontalAlignment="Center" />
+            </Button>
+        </Border>
+
+    </Grid>
+
+</Window>

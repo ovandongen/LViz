@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <data name="Title_App"><value>LViz</value></data>
+  <data name="Title_Settings"><value>Instellingen</value></data>
+  <data name="Tray_Tooltip"><value>LViz</value></data>
+  <data name="Tray_ShowLayers"><value>Lagen tonen</value></data>
+  <data name="Tray_Quit"><value>Afsluiten</value></data>
+
+  <data name="Tooltip_Quit"><value>Afsluiten</value></data>
+  <data name="Tooltip_Minimize"><value>Minimaliseren</value></data>
+  <data name="Tooltip_LiveHighlighting"><value>Live tracking — toetsen tonen + automatische laagwissel</value></data>
+  <data name="Tooltip_AutoLayerSwitch"><value>Automatische laagwissel</value></data>
+  <data name="Tooltip_AlwaysOnTop"><value>Altijd op voorgrond</value></data>
+  <data name="Tooltip_OpenLogFolder"><value>Logmap openen</value></data>
+  <data name="Tooltip_CopyDiagnostics"><value>Diagnose naar klembord kopiëren</value></data>
+  <data name="Tooltip_Help"><value>Help</value></data>
+  <data name="Tooltip_Settings"><value>Instellingen</value></data>
+  <data name="Tooltip_Refresh"><value>Keymap opnieuw inladen</value></data>
+  <data name="Tooltip_LoadLayout"><value>Keymap openen…</value></data>
+  <data name="Tooltip_Keyboard"><value>Toetsenbord</value></data>
+  <data name="Tooltip_StackedLayout"><value>Gestapelde indeling wisselen</value></data>
+  <data name="Tooltip_ModifierStyle"><value>Modifier-symbolen: Mac / Windows</value></data>
+
+  <data name="Status_Ready"><value>Klaar</value></data>
+  <data name="Status_NoLayoutLoaded"><value>Geen keymap geladen — klik op het mappictogram om een ZMK .keymap te openen</value></data>
+  <data name="Status_Loaded"><value>Geladen: {0} ({1} lagen)</value></data>
+  <data name="Status_LoadErrorFormat"><value>Laden mislukt: {0}</value></data>
+  <data name="Status_DiagnosticsCopied"><value>Diagnose naar klembord gekopieerd</value></data>
+  <data name="Status_KeyboardSwitched"><value>Toetsenbord gewisseld naar {0}</value></data>
+  <data name="Status_KeyboardSwitchedUnloaded"><value>Toetsenbord gewisseld naar {0} — laad de layout opnieuw</value></data>
+  <data name="Status_KeyboardHintFormat"><value>{0} · {1} toetsen</value></data>
+  <data name="Status_LayerSourceHintFormat"><value>via {0}</value></data>
+  <data name="Status_LoadKeyCountMismatch"><value>layout heeft {0} toetsen maar {1} verwacht er {2} — wissel toetsenbord of laad een passende JSON</value></data>
+  <data name="Status_AutoSwitchedKeyboard"><value>automatisch gewisseld naar {0}</value></data>
+
+  <data name="Toast_LoadFailedFormat"><value>Kon {0} niet laden: {1}</value></data>
+
+  <data name="LoadDialog_Title"><value>ZMK keymap openen</value></data>
+  <data name="LoadDialog_FileType"><value>ZMK keymap</value></data>
+
+  <data name="Settings_BackgroundOpacity"><value>Achtergrondopaciteit</value></data>
+  <data name="Settings_BackgroundOpacityHint"><value>Hoe dicht de donkere vulling achter het toetsenbord is — zet op 0 voor een volledig transparante overlay.</value></data>
+  <data name="Settings_PressHighlight"><value>Kleur indrukmarkering</value></data>
+  <data name="Settings_PressHighlightHint"><value>Kleur van de stip die bij elke ingedrukte toets verschijnt.</value></data>
+  <data name="Settings_ColorTrayIcon"><value>Tray-icoon kleuren op actieve laag</value></data>
+  <data name="Settings_ColorTrayIconHint"><value>Kleur het systeemvak-icoon mee met de actieve laag, zodat je in één oogopslag de laag ziet wanneer het venster verborgen is. Zet uit als het detoneert met je menubalk.</value></data>
+  <data name="Settings_GlobalHotkey"><value>Globale toon/verberg-sneltoets</value></data>
+  <data name="Settings_GlobalHotkeyHint"><value>Druk overal op deze toets om de laagweergave te tonen of verbergen. De gekozen toets verschijnt niet in de laag-toetslijst hieronder.</value></data>
+  <data name="Settings_Tab_General"><value>Algemeen</value></data>
+  <data name="Settings_Tab_Layers"><value>Lagen</value></data>
+  <data name="Settings_Tab_AutoSwitch"><value>Auto-wissel</value></data>
+  <data name="Settings_Tab_MouseLayer"><value>Muis-laag</value></data>
+  <data name="Settings_MouseLayer_Title"><value>Laag bij muisbeweging</value></data>
+  <data name="Settings_MouseLayer_Hint"><value>Terwijl de muis beweegt, wordt de gekozen laag naar het toetsenbord gestuurd. Als de muis langer dan de onderstaande tijdslimiet stilstaat, wordt teruggeschakeld. Vereist dat het toetsenbord via Raw HID is verbonden.</value></data>
+  <data name="Settings_MouseLayer_Enable"><value>Laag-omschakeling bij muisbeweging inschakelen</value></data>
+  <data name="Settings_MouseLayer_Layer"><value>Laag tijdens beweging:</value></data>
+  <data name="Settings_MouseLayer_IdleTimeout"><value>Inactiviteitstijd (ms):</value></data>
+  <data name="Settings_MouseLayer_EndlessTimeout"><value>Eindeloze tijdslimiet (alleen verlaten via de opties hieronder)</value></data>
+  <data name="Settings_MouseLayer_EndlessTimeout_Hint"><value>Indien aangevinkt is de tijdslimiet uitgeschakeld en blijft de muislaag actief totdat een transparante of lege toets wordt ingedrukt. Minstens één van de opties hieronder moet aangevinkt blijven.</value></data>
+  <data name="Settings_MouseLayer_ExitOnTransparent"><value>Verlaten bij transparante toets (&amp;trans)</value></data>
+  <data name="Settings_MouseLayer_ExitOnEmpty"><value>Verlaten bij lege toets (&amp;none)</value></data>
+  <data name="Settings_MouseLayer_ExitOnTransparent_Hint"><value>Terwijl de muislaag actief is, schakelt het indrukken van een toets waarvan de binding op de huidige laag overeenkomt met een aangevinkte optie hierboven direct terug. Beweeg de muis opnieuw om opnieuw te activeren.</value></data>
+  <data name="Settings_AutoSwitch_Header"><value>App → laag-regels</value></data>
+  <data name="Settings_AutoSwitch_Hint"><value>Regels worden in volgorde gecontroleerd; de eerste waarvan de zoekterm hoofdletterongevoelig voorkomt in de procesnaam van de actieve app wint. Wijzigingen worden direct opgeslagen. Indien ingeschakeld wordt bij elke focuswissel de bijbehorende laag naar het toetsenbord gestuurd.</value></data>
+  <data name="Settings_AutoSwitch_Enable"><value>Automatisch schakelen inschakelen (gekoppelde laag naar toetsenbord bij focuswissel)</value></data>
+  <data name="Settings_AutoSwitch_FallbackLabel"><value>Wanneer focus naar een app zonder regel gaat:</value></data>
+  <data name="Settings_AutoSwitch_FallbackPrevious"><value>Vorige laag herstellen</value></data>
+  <data name="Settings_AutoSwitch_FallbackBase"><value>Naar basislaag (0) schakelen</value></data>
+  <data name="Settings_AutoSwitch_ExitKeysLabel"><value>Ontsnap-toets (dubbeltik om te schakelen):</value></data>
+  <data name="Settings_AutoSwitch_ExitKeysHint"><value>Kies één toets op het toetsenbord. Dubbeltikken terwijl een regel-laag actief is schakelt naar de gekozen terugvallaag hierboven; opnieuw dubbeltikken keert terug naar de laag van de regel. Kies bij voorkeur een toets die geen OS-toetsaanslag verstuurt.</value></data>
+  <data name="Settings_AutoSwitch_ExitOnTransparent"><value>Verlaten bij transparante toets (&amp;trans)</value></data>
+  <data name="Settings_AutoSwitch_ExitOnEmpty"><value>Verlaten bij lege toets (&amp;none)</value></data>
+  <data name="Settings_AutoSwitch_ExitOnTransparent_Hint"><value>Terwijl een regel-laag actief is, schakelt het indrukken van een toets waarvan de binding op die laag overeenkomt met een aangevinkte optie hierboven direct terug naar de terugvallaag. Dubbeltik op de ontsnap-toets om de regel opnieuw te activeren.</value></data>
+  <data name="Settings_AutoSwitch_ExitKeysNone"><value>(geen)</value></data>
+  <data name="Settings_AutoSwitch_PickExitKeys"><value>Toets kiezen…</value></data>
+  <data name="Settings_AutoSwitch_ClearExitKeys"><value>Wissen</value></data>
+  <data name="Settings_AutoSwitch_PickExitKeysTitle"><value>Ontsnap-toets kiezen</value></data>
+  <data name="Settings_AutoSwitch_PickExitKeysHint"><value>Tik op één toets om de ontsnap-toets in te stellen. Tik op de geselecteerde toets om die te verwijderen. De toets activeert bij dubbeltik.</value></data>
+  <data name="Settings_AutoSwitch_PickExitKeysCandidates"><value>Goede kandidaten: toetsen die geen OS-toetsaanslag versturen (bv. een losse modifier als Shift/Ctrl, of een toets gebonden aan &amp;none) — zo lekken dubbeltikken geen tekens in de focus-app.</value></data>
+  <data name="Settings_AutoSwitch_PickExitKeysSelection"><value>Selectie:</value></data>
+  <data name="Settings_AutoSwitch_PickExitKeysOk"><value>OK</value></data>
+  <data name="Settings_AutoSwitch_PickExitKeysCancel"><value>Annuleren</value></data>
+  <data name="Settings_AutoSwitch_ProcessMatch"><value>Procesnaam bevat</value></data>
+  <data name="Settings_AutoSwitch_Layer"><value>Laag</value></data>
+  <data name="Settings_AutoSwitch_Add"><value>Regel toevoegen</value></data>
+  <data name="Settings_AutoSwitch_Remove"><value>Verwijderen</value></data>
+  <data name="Settings_AutoSwitch_MoveUp"><value>Omhoog</value></data>
+  <data name="Settings_AutoSwitch_MoveDown"><value>Omlaag</value></data>
+  <data name="Settings_AutoSwitch_Empty"><value>Nog geen regels. Voeg er hierboven een toe.</value></data>
+  <data name="Settings_AutoSwitch_WouldFireFormat"><value>Actieve app zou activeren: {0}</value></data>
+  <data name="Settings_AutoSwitch_WouldFireNone"><value>Actieve app: geen passende regel.</value></data>
+  <data name="Settings_AutoSwitch_PickProcess"><value>Kies…</value></data>
+  <data name="Settings_AutoSwitch_PickProcessEmpty"><value>(geen actieve processen)</value></data>
+  <data name="Settings_AutoSwitch_PickProcessFilter"><value>Filteren…</value></data>
+  <data name="Settings_AutoSwitch_LayerFormat"><value>{0} (L:{1})</value></data>
+  <data name="Settings_AutoSwitch_LayerInvalid"><value>(ongeldige laag)</value></data>
+  <data name="Settings_AutoSwitch_SectionEngine"><value>Motor</value></data>
+  <data name="Settings_AutoSwitch_SectionExitKey"><value>Ontsnap-toets</value></data>
+  <data name="Settings_AutoSwitch_SectionRules"><value>Regels</value></data>
+  <data name="Settings_LayersFormat"><value>Lagen — {0}</value></data>
+  <data name="Settings_LayersHint"><value>Pas per laag de weergavekleur aan.</value></data>
+  <data name="Settings_LayerColorsReset"><value>Terugzetten</value></data>
+  <data name="Settings_Layout"><value>Indeling</value></data>
+  <data name="Settings_TopHand"><value>Bovenste helft</value></data>
+  <data name="Settings_CheckForUpdates"><value>Controleer op updates</value></data>
+  <data name="Settings_Checking"><value>Bezig met controleren…</value></data>
+  <data name="Settings_UpToDate"><value>Je gebruikt de nieuwste versie.</value></data>
+  <data name="Settings_UpdateAvailable"><value>Update beschikbaar: {0} — klik om te downloaden.</value></data>
+  <data name="Settings_UpdateCheckFailed"><value>Kon niet controleren op updates.</value></data>
+</root>

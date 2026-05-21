@@ -1,0 +1,191 @@
+name: Release
+
+# Push a tag like `v0.1.0` to build the artifacts and publish a GitHub Release.
+# `workflow_dispatch` lets you build the artifacts manually without releasing.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  build-windows:
+    name: Build Windows (win-x64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish
+        shell: bash
+        run: |
+          dotnet publish src/LViz.App/LViz.App.csproj \
+            -c Release -r win-x64 --self-contained true \
+            -f net10.0 \
+            -p:PublishSingleFile=false \
+            -p:Version=${{ steps.ver.outputs.version }}
+
+      - name: Package zip
+        shell: pwsh
+        run: |
+          $publish = "src/LViz.App/bin/Release/net10.0/win-x64/publish"
+          $zip = "LViz-${{ steps.ver.outputs.version }}-windows-x64.zip"
+          Compress-Archive -Path "$publish/*" -DestinationPath $zip -Force
+          Get-Item $zip | Format-List Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: LViz-*-windows-x64.zip
+          if-no-files-found: error
+
+  build-macos:
+    name: Build macOS (${{ matrix.rid }})
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [osx-arm64, osx-x64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "arch=${RID#osx-}" >> "$GITHUB_OUTPUT"
+        env:
+          RID: ${{ matrix.rid }}
+
+      - name: Stamp version into Info.plist
+        run: |
+          # Mutate the source plist before the script copies+signs the bundle,
+          # otherwise editing the in-bundle plist would invalidate codesign.
+          PLIST="build/macos/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ steps.ver.outputs.version }}" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ steps.ver.outputs.version }}" "$PLIST"
+
+      - name: Build .app bundle
+        run: |
+          # CI has no "LViz Local Dev" Keychain cert; the script
+          # falls back to ad-hoc signing automatically. End users may need
+          # to re-grant Accessibility after upgrades — see README macOS notes.
+          scripts/build-mac-app.sh -c Release -r ${{ matrix.rid }} -v ${{ steps.ver.outputs.version }}
+
+      - name: Package zip (ditto)
+        run: |
+          APP="src/LViz.App/bin/macos-bundle/LViz.app"
+          ZIP="LViz-${{ steps.ver.outputs.version }}-macos-${{ steps.ver.outputs.arch }}.zip"
+          # ditto preserves bundle structure, symlinks, extended attrs, and
+          # the codesign signature, which `zip` does not.
+          ditto -c -k --keepParent "$APP" "$ZIP"
+          ls -lh "$ZIP"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ steps.ver.outputs.arch }}
+          path: LViz-*-macos-${{ steps.ver.outputs.arch }}.zip
+          if-no-files-found: error
+
+  build-linux:
+    name: Build Linux (linux-x64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish
+        shell: bash
+        run: |
+          dotnet publish src/LViz.App/LViz.App.csproj \
+            -c Release -r linux-x64 --self-contained true \
+            -f net10.0 \
+            -p:PublishSingleFile=false \
+            -p:Version=${{ steps.ver.outputs.version }}
+
+      - name: Package tarball
+        shell: bash
+        run: |
+          # tar (not zip) preserves the +x bit on the launcher binary so
+          # users don't have to chmod after extracting.
+          publish="src/LViz.App/bin/Release/net10.0/linux-x64/publish"
+          tarball="LViz-${{ steps.ver.outputs.version }}-linux-x64.tar.gz"
+          tar -czf "$tarball" -C "$publish" .
+          ls -lh "$tarball"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64
+          path: LViz-*-linux-x64.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: [build-windows, build-macos, build-linux]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lh artifacts
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/LViz-*.zip
+            artifacts/LViz-*.tar.gz
+          generate_release_notes: true
+          fail_on_unmatched_files: true

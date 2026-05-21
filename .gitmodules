@@ -1,0 +1,3 @@
+[submodule "external/zmk-hid-protocol"]
+	path = external/zmk-hid-protocol
+	url = https://github.com/ovandongen/zmk-hid-protocol.git

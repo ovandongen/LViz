@@ -1,0 +1,202 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:LViz.App.ViewModels"
+             xmlns:conv="using:Avalonia.Data.Converters"
+             xmlns:convApp="using:LViz.App.Converters"
+             xmlns:i="https://github.com/projektanker/icons.avalonia"
+             x:Class="LViz.App.Views.BoardView"
+             x:Name="Board"
+             x:DataType="vm:IBoardSurface">
+
+    <UserControl.Resources>
+        <!-- All brushes (KeyStroke, ComboFill, ComboStroke) live in App.axaml
+             — keep this dictionary template-only. -->
+
+        <!-- Single key template, shared between the two per-hand ItemsControls
+             below so we don't have to keep two copies in sync. -->
+        <DataTemplate x:Key="KeyTemplate" x:DataType="vm:KeyViewModel">
+            <Grid Width="{Binding Position.Width}"
+                  Height="{Binding Position.Height}"
+                  Background="Transparent"
+                  PointerPressed="OnKeyPointerPressed"
+                  RenderTransformOrigin="{Binding RotationOrigin}"
+                  ToolTip.Tip="{Binding Tooltip}">
+                <Grid.RenderTransform>
+                    <RotateTransform Angle="{Binding Position.RotationDegrees}" />
+                </Grid.RenderTransform>
+
+                <!-- Inner Margin gives every key a uniform visual gap from
+                     its neighbours without disturbing the outer Grid's
+                     hit-test rectangle or its absolute-coord rotation
+                     pivot. Tune here to adjust all dtsi-rendered boards
+                     at once. -->
+                <Grid Margin="1">
+                <!-- Key fill: driven by KeyFillColor (precedence: decoration.background
+                     > target-layer palette color > default KeyDefaultFill). -->
+                <Rectangle RadiusX="6" RadiusY="6"
+                           Stroke="{StaticResource KeyStroke}"
+                           StrokeThickness="1"
+                           Fill="{Binding KeyFillColor, Converter={x:Static convApp:HexColorToBrushConverter.Instance}}" />
+
+                <!-- Press-indicator dot: pulses when the hook sees this
+                     key fire. Fill/Stroke walk past the per-item
+                     KeyViewModel DataContext via ElementName=Board to
+                     pick up the user-chosen highlight color from the
+                     MainWindowViewModel that owns this UserControl. -->
+                <Ellipse Classes="pressDot"
+                         Classes.active="{Binding IsPressed}"
+                         Width="10" Height="10"
+                         HorizontalAlignment="Right"
+                         VerticalAlignment="Top"
+                         Margin="0,5,5,0"
+                         IsHitTestVisible="False"
+                         Fill="{Binding DataContext.PressHighlightColor, ElementName=Board, Converter={x:Static convApp:HexColorToBrushConverter.Instance}}"
+                         Stroke="{Binding DataContext.PressHighlightStrokeColor, ElementName=Board, Converter={x:Static convApp:HexColorToBrushConverter.Instance}}"
+                         StrokeThickness="1" />
+
+                <!-- Combo-indicator earmark: right triangle hugging the
+                     bottom-left corner with the key's 6px radius
+                     baked into the geometry — left edge runs down to
+                     (0,8), arcs along the key corner to (6,14), then
+                     straight along the bottom to (14,14), then up the
+                     hypotenuse. Static (no animation). The combo's
+                     name, key positions, and resulting binding are
+                     appended to the per-key tooltip. -->
+                <Path Data="M 0,0 L 0,8 A 6,6 0 0 0 6,14 L 14,14 Z"
+                      HorizontalAlignment="Left"
+                      VerticalAlignment="Bottom"
+                      IsHitTestVisible="False"
+                      IsVisible="{Binding IsInCombo}"
+                      Fill="{StaticResource ComboFill}"
+                      Stroke="{StaticResource ComboStroke}"
+                      StrokeThickness="1" />
+
+                <!-- Category hint in the top-left corner (e.g. "To Layer",
+                     "Layer Tap") — distinguishes layer-switch keys at a
+                     glance without cluttering the main glyph. -->
+                <TextBlock Text="{Binding TopLeftLabel}"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Top"
+                           Margin="4,5,0,0"
+                           FontSize="7"
+                           FontWeight="Bold"
+                           Opacity="0.75"
+                           FontStyle="Italic"
+                           Foreground="{Binding KeyForegroundColor, Converter={x:Static convApp:HexColorToBrushConverter.Instance}}"
+                           IsVisible="{Binding TopLeftLabel, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+
+                <!-- Label stack: optional Font Awesome icon on top (from
+                     decoration.icon), then main glyph, then optional
+                     subscript. Dark foreground works across default
+                     white and the pastel layer palette. -->
+                <StackPanel Orientation="Vertical"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Margin="0,8,0,0"
+                            Spacing="2">
+                    <i:Icon Value="{Binding IconName}"
+                            FontSize="14"
+                            Opacity="0.8"
+                            HorizontalAlignment="Center"
+                            Foreground="{Binding KeyForegroundColor, Converter={x:Static convApp:HexColorToBrushConverter.Instance}}"
+                            IsVisible="{Binding IconName, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Text="{Binding Label}"
+                               HorizontalAlignment="Center"
+                               FontSize="{Binding LabelFontSize}"
+                               FontWeight="SemiBold"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"
+                               Foreground="{Binding KeyForegroundColor, Converter={x:Static convApp:HexColorToBrushConverter.Instance}}" />
+                    <TextBlock Text="{Binding Subscript}"
+                               HorizontalAlignment="Center"
+                               FontSize="{Binding SubscriptFontSize}"
+                               FontWeight="Bold"
+                               Opacity="0.9"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"
+                               Foreground="{Binding KeyForegroundColor, Converter={x:Static convApp:HexColorToBrushConverter.Instance}}"
+                               IsVisible="{Binding Subscript, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+                </Grid>
+            </Grid>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <!-- Viewbox auto-scales the fixed canvas to whatever room the window
+         provides. Outer Canvas hosts two per-hand groups: each
+         ItemsControl renders its keys at their absolute Position.X/Y, but
+         the surrounding Canvas.Left/Top on the host ItemsControl shifts
+         the whole half. In horizontal mode all four offsets are 0; in
+         stacked mode the halves are translated to sit one above the other.
+         NOTE: Canvas.Left/Top are applied via ItemsControl.Styles (per-item
+         Binding context) rather than ItemContainerTheme — the ControlTheme
+         variant doesn't rebind reliably per item in Avalonia 11, which
+         collapses every key to (0,0). -->
+    <Viewbox Stretch="Uniform" StretchDirection="Both" ClipToBounds="False">
+        <Canvas Width="{Binding CanvasWidth}" Height="{Binding CanvasHeight}"
+                Background="Transparent" ClipToBounds="False">
+            <ItemsControl ItemsSource="{Binding LeftKeys}"
+                          Width="{Binding BoardSurfaceWidth}"
+                          Height="{Binding BoardSurfaceHeight}"
+                          Canvas.Left="{Binding LeftHandX}"
+                          Canvas.Top="{Binding LeftHandY}"
+                          ClipToBounds="False"
+                          ItemTemplate="{StaticResource KeyTemplate}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <Canvas />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.Styles>
+                    <Style Selector="ContentPresenter">
+                        <Setter Property="Canvas.Left" Value="{Binding Position.X}" />
+                        <Setter Property="Canvas.Top" Value="{Binding Position.Y}" />
+                    </Style>
+                    <Style Selector="Ellipse.pressDot">
+                        <Setter Property="Opacity" Value="0" />
+                        <Setter Property="Transitions">
+                            <Transitions>
+                                <DoubleTransition Property="Opacity" Duration="0:0:0.08" />
+                            </Transitions>
+                        </Setter>
+                    </Style>
+                    <Style Selector="Ellipse.pressDot.active">
+                        <Setter Property="Opacity" Value="1" />
+                    </Style>
+                </ItemsControl.Styles>
+            </ItemsControl>
+
+            <ItemsControl ItemsSource="{Binding RightKeys}"
+                          Width="{Binding BoardSurfaceWidth}"
+                          Height="{Binding BoardSurfaceHeight}"
+                          Canvas.Left="{Binding RightHandX}"
+                          Canvas.Top="{Binding RightHandY}"
+                          ClipToBounds="False"
+                          ItemTemplate="{StaticResource KeyTemplate}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <Canvas />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.Styles>
+                    <Style Selector="ContentPresenter">
+                        <Setter Property="Canvas.Left" Value="{Binding Position.X}" />
+                        <Setter Property="Canvas.Top" Value="{Binding Position.Y}" />
+                    </Style>
+                    <Style Selector="Ellipse.pressDot">
+                        <Setter Property="Opacity" Value="0" />
+                        <Setter Property="Transitions">
+                            <Transitions>
+                                <DoubleTransition Property="Opacity" Duration="0:0:0.08" />
+                            </Transitions>
+                        </Setter>
+                    </Style>
+                    <Style Selector="Ellipse.pressDot.active">
+                        <Setter Property="Opacity" Value="1" />
+                    </Style>
+                </ItemsControl.Styles>
+            </ItemsControl>
+        </Canvas>
+    </Viewbox>
+
+</UserControl>

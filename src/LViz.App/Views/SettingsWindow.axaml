@@ -1,0 +1,543 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LViz.App.ViewModels"
+        xmlns:conv="using:LViz.App.Converters"
+        x:Class="LViz.App.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Name="SettingsRoot"
+        Title="{Binding [Title_Settings], Source={StaticResource Loc}}"
+        Width="560" Height="640"
+        MinWidth="420" MinHeight="320"
+        WindowStartupLocation="CenterOwner">
+
+    <Window.Resources>
+        <conv:HexColorToBrushConverter x:Key="HexToBrush" />
+        <conv:AppLayerRuleLabelConverter x:Key="AppLayerRuleLabel" />
+    </Window.Resources>
+
+    <DockPanel Margin="8">
+
+        <!-- Version & update-check footer: docked at the bottom so it stays
+             visible across both tabs and any future tabs. The check button
+             swaps for an italic "Checking…" label while the request is in
+             flight; the result text is clickable when an update is found
+             (the link click handler lives in the code-behind because
+             TextBlock has no built-in command for PointerPressed). -->
+        <Border DockPanel.Dock="Bottom" Height="1" Background="{StaticResource BgSurface0}" Margin="0,8,0,0" />
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="8,8,8,4" Spacing="8">
+            <TextBlock Text="{Binding AppVersion}" Foreground="{StaticResource TextMuted}" FontSize="11"
+                       VerticalAlignment="Center" />
+            <Button Content="{Binding [Settings_CheckForUpdates], Source={StaticResource Loc}}"
+                    Command="{Binding CheckForUpdatesCommand}"
+                    IsVisible="{Binding !IsCheckingForUpdates}"
+                    Padding="4,1" FontSize="11" Background="Transparent"
+                    Foreground="{StaticResource AccentBlue}" BorderThickness="0" Cursor="Hand" />
+            <TextBlock Text="{Binding [Settings_Checking], Source={StaticResource Loc}}"
+                       IsVisible="{Binding IsCheckingForUpdates}"
+                       Foreground="{StaticResource TextMuted}" FontSize="11" FontStyle="Italic"
+                       VerticalAlignment="Center" />
+            <TextBlock Text="{Binding UpdateMessage}" Foreground="{StaticResource AccentGreen}" FontSize="11"
+                       VerticalAlignment="Center" TextWrapping="Wrap"
+                       IsVisible="{Binding UpdateMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                       Cursor="Hand" TextDecorations="Underline"
+                       Name="UpdateLink" PointerPressed="OnUpdateLinkClick" />
+        </StackPanel>
+
+        <TabControl>
+
+        <!-- General tab: app-wide settings (not scoped per layer). -->
+        <TabItem Header="{Binding [Settings_Tab_General], Source={StaticResource Loc}}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="20" Spacing="16">
+
+                    <!-- Background opacity -->
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding [Settings_BackgroundOpacity], Source={StaticResource Loc}}"
+                                   FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                        <TextBlock Text="{Binding [Settings_BackgroundOpacityHint], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                            <Slider Grid.Column="0"
+                                    Minimum="0" Maximum="1"
+                                    TickFrequency="0.05"
+                                    IsSnapToTickEnabled="True"
+                                    Value="{Binding MainViewModel.BackgroundOpacity, Mode=TwoWay}"
+                                    VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding BackgroundOpacityPercent}"
+                                       Foreground="{StaticResource Text}"
+                                       MinWidth="44"
+                                       TextAlignment="Right"
+                                       VerticalAlignment="Center"
+                                       Margin="8,0,0,0" />
+                        </Grid>
+                    </StackPanel>
+
+                    <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+                    <!-- Press-highlight color -->
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding [Settings_PressHighlight], Source={StaticResource Loc}}"
+                                   FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                        <TextBlock Text="{Binding [Settings_PressHighlightHint], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                        <Button Padding="2" Margin="0,4,0,0"
+                                HorizontalAlignment="Left"
+                                Background="Transparent" BorderThickness="0">
+                            <Border Width="56" Height="22" CornerRadius="3"
+                                    Background="{Binding PressHighlightColorHex, Converter={StaticResource HexToBrush}}"
+                                    BorderBrush="{StaticResource BgSurface1}" BorderThickness="1" />
+                            <Button.Flyout>
+                                <Flyout Placement="BottomEdgeAlignedLeft">
+                                    <ColorView Color="{Binding PressHighlightColor, Mode=TwoWay}"
+                                               IsAlphaVisible="False" />
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                    </StackPanel>
+
+                    <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+                    <!-- Global show/hide hotkey. Single key only (no modifier UI today);
+                         the chosen key is auto-excluded from the layer-key picker on the
+                         Layers tab so the two can't collide. Hidden on Linux —
+                         Wayland blocks global hooks from unfocused windows. -->
+                    <StackPanel Spacing="6" IsVisible="{Binding IsGlobalHotkeySupported}">
+                        <TextBlock Text="{Binding [Settings_GlobalHotkey], Source={StaticResource Loc}}"
+                                   FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                        <TextBlock Text="{Binding [Settings_GlobalHotkeyHint], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                        <ComboBox MinWidth="120" Margin="0,4,0,0"
+                                  HorizontalAlignment="Left"
+                                  ItemsSource="{Binding HotkeyKeyChoices}"
+                                  SelectedItem="{Binding MainViewModel.HotkeyKey, Mode=TwoWay}" />
+                    </StackPanel>
+
+                    <Border Height="1" Background="{StaticResource BgSurface0}" IsVisible="{Binding IsGlobalHotkeySupported}" />
+
+                    <!-- Tray icon active-layer tint -->
+                    <StackPanel Spacing="6">
+                        <CheckBox Content="{Binding [Settings_ColorTrayIcon], Source={StaticResource Loc}}"
+                                  IsChecked="{Binding MainViewModel.ColorTrayIconByActiveLayer, Mode=TwoWay}" />
+                        <TextBlock Text="{Binding [Settings_ColorTrayIconHint], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+                    <!-- Layout: top-hand picker for stacked mode. Greyed out
+                         until the user enables stacked layout via the toolbar. -->
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding [Settings_Layout], Source={StaticResource Loc}}"
+                                   FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0"
+                                    IsEnabled="{Binding MainViewModel.IsStackedLayout}">
+                            <TextBlock Text="{Binding [Settings_TopHand], Source={StaticResource Loc}}"
+                                       VerticalAlignment="Center" Foreground="{StaticResource TextSubtle}" FontSize="12" />
+                            <ComboBox MinWidth="100"
+                                      ItemsSource="{Binding AvailableTopHands}"
+                                      SelectedItem="{Binding MainViewModel.StackedTopHand, Mode=TwoWay}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- Layers tab: per-loaded-layer color override on one row each.
+             Rebuilds when the layout loads or active keyboard profile changes. -->
+        <TabItem Header="{Binding [Settings_Tab_Layers], Source={StaticResource Loc}}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="20" Spacing="12">
+
+                    <TextBlock Text="{Binding LayersHeader}"
+                               FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                    <TextBlock Text="{Binding [Settings_LayersHint], Source={StaticResource Loc}}"
+                               Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+
+                    <ItemsControl ItemsSource="{Binding LayerEntries}"
+                                  IsVisible="{Binding HasLayoutForLayers}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:LayerSettingsEntry">
+                                <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,3,0,3">
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding DisplayName}"
+                                               Foreground="{StaticResource Text}"
+                                               VerticalAlignment="Center" />
+
+                                    <!-- Color swatch + picker -->
+                                    <Button Grid.Column="1" Padding="2"
+                                            Background="Transparent" BorderThickness="0">
+                                        <Border Width="56" Height="22" CornerRadius="3"
+                                                Background="{Binding Color.ColorHex, Converter={StaticResource HexToBrush}}"
+                                                BorderBrush="{StaticResource BgSurface1}" BorderThickness="1" />
+                                        <Button.Flyout>
+                                            <Flyout Placement="BottomEdgeAlignedLeft">
+                                                <ColorView Color="{Binding Color.Color, Mode=TwoWay}"
+                                                           IsAlphaVisible="False" />
+                                            </Flyout>
+                                        </Button.Flyout>
+                                    </Button>
+
+                                    <Button Grid.Column="2" Margin="6,0,0,0"
+                                            Padding="8,2"
+                                            Content="{Binding [Settings_LayerColorsReset], Source={StaticResource Loc}}"
+                                            Command="{Binding Color.ResetCommand}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- Auto-switch tab: per-keyboard rules mapping focused app → ZMK layer.
+             Pushing layers to firmware needs the Raw HID source connected; the
+             tab is hidden while we're still searching for the keyboard. -->
+        <TabItem Header="{Binding [Settings_Tab_AutoSwitch], Source={StaticResource Loc}}"
+                 IsVisible="{Binding MainViewModel.IsAppRulesTabVisible}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="20" Spacing="16">
+
+                    <!-- Engine section: master enable + fallback policy. -->
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding [Settings_AutoSwitch_SectionEngine], Source={StaticResource Loc}}"
+                                   FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                        <TextBlock Text="{Binding [Settings_AutoSwitch_Hint], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+
+                        <CheckBox Content="{Binding [Settings_AutoSwitch_Enable], Source={StaticResource Loc}}"
+                                  IsChecked="{Binding MainViewModel.IsAutoSwitchKeyboardLayerEnabled, Mode=TwoWay}"
+                                  Foreground="{StaticResource Text}"
+                                  Margin="0,4,0,0" />
+
+                        <StackPanel Spacing="4" Margin="0,4,0,0">
+                            <TextBlock Text="{Binding [Settings_AutoSwitch_FallbackLabel], Source={StaticResource Loc}}"
+                                       Foreground="{StaticResource Text}" FontSize="12" />
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <RadioButton GroupName="AutoSwitchFallback"
+                                             Content="{Binding [Settings_AutoSwitch_FallbackBase], Source={StaticResource Loc}}"
+                                             IsChecked="{Binding IsFallbackBase, Mode=TwoWay}"
+                                             Foreground="{StaticResource Text}" />
+                                <RadioButton GroupName="AutoSwitchFallback"
+                                             Content="{Binding [Settings_AutoSwitch_FallbackPrevious], Source={StaticResource Loc}}"
+                                             IsChecked="{Binding IsFallbackPrevious, Mode=TwoWay}"
+                                             Foreground="{StaticResource Text}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+                    <!-- Exit-tap key: a single firmware key position that
+                         toggles the engine between the rule-driven layer
+                         and the fallback target when double-tapped. Pressed
+                         on the physical keyboard; we consume the firmware
+                         key events (regardless of OS keypress permission)
+                         via the submodule's MultiTapDetector. -->
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding [Settings_AutoSwitch_SectionExitKey], Source={StaticResource Loc}}"
+                                   FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                        <TextBlock Text="{Binding [Settings_AutoSwitch_ExitKeysHint], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                            <TextBlock Text="{Binding ExitTapSummary}"
+                                       Foreground="{StaticResource AccentGreen}" FontSize="12" FontWeight="SemiBold"
+                                       VerticalAlignment="Center"
+                                       MinWidth="160" />
+                            <Button Content="{Binding [Settings_AutoSwitch_PickExitKeys], Source={StaticResource Loc}}"
+                                    Click="OnPickExitKeysClick" />
+                            <Button Content="{Binding [Settings_AutoSwitch_ClearExitKeys], Source={StaticResource Loc}}"
+                                    Command="{Binding ClearExitTapCommand}"
+                                    IsEnabled="{Binding HasExitTap}" />
+                        </StackPanel>
+
+                        <CheckBox Content="{Binding [Settings_AutoSwitch_ExitOnTransparent], Source={StaticResource Loc}}"
+                                  IsChecked="{Binding IsAutoSwitchExitOnTransparentKey, Mode=TwoWay}"
+                                  Foreground="{StaticResource Text}"
+                                  Margin="0,6,0,0" />
+                        <CheckBox Content="{Binding [Settings_AutoSwitch_ExitOnEmpty], Source={StaticResource Loc}}"
+                                  IsChecked="{Binding IsAutoSwitchExitOnEmptyKey, Mode=TwoWay}"
+                                  Foreground="{StaticResource Text}" />
+                        <TextBlock Text="{Binding [Settings_AutoSwitch_ExitOnTransparent_Hint], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+                    <!-- Rules section: new-rule editor + existing rule list + live status. -->
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding [Settings_AutoSwitch_SectionRules], Source={StaticResource Loc}}"
+                                   FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+
+                        <!-- New-rule editor. MaxLength caps the textbox so a
+                             paste-bomb can't bloat settings.json. The Pick…
+                             button opens a flyout listing running processes
+                             (refreshed on each open via code-behind). -->
+                        <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,4,0,0">
+                        <TextBox Grid.Column="0"
+                                 Watermark="{Binding [Settings_AutoSwitch_ProcessMatch], Source={StaticResource Loc}}"
+                                 Text="{Binding NewRuleProcessMatch, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 MaxLength="200"
+                                 VerticalAlignment="Center" />
+                        <Button x:Name="PickProcessButton" Grid.Column="1" Margin="8,0,0,0"
+                                Content="{Binding [Settings_AutoSwitch_PickProcess], Source={StaticResource Loc}}">
+                            <Button.Flyout>
+                                <Flyout Placement="Bottom" Opening="OnPickProcessFlyoutOpening">
+                                    <Grid Width="260" Height="320" RowDefinitions="Auto,*">
+                                        <TextBox Grid.Row="0" Margin="0,0,0,4"
+                                                 Watermark="{Binding [Settings_AutoSwitch_PickProcessFilter], Source={StaticResource Loc}}"
+                                                 Text="{Binding ProcessFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <ListBox Grid.Row="1"
+                                                 x:Name="ProcessPickerList"
+                                                 ItemsSource="{Binding RunningProcessNames}"
+                                                 IsVisible="{Binding HasRunningProcesses}"
+                                                 SelectionChanged="OnProcessPickerSelectionChanged">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding}" Padding="4,2" />
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                        <TextBlock Grid.Row="1"
+                                                   Text="{Binding [Settings_AutoSwitch_PickProcessEmpty], Source={StaticResource Loc}}"
+                                                   Foreground="{StaticResource TextMuted}" FontStyle="Italic"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   IsVisible="{Binding !HasRunningProcesses}" />
+                                    </Grid>
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                        <ComboBox Grid.Column="2" Margin="8,0,0,0" MinWidth="160"
+                                  ItemsSource="{Binding MainViewModel.Layers}"
+                                  SelectedItem="{Binding NewRuleLayer, Mode=TwoWay}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:LayerViewModel">
+                                    <TextBlock Text="{Binding DisplayName}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <Button Grid.Column="3" Margin="8,0,0,0"
+                                Content="{Binding [Settings_AutoSwitch_Add], Source={StaticResource Loc}}"
+                                Command="{Binding AddAppLayerRuleCommand}" />
+                    </Grid>
+
+                    <Border Height="1" Background="{StaticResource BgSurface0}" Margin="0,4" />
+
+                    <!-- Empty-state hint -->
+                    <TextBlock Text="{Binding [Settings_AutoSwitch_Empty], Source={StaticResource Loc}}"
+                               Foreground="{StaticResource TextMuted}" FontSize="11" FontStyle="Italic"
+                               IsVisible="{Binding HasNoEditingRules}" />
+
+                    <!-- Existing rules. Each row's DataContext is the underlying
+                         AppLayerRule record; the layer label is computed via a
+                         multi-converter against MainViewModel.Layers (with Count
+                         as a re-evaluation trigger on keymap reload). Commands
+                         live on the SettingsViewModel (the window's DataContext)
+                         so we reach them via ElementName binding — the
+                         (vm:T)DataContext cast pattern is unreliable inside
+                         deferred templates (see CLAUDE.md). -->
+                    <ItemsControl ItemsSource="{Binding EditingRules}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="*,200,Auto,Auto,Auto" Margin="0,3,0,3">
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding ProcessMatch}"
+                                               Foreground="{StaticResource Text}"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="1"
+                                               Foreground="{StaticResource TextSubtle}"
+                                               VerticalAlignment="Center">
+                                        <TextBlock.Text>
+                                            <MultiBinding Converter="{StaticResource AppLayerRuleLabel}">
+                                                <Binding Path="LayerIndex" />
+                                                <Binding Path="DataContext.MainViewModel.Layers" ElementName="SettingsRoot" />
+                                                <Binding Path="DataContext.MainViewModel.Layers.Count" ElementName="SettingsRoot" />
+                                            </MultiBinding>
+                                        </TextBlock.Text>
+                                    </TextBlock>
+                                    <Button Grid.Column="2" Content="▲" Padding="6,2" MinWidth="0"
+                                            ToolTip.Tip="{Binding [Settings_AutoSwitch_MoveUp], Source={StaticResource Loc}}"
+                                            Command="{Binding DataContext.MoveAppLayerRuleUpCommand, ElementName=SettingsRoot}"
+                                            CommandParameter="{Binding}" />
+                                    <Button Grid.Column="3" Content="▼" Padding="6,2" MinWidth="0" Margin="2,0,0,0"
+                                            ToolTip.Tip="{Binding [Settings_AutoSwitch_MoveDown], Source={StaticResource Loc}}"
+                                            Command="{Binding DataContext.MoveAppLayerRuleDownCommand, ElementName=SettingsRoot}"
+                                            CommandParameter="{Binding}" />
+                                    <Button Grid.Column="4" Margin="8,0,0,0"
+                                            Content="{Binding [Settings_AutoSwitch_Remove], Source={StaticResource Loc}}"
+                                            Command="{Binding DataContext.RemoveAppLayerRuleCommand, ElementName=SettingsRoot}"
+                                            CommandParameter="{Binding}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                        <Border Height="1" Background="{StaticResource BgSurface0}" Margin="0,4" />
+
+                        <TextBlock Text="{Binding WouldFireText}"
+                                   Foreground="{StaticResource AccentGreen}" FontSize="12" />
+                    </StackPanel>
+
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+
+        <!-- Mouse layer tab: per-keyboard mouse-movement layer push. Like
+             Auto-switch, this writes to the firmware over Raw HID, so the
+             tab is gated on IsHidSourceActive — there's no value in
+             configuring a push target when nothing can receive it. -->
+        <TabItem Header="{Binding [Settings_Tab_MouseLayer], Source={StaticResource Loc}}"
+                 IsVisible="{Binding MainViewModel.IsHidSourceActive}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="20" Spacing="12">
+
+                    <TextBlock Text="{Binding [Settings_MouseLayer_Title], Source={StaticResource Loc}}"
+                               FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                    <TextBlock Text="{Binding [Settings_MouseLayer_Hint], Source={StaticResource Loc}}"
+                               Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+
+                    <CheckBox Content="{Binding [Settings_MouseLayer_Enable], Source={StaticResource Loc}}"
+                              IsChecked="{Binding IsMouseLayerEnabled, Mode=TwoWay}"
+                              Foreground="{StaticResource Text}"
+                              Margin="0,4,0,0" />
+
+                    <!-- Layer-while-moving picker. Disabled when the engine is off
+                         (no point picking a target when nothing will fire). -->
+                    <StackPanel Spacing="4" Margin="0,4,0,0"
+                                IsEnabled="{Binding IsMouseLayerEnabled}">
+                        <TextBlock Text="{Binding [Settings_MouseLayer_Layer], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource Text}" FontSize="12" />
+                        <ComboBox MinWidth="200" HorizontalAlignment="Left"
+                                  ItemsSource="{Binding MainViewModel.Layers}"
+                                  SelectedItem="{Binding SelectedMouseLayer, Mode=TwoWay}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:LayerViewModel">
+                                    <TextBlock Text="{Binding DisplayName}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <!-- Idle-timeout slider, 200–2000 ms; numeric readout to the right.
+                         Disabled when Endless is checked — the value is preserved so
+                         toggling endless off restores the previous timeout. -->
+                    <StackPanel Spacing="4" Margin="0,4,0,0"
+                                IsEnabled="{Binding IsMouseLayerEnabled}">
+                        <TextBlock Text="{Binding [Settings_MouseLayer_IdleTimeout], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource Text}" FontSize="12" />
+                        <Grid ColumnDefinitions="*,Auto"
+                              IsEnabled="{Binding IsMouseLayerIdleTimeoutEnabled}">
+                            <Slider Grid.Column="0"
+                                    Minimum="200" Maximum="2000"
+                                    TickFrequency="50"
+                                    IsSnapToTickEnabled="True"
+                                    Value="{Binding MouseLayerIdleTimeoutMs, Mode=TwoWay}"
+                                    VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding MouseLayerIdleTimeoutMs}"
+                                       Foreground="{StaticResource Text}"
+                                       MinWidth="44"
+                                       TextAlignment="Right"
+                                       VerticalAlignment="Center"
+                                       Margin="8,0,0,0" />
+                        </Grid>
+                        <CheckBox Content="{Binding [Settings_MouseLayer_EndlessTimeout], Source={StaticResource Loc}}"
+                                  IsChecked="{Binding IsMouseLayerEndlessTimeout, Mode=TwoWay}"
+                                  Foreground="{StaticResource Text}" />
+                        <TextBlock Text="{Binding [Settings_MouseLayer_EndlessTimeout_Hint], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <!-- Transparent (&trans) and empty (&none) keypress
+                         exits — independent per-flag opt-ins. When endless
+                         timeout is on the SettingsViewModel guarantees ≥1
+                         remains enabled. -->
+                    <StackPanel Spacing="4" Margin="0,8,0,0"
+                                IsEnabled="{Binding IsMouseLayerEnabled}">
+                        <CheckBox Content="{Binding [Settings_MouseLayer_ExitOnTransparent], Source={StaticResource Loc}}"
+                                  IsChecked="{Binding IsMouseLayerExitOnTransparentKey, Mode=TwoWay}"
+                                  Foreground="{StaticResource Text}" />
+                        <CheckBox Content="{Binding [Settings_MouseLayer_ExitOnEmpty], Source={StaticResource Loc}}"
+                                  IsChecked="{Binding IsMouseLayerExitOnEmptyKey, Mode=TwoWay}"
+                                  Foreground="{StaticResource Text}" />
+                        <TextBlock Text="{Binding [Settings_MouseLayer_ExitOnTransparent_Hint], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                    </StackPanel>
+
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- Testing tab: temporary scratch area for HID push tests. Remove when done. -->
+        <TabItem Header="Testing" IsVisible="False">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="20" Spacing="12">
+                    <TextBlock Text="Push layer to keyboard"
+                               FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                    <TextBlock Text="Selecting a layer fires SetLayerStateAsync immediately. See log for app push acknowledged / external change events."
+                               Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                    <ComboBox MinWidth="220"
+                              HorizontalAlignment="Left"
+                              ItemsSource="{Binding MainViewModel.Layers}"
+                              SelectedItem="{Binding SelectedTestLayer, Mode=TwoWay}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:LayerViewModel">
+                                <TextBlock Text="{Binding DisplayName}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <Separator Margin="0,8" />
+
+                    <TextBlock Text="HID queries (shared module)"
+                               FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                    <TextBlock Text="Sends 0xFD GetDeviceInfo / 0xFB GetConfigId and waits up to 1s for the matching reply."
+                               Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                    <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto" Margin="0,4,0,0" ColumnSpacing="8" RowSpacing="6">
+                        <Button Grid.Row="0" Grid.Column="0"
+                                Content="Query device info"
+                                HorizontalAlignment="Stretch"
+                                Command="{Binding QueryDeviceInfoCommand}" />
+                        <TextBlock Grid.Row="0" Grid.Column="1"
+                                   Text="{Binding DeviceInfoResult}"
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource Text}"
+                                   TextWrapping="Wrap" />
+                        <Button Grid.Row="1" Grid.Column="0"
+                                Content="Query config ID"
+                                HorizontalAlignment="Stretch"
+                                Command="{Binding QueryConfigIdCommand}" />
+                        <TextBlock Grid.Row="1" Grid.Column="1"
+                                   Text="{Binding ConfigIdResult}"
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource Text}"
+                                   TextWrapping="Wrap" />
+                    </Grid>
+
+                    <Separator Margin="0,8" />
+
+                    <TextBlock Text="Active window (focus follows OS)"
+                               FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                    <TextBlock Text="Updates within ~500 ms of focus change. WindowTitle is null on macOS by design (no Accessibility entitlement)."
+                               Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                    <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto" Margin="0,4,0,0">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="ProcessName" Foreground="{StaticResource TextMuted}" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding MainViewModel.ActiveWindow.ProcessName, FallbackValue='(none)', TargetNullValue='(none)'}" Foreground="{StaticResource Text}" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="BundleId" Foreground="{StaticResource TextMuted}" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding MainViewModel.ActiveWindow.BundleId, FallbackValue='(none)', TargetNullValue='(none)'}" Foreground="{StaticResource Text}" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="WindowTitle" Foreground="{StaticResource TextMuted}" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding MainViewModel.ActiveWindow.WindowTitle, FallbackValue='(none)', TargetNullValue='(none)'}" Foreground="{StaticResource Text}" TextWrapping="Wrap" />
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        </TabControl>
+
+    </DockPanel>
+
+</Window>
