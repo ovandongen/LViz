@@ -65,6 +65,7 @@ internal static class AppServices
         // call sites see identical state.
         services.AddSingleton<ILocalization>(Loc.Instance);
         services.AddSingleton<ILayerColorService>(LayerColorPalette.Service);
+        services.AddSingleton<IKeyLabelOverrideService>(KeyLabelOverrides.Service);
 
         services.AddSingleton<MainWindowViewModel>(sp =>
             new MainWindowViewModel(

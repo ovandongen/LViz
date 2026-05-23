@@ -4,6 +4,7 @@ using LViz.App.Services;
 using LViz.Core.Keymap;
 using LViz.Core.Layout;
 using LViz.Core.Models;
+using LViz.Core.Settings;
 
 namespace LViz.App.ViewModels;
 
@@ -52,6 +53,23 @@ public partial class KeyViewModel : ObservableObject
     [ObservableProperty] private string _tooltip = "";
 
     /// <summary>
+    /// When non-null, replaces the length-based auto-scaled value of
+    /// <see cref="LabelFontSize"/>. Set by an active <see cref="KeyLabelOverride"/>;
+    /// reset to null when no override applies. The setter notifies
+    /// <see cref="LabelFontSize"/> so the rendered TextBlock re-measures.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LabelFontSize))]
+    private double? _labelFontSizeOverride;
+
+    /// <summary>
+    /// True when a <see cref="KeyLabelOverride"/> flips the main label to
+    /// bold. The XAML binds <c>FontWeight</c> through a converter, defaulting
+    /// to <c>SemiBold</c> when this is false to match the original literal.
+    /// </summary>
+    [ObservableProperty] private bool _isLabelBold;
+
+    /// <summary>
     /// Auto-contrasting label/icon color for the current <see cref="KeyFillColor"/>.
     /// Uses Rec. 709 luminance (0.2126R + 0.7152G + 0.0722B) with a threshold
     /// around mid-grey so pastel fills still read dark while navy / black
@@ -92,7 +110,8 @@ public partial class KeyViewModel : ObservableObject
     /// get an explicit bump so they're not lost at the default body weight.
     /// </summary>
     public double LabelFontSize =>
-        IsArrowGlyph(Label) ? 28 : LabelFontSizeForLength(LongestWordLength(Label));
+        LabelFontSizeOverride
+        ?? (IsArrowGlyph(Label) ? 28 : LabelFontSizeForLength(LongestWordLength(Label)));
 
     /// <summary>
     /// Same length-based scaling for the subscript — single-char glyphs (the
@@ -152,19 +171,40 @@ public partial class KeyViewModel : ObservableObject
     /// is layered on afterwards via <see cref="SetCombos"/>, once every key's
     /// label is settled (so the combo tooltip can name participants by label).
     /// </summary>
-    public void ApplyBinding(KeyBinding binding, int? targetLayer, string? targetLayerName, string profileId, HoldTap? holdTap = null)
+    public void ApplyBinding(KeyBinding binding, int activeLayerIndex, int? targetLayer, string? targetLayerName, string profileId, HoldTap? holdTap = null)
     {
         Behavior = binding.Behavior;
         IsInCombo = false;
         KeyFillColor = ResolveFillColor(binding, targetLayer, profileId);
         IconName = KeyLabelFormatter.NormalizeIconName(binding.DecorationIcon);
         _baseTooltip = BuildTooltip(binding, targetLayerName, holdTap);
-        Tooltip = _baseTooltip;
+        Tooltip = AppendEditHint(_baseTooltip);
 
         var (label, sub, topLeft) = ComputeLabels(binding, targetLayerName, holdTap);
         Label = label;
         Subscript = sub;
         TopLeftLabel = topLeft;
+
+        // User-authored override wins over the formatter — same precedence as
+        // decoration.label in KeyLabelFormatter.FormatBinding, applied here so
+        // it composes on top of the icon/fill colour decisions above (which
+        // come from the binding's own decoration, not the user override).
+        var ov = KeyLabelOverrides.Get(profileId, activeLayerIndex, Position.Index);
+        if (ov is not null)
+        {
+            Label = ov.MainLabel;
+            Subscript = ov.Subscript;
+            TopLeftLabel = ov.TopLeftBadge;
+            if (!string.IsNullOrEmpty(ov.Icon))
+                IconName = KeyLabelFormatter.NormalizeIconName(ov.Icon);
+            LabelFontSizeOverride = ov.FontSize;
+            IsLabelBold = ov.Bold;
+        }
+        else
+        {
+            LabelFontSizeOverride = null;
+            IsLabelBold = false;
+        }
     }
 
     /// <summary>
@@ -204,6 +244,18 @@ public partial class KeyViewModel : ObservableObject
         return string.Join("\n\n", sections);
     }
 
+    /// <summary>
+    /// Discoverability hint appended to every per-key tooltip on surfaces that
+    /// flow bindings through <see cref="ApplyBinding"/> — the main board.
+    /// The exit-key picker writes <see cref="Tooltip"/> directly, so it never
+    /// sees this line. Kept as the final section so combo info (added later
+    /// by <see cref="SetCombos"/>) is sandwiched above the hint, not below.
+    /// </summary>
+    private const string EditHintSection = "Right-click to edit label";
+
+    private static string AppendEditHint(string body) =>
+        string.IsNullOrEmpty(body) ? EditHintSection : body + "\n\n" + EditHintSection;
+
     private string BuildHeaderSection(KeyBinding b)
     {
         var posLine = Position.Description is { } desc
@@ -223,7 +275,7 @@ public partial class KeyViewModel : ObservableObject
         if (combos is null || combos.Count == 0)
         {
             IsInCombo = false;
-            Tooltip = _baseTooltip;
+            Tooltip = AppendEditHint(_baseTooltip);
             return;
         }
 
@@ -231,7 +283,7 @@ public partial class KeyViewModel : ObservableObject
         var sections = new List<string> { _baseTooltip };
         foreach (var combo in combos)
             sections.Add(KeyLabelFormatter.BuildComboSection(combo, labelLookup));
-        Tooltip = string.Join("\n\n", sections);
+        Tooltip = AppendEditHint(string.Join("\n\n", sections));
     }
 
     /// <summary>

@@ -1,0 +1,103 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LViz.App.ViewModels"
+        xmlns:i="https://github.com/projektanker/icons.avalonia"
+        x:Class="LViz.App.Views.EditKeyLabelDialog"
+        x:DataType="vm:EditKeyLabelDialogViewModel"
+        Title="Edit key label"
+        Width="420" Height="460"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BgBase}">
+
+    <DockPanel Margin="16">
+
+        <StackPanel DockPanel.Dock="Top" Spacing="2" Margin="0,0,0,12">
+            <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}">
+                <Run Text="Layer " /><Run Text="{Binding LayerIndex}" /><Run Text="  ·  Key " /><Run Text="{Binding KeyIndex}" />
+            </TextBlock>
+            <TextBlock FontSize="11" FontStyle="Italic" Foreground="{StaticResource TextSubtle}"
+                       TextWrapping="Wrap">
+                <Run Text="Default: " /><Run Text="{Binding DefaultLabelHint}" />
+            </TextBlock>
+        </StackPanel>
+
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,12,0,0">
+            <Button Grid.Column="0"
+                    Content="Clear override"
+                    IsEnabled="{Binding HasExistingOverride}"
+                    Click="OnClearOverrideClick" />
+            <Button Grid.Column="2"
+                    Content="Cancel"
+                    Margin="8,0,0,0"
+                    Click="OnCancelClick" />
+            <Button Grid.Column="3"
+                    Content="Save"
+                    Margin="8,0,0,0"
+                    Classes="accent"
+                    IsDefault="True"
+                    Click="OnSaveClick" />
+        </Grid>
+
+        <StackPanel Spacing="10">
+
+            <StackPanel Spacing="2">
+                <TextBlock Text="Main label" FontSize="11" Foreground="{StaticResource TextSubtle}" />
+                <TextBox Text="{Binding MainLabel, Mode=TwoWay}" />
+            </StackPanel>
+
+            <StackPanel Spacing="2">
+                <TextBlock Text="Subscript" FontSize="11" Foreground="{StaticResource TextSubtle}" />
+                <TextBox Text="{Binding Subscript, Mode=TwoWay}" />
+            </StackPanel>
+
+            <StackPanel Spacing="2">
+                <TextBlock Text="Top-left badge" FontSize="11" Foreground="{StaticResource TextSubtle}" />
+                <TextBox Text="{Binding TopLeftBadge, Mode=TwoWay}" />
+            </StackPanel>
+
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,6,0,0">
+                <TextBlock Grid.Row="0" Grid.ColumnSpan="4"
+                           Text="Icon" FontSize="11" Foreground="{StaticResource TextSubtle}" />
+                <Border Grid.Row="1" Grid.Column="0"
+                        Width="36" Height="36"
+                        Background="{StaticResource BgSurface0}" CornerRadius="4"
+                        Margin="0,2,8,0">
+                    <i:Icon Value="{Binding Icon}"
+                            FontSize="20"
+                            Foreground="{StaticResource Text}"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            IsVisible="{Binding Icon, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </Border>
+                <TextBlock Grid.Row="1" Grid.Column="1"
+                           Text="{Binding Icon}" FontSize="12" Foreground="{StaticResource Text}"
+                           VerticalAlignment="Center" Margin="0,2,8,0" />
+                <Button Grid.Row="1" Grid.Column="2" Content="Pick…" Margin="0,2,4,0"
+                        Click="OnPickIconClick" />
+                <Button Grid.Row="1" Grid.Column="3" Content="Clear" Margin="0,2,0,0"
+                        Click="OnClearIconClick"
+                        IsEnabled="{Binding Icon, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </Grid>
+
+            <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,6,0,0">
+                <StackPanel Grid.Column="0" Spacing="2">
+                    <TextBlock Text="Font size" FontSize="11" Foreground="{StaticResource TextSubtle}" />
+                    <NumericUpDown Value="{Binding FontSize, Mode=TwoWay}"
+                                   Minimum="6" Maximum="48"
+                                   Increment="1" FormatString="0"
+                                   HorizontalAlignment="Left" Width="120" />
+                </StackPanel>
+                <Button Grid.Column="1" Content="Reset" VerticalAlignment="Bottom" Margin="8,0,0,0"
+                        Click="OnResetFontSizeClick" />
+                <CheckBox Grid.Column="2" Content="Bold" Margin="16,0,0,0"
+                          VerticalAlignment="Bottom"
+                          IsChecked="{Binding Bold, Mode=TwoWay}" />
+            </Grid>
+
+        </StackPanel>
+    </DockPanel>
+
+</Window>

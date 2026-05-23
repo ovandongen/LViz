@@ -37,6 +37,17 @@ public record UserSettings
     /// </summary>
     public Dictionary<string, Dictionary<int, string>> LayerColors { get; init; } = new();
 
+    /// <summary>
+    /// Per-key label overrides — three-level dict: profile id → layer index →
+    /// key position index → <see cref="KeyLabelOverride"/>. When an entry
+    /// exists, it replaces the entire rendered text of the key on that layer
+    /// (matching the precedence of <c>decoration.label</c> in
+    /// <c>KeyLabelFormatter.FormatBinding</c>). Missing entries fall through
+    /// to the formatter-computed defaults.
+    /// </summary>
+    public Dictionary<string, Dictionary<int, Dictionary<int, KeyLabelOverride>>>
+        KeyLabelOverrides { get; init; } = new();
+
     /// <summary>Whether the window stays on top of other windows.</summary>
     public bool AlwaysOnTop { get; init; } = true;
 

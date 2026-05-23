@@ -24,6 +24,7 @@
     <None Update="corne.dtsi">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <EmbeddedResource Include="Keymap\Fixtures\*.keymap" />
   </ItemGroup>
 
 </Project>

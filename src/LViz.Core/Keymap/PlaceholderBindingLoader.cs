@@ -3,12 +3,13 @@ using LViz.Core.Models;
 namespace LViz.Core.Keymap;
 
 /// <summary>
-/// Stand-in for the (not-yet-written) ZMK <c>.keymap</c> parser. Produces a
+/// Stand-in for the (no-longer-needed) initial-fork loader. Produces a
 /// single-layer <see cref="KeyboardConfig"/> where every binding is
-/// <c>&amp;kp</c> with a positional placeholder ("idx 0", "idx 1", …). Lets
-/// the app render real board geometry end-to-end before binding data is
-/// available.
+/// <c>&amp;kp</c> with a positional placeholder ("idx 0", "idx 1", …).
+/// Superseded by <see cref="Parser.ZmkKeymapLoader"/>; kept for one release
+/// in case anyone needs to render bare board geometry without a real keymap.
 /// </summary>
+[Obsolete("Use LViz.Core.Keymap.Parser.ZmkKeymapLoader instead.")]
 public static class PlaceholderBindingLoader
 {
     public static KeyboardConfig BuildForProfile(string keyboardId, int keyCount)

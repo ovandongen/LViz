@@ -80,6 +80,14 @@ public static class KeyLabelFormatter
             "&lt"  when b.Params.Count == 2 && int.TryParse(b.Params[0], out _)
                 => (ZmkKeycodeLabel.Display(b.Params[1]), LayerOrIndex(b.Params[0]), "Layer Tap"),
 
+            // &mt is ZMK's built-in mod-tap — first param is a modifier
+            // keycode, second is the tap keycode. Route through the same
+            // modifier-glyph machinery user-defined hold-taps use.
+            "&mt" when b.Params.Count == 2
+                => (ZmkKeycodeLabel.Display(b.Params[1]),
+                    ZmkKeycodeLabel.ModifierSubscript(b.Params[0]) ?? b.Params[0],
+                    "Mod-Tap"),
+
             "&bt"        when b.Params.Count >= 1 => (FormatBtParams(b.Params),        "", "Bluetooth"),
             "&out"       when b.Params.Count >= 1 => (FormatOutParam(b.Params[0]),     "", "Output"),
             "&sys_reset"                          => ("Reset",                         "", "System"),
@@ -123,8 +131,10 @@ public static class KeyLabelFormatter
 
     private static (string Label, string Subscript, string TopLeft) FormatFallback(KeyBinding b) =>
         b.Params.Count == 0
-            ? (b.Behavior.TrimStart('&'), "", "")
-            : (string.Join(' ', b.Params), "", "");
+            // Underscores in behavior names (e.g. &my_macro) get turned into
+            // spaces so long labels can wrap on a key cap.
+            ? (b.Behavior.TrimStart('&').Replace('_', ' '), "", "")
+            : (string.Join(' ', b.Params).Replace('_', ' '), "", "");
 
     /// <summary>
     /// Display-only camelCase/underscore split — used for the subscript so a

@@ -1,0 +1,25 @@
+// Minimal one-layer keymap that exercises every builtin behavior in v1.
+#include <dt-bindings/zmk/keys.h>
+#include <dt-bindings/zmk/bt.h>
+#include <behaviors.dtsi>
+
+#define DEFAULT 0
+
+/ {
+    keymap {
+        compatible = "zmk,keymap";
+
+        default_layer {
+            display-name = "Base";
+            bindings = <
+                &kp A     &kp B     &kp C
+                &trans    &none     &mo 1
+                &to 0     &tog 1    &sl 1
+                &lt 1 SPACE  &mt LSHFT D
+                &bt BT_SEL 0   &bt BT_CLR
+                &out OUT_TOG
+                &sys_reset    &bootloader
+            >;
+        };
+    };
+};

@@ -130,16 +130,25 @@ public static class ZmkKeycodeLabel
     /// </summary>
     private static readonly Dictionary<string, Mod> ModifierKeycodes = new(StringComparer.Ordinal)
     {
+        // ZMK's dt-bindings/zmk/keys.h exposes both short (LSHFT) and
+        // medium (LSHIFT) aliases for every modifier — different keymaps
+        // pick different conventions, so every spelling has to be here.
         ["LSHFT"] = Mod.Shift, ["RSHFT"] = Mod.Shift,
+        ["LSHIFT"] = Mod.Shift, ["RSHIFT"] = Mod.Shift,
         ["LEFT_SHIFT"] = Mod.Shift, ["RIGHT_SHIFT"] = Mod.Shift,
         ["LCTRL"] = Mod.Ctrl, ["RCTRL"] = Mod.Ctrl,
+        ["LCTL"] = Mod.Ctrl, ["RCTL"] = Mod.Ctrl,
         ["LEFT_CONTROL"] = Mod.Ctrl, ["RIGHT_CONTROL"] = Mod.Ctrl,
         ["LALT"] = Mod.Alt, ["RALT"] = Mod.Alt,
         ["LEFT_ALT"] = Mod.Alt, ["RIGHT_ALT"] = Mod.Alt,
         ["LGUI"] = Mod.Gui, ["RGUI"] = Mod.Gui,
         ["LEFT_GUI"] = Mod.Gui, ["RIGHT_GUI"] = Mod.Gui,
+        ["LCMD"] = Mod.Gui, ["RCMD"] = Mod.Gui,
         ["LEFT_COMMAND"] = Mod.Gui, ["RIGHT_COMMAND"] = Mod.Gui,
+        ["LMETA"] = Mod.Gui, ["RMETA"] = Mod.Gui,
+        ["LEFT_META"] = Mod.Gui, ["RIGHT_META"] = Mod.Gui,
         ["LWIN"] = Mod.Gui, ["RWIN"] = Mod.Gui,
+        ["LEFT_WIN"] = Mod.Gui, ["RIGHT_WIN"] = Mod.Gui,
     };
 
     /// <summary>Two-character ZMK modifier-function shorthands (used inside <c>LS(...)</c> wrappers).</summary>
@@ -179,7 +188,9 @@ public static class ZmkKeycodeLabel
 
     /// <summary>
     /// Returns a short display glyph for a ZMK keycode. Falls through to the
-    /// raw input for anything not in the map (e.g. TAB, ESC, F1..F24, letters).
+    /// raw input (with underscores converted to spaces so long labels can
+    /// wrap) for anything not in the map — e.g. TAB, ESC, F1..F24, letters,
+    /// and rarities like <c>PG_UP</c>.
     /// </summary>
     public static string Display(string zmkKeycode)
     {
@@ -202,7 +213,10 @@ public static class ZmkKeycodeLabel
             && zmkKeycode[7] >= '0' && zmkKeycode[7] <= '9')
             return zmkKeycode[7].ToString();
 
-        return zmkKeycode;
+        // Convert underscores so TextBlock.TextWrapping can break on the
+        // resulting spaces. Keycodes worth keeping intact already have an
+        // explicit DisplayMap entry above.
+        return zmkKeycode.Replace('_', ' ');
     }
 
     /// <summary>

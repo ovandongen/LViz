@@ -26,10 +26,17 @@ public class ZmkKeycodeLabelTests
     // Modifier keys as bare keycodes — rendered as icons.
     [InlineData("LCTRL", "⌃")]
     [InlineData("RCTRL", "⌃")]
+    [InlineData("LCTL", "⌃")]
     [InlineData("LSHFT", "⇪")]
+    [InlineData("LSHIFT", "⇪")]
+    [InlineData("RSHIFT", "⇪")]
     [InlineData("LEFT_SHIFT", "⇪")]
     [InlineData("RGUI", "⌘")]
+    [InlineData("LCMD", "⌘")]
+    [InlineData("LMETA", "⌘")]
+    [InlineData("LWIN", "⌘")]
     [InlineData("LALT", "⌥")]
+    [InlineData("RALT", "⌥")]
     // Numpad: KP_ prefix strips and routes through the main map.
     [InlineData("KP_N1", "1")]
     [InlineData("KP_N9", "9")]
@@ -63,13 +70,16 @@ public class ZmkKeycodeLabelTests
     }
 
     [Theory]
-    [InlineData("ESC")]
-    [InlineData("F14")]
-    [InlineData("A")]
-    [InlineData("UNKNOWN_KC")]
-    public void Display_UnknownKeycodesFallThrough(string input)
+    [InlineData("ESC", "ESC")]
+    [InlineData("F14", "F14")]
+    [InlineData("A", "A")]
+    // Underscored fall-through keycodes get spaces so long labels can wrap.
+    [InlineData("UNKNOWN_KC", "UNKNOWN KC")]
+    [InlineData("PG_UP", "PG UP")]
+    [InlineData("PG_DN", "PG DN")]
+    public void Display_UnknownKeycodesFallThroughWithUnderscoresAsSpaces(string input, string expected)
     {
-        Assert.Equal(input, ZmkKeycodeLabel.Display(input));
+        Assert.Equal(expected, ZmkKeycodeLabel.Display(input));
     }
 
     [Fact]

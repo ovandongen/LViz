@@ -1,0 +1,54 @@
+// Keymap exercising layers + combos + macros + a user-defined hold-tap.
+#include <dt-bindings/zmk/keys.h>
+#include <behaviors.dtsi>
+
+#define DEFAULT 0
+#define LOWER 1
+
+/ {
+    behaviors {
+        ht: ht {
+            compatible = "zmk,behavior-hold-tap";
+            #binding-cells = <2>;
+            tapping-term-ms = <200>;
+            bindings = <&mo>, <&kp>;
+        };
+    };
+
+    macros {
+        my_macro: my_macro {
+            compatible = "zmk,behavior-macro";
+            #binding-cells = <0>;
+            bindings = <&macro_tap &kp H &kp I>;
+        };
+    };
+
+    combos {
+        compatible = "zmk,combos";
+        combo_esc {
+            timeout-ms = <50>;
+            key-positions = <10 11>;
+            bindings = <&kp ESC>;
+        };
+    };
+
+    keymap {
+        compatible = "zmk,keymap";
+
+        default_layer {
+            display-name = "Base";
+            bindings = <
+                &kp Q     &kp W     &kp E
+                &ht LSHFT A   &mo LOWER
+            >;
+        };
+
+        lower_layer {
+            display-name = "lower";
+            bindings = <
+                &kp N1    &kp N2    &kp N3
+                &trans    &trans
+            >;
+        };
+    };
+};

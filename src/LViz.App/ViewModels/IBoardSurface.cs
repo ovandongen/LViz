@@ -38,4 +38,12 @@ public interface IBoardSurface
     /// rendering stays read-only; the picker VM provides the handler.
     /// </summary>
     Action<int>? OnKeyTapped { get; }
+
+    /// <summary>
+    /// Optional per-cap right-click handler. Symmetric with
+    /// <see cref="OnKeyTapped"/>: the main VM provides a handler that opens
+    /// the per-key label-override editor; the exit-key picker leaves it
+    /// null so right-clicks in that surface are inert.
+    /// </summary>
+    Action<int>? OnKeyRightTapped { get; }
 }

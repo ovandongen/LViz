@@ -85,6 +85,7 @@ public partial class ExitKeyPickerViewModel : ObservableObject, IBoardSurface
     public string PressHighlightStrokeColor => AppTheme.PickerPressStrokeHex;
 
     public Action<int>? OnKeyTapped => ToggleKey;
+    public Action<int>? OnKeyRightTapped => null;
 
     /// <summary>True when the user has at least one cap selected — drives
     /// the OK button's IsEnabled and the empty-state hint visibility.</summary>

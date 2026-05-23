@@ -10,6 +10,7 @@ using LViz.App.Services.MouseIdle;
 using LViz.Core.Diagnostics;
 using LViz.Core.Input;
 using LViz.Core.Keymap;
+using LViz.Core.Keymap.Parser;
 using LViz.Core.Layout;
 using LViz.Core.Models;
 using LViz.Core.Settings;
@@ -31,6 +32,26 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// handler so taps register selections.
     /// </summary>
     public Action<int>? OnKeyTapped => null;
+
+    /// <summary>
+    /// Right-click on a key opens the per-key label-override editor. Wired
+    /// up so the View can stay binding-only; the actual dialog launch is a
+    /// callback into <c>App.axaml.cs</c> (see <see cref="EditKeyLabelRequested"/>)
+    /// because the View can't construct a window directly without leaking
+    /// Avalonia.Controls into the VM.
+    /// </summary>
+    public Action<int>? OnKeyRightTapped => OnKeyRightTappedInternal;
+
+    private void OnKeyRightTappedInternal(int keyIndex) =>
+        EditKeyLabelRequested?.Invoke(keyIndex, ActiveLayerIndex);
+
+    /// <summary>
+    /// Invoked when the user right-clicks a key. The callback (set by
+    /// <c>App.axaml.cs</c>) owns the modal dialog lifecycle and calls
+    /// <see cref="SetKeyLabelOverride"/> on completion. Parameters:
+    /// (keyIndex, activeLayerIndex).
+    /// </summary>
+    public Action<int, int>? EditKeyLabelRequested { get; set; }
 
     private readonly ISettingsService _settingsService;
 
@@ -230,6 +251,94 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         if (_config is not null)
             ApplyActiveLayer(ActiveLayerIndex);
         OnPropertyChanged(nameof(ActiveLayerTintColor));
+    }
+
+    /// <summary>
+    /// Sets or clears a per-(layer, key) label override for the currently
+    /// active keyboard profile. Persists to
+    /// <see cref="UserSettings.KeyLabelOverrides"/> through the same
+    /// PersistSetting → SettingsService.Save → AtomicFile chain
+    /// <see cref="SetLayerColorOverride"/> uses, then re-applies the active
+    /// layer so the affected key repaints. <c>null</c> or
+    /// <see cref="KeyLabelOverride.IsEmpty"/> removes the entry.
+    /// </summary>
+    public void SetKeyLabelOverride(int layerIndex, int keyIndex, KeyLabelOverride? value)
+    {
+        var profileId = _profile.Id;
+        KeyLabelOverrides.Set(profileId, layerIndex, keyIndex, value);
+
+        PersistSetting(s =>
+        {
+            var clone = CloneKeyLabelOverrides(s.KeyLabelOverrides);
+            if (value is null || value.IsEmpty)
+            {
+                if (clone.TryGetValue(profileId, out var perLayer)
+                    && perLayer.TryGetValue(layerIndex, out var perKey))
+                {
+                    perKey.Remove(keyIndex);
+                    if (perKey.Count == 0) perLayer.Remove(layerIndex);
+                    if (perLayer.Count == 0) clone.Remove(profileId);
+                }
+            }
+            else
+            {
+                if (!clone.TryGetValue(profileId, out var perLayer))
+                    clone[profileId] = perLayer = new Dictionary<int, Dictionary<int, KeyLabelOverride>>();
+                if (!perLayer.TryGetValue(layerIndex, out var perKey))
+                    perLayer[layerIndex] = perKey = new Dictionary<int, KeyLabelOverride>();
+                perKey[keyIndex] = value;
+            }
+            return s with { KeyLabelOverrides = clone };
+        });
+
+        if (_config is not null && layerIndex == ActiveLayerIndex)
+            ApplyActiveLayer(ActiveLayerIndex);
+    }
+
+    private static Dictionary<string, Dictionary<int, Dictionary<int, KeyLabelOverride>>>
+        CloneKeyLabelOverrides(Dictionary<string, Dictionary<int, Dictionary<int, KeyLabelOverride>>> src)
+    {
+        var copy = new Dictionary<string, Dictionary<int, Dictionary<int, KeyLabelOverride>>>();
+        foreach (var (pid, perLayer) in src)
+        {
+            var layerCopy = new Dictionary<int, Dictionary<int, KeyLabelOverride>>();
+            foreach (var (layerIdx, perKey) in perLayer)
+                layerCopy[layerIdx] = new Dictionary<int, KeyLabelOverride>(perKey);
+            copy[pid] = layerCopy;
+        }
+        return copy;
+    }
+
+    /// <summary>
+    /// Snapshot of the formatter-computed default text + the current override
+    /// (if any) for the given (layer, key) slot — used by
+    /// <see cref="Views.EditKeyLabelDialog"/> to seed the editor and show a
+    /// "current default looks like…" hint. Returns null when the slot is out
+    /// of range.
+    /// </summary>
+    public (string DefaultHint, KeyLabelOverride? Existing)? GetKeyLabelEditContext(int layerIndex, int keyIndex)
+    {
+        if (_config is null) return null;
+        if (layerIndex < 0 || layerIndex >= _config.Layers.Count) return null;
+        if (keyIndex < 0 || keyIndex >= Keys.Count) return null;
+
+        var holdTapByName = _config.HoldTaps.ToDictionary(h => h.Name, StringComparer.Ordinal);
+        var binding = _bindingResolver?.ResolveEffectiveBinding(layerIndex, keyIndex) ?? KeyBinding.Transparent;
+        holdTapByName.TryGetValue(binding.Behavior, out var holdTap);
+        var targetLayer = LayerBindingResolver.ResolveTargetLayer(binding, holdTap);
+        var targetLayerName = targetLayer is int tl && tl >= 0 && tl < _config.Layers.Count
+            ? _config.Layers[tl].Name
+            : null;
+
+        var (label, sub, top) = KeyLabelFormatter.FormatBinding(binding, targetLayerName, holdTap);
+        var parts = new List<string>();
+        if (!string.IsNullOrEmpty(top)) parts.Add($"[{top}]");
+        if (!string.IsNullOrEmpty(label)) parts.Add(label);
+        if (!string.IsNullOrEmpty(sub)) parts.Add($"({sub})");
+        var hint = parts.Count > 0 ? string.Join(" ", parts) : binding.Display;
+
+        var existing = KeyLabelOverrides.Get(_profile.Id, layerIndex, keyIndex);
+        return (hint, existing);
     }
 
     public ObservableCollection<KeyViewModel> Keys { get; } = new();
@@ -493,6 +602,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         // Seed the static palette with persisted per-keyboard, per-layer overrides
         // so the very first paint already reflects the user's customization.
         LayerColorPalette.SetOverrides(s.LayerColors);
+        KeyLabelOverrides.SetOverrides(s.KeyLabelOverrides);
 
         // HID stack owns the layer source, command sender, and state tracker.
         // Constructed eagerly so push surfaces are available before Start();
@@ -604,10 +714,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     {
         try
         {
-            // TODO: replace with the real .keymap parser. Until then we
-            // synthesize a placeholder one-layer keymap so the board renders
-            // end-to-end against whatever file the user picked.
-            var config = PlaceholderBindingLoader.BuildForProfile(_profile.Id, _profile.KeyCount);
+            var config = ZmkKeymapLoader.Load(path, _profile.Id);
             var bindingCount = config.LayerCount > 0 ? config.Layers[0].Bindings.Count : 0;
             var keyCountMismatch = config.LayerCount > 0 && bindingCount != _profile.KeyCount;
             IKeyboardProfile? autoSwitchedTo = null;
@@ -969,6 +1076,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                 : null;
             Keys[i].ApplyBinding(
                 binding,
+                activeLayerIndex: layer.Index,
                 targetLayer: targetLayer,
                 targetLayerName: targetLayerName,
                 profileId: _profile.Id,

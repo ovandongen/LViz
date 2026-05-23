@@ -103,7 +103,7 @@
                     <TextBlock Text="{Binding Label}"
                                HorizontalAlignment="Center"
                                FontSize="{Binding LabelFontSize}"
-                               FontWeight="SemiBold"
+                               FontWeight="{Binding IsLabelBold, Converter={x:Static convApp:BoolToFontWeightConverter.Instance}}"
                                TextWrapping="Wrap"
                                TextAlignment="Center"
                                Foreground="{Binding KeyForegroundColor, Converter={x:Static convApp:HexColorToBrushConverter.Instance}}" />

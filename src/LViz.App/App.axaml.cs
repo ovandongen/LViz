@@ -201,8 +201,14 @@ public partial class App : Application
                     [
                         new FilePickerFileType(Loc.Instance["LoadDialog_FileType"])
                         {
-                            Patterns = ["*.json"]
-                        }
+                            // .keymap has no registered UTI on macOS, so a
+                            // bare extension filter greys the file out. Tell
+                            // the OS to treat it as plain text — the file is.
+                            Patterns = ["*.keymap"],
+                            MimeTypes = ["text/plain"],
+                            AppleUniformTypeIdentifiers = ["public.plain-text"],
+                        },
+                        FilePickerFileTypes.All,
                     ],
                 });
                 if (file.Count > 0)
@@ -241,6 +247,21 @@ public partial class App : Application
                     settingsWindow = null;
                 };
                 settingsWindow.Show(mainWindow);
+            };
+
+            viewModel.EditKeyLabelRequested = (keyIndex, layerIndex) =>
+            {
+                var ctx = viewModel.GetKeyLabelEditContext(layerIndex, keyIndex);
+                if (ctx is null) return;
+                var dlgVm = new EditKeyLabelDialogViewModel(
+                    layerIndex, keyIndex, ctx.Value.DefaultHint, ctx.Value.Existing);
+                var dlg = new EditKeyLabelDialog { DataContext = dlgVm };
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    var result = await dlg.ShowDialog<EditKeyLabelDialog.Result>(mainWindow);
+                    if (result.Saved)
+                        viewModel.SetKeyLabelOverride(layerIndex, keyIndex, result.Value);
+                });
             };
 
             viewModel.CopyDiagnosticsRequested = async () =>
