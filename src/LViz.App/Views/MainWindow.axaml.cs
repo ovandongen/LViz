@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.VisualTree;
 using LViz.App.Services;
+using LViz.App.ViewModels;
 using LViz.Core.Diagnostics;
 
 namespace LViz.App.Views;
@@ -111,19 +112,24 @@ public partial class MainWindow : Window
         // Move the whole bars panel to top or bottom of the outer grid
         Grid.SetRow(BarsPanel, shouldBeBottom ? 2 : 0);
 
-        // Swap inner order: status bar always at the outer edge
+        // Swap inner order: status bar always at the outer edge; combo
+        // legend (when visible) always closest to the keyboard.
         if (shouldBeBottom)
         {
-            // Bottom: tabs first (row 0), status bar at very bottom (row 1)
-            Grid.SetRow(LayerTabs, 0);
-            Grid.SetRow(StatusBar, 1);
+            // Bottom edge: combo legend nearest the keyboard (row 0),
+            // tabs middle (row 1), status bar at the outer edge (row 2).
+            Grid.SetRow(ComboLegend, 0);
+            Grid.SetRow(LayerTabs, 1);
+            Grid.SetRow(StatusBar, 2);
             StatusBar.CornerRadius = new CornerRadius(0, 0, 8, 8);
         }
         else
         {
-            // Top: status bar at very top (row 0), tabs below (row 1)
+            // Top edge: status bar at the outer edge (row 0), tabs middle
+            // (row 1), combo legend nearest the keyboard (row 2).
             Grid.SetRow(StatusBar, 0);
             Grid.SetRow(LayerTabs, 1);
+            Grid.SetRow(ComboLegend, 2);
             StatusBar.CornerRadius = new CornerRadius(8, 8, 0, 0);
         }
     }
@@ -183,6 +189,25 @@ public partial class MainWindow : Window
             WindowEdge.SouthEast                         => new Cursor(StandardCursorType.BottomRightCorner),
             _                                            => Cursor.Default,
         };
+    }
+
+    /// <summary>
+    /// Pointer enters a combo legend tile → ask the main VM to highlight
+    /// just that combo's number. Symmetric with the board-side handler in
+    /// <see cref="BoardView"/>.
+    /// </summary>
+    private void OnComboTilePointerEntered(object? sender, PointerEventArgs e)
+    {
+        if (sender is not Control c) return;
+        if (c.DataContext is not ComboViewModel combo) return;
+        if (DataContext is not MainWindowViewModel vm) return;
+        vm.SetHighlightedCombos(new[] { combo.Number });
+    }
+
+    private void OnComboTilePointerExited(object? sender, PointerEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+        vm.SetHighlightedCombos(Array.Empty<int>());
     }
 
     private WindowEdge? GetResizeEdge(Point pos)

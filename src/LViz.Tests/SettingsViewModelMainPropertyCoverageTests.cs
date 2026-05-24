@@ -40,6 +40,7 @@ public class SettingsViewModelMainPropertyCoverageTests
         "HotkeyKey",
         "HotkeyModifiers",
         "IsStackedLayout",
+        "IsComboOverlayVisible",
         "StackedTopHand",
         "IsWindowsModifierStyle",
         "ColorTrayIconByActiveLayer",

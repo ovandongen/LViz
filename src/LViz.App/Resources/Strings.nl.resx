@@ -71,6 +71,8 @@
   <data name="Tooltip_Keyboard"><value>Toetsenbord</value></data>
   <data name="Tooltip_StackedLayout"><value>Gestapelde indeling wisselen</value></data>
   <data name="Tooltip_ModifierStyle"><value>Modifier-symbolen: Mac / Windows</value></data>
+  <data name="Tooltip_ComboOverlay"><value>Combo-overlay tonen</value></data>
+  <data name="ComboLegend_Empty"><value>Geen combo's op deze laag</value></data>
 
   <data name="Status_Ready"><value>Klaar</value></data>
   <data name="Status_NoLayoutLoaded"><value>Geen keymap geladen — klik op het mappictogram om een ZMK .keymap te openen</value></data>

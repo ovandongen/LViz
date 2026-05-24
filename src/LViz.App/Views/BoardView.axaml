@@ -44,7 +44,7 @@
                      pick up the user-chosen highlight color from the
                      MainWindowViewModel that owns this UserControl. -->
                 <Ellipse Classes="pressDot"
-                         Classes.active="{Binding IsPressed}"
+                         Classes.active="{Binding IsAnyHighlight}"
                          Width="10" Height="10"
                          HorizontalAlignment="Right"
                          VerticalAlignment="Top"
@@ -59,17 +59,66 @@
                      baked into the geometry — left edge runs down to
                      (0,8), arcs along the key corner to (6,14), then
                      straight along the bottom to (14,14), then up the
-                     hypotenuse. Static (no animation). The combo's
-                     name, key positions, and resulting binding are
-                     appended to the per-key tooltip. -->
+                     hypotenuse. Static (no animation); shown only when
+                     the combo overlay is OFF. Combos still surface via
+                     the per-key tooltip. -->
                 <Path Data="M 0,0 L 0,8 A 6,6 0 0 0 6,14 L 14,14 Z"
                       HorizontalAlignment="Left"
                       VerticalAlignment="Bottom"
                       IsHitTestVisible="False"
-                      IsVisible="{Binding IsInCombo}"
                       Fill="{StaticResource ComboFill}"
                       Stroke="{StaticResource ComboStroke}"
-                      StrokeThickness="1" />
+                      StrokeThickness="1">
+                    <Path.IsVisible>
+                        <MultiBinding Converter="{x:Static conv:BoolConverters.And}">
+                            <Binding Path="IsInCombo" />
+                            <Binding Path="DataContext.IsComboOverlayVisible"
+                                     ElementName="Board"
+                                     Converter="{x:Static conv:BoolConverters.Not}" />
+                        </MultiBinding>
+                    </Path.IsVisible>
+                </Path>
+
+                <!-- Numbered combo badges: shown when the combo overlay is ON.
+                     One pill per combo this key participates in, anchored at
+                     the bottom-left corner and stacked horizontally to the
+                     right. Capped at 3 in the VM (KeyViewModel.MaxComboBadges) —
+                     a 4th combo number doesn't fit and is dropped from the
+                     strip (still listed in the per-key tooltip). Each pill
+                     drives its own Classes.active so hover lights up just
+                     that combo's legend tile, 1:1. -->
+                <ItemsControl ItemsSource="{Binding ComboBadges}"
+                              HorizontalAlignment="Left"
+                              VerticalAlignment="Bottom"
+                              Margin="2,0,0,2">
+                    <ItemsControl.IsVisible>
+                        <MultiBinding Converter="{x:Static conv:BoolConverters.And}">
+                            <Binding Path="IsInCombo" />
+                            <Binding Path="DataContext.IsComboOverlayVisible" ElementName="Board" />
+                        </MultiBinding>
+                    </ItemsControl.IsVisible>
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="2" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:KeyComboBadgeViewModel">
+                            <Border Classes="comboBadge"
+                                    Classes.active="{Binding IsHighlighted}"
+                                    BorderThickness="1"
+                                    CornerRadius="3"
+                                    Padding="3,0"
+                                    PointerEntered="OnComboBadgePointerEntered"
+                                    PointerExited="OnComboBadgePointerExited">
+                                <TextBlock Text="{Binding Number}"
+                                           FontSize="8"
+                                           FontWeight="Bold"
+                                           IsHitTestVisible="False" />
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
                 <!-- Category hint in the top-left corner (e.g. "To Layer",
                      "Layer Tap") — distinguishes layer-switch keys at a
@@ -164,6 +213,33 @@
                     <Style Selector="Ellipse.pressDot.active">
                         <Setter Property="Opacity" Value="1" />
                     </Style>
+                    <!-- Background / BorderBrush / Foreground live on Style
+                         setters (not on the Border / TextBlock as attributes)
+                         because local attribute values beat Style setters in
+                         Avalonia — so leaving them inline would shadow the
+                         .active swap and break the legend → pill highlight
+                         direction. The pill itself only swaps fill/text on
+                         .active; the loud visual emphasis on the key comes
+                         from the existing press-dot (driven by IsAnyHighlight
+                         on KeyViewModel). -->
+                    <Style Selector="Border.comboBadge">
+                        <Setter Property="Background" Value="{StaticResource ComboFill}" />
+                        <Setter Property="BorderBrush" Value="{StaticResource ComboStroke}" />
+                        <Setter Property="Transitions">
+                            <Transitions>
+                                <BrushTransition Property="Background" Duration="0:0:0.12" />
+                            </Transitions>
+                        </Setter>
+                    </Style>
+                    <Style Selector="Border.comboBadge TextBlock">
+                        <Setter Property="Foreground" Value="{StaticResource BgBase}" />
+                    </Style>
+                    <Style Selector="Border.comboBadge.active">
+                        <Setter Property="Background" Value="{StaticResource ComboStroke}" />
+                    </Style>
+                    <Style Selector="Border.comboBadge.active TextBlock">
+                        <Setter Property="Foreground" Value="{StaticResource Text}" />
+                    </Style>
                 </ItemsControl.Styles>
             </ItemsControl>
 
@@ -194,6 +270,33 @@
                     </Style>
                     <Style Selector="Ellipse.pressDot.active">
                         <Setter Property="Opacity" Value="1" />
+                    </Style>
+                    <!-- Background / BorderBrush / Foreground live on Style
+                         setters (not on the Border / TextBlock as attributes)
+                         because local attribute values beat Style setters in
+                         Avalonia — so leaving them inline would shadow the
+                         .active swap and break the legend → pill highlight
+                         direction. The pill itself only swaps fill/text on
+                         .active; the loud visual emphasis on the key comes
+                         from the existing press-dot (driven by IsAnyHighlight
+                         on KeyViewModel). -->
+                    <Style Selector="Border.comboBadge">
+                        <Setter Property="Background" Value="{StaticResource ComboFill}" />
+                        <Setter Property="BorderBrush" Value="{StaticResource ComboStroke}" />
+                        <Setter Property="Transitions">
+                            <Transitions>
+                                <BrushTransition Property="Background" Duration="0:0:0.12" />
+                            </Transitions>
+                        </Setter>
+                    </Style>
+                    <Style Selector="Border.comboBadge TextBlock">
+                        <Setter Property="Foreground" Value="{StaticResource BgBase}" />
+                    </Style>
+                    <Style Selector="Border.comboBadge.active">
+                        <Setter Property="Background" Value="{StaticResource ComboStroke}" />
+                    </Style>
+                    <Style Selector="Border.comboBadge.active TextBlock">
+                        <Setter Property="Foreground" Value="{StaticResource Text}" />
                     </Style>
                 </ItemsControl.Styles>
             </ItemsControl>

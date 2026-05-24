@@ -458,6 +458,66 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     [RelayCommand]
     private void ToggleStackedLayout() => IsStackedLayout = !IsStackedLayout;
 
+    /// <summary>
+    /// When true, combo keys show numbered indicators (e.g. <c>"1"</c>,
+    /// <c>"1,3"</c>) instead of the static earmark, and the combo legend is
+    /// visible beneath the keyboard. Persisted across launches.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isComboOverlayVisible;
+
+    partial void OnIsComboOverlayVisibleChanged(bool value) =>
+        PersistSetting(s => s with { ComboOverlayVisible = value });
+
+    [RelayCommand]
+    private void ToggleComboOverlay() => IsComboOverlayVisible = !IsComboOverlayVisible;
+
+    /// <summary>
+    /// Every combo declared in the loaded keymap, numbered sequentially
+    /// in source-file order starting at 1. Not layer-scoped — combos
+    /// surface on every layer view so the user can see what chords exist
+    /// even when sitting on a layer where the combo doesn't fire.
+    /// Repopulated by <see cref="ApplyActiveLayer"/> on layout reload.
+    /// </summary>
+    public ObservableCollection<ComboViewModel> Combos { get; } = new();
+
+    /// <summary>
+    /// Sets the currently-highlighted combo numbers. Pass empty to clear.
+    /// Idempotent and cheap to call from PointerEntered / PointerExited.
+    ///
+    /// Drives three pieces of state in lockstep: the legend tile's
+    /// <c>IsHighlighted</c>, each on-key pill's <c>IsHighlighted</c>, and —
+    /// for every participating key (including ones whose pill was capped
+    /// out by <c>MaxComboBadges</c>) — the per-key
+    /// <c>IsComboKeyHighlighted</c> flag that re-uses the existing
+    /// press-dot visual via <c>IsAnyHighlight</c>. That way hovering a
+    /// combo lights the same dot a live HID press would, no extra
+    /// indicator.
+    /// </summary>
+    public void SetHighlightedCombos(IReadOnlyCollection<int> numbers)
+    {
+        numbers ??= Array.Empty<int>();
+        var numberSet = numbers as ISet<int> ?? new HashSet<int>(numbers);
+
+        for (var i = 0; i < Combos.Count; i++)
+            Combos[i].IsHighlighted = numberSet.Contains(Combos[i].Number);
+
+        foreach (var key in Keys)
+        {
+            key.IsComboKeyHighlighted = false;
+            foreach (var badge in key.ComboBadges)
+                badge.IsHighlighted = numberSet.Contains(badge.Number);
+        }
+
+        foreach (var n in numberSet)
+        {
+            if (n < 1 || n > Combos.Count) continue;
+            foreach (var idx in Combos[n - 1].KeyIndices)
+                if (idx >= 0 && idx < Keys.Count)
+                    Keys[idx].IsComboKeyHighlighted = true;
+        }
+    }
+
     /// <summary>All keyboard profiles the user can switch between, for the picker flyout.</summary>
     public IReadOnlyList<IKeyboardProfile> AvailableKeyboards => KeyboardProfileRegistry.All;
 
@@ -593,6 +653,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         if (!string.IsNullOrWhiteSpace(s.HotkeyKey))
             _hotkeyKey = s.HotkeyKey;
         _isStackedLayout = s.StackedLayout;
+        _isComboOverlayVisible = s.ComboOverlayVisible;
         _stackedTopHand = string.IsNullOrWhiteSpace(s.StackedTopHand) ? "Left" : s.StackedTopHand;
         _isWindowsModifierStyle = string.Equals(s.ModifierStyle, "Windows", StringComparison.OrdinalIgnoreCase);
         // Seed the static *before* the first ApplyActiveLayer so initial render
@@ -748,6 +809,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
             RebuildLayers();
             ApplyActiveLayer(0);
+            BuildCombosForConfig();
             HasLayoutLoaded = true;
             _loadedLayoutPath = path;
             _lastLoadError = null;
@@ -1050,18 +1112,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
         var holdTapByName = _config.HoldTaps.ToDictionary(h => h.Name, StringComparer.Ordinal);
 
-        var combosByKey = new Dictionary<int, List<ZmkCombo>>();
-        foreach (var combo in _config.Combos)
-        {
-            if (!combo.AppliesToLayer(layer.Index)) continue;
-            foreach (var keyIdx in combo.KeyPositions)
-            {
-                if (!combosByKey.TryGetValue(keyIdx, out var list))
-                    combosByKey[keyIdx] = list = new List<ZmkCombo>();
-                list.Add(combo);
-            }
-        }
-
         for (int i = 0; i < Keys.Count; i++)
         {
             // Resolve the effective binding by walking the predecessor graph:
@@ -1083,17 +1133,62 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                 holdTap: holdTap);
         }
 
-        // Second pass — every key's label is now settled, so combo participants
-        // can be named by their rendered label (Q + W) in the tooltip.
-        string LabelLookup(int idx) => idx >= 0 && idx < Keys.Count ? Keys[idx].Label : "";
-        for (int i = 0; i < Keys.Count; i++)
-        {
-            if (combosByKey.TryGetValue(i, out var keyCombos))
-                Keys[i].SetCombos(keyCombos, LabelLookup);
-        }
-
         for (int i = 0; i < Layers.Count; i++)
             Layers[i].IsSelected = Layers[i].Index == index;
+    }
+
+    /// <summary>
+    /// Walks <see cref="_config"/>'s combos once and populates the legend
+    /// collection plus each key's <see cref="KeyViewModel.SetCombos"/>.
+    /// Called once per keymap load from <see cref="LoadLayoutFromPath"/>
+    /// after the initial <see cref="ApplyActiveLayer"/> — combos aren't
+    /// layer-scoped, so this work doesn't repeat on layer switch. The
+    /// participating-key labels in the legend's
+    /// <c>ParticipatingKeysText</c> reflect whatever layer was active at
+    /// load time (layer 0 in practice) and stay stable from there.
+    /// </summary>
+    private void BuildCombosForConfig()
+    {
+        SetHighlightedCombos(Array.Empty<int>());
+        Combos.Clear();
+
+        if (_config is null)
+        {
+            for (var i = 0; i < Keys.Count; i++)
+                Keys[i].SetCombos(Array.Empty<ZmkCombo>(), Array.Empty<int>(), _ => "");
+            return;
+        }
+
+        var allCombos = _config.Combos;
+        var combosByKey = new Dictionary<int, List<ZmkCombo>>();
+        var numbersByKey = new Dictionary<int, List<int>>();
+        for (var i = 0; i < allCombos.Count; i++)
+        {
+            var combo = allCombos[i];
+            var number = i + 1;
+            foreach (var keyIdx in combo.KeyPositions)
+            {
+                if (!combosByKey.TryGetValue(keyIdx, out var list))
+                    combosByKey[keyIdx] = list = new List<ZmkCombo>();
+                list.Add(combo);
+                if (!numbersByKey.TryGetValue(keyIdx, out var nums))
+                    numbersByKey[keyIdx] = nums = new List<int>();
+                nums.Add(number);
+            }
+        }
+
+        string LabelLookup(int idx) => idx >= 0 && idx < Keys.Count ? Keys[idx].Label : "";
+
+        for (var i = 0; i < Keys.Count; i++)
+        {
+            if (combosByKey.TryGetValue(i, out var keyCombos))
+                Keys[i].SetCombos(keyCombos, numbersByKey[i], LabelLookup);
+            else
+                Keys[i].SetCombos(Array.Empty<ZmkCombo>(), Array.Empty<int>(), LabelLookup);
+        }
+
+        for (var i = 0; i < allCombos.Count; i++)
+            Combos.Add(new ComboViewModel(i + 1, allCombos[i], LabelLookup));
     }
 
     /// <summary>

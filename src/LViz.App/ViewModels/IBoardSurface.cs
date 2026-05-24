@@ -32,6 +32,14 @@ public interface IBoardSurface
     string PressHighlightStrokeColor { get; }
 
     /// <summary>
+    /// When true, combo keys render a numbered badge instead of the static
+    /// earmark, and the indicator becomes hit-testable so hover handlers
+    /// can drive bidirectional highlight against the legend. Main VM toggles
+    /// this from the toolbar; the picker VM always returns false.
+    /// </summary>
+    bool IsComboOverlayVisible { get; }
+
+    /// <summary>
     /// Optional per-cap click handler. When non-null, <c>BoardView</c>'s
     /// code-behind invokes this with the tapped <see cref="KeyViewModel"/>'s
     /// <c>Position.Index</c>. The main VM leaves it null so the main window's

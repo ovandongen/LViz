@@ -84,6 +84,10 @@ public partial class ExitKeyPickerViewModel : ObservableObject, IBoardSurface
     public string PressHighlightColor => AppTheme.PressHighlightDefaultHex;
     public string PressHighlightStrokeColor => AppTheme.PickerPressStrokeHex;
 
+    // Picker has no combos — overlay always off so the indicator stays
+    // hidden (no combo earmarks here) and pointer events don't bind.
+    public bool IsComboOverlayVisible => false;
+
     public Action<int>? OnKeyTapped => ToggleKey;
     public Action<int>? OnKeyRightTapped => null;
 

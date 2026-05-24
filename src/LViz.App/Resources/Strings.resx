@@ -73,6 +73,8 @@
   <data name="Tooltip_Keyboard"><value>Keyboard</value></data>
   <data name="Tooltip_StackedLayout"><value>Toggle stacked layout</value></data>
   <data name="Tooltip_ModifierStyle"><value>Modifier symbols: Mac / Windows</value></data>
+  <data name="Tooltip_ComboOverlay"><value>Show combo overlay</value></data>
+  <data name="ComboLegend_Empty"><value>No combos on this layer</value></data>
 
   <!-- Status messages -->
   <data name="Status_Ready"><value>Ready</value></data>

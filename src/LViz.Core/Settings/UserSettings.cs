@@ -121,6 +121,14 @@ public record UserSettings
     /// </summary>
     public bool StackedLayout { get; init; } = false;
 
+    /// <summary>
+    /// When true, the combo overlay is active: combo keys show numbered
+    /// indicators (e.g. <c>"1"</c>, <c>"1,3"</c>) instead of the static
+    /// earmark, and a legend listing every combo on the active layer is
+    /// shown beneath the keyboard.
+    /// </summary>
+    public bool ComboOverlayVisible { get; init; } = false;
+
     /// <summary>Which half goes on top in stacked mode. "Left" or "Right".</summary>
     public string StackedTopHand { get; init; } = "Left";
 
