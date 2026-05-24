@@ -101,8 +101,6 @@ public static class ZmkKeymapInterpreter
             Combos: combos);
     }
 
-    // ---- slicer ------------------------------------------------------------
-
     private static IReadOnlyList<KeyBinding> SliceBindings(
         DtProperty? bindingsProp,
         IReadOnlyDictionary<string, int> userArities)
@@ -167,8 +165,6 @@ public static class ZmkKeymapInterpreter
         DtCellRef r => "&" + r.PhandleName,
         _ => "",
     };
-
-    // ---- AST traversal helpers --------------------------------------------
 
     private static IEnumerable<DtNode> FlattenNodes(DtRoot root)
     {

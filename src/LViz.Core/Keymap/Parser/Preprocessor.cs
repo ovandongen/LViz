@@ -31,8 +31,6 @@ public static class Preprocessor
         return SubstituteDefines(withoutConditionals, defines);
     }
 
-    // ---- Stage 1: comment stripping ----------------------------------------
-
     private static string StripComments(string source)
     {
         var sb = new StringBuilder(source.Length);
@@ -92,8 +90,6 @@ public static class Preprocessor
         }
         return sb.ToString();
     }
-
-    // ---- Stage 2: #if/#ifdef/#define directives ----------------------------
 
     private static readonly Regex DirectiveRegex = new(@"^\s*#\s*(\w+)(.*)$", RegexOptions.Compiled);
 
@@ -235,8 +231,6 @@ public static class Preprocessor
         return -1;
     }
 
-    // ---- Stage 3: #define substitution -------------------------------------
-
     // Identifier tokens that may match a #define key. We do a single linear
     // scan over the non-string text so substitutions are word-bounded and
     // don't disturb keycode tokens inside string literals (rare in keymaps
@@ -274,8 +268,6 @@ public static class Preprocessor
                 var word = source[start..i];
                 if (defines.TryGetValue(word, out var replacement))
                 {
-                    // Recursive expansion up to a small fixed depth — guards
-                    // against pathological #define cycles in user input.
                     sb.Append(ExpandRecursively(replacement, defines, depth: 0));
                 }
                 else
@@ -293,7 +285,8 @@ public static class Preprocessor
 
     private static string ExpandRecursively(string value, Dictionary<string, string> defines, int depth)
     {
-        if (depth > 8) return value;
+        if (depth > 8)
+            throw new ZmkKeymapParseException("Recursive #define expansion exceeds 8 levels — likely a cycle.");
         var sb = new StringBuilder(value.Length);
         int i = 0;
         while (i < value.Length)
@@ -319,8 +312,6 @@ public static class Preprocessor
 
     private static bool IsIdentStart(char c) => c == '_' || char.IsLetter(c);
     private static bool IsIdentCont(char c) => c == '_' || char.IsLetterOrDigit(c);
-
-    // ---- Stage 2 helper: expression evaluator for #if / #elif --------------
 
     /// <summary>
     /// Evaluates a preprocessor expression. Supports <c>defined(X)</c>,

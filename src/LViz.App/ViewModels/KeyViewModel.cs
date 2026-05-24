@@ -33,12 +33,18 @@ public partial class KeyViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LabelFontSize))]
+    [NotifyPropertyChangedFor(nameof(IconFontSize))]
     private string _label = "";
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SubscriptFontSize))]
     private string _subscript = "";
     [ObservableProperty] private string _topLeftLabel = "";
     [ObservableProperty] private string _iconName = "";
+
+    // Icon size grows when there's no main label competing for centre space.
+    // TopLeftLabel is corner-positioned and Subscript is small — neither
+    // collides with a centred icon, so only Label gates the size.
+    public double IconFontSize => string.IsNullOrEmpty(Label) ? 32 : 14;
     [ObservableProperty] private string _behavior = "";
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(KeyForegroundColor))]
@@ -52,21 +58,10 @@ public partial class KeyViewModel : ObservableObject
     [ObservableProperty] private bool _isInCombo;
     [ObservableProperty] private string _tooltip = "";
 
-    /// <summary>
-    /// When non-null, replaces the length-based auto-scaled value of
-    /// <see cref="LabelFontSize"/>. Set by an active <see cref="KeyLabelOverride"/>;
-    /// reset to null when no override applies. The setter notifies
-    /// <see cref="LabelFontSize"/> so the rendered TextBlock re-measures.
-    /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LabelFontSize))]
     private double? _labelFontSizeOverride;
 
-    /// <summary>
-    /// True when a <see cref="KeyLabelOverride"/> flips the main label to
-    /// bold. The XAML binds <c>FontWeight</c> through a converter, defaulting
-    /// to <c>SemiBold</c> when this is false to match the original literal.
-    /// </summary>
     [ObservableProperty] private bool _isLabelBold;
 
     /// <summary>
@@ -165,12 +160,6 @@ public partial class KeyViewModel : ObservableObject
     // by appending combo info without re-running the per-key binding logic.
     private string _baseTooltip = "";
 
-    /// <summary>
-    /// Pushes a new binding from the active layer into this view model.
-    /// Driven by <see cref="MainWindowViewModel"/> on layer change. Combo info
-    /// is layered on afterwards via <see cref="SetCombos"/>, once every key's
-    /// label is settled (so the combo tooltip can name participants by label).
-    /// </summary>
     public void ApplyBinding(KeyBinding binding, int activeLayerIndex, int? targetLayer, string? targetLayerName, string profileId, HoldTap? holdTap = null)
     {
         Behavior = binding.Behavior;
@@ -186,9 +175,7 @@ public partial class KeyViewModel : ObservableObject
         TopLeftLabel = topLeft;
 
         // User-authored override wins over the formatter — same precedence as
-        // decoration.label in KeyLabelFormatter.FormatBinding, applied here so
-        // it composes on top of the icon/fill colour decisions above (which
-        // come from the binding's own decoration, not the user override).
+        // decoration.label in KeyLabelFormatter.FormatBinding.
         var ov = KeyLabelOverrides.Get(profileId, activeLayerIndex, Position.Index);
         if (ov is not null)
         {
@@ -207,12 +194,10 @@ public partial class KeyViewModel : ObservableObject
         }
     }
 
-    /// <summary>
-    /// decoration.icon acts as flair above the label — if a decoration.label
-    /// is also set, it still drives the main label, but the derived
-    /// label/subscript/badge logic is skipped so the user-authored pairing
-    /// wins cleanly. Otherwise delegates to <see cref="KeyLabelFormatter.FormatBinding"/>.
-    /// </summary>
+    // decoration.icon acts as flair above the label — if a decoration.label
+    // is also set, it still drives the main label, but the derived
+    // label/subscript/badge logic is skipped so the user-authored pairing
+    // wins cleanly.
     private (string Label, string Subscript, string TopLeft) ComputeLabels(
         KeyBinding binding, string? targetLayerName, HoldTap? holdTap)
     {
@@ -244,13 +229,6 @@ public partial class KeyViewModel : ObservableObject
         return string.Join("\n\n", sections);
     }
 
-    /// <summary>
-    /// Discoverability hint appended to every per-key tooltip on surfaces that
-    /// flow bindings through <see cref="ApplyBinding"/> — the main board.
-    /// The exit-key picker writes <see cref="Tooltip"/> directly, so it never
-    /// sees this line. Kept as the final section so combo info (added later
-    /// by <see cref="SetCombos"/>) is sandwiched above the hint, not below.
-    /// </summary>
     private const string EditHintSection = "Right-click to edit label";
 
     private static string AppendEditHint(string body) =>
@@ -264,12 +242,6 @@ public partial class KeyViewModel : ObservableObject
         return $"{posLine}\n\n{b.Display}";
     }
 
-    /// <summary>
-    /// Appends combo information to the tooltip and flips <see cref="IsInCombo"/>.
-    /// Called by <see cref="MainWindowViewModel"/> in a second pass after every
-    /// key has its label settled, so participating keys can be named by their
-    /// rendered label (Q, W) rather than raw row/col coords.
-    /// </summary>
     public void SetCombos(IReadOnlyList<ZmkCombo> combos, Func<int, string> labelLookup)
     {
         if (combos is null || combos.Count == 0)

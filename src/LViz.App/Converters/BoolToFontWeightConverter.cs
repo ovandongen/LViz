@@ -4,13 +4,6 @@ using Avalonia.Media;
 
 namespace LViz.App.Converters;
 
-/// <summary>
-/// Maps a bool to an Avalonia <see cref="FontWeight"/>: <c>true</c> →
-/// <see cref="FontWeight.Bold"/>, <c>false</c> → <see cref="FontWeight.SemiBold"/>.
-/// The false case matches the original literal <c>FontWeight="SemiBold"</c> on
-/// the key-label TextBlock in <c>BoardView.axaml</c>, so keys without a
-/// user-authored bold flag render identically to before.
-/// </summary>
 public class BoolToFontWeightConverter : IValueConverter
 {
     public static readonly BoolToFontWeightConverter Instance = new();

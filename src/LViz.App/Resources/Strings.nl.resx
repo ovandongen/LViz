@@ -158,4 +158,26 @@
   <data name="Settings_UpToDate"><value>Je gebruikt de nieuwste versie.</value></data>
   <data name="Settings_UpdateAvailable"><value>Update beschikbaar: {0} — klik om te downloaden.</value></data>
   <data name="Settings_UpdateCheckFailed"><value>Kon niet controleren op updates.</value></data>
+  <data name="EditKey_Title"><value>Toetslabel bewerken</value></data>
+  <data name="EditKey_LayerKeyFormat"><value>Laag {0}  ·  Toets {1}</value></data>
+  <data name="EditKey_DefaultFormat"><value>Standaard: {0}</value></data>
+  <data name="EditKey_ClearOverride"><value>Override wissen</value></data>
+  <data name="EditKey_Cancel"><value>Annuleren</value></data>
+  <data name="EditKey_Save"><value>Opslaan</value></data>
+  <data name="EditKey_MainLabel"><value>Hoofdlabel</value></data>
+  <data name="EditKey_Subscript"><value>Subscript</value></data>
+  <data name="EditKey_TopLeftBadge"><value>Badge linksboven</value></data>
+  <data name="EditKey_Icon"><value>Icoon</value></data>
+  <data name="EditKey_Pick"><value>Kies…</value></data>
+  <data name="EditKey_Clear"><value>Wissen</value></data>
+  <data name="EditKey_FontSize"><value>Lettergrootte</value></data>
+  <data name="EditKey_Reset"><value>Standaard</value></data>
+  <data name="EditKey_Bold"><value>Vet</value></data>
+  <data name="IconPicker_Title"><value>Kies een icoon</value></data>
+  <data name="IconPicker_SearchWatermark"><value>Iconen zoeken…</value></data>
+  <data name="IconPicker_CountFormat"><value>{0} van {1} iconen</value></data>
+  <data name="IconPicker_SelectedFormat"><value>Geselecteerd: {0}</value></data>
+  <data name="IconPicker_None"><value>(geen)</value></data>
+  <data name="IconPicker_ClearIcon"><value>Icoon wissen</value></data>
+  <data name="IconPicker_Cancel"><value>Annuleren</value></data>
 </root>

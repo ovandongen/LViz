@@ -95,7 +95,7 @@
                             Margin="0,8,0,0"
                             Spacing="2">
                     <i:Icon Value="{Binding IconName}"
-                            FontSize="14"
+                            FontSize="{Binding IconFontSize}"
                             Opacity="0.8"
                             HorizontalAlignment="Center"
                             Foreground="{Binding KeyForegroundColor, Converter={x:Static convApp:HexColorToBrushConverter.Instance}}"
@@ -106,7 +106,8 @@
                                FontWeight="{Binding IsLabelBold, Converter={x:Static convApp:BoolToFontWeightConverter.Instance}}"
                                TextWrapping="Wrap"
                                TextAlignment="Center"
-                               Foreground="{Binding KeyForegroundColor, Converter={x:Static convApp:HexColorToBrushConverter.Instance}}" />
+                               Foreground="{Binding KeyForegroundColor, Converter={x:Static convApp:HexColorToBrushConverter.Instance}}"
+                               IsVisible="{Binding Label, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
                     <TextBlock Text="{Binding Subscript}"
                                HorizontalAlignment="Center"
                                FontSize="{Binding SubscriptFontSize}"

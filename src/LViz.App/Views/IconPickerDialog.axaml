@@ -5,7 +5,7 @@
         xmlns:i="https://github.com/projektanker/icons.avalonia"
         x:Class="LViz.App.Views.IconPickerDialog"
         x:DataType="vm:IconPickerViewModel"
-        Title="Pick an icon"
+        Title="{Binding [IconPicker_Title], Source={StaticResource Loc}}"
         Width="640" Height="560"
         CanResize="False"
         ShowInTaskbar="False"
@@ -16,62 +16,86 @@
     <DockPanel Margin="16">
 
         <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,8">
-            <TextBox Watermark="Search icons…"
+            <TextBox Watermark="{Binding [IconPicker_SearchWatermark], Source={StaticResource Loc}}"
                      Text="{Binding Query, Mode=TwoWay}"
                      x:Name="SearchBox" />
             <TextBlock Foreground="{StaticResource TextSubtle}" FontSize="11"
-                       IsVisible="{Binding LoadError, Converter={x:Static StringConverters.IsNullOrEmpty}}">
-                <Run Text="{Binding Entries.Count}" /><Run Text=" of " /><Run Text="{Binding TotalCount}" /><Run Text=" icons" />
-            </TextBlock>
-            <TextBlock Foreground="{StaticResource AccentRed}" FontSize="11"
-                       Text="{Binding LoadError}"
-                       IsVisible="{Binding LoadError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                       TextWrapping="Wrap" />
+                       Text="{Binding CountText}" />
         </StackPanel>
 
         <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto,Auto" Margin="0,8,0,0">
-            <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource TextSubtle}" FontSize="11">
-                <Run Text="Selected: " /><Run Text="{Binding Selected.Name, FallbackValue='(none)'}" />
-            </TextBlock>
-            <Button Grid.Column="1" Content="Clear icon" Margin="0,0,8,0"
+            <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                       Foreground="{StaticResource TextSubtle}" FontSize="11"
+                       Text="{Binding SelectedText}" />
+            <Button Grid.Column="1"
+                    Content="{Binding [IconPicker_ClearIcon], Source={StaticResource Loc}}"
+                    Margin="0,0,8,0"
                     Click="OnClearClick" />
-            <Button Grid.Column="2" Content="Cancel" Click="OnCancelClick" />
+            <Button Grid.Column="2"
+                    Content="{Binding [IconPicker_Cancel], Source={StaticResource Loc}}"
+                    Click="OnCancelClick" />
         </Grid>
 
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding Entries}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="svc:FontAwesomeCatalog+Entry">
-                        <Button Width="72" Height="72" Margin="2"
-                                Background="{StaticResource BgSurface0}"
-                                BorderBrush="{StaticResource BgSurface1}"
-                                BorderThickness="1"
-                                Padding="4"
-                                ToolTip.Tip="{Binding Name}"
-                                Click="OnIconButtonClick"
-                                Tag="{Binding Name}">
-                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="2">
-                                <i:Icon Value="{Binding Name}"
-                                        FontSize="24"
-                                        Foreground="{StaticResource Text}"
-                                        HorizontalAlignment="Center" />
-                                <TextBlock Text="{Binding Name}"
-                                           FontSize="8"
-                                           Foreground="{StaticResource TextSubtle}"
-                                           HorizontalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis"
-                                           MaxWidth="64" />
-                            </StackPanel>
-                        </Button>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+        <ListBox ItemsSource="{Binding Rows}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Padding="0"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <VirtualizingStackPanel />
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.Styles>
+                <Style Selector="ListBoxItem">
+                    <Setter Property="Padding" Value="0" />
+                    <Setter Property="Background" Value="Transparent" />
+                </Style>
+                <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+                    <Setter Property="Background" Value="Transparent" />
+                </Style>
+                <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                    <Setter Property="Background" Value="Transparent" />
+                </Style>
+            </ListBox.Styles>
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <ItemsControl ItemsSource="{Binding}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="svc:FontAwesomeCatalog+Entry">
+                                <Button Width="72" Height="72" Margin="2"
+                                        Background="{StaticResource BgSurface0}"
+                                        BorderBrush="{StaticResource BgSurface1}"
+                                        BorderThickness="1"
+                                        Padding="4"
+                                        ToolTip.Tip="{Binding Name}"
+                                        Click="OnIconButtonClick"
+                                        Tag="{Binding Name}">
+                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="2">
+                                        <i:Icon Value="{Binding Name}"
+                                                FontSize="24"
+                                                Foreground="{StaticResource Text}"
+                                                HorizontalAlignment="Center" />
+                                        <TextBlock Text="{Binding Name}"
+                                                   FontSize="8"
+                                                   Foreground="{StaticResource TextSubtle}"
+                                                   HorizontalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   MaxWidth="64" />
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
 
     </DockPanel>
 
