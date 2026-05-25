@@ -6,9 +6,18 @@ namespace LViz.Core.Layout;
 /// </summary>
 public static class KeyboardProfileRegistry
 {
+    // Order matters: AutoSwitchEngine's key-count fallback accepts the first
+    // profile whose key count matches the loaded keymap. Corne stays first
+    // so the as-shipped default resolves without scanning.
     private static readonly IKeyboardProfile[] Profiles =
     [
         new CorneProfile(),
+        new ADuxProfile(),
+        new KyriaProfile(),
+        new Lily58Profile(),
+        new SofleProfile(),
+        new Go60Profile(),
+        new Glove80Profile(),
     ];
 
     public static IReadOnlyList<IKeyboardProfile> All => Profiles;

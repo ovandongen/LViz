@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using LViz.Core.Keymap;
 using LViz.Core.Models;
+using LViz.Core.Settings;
 
 namespace LViz.App.ViewModels;
 
@@ -19,18 +20,36 @@ public partial class ComboViewModel : ObservableObject
     public string ParticipatingKeysText { get; }
     public IReadOnlyList<int> KeyIndices { get; }
 
+    /// <summary>
+    /// Sorted, comma-joined key-positions string — the stable combo identity
+    /// used for <see cref="LViz.Core.Settings.ComboLabelOverride"/> lookup.
+    /// e.g. <c>"12,13"</c> for a two-key combo on positions 12 and 13.
+    /// </summary>
+    public string KeyPositionsKey { get; }
+
+    /// <summary>
+    /// Computed default label (what the formatter would produce from the
+    /// binding alone, ignoring user overrides). Surfaced to the edit dialog
+    /// as the "default" hint so the user can see what they're overriding.
+    /// </summary>
+    public string DefaultLabel { get; }
+
     [ObservableProperty] private bool _isHighlighted;
 
     public ComboViewModel(
         int number,
         ZmkCombo combo,
-        Func<int, string> labelLookup)
+        Func<int, string> labelLookup,
+        IReadOnlyDictionary<string, ZmkMacro>? macros = null,
+        ComboLabelOverride? overrideEntry = null)
     {
         Number = number;
         KeyIndices = combo.KeyPositions;
+        KeyPositionsKey = ComboLabelOverrides.KeyPositionsToKey(combo.KeyPositions);
 
-        var (label, subscript, _) = KeyLabelFormatter.FormatBinding(combo.Binding, null);
-        Label = !string.IsNullOrEmpty(label) ? label : combo.Binding.Display;
+        var (computedLabel, subscript, _) = KeyLabelFormatter.FormatBinding(combo.Binding, null, holdTap: null, macros: macros);
+        DefaultLabel = !string.IsNullOrEmpty(computedLabel) ? computedLabel : combo.Binding.Display;
+        Label = !string.IsNullOrEmpty(overrideEntry?.MainLabel) ? overrideEntry!.MainLabel : DefaultLabel;
         Subscript = subscript;
 
         ParticipatingKeysText = string.Join(" + ", combo.KeyPositions.Select(idx =>

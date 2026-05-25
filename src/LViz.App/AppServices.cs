@@ -66,6 +66,7 @@ internal static class AppServices
         services.AddSingleton<ILocalization>(Loc.Instance);
         services.AddSingleton<ILayerColorService>(LayerColorPalette.Service);
         services.AddSingleton<IKeyLabelOverrideService>(KeyLabelOverrides.Service);
+        services.AddSingleton<IComboLabelOverrideService>(ComboLabelOverrides.Service);
 
         services.AddSingleton<MainWindowViewModel>(sp =>
             new MainWindowViewModel(

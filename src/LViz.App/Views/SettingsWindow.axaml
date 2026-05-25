@@ -50,6 +50,25 @@
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="20" Spacing="16">
 
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding [Settings_KeyboardProfile], Source={StaticResource Loc}}"
+                                   FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                        <TextBlock Text="{Binding [Settings_KeyboardProfileHint], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                        <ComboBox MinWidth="200" Margin="0,4,0,0"
+                                  HorizontalAlignment="Left"
+                                  ItemsSource="{Binding KeyboardChoices}"
+                                  SelectedItem="{Binding SelectedKeyboardProfile, Mode=TwoWay}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding DisplayName}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <Border Height="1" Background="{StaticResource BgSurface0}" />
+
                     <!-- Background opacity -->
                     <StackPanel Spacing="6">
                         <TextBlock Text="{Binding [Settings_BackgroundOpacity], Source={StaticResource Loc}}"

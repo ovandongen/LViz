@@ -17,17 +17,19 @@ public record UserSettings
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
 
     /// <summary>
-    /// Which Moergo keyboard profile to use. "GO60" or "Glove80". Chosen once by the user
-    /// at first launch (or via settings) — remembered across sessions.
+    /// Which keyboard profile to render. Matches an
+    /// <see cref="Layout.IKeyboardProfile.Id"/> in
+    /// <see cref="Layout.KeyboardProfileRegistry.All"/>. Unresolved ids fall
+    /// back to Corne so a stale id from a removed board doesn't brick startup.
     /// </summary>
-    public string Keyboard { get; init; } = "GO60";
+    public string Keyboard { get; init; } = "Corne";
 
     /// <summary>
-    /// Last-used Moergo layout-editor JSON path per keyboard profile.
-    /// Key = profile id ("GO60", "Glove80"), Value = absolute path. Empty until
-    /// the user has picked a file — switching keyboards reloads whichever JSON
-    /// was last associated with the new profile (or leaves the board blank if
-    /// none yet).
+    /// Last-used keymap path per keyboard profile. Key = profile id
+    /// (e.g. "Corne", "GO60", "Glove80"), Value = absolute path. Empty until
+    /// the user has picked a file — switching keyboards reloads whichever
+    /// path was last associated with the new profile (or leaves the board
+    /// blank if none yet).
     /// </summary>
     public Dictionary<string, string> LayoutJsonPaths { get; init; } = new();
 
@@ -47,6 +49,17 @@ public record UserSettings
     /// </summary>
     public Dictionary<string, Dictionary<int, Dictionary<int, KeyLabelOverride>>>
         KeyLabelOverrides { get; init; } = new();
+
+    /// <summary>
+    /// Per-combo label overrides — two-level dict: profile id → key-positions
+    /// string → <see cref="ComboLabelOverride"/>. The key-positions string is
+    /// the sorted, comma-joined list of physical key indices the combo fires
+    /// from (e.g. <c>"12,13"</c>) — stable across keymap re-exports as long as
+    /// the user keeps the combo on the same physical keys. Combos are global,
+    /// not layer-scoped, so there's no layer dimension.
+    /// </summary>
+    public Dictionary<string, Dictionary<string, ComboLabelOverride>>
+        ComboLabelOverrides { get; init; } = new();
 
     /// <summary>Whether the window stays on top of other windows.</summary>
     public bool AlwaysOnTop { get; init; } = true;

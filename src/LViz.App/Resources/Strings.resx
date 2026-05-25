@@ -97,6 +97,8 @@
   <data name="LoadDialog_FileType"><value>ZMK keymap</value></data>
 
   <!-- Settings window -->
+  <data name="Settings_KeyboardProfile"><value>Keyboard profile</value></data>
+  <data name="Settings_KeyboardProfileHint"><value>Which board's physical layout to render. Auto-switches on load if the keymap's key count matches a different profile.</value></data>
   <data name="Settings_BackgroundOpacity"><value>Background opacity</value></data>
   <data name="Settings_BackgroundOpacityHint"><value>How solid the dark fill behind the keyboard is — drop to 0 for a fully transparent overlay.</value></data>
   <data name="Settings_PressHighlight"><value>Press highlight color</value></data>
@@ -166,6 +168,10 @@
   <data name="Settings_UpToDate"><value>You're on the latest version.</value></data>
   <data name="Settings_UpdateAvailable"><value>Update available: {0} — click to download.</value></data>
   <data name="Settings_UpdateCheckFailed"><value>Could not check for updates.</value></data>
+  <data name="EditCombo_Title"><value>Edit combo label</value></data>
+  <data name="EditCombo_HeaderFormat"><value>Combo #{0}</value></data>
+  <data name="EditCombo_KeysFormat"><value>Keys: {0}</value></data>
+  <data name="EditCombo_DefaultFormat"><value>Default: {0}</value></data>
   <data name="EditKey_Title"><value>Edit key label</value></data>
   <data name="EditKey_LayerKeyFormat"><value>Layer {0}  ·  Key {1}</value></data>
   <data name="EditKey_DefaultFormat"><value>Default: {0}</value></data>

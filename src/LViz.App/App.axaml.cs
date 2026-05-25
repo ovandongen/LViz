@@ -264,6 +264,23 @@ public partial class App : Application
                 });
             };
 
+            viewModel.EditComboLabelRequested = (keyPositionsKey) =>
+            {
+                var ctx = viewModel.GetComboLabelEditContext(keyPositionsKey);
+                if (ctx is null) return;
+                var dlgVm = new EditComboLabelDialogViewModel(
+                    ctx.Value.Number, keyPositionsKey,
+                    ctx.Value.DefaultLabel, ctx.Value.ParticipatingKeys,
+                    ctx.Value.Existing);
+                var dlg = new EditComboLabelDialog { DataContext = dlgVm };
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    var result = await dlg.ShowDialog<EditComboLabelDialog.Result>(mainWindow);
+                    if (result.Saved)
+                        viewModel.SetComboLabelOverride(keyPositionsKey, result.Value);
+                });
+            };
+
             viewModel.CopyDiagnosticsRequested = async () =>
             {
                 try

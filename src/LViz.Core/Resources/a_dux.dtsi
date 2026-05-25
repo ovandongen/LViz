@@ -1,0 +1,49 @@
+// a_dux (tomsxor / The_Royal). 34-key minimal split: 3 rows × 5 cols per
+// hand + 2 thumbs per hand. No rotated keys.
+// Adapted from upstream ZMK firmware:
+//   app/boards/shields/a_dux/a_dux-layouts.dtsi
+// Stripped of #includes and SPDX header.
+
+/ {
+    a_dux_layout: a_dux_layout {
+        compatible = "zmk,physical-layout";
+        display-name = "Default";
+
+        keys  //                     w   h    x    y     rot    rx    ry
+            = <&key_physical_attrs 100 100    0  133       0     0     0>
+            , <&key_physical_attrs 100 100  100   31       0     0     0>
+            , <&key_physical_attrs 100 100  200    0       0     0     0>
+            , <&key_physical_attrs 100 100  300   28       0     0     0>
+            , <&key_physical_attrs 100 100  400   42       0     0     0>
+            , <&key_physical_attrs 100 100  800   42       0     0     0>
+            , <&key_physical_attrs 100 100  900   28       0     0     0>
+            , <&key_physical_attrs 100 100 1000    0       0     0     0>
+            , <&key_physical_attrs 100 100 1100   31       0     0     0>
+            , <&key_physical_attrs 100 100 1200  133       0     0     0>
+            , <&key_physical_attrs 100 100    0  233       0     0     0>
+            , <&key_physical_attrs 100 100  100  131       0     0     0>
+            , <&key_physical_attrs 100 100  200  100       0     0     0>
+            , <&key_physical_attrs 100 100  300  128       0     0     0>
+            , <&key_physical_attrs 100 100  400  142       0     0     0>
+            , <&key_physical_attrs 100 100  800  142       0     0     0>
+            , <&key_physical_attrs 100 100  900  128       0     0     0>
+            , <&key_physical_attrs 100 100 1000  100       0     0     0>
+            , <&key_physical_attrs 100 100 1100  131       0     0     0>
+            , <&key_physical_attrs 100 100 1200  233       0     0     0>
+            , <&key_physical_attrs 100 100    0  333       0     0     0>
+            , <&key_physical_attrs 100 100  100  231       0     0     0>
+            , <&key_physical_attrs 100 100  200  200       0     0     0>
+            , <&key_physical_attrs 100 100  300  228       0     0     0>
+            , <&key_physical_attrs 100 100  400  242       0     0     0>
+            , <&key_physical_attrs 100 100  800  242       0     0     0>
+            , <&key_physical_attrs 100 100  900  228       0     0     0>
+            , <&key_physical_attrs 100 100 1000  200       0     0     0>
+            , <&key_physical_attrs 100 100 1100  231       0     0     0>
+            , <&key_physical_attrs 100 100 1200  333       0     0     0>
+            , <&key_physical_attrs 100 100  400  375       0     0     0>
+            , <&key_physical_attrs 100 100  500  400       0     0     0>
+            , <&key_physical_attrs 100 100  700  400       0     0     0>
+            , <&key_physical_attrs 100 100  800  375       0     0     0>
+            ;
+    };
+};

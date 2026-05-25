@@ -191,7 +191,7 @@ public partial class KeyViewModel : ObservableObject
     private string _baseTooltip = "";
     private string _comboTooltipSections = "";
 
-    public void ApplyBinding(KeyBinding binding, int activeLayerIndex, int? targetLayer, string? targetLayerName, string profileId, HoldTap? holdTap = null)
+    public void ApplyBinding(KeyBinding binding, int activeLayerIndex, int? targetLayer, string? targetLayerName, string profileId, HoldTap? holdTap = null, IReadOnlyDictionary<string, ZmkMacro>? macros = null)
     {
         Behavior = binding.Behavior;
         KeyFillColor = ResolveFillColor(binding, targetLayer, profileId);
@@ -199,7 +199,7 @@ public partial class KeyViewModel : ObservableObject
         _baseTooltip = BuildTooltip(binding, targetLayerName, holdTap);
         Tooltip = AppendEditHint(ComposeTooltip());
 
-        var (label, sub, topLeft) = ComputeLabels(binding, targetLayerName, holdTap);
+        var (label, sub, topLeft) = ComputeLabels(binding, targetLayerName, holdTap, macros);
         Label = label;
         Subscript = sub;
         TopLeftLabel = topLeft;
@@ -229,11 +229,12 @@ public partial class KeyViewModel : ObservableObject
     // label/subscript/badge logic is skipped so the user-authored pairing
     // wins cleanly.
     private (string Label, string Subscript, string TopLeft) ComputeLabels(
-        KeyBinding binding, string? targetLayerName, HoldTap? holdTap)
+        KeyBinding binding, string? targetLayerName, HoldTap? holdTap,
+        IReadOnlyDictionary<string, ZmkMacro>? macros)
     {
         if (!string.IsNullOrEmpty(IconName))
             return (binding.DecorationLabel ?? "", "", "");
-        return KeyLabelFormatter.FormatBinding(binding, targetLayerName, holdTap);
+        return KeyLabelFormatter.FormatBinding(binding, targetLayerName, holdTap, macros);
     }
 
     /// <summary>

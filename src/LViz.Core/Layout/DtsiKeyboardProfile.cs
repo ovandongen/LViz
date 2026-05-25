@@ -97,6 +97,13 @@ public class DtsiKeyboardProfile : IKeyboardProfile
         var col = hand == Hand.Left
             ? entry.X / 100 + 1
             : (_rightmostMatrixXCentiU - entry.X) / 100 + 1;
-        return $"Row {row}, {(hand == Hand.Left ? "L" : "R")} col {col} ({FingerByCol[col - 1]})";
+        // Inner positions on row 4 of Sofle/Lily58 (the encoder slots in
+        // upstream ZMK matrices) sit beyond the 6-column matrix and have no
+        // finger mapping. Fall back to a generic label instead of indexing
+        // past FingerByCol.
+        var finger = col >= 1 && col <= FingerByCol.Length
+            ? $" ({FingerByCol[col - 1]})"
+            : " (inner)";
+        return $"Row {row}, {(hand == Hand.Left ? "L" : "R")} col {col}{finger}";
     }
 }

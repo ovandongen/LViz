@@ -196,6 +196,28 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     /// picker renders the keyboard the user is configuring.</summary>
     public Core.Layout.IKeyboardProfile ActiveKeyboardProfile => _mainViewModel.SelectedKeyboard;
 
+    /// <summary>All registered keyboard profiles, surfaced for the Settings
+    /// dropdown. Order matches <see cref="Core.Layout.KeyboardProfileRegistry.All"/>.</summary>
+    public IReadOnlyList<Core.Layout.IKeyboardProfile> KeyboardChoices =>
+        Core.Layout.KeyboardProfileRegistry.All;
+
+    /// <summary>TwoWay-bound profile selector. Routes user picks through
+    /// <see cref="MainWindowViewModel.SelectKeyboardCommand"/> so the full
+    /// switch path (rebuild keys, re-scope HID, drop incompatible layout,
+    /// persist) runs — direct property assignment would skip all of that.
+    /// The setter ignores no-op selections and null (combo-box clear).</summary>
+    public Core.Layout.IKeyboardProfile SelectedKeyboardProfile
+    {
+        get => _mainViewModel.SelectedKeyboard;
+        set
+        {
+            if (value is null) return;
+            if (string.Equals(value.Id, _mainViewModel.SelectedKeyboard?.Id, StringComparison.OrdinalIgnoreCase))
+                return;
+            _mainViewModel.SelectKeyboardCommand.Execute(value);
+        }
+    }
+
 
     /// <summary>
     /// In-progress edit buffer for app→layer rules. All add/remove/move
@@ -489,6 +511,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         {
             s.RebuildLayerEntries();
             s.OnPropertyChanged(nameof(ActiveKeyboardProfile));
+            s.OnPropertyChanged(nameof(SelectedKeyboardProfile));
             s.OnPropertyChanged(nameof(ExitTapKey));
             s.OnPropertyChanged(nameof(ExitTapSummary));
             s.OnPropertyChanged(nameof(HasExitTap));

@@ -1,0 +1,52 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LViz.App.ViewModels"
+        x:Class="LViz.App.Views.EditComboLabelDialog"
+        x:DataType="vm:EditComboLabelDialogViewModel"
+        Title="{Binding [EditCombo_Title], Source={StaticResource Loc}}"
+        Width="380" Height="220"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BgBase}">
+
+    <DockPanel Margin="16">
+
+        <StackPanel DockPanel.Dock="Top" Spacing="2" Margin="0,0,0,12">
+            <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}"
+                       Text="{Binding HeaderText}" />
+            <TextBlock FontSize="11" FontStyle="Italic" Foreground="{StaticResource TextSubtle}"
+                       TextWrapping="Wrap"
+                       Text="{Binding ParticipatingHintLine}" />
+            <TextBlock FontSize="11" FontStyle="Italic" Foreground="{StaticResource TextSubtle}"
+                       TextWrapping="Wrap"
+                       Text="{Binding DefaultHintLine}" />
+        </StackPanel>
+
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,12,0,0">
+            <Button Grid.Column="0"
+                    Content="{Binding [EditKey_ClearOverride], Source={StaticResource Loc}}"
+                    IsEnabled="{Binding HasExistingOverride}"
+                    Click="OnClearOverrideClick" />
+            <Button Grid.Column="2"
+                    Content="{Binding [EditKey_Cancel], Source={StaticResource Loc}}"
+                    Margin="8,0,0,0"
+                    Click="OnCancelClick" />
+            <Button Grid.Column="3"
+                    Content="{Binding [EditKey_Save], Source={StaticResource Loc}}"
+                    Margin="8,0,0,0"
+                    Classes="accent"
+                    IsDefault="True"
+                    Click="OnSaveClick" />
+        </Grid>
+
+        <StackPanel Spacing="2">
+            <TextBlock Text="{Binding [EditKey_MainLabel], Source={StaticResource Loc}}"
+                       FontSize="11" Foreground="{StaticResource TextSubtle}" />
+            <TextBox Text="{Binding MainLabel, Mode=TwoWay}" />
+        </StackPanel>
+
+    </DockPanel>
+
+</Window>

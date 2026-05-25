@@ -53,6 +53,16 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// </summary>
     public Action<int, int>? EditKeyLabelRequested { get; set; }
 
+    /// <summary>
+    /// Invoked when the user right-clicks a combo legend tile. Callback (set
+    /// by <c>App.axaml.cs</c>) owns the modal-dialog lifecycle and calls
+    /// <see cref="SetComboLabelOverride"/> on save.
+    /// </summary>
+    public Action<string>? EditComboLabelRequested { get; set; }
+
+    public void RequestEditCombo(string keyPositionsKey) =>
+        EditComboLabelRequested?.Invoke(keyPositionsKey);
+
     private readonly ISettingsService _settingsService;
 
     private IKeyboardProfile _profile;
@@ -264,49 +274,37 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// </summary>
     public void SetKeyLabelOverride(int layerIndex, int keyIndex, KeyLabelOverride? value)
     {
-        var profileId = _profile.Id;
-        KeyLabelOverrides.Set(profileId, layerIndex, keyIndex, value);
-
-        PersistSetting(s =>
-        {
-            var clone = CloneKeyLabelOverrides(s.KeyLabelOverrides);
-            if (value is null || value.IsEmpty)
-            {
-                if (clone.TryGetValue(profileId, out var perLayer)
-                    && perLayer.TryGetValue(layerIndex, out var perKey))
-                {
-                    perKey.Remove(keyIndex);
-                    if (perKey.Count == 0) perLayer.Remove(layerIndex);
-                    if (perLayer.Count == 0) clone.Remove(profileId);
-                }
-            }
-            else
-            {
-                if (!clone.TryGetValue(profileId, out var perLayer))
-                    clone[profileId] = perLayer = new Dictionary<int, Dictionary<int, KeyLabelOverride>>();
-                if (!perLayer.TryGetValue(layerIndex, out var perKey))
-                    perLayer[layerIndex] = perKey = new Dictionary<int, KeyLabelOverride>();
-                perKey[keyIndex] = value;
-            }
-            return s with { KeyLabelOverrides = clone };
-        });
+        KeyLabelOverrides.Set(_profile.Id, layerIndex, keyIndex, value);
+        PersistSetting(s => s with { KeyLabelOverrides = KeyLabelOverrides.Snapshot() });
 
         if (_config is not null && layerIndex == ActiveLayerIndex)
             ApplyActiveLayer(ActiveLayerIndex);
     }
 
-    private static Dictionary<string, Dictionary<int, Dictionary<int, KeyLabelOverride>>>
-        CloneKeyLabelOverrides(Dictionary<string, Dictionary<int, Dictionary<int, KeyLabelOverride>>> src)
+    /// <summary>
+    /// Sets or clears a combo-pill label override for the active profile, then
+    /// rebuilds the combo VM list so the affected pill repaints.
+    /// </summary>
+    public void SetComboLabelOverride(string keyPositionsKey, ComboLabelOverride? value)
     {
-        var copy = new Dictionary<string, Dictionary<int, Dictionary<int, KeyLabelOverride>>>();
-        foreach (var (pid, perLayer) in src)
-        {
-            var layerCopy = new Dictionary<int, Dictionary<int, KeyLabelOverride>>();
-            foreach (var (layerIdx, perKey) in perLayer)
-                layerCopy[layerIdx] = new Dictionary<int, KeyLabelOverride>(perKey);
-            copy[pid] = layerCopy;
-        }
-        return copy;
+        ComboLabelOverrides.Set(_profile.Id, keyPositionsKey, value);
+        PersistSetting(s => s with { ComboLabelOverrides = ComboLabelOverrides.Snapshot() });
+        BuildCombosForConfig();
+    }
+
+    /// <summary>
+    /// Snapshot of the default-computed label + current override (if any) for
+    /// the combo identified by <paramref name="keyPositionsKey"/>. Returns null
+    /// when no combo matches the key (defensive — the View only invokes this
+    /// for an existing ComboViewModel).
+    /// </summary>
+    public (int Number, string DefaultLabel, string ParticipatingKeys, ComboLabelOverride? Existing)?
+        GetComboLabelEditContext(string keyPositionsKey)
+    {
+        var combo = Combos.FirstOrDefault(c => c.KeyPositionsKey == keyPositionsKey);
+        if (combo is null) return null;
+        var existing = ComboLabelOverrides.Get(_profile.Id, keyPositionsKey);
+        return (combo.Number, combo.DefaultLabel, combo.ParticipatingKeysText, existing);
     }
 
     /// <summary>
@@ -323,6 +321,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         if (keyIndex < 0 || keyIndex >= Keys.Count) return null;
 
         var holdTapByName = _config.HoldTaps.ToDictionary(h => h.Name, StringComparer.Ordinal);
+        var macrosByName = _config.Macros.ToDictionary(m => m.Name, StringComparer.Ordinal);
         var binding = _bindingResolver?.ResolveEffectiveBinding(layerIndex, keyIndex) ?? KeyBinding.Transparent;
         holdTapByName.TryGetValue(binding.Behavior, out var holdTap);
         var targetLayer = LayerBindingResolver.ResolveTargetLayer(binding, holdTap);
@@ -330,7 +329,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             ? _config.Layers[tl].Name
             : null;
 
-        var (label, sub, top) = KeyLabelFormatter.FormatBinding(binding, targetLayerName, holdTap);
+        var (label, sub, top) = KeyLabelFormatter.FormatBinding(binding, targetLayerName, holdTap, macrosByName);
         var parts = new List<string>();
         if (!string.IsNullOrEmpty(top)) parts.Add($"[{top}]");
         if (!string.IsNullOrEmpty(label)) parts.Add(label);
@@ -664,6 +663,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         // so the very first paint already reflects the user's customization.
         LayerColorPalette.SetOverrides(s.LayerColors);
         KeyLabelOverrides.SetOverrides(s.KeyLabelOverrides);
+        ComboLabelOverrides.SetOverrides(s.ComboLabelOverrides);
 
         // HID stack owns the layer source, command sender, and state tracker.
         // Constructed eagerly so push surfaces are available before Start();
@@ -1111,6 +1111,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         var layer = _config.Layers[index];
 
         var holdTapByName = _config.HoldTaps.ToDictionary(h => h.Name, StringComparer.Ordinal);
+        var macrosByName = _config.Macros.ToDictionary(m => m.Name, StringComparer.Ordinal);
 
         for (int i = 0; i < Keys.Count; i++)
         {
@@ -1130,7 +1131,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                 targetLayer: targetLayer,
                 targetLayerName: targetLayerName,
                 profileId: _profile.Id,
-                holdTap: holdTap);
+                holdTap: holdTap,
+                macros: macrosByName);
         }
 
         for (int i = 0; i < Layers.Count; i++)
@@ -1187,8 +1189,14 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                 Keys[i].SetCombos(Array.Empty<ZmkCombo>(), Array.Empty<int>(), LabelLookup);
         }
 
+        var macrosByName = _config.Macros.ToDictionary(m => m.Name, StringComparer.Ordinal);
         for (var i = 0; i < allCombos.Count; i++)
-            Combos.Add(new ComboViewModel(i + 1, allCombos[i], LabelLookup));
+        {
+            var combo = allCombos[i];
+            var key = ComboLabelOverrides.KeyPositionsToKey(combo.KeyPositions);
+            var ov = ComboLabelOverrides.Get(_profile.Id, key);
+            Combos.Add(new ComboViewModel(i + 1, combo, LabelLookup, macrosByName, ov));
+        }
     }
 
     /// <summary>

@@ -17,6 +17,12 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\corne.dtsi" />
+    <EmbeddedResource Include="Resources\a_dux.dtsi" />
+    <EmbeddedResource Include="Resources\kyria.dtsi" />
+    <EmbeddedResource Include="Resources\lily58.dtsi" />
+    <EmbeddedResource Include="Resources\sofle.dtsi" />
+    <EmbeddedResource Include="Resources\go60.dtsi" />
+    <EmbeddedResource Include="Resources\glove80.dtsi" />
   </ItemGroup>
 
 </Project>

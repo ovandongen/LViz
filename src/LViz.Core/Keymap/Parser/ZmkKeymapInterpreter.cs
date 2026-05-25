@@ -59,7 +59,7 @@ public static class ZmkKeymapInterpreter
             int layerIdx = 0;
             foreach (var layerNode in keymapNode.Children)
             {
-                var name = GetString(layerNode, "display-name") ?? layerNode.Name;
+                var name = GetString(layerNode, "display-name") ?? StripLayerPrefix(layerNode.Name);
                 var bindings = SliceBindings(GetProperty(layerNode, "bindings"), userArities);
                 layers.Add(new Layer(layerIdx++, name, bindings));
             }
@@ -138,24 +138,82 @@ public static class ZmkKeymapInterpreter
             {
                 // Greedy: consume non-ref cells until next ref or end.
                 while (i < cells.Count && cells[i] is not DtCellRef)
-                {
-                    paramList.Add(StringifyCell(cells[i]));
-                    i++;
-                }
+                    ConsumeLogicalParam(cells, ref i, paramList);
             }
             else
             {
                 for (int k = 0; k < arity && i < cells.Count; k++)
-                {
-                    paramList.Add(StringifyCell(cells[i]));
-                    i++;
-                }
+                    ConsumeLogicalParam(cells, ref i, paramList);
             }
 
             output.Add(new KeyBinding(behavior, paramList));
         }
         return output;
     }
+
+    /// <summary>
+    /// Consumes one logical param from <paramref name="cells"/> at index
+    /// <paramref name="i"/>, advancing past it. A modifier-wrapped keycode
+    /// like <c>LS(N7)</c> is lexed as two adjacent cells — <c>Ident("LS")</c>
+    /// then <c>ParenExpr("(N7)")</c> — but logically it's a single
+    /// behavior parameter. Flatten the pair (and recurse for chains like
+    /// <c>LC(LS(N7))</c>) so downstream formatters see the same flat param
+    /// shape JSON-loaded bindings produce.
+    /// </summary>
+    private static void ConsumeLogicalParam(IReadOnlyList<DtCell> cells, ref int i, List<string> paramList)
+    {
+        if (cells[i] is DtCellIdent ident
+            && i + 1 < cells.Count
+            && cells[i + 1] is DtCellParenExpr paren)
+        {
+            paramList.Add(ident.Text);
+            paramList.AddRange(FlattenParenExpr(paren.RawText));
+            i += 2;
+            return;
+        }
+        paramList.Add(StringifyCell(cells[i]));
+        i++;
+    }
+
+    /// <summary>
+    /// Flattens a verbatim paren expression like <c>"(N7)"</c> → <c>["N7"]</c>,
+    /// <c>"(LC(LS(N7)))"</c> → <c>["LC", "LS", "N7"]</c>. Used to unwrap
+    /// modifier-wrapped keycodes in keymap-file bindings so the formatter
+    /// sees the same flat shape JSON-loaded bindings produce.
+    /// </summary>
+    private static IEnumerable<string> FlattenParenExpr(string raw)
+    {
+        raw = raw.Trim();
+        if (raw.StartsWith("(", StringComparison.Ordinal) && raw.EndsWith(")", StringComparison.Ordinal))
+            raw = raw.Substring(1, raw.Length - 2).Trim();
+        if (raw.Length == 0) yield break;
+
+        var parenIdx = raw.IndexOf('(');
+        if (parenIdx > 0)
+        {
+            yield return raw.Substring(0, parenIdx).Trim();
+            foreach (var t in FlattenParenExpr(raw.Substring(parenIdx))) yield return t;
+        }
+        else
+        {
+            foreach (var part in raw.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                yield return part;
+        }
+    }
+
+    private const string LayerNodeNamePrefix = "layer_";
+
+    /// <summary>
+    /// Moergo's keymap exporter names layer nodes <c>layer_&lt;Name&gt;</c>
+    /// without setting <c>display-name</c>, so the raw node name surfaces in
+    /// the layer tabs and on every <c>&amp;mo</c>/<c>&amp;lt</c> key as a
+    /// redundant "layer Symbol" / "layer Mouse" label. Strip the prefix when
+    /// falling back to the node name; explicit <c>display-name</c> wins.
+    /// </summary>
+    private static string StripLayerPrefix(string nodeName) =>
+        nodeName.StartsWith(LayerNodeNamePrefix, StringComparison.Ordinal)
+            ? nodeName.Substring(LayerNodeNamePrefix.Length)
+            : nodeName;
 
     private static string StringifyCell(DtCell cell) => cell switch
     {

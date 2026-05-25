@@ -353,6 +353,7 @@
                                             Focusable="False"
                                             PointerEntered="OnComboTilePointerEntered"
                                             PointerExited="OnComboTilePointerExited"
+                                            PointerPressed="OnComboTilePointerPressed"
                                             ToolTip.Tip="{Binding ParticipatingKeysText}">
                                         <StackPanel Orientation="Horizontal" Spacing="8"
                                                     VerticalAlignment="Center">

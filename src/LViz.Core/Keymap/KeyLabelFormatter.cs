@@ -26,7 +26,8 @@ public static class KeyLabelFormatter
     /// </list>
     /// </summary>
     public static (string Label, string Subscript, string TopLeft) FormatBinding(
-        KeyBinding b, string? targetLayerName, HoldTap? holdTap = null)
+        KeyBinding b, string? targetLayerName, HoldTap? holdTap = null,
+        IReadOnlyDictionary<string, ZmkMacro>? macros = null)
     {
         if (!string.IsNullOrEmpty(b.DecorationLabel))
             return (b.DecorationLabel, "", "");
@@ -40,6 +41,7 @@ public static class KeyLabelFormatter
 
         return TryFormatStandardBehavior(b, layerName)
             ?? TryFormatMacroConvention(b)
+            ?? TryFormatUserMacro(b, macros)
             ?? FormatFallback(b);
     }
 
@@ -127,6 +129,34 @@ public static class KeyLabelFormatter
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Render a user-defined <c>zmk,behavior-macro</c> as the concatenation of
+    /// the keycodes it types. e.g. a "BracketC" macro whose body is
+    /// <c>&amp;kp LEFT_BRACKET &amp;kp RIGHT_BRACKET &amp;kp LEFT</c> renders
+    /// as "[]←" — far more readable than the user's macro name.
+    /// Falls back (returns null) when the macro body isn't a <c>&amp;kp</c>
+    /// chain so things like Bluetooth-pairing macros keep their name.
+    /// </summary>
+    private static (string Label, string Subscript, string TopLeft)? TryFormatUserMacro(
+        KeyBinding b, IReadOnlyDictionary<string, ZmkMacro>? macros)
+    {
+        if (macros is null || !macros.TryGetValue(b.Behavior, out var macro)) return null;
+
+        var label = new StringBuilder();
+        int kpCount = 0;
+        foreach (var inner in macro.Bindings)
+        {
+            if (inner.Behavior != "&kp" || inner.Params.Count == 0) continue;
+            var (lbl, _) = ZmkKeycodeLabel.FormatKpParams(inner.Params);
+            label.Append(lbl);
+            // Cap at 4 keycodes — a macro that types a whole word shouldn't
+            // monopolize the key cap. Tooltip already shows the raw body.
+            if (++kpCount >= 4) break;
+        }
+
+        return kpCount == 0 ? null : (label.ToString(), "", "Macro");
     }
 
     private static (string Label, string Subscript, string TopLeft) FormatFallback(KeyBinding b) =>

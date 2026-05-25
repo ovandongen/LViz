@@ -159,7 +159,7 @@ public class UserSettingsJsonRoundTripTests
 
             Assert.NotNull(loaded);
             Assert.Equal(UserSettings.CurrentSchemaVersion, loaded.SchemaVersion);
-            Assert.Equal("GO60", loaded.Keyboard);
+            Assert.Equal("Corne", loaded.Keyboard);
             Assert.Empty(loaded.MouseLayer);
         }
         finally
@@ -180,7 +180,7 @@ public class UserSettingsJsonRoundTripTests
             var svc = new SettingsService(path);
             var loaded = svc.Load();
 
-            Assert.Equal("GO60", loaded.Keyboard);  // default, not "Glove80"
+            Assert.Equal("Corne", loaded.Keyboard);  // default, not "Glove80"
             Assert.True(File.Exists(backup), "future-versioned settings file must be backed up");
         }
         finally
@@ -200,7 +200,7 @@ public class UserSettingsJsonRoundTripTests
             var svc = new SettingsService(path);
             var loaded = svc.Load();
 
-            Assert.Equal("GO60", loaded.Keyboard);
+            Assert.Equal("Corne", loaded.Keyboard);
             Assert.Empty(loaded.MouseLayer);
         }
         finally

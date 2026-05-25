@@ -210,6 +210,21 @@ public partial class MainWindow : Window
         vm.SetHighlightedCombos(Array.Empty<int>());
     }
 
+    /// <summary>
+    /// Right-click on a combo legend tile opens the combo-label editor. Editing
+    /// is intentionally scoped to the legend only — on-key combo pills are
+    /// already crowded with the number badge.
+    /// </summary>
+    private void OnComboTilePointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Control c) return;
+        if (c.DataContext is not ComboViewModel combo) return;
+        if (DataContext is not MainWindowViewModel vm) return;
+        if (!e.GetCurrentPoint(c).Properties.IsRightButtonPressed) return;
+        vm.RequestEditCombo(combo.KeyPositionsKey);
+        e.Handled = true;
+    }
+
     private WindowEdge? GetResizeEdge(Point pos)
     {
         // `<` on the near edge and `>=` on the far edge keeps both hot zones

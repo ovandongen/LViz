@@ -90,4 +90,17 @@ public class BehaviorAritySlicerTests
         Assert.Contains("LC", param);
         Assert.Contains("LSFT", param);
     }
+
+    [Fact]
+    public void ModifierFunctionWrapperFlattensToParams()
+    {
+        // &kp LS(N7) — without outer parens — must flatten to ["LS","N7"]
+        // so the formatter renders "&" (Shift+7) instead of just "LS".
+        // Regression: Glove80 symb layer uses this form heavily.
+        var bindings = SliceLayer("&kp LS(N7) &kp LS(LBKT) &kp LC(LS(A))");
+        Assert.Equal(3, bindings.Count);
+        Assert.Equal(new[] { "LS", "N7" }, bindings[0].Params);
+        Assert.Equal(new[] { "LS", "LBKT" }, bindings[1].Params);
+        Assert.Equal(new[] { "LC", "LS", "A" }, bindings[2].Params);
+    }
 }

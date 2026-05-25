@@ -91,6 +91,8 @@
   <data name="LoadDialog_Title"><value>ZMK keymap openen</value></data>
   <data name="LoadDialog_FileType"><value>ZMK keymap</value></data>
 
+  <data name="Settings_KeyboardProfile"><value>Toetsenbordprofiel</value></data>
+  <data name="Settings_KeyboardProfileHint"><value>Welke fysieke layout het bord moet weergeven. Wisselt automatisch bij het laden als het aantal toetsen overeenkomt met een ander profiel.</value></data>
   <data name="Settings_BackgroundOpacity"><value>Achtergrondopaciteit</value></data>
   <data name="Settings_BackgroundOpacityHint"><value>Hoe dicht de donkere vulling achter het toetsenbord is — zet op 0 voor een volledig transparante overlay.</value></data>
   <data name="Settings_PressHighlight"><value>Kleur indrukmarkering</value></data>
@@ -160,6 +162,10 @@
   <data name="Settings_UpToDate"><value>Je gebruikt de nieuwste versie.</value></data>
   <data name="Settings_UpdateAvailable"><value>Update beschikbaar: {0} — klik om te downloaden.</value></data>
   <data name="Settings_UpdateCheckFailed"><value>Kon niet controleren op updates.</value></data>
+  <data name="EditCombo_Title"><value>Combolabel bewerken</value></data>
+  <data name="EditCombo_HeaderFormat"><value>Combo #{0}</value></data>
+  <data name="EditCombo_KeysFormat"><value>Toetsen: {0}</value></data>
+  <data name="EditCombo_DefaultFormat"><value>Standaard: {0}</value></data>
   <data name="EditKey_Title"><value>Toetslabel bewerken</value></data>
   <data name="EditKey_LayerKeyFormat"><value>Laag {0}  ·  Toets {1}</value></data>
   <data name="EditKey_DefaultFormat"><value>Standaard: {0}</value></data>
