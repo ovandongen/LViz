@@ -1,7 +1,5 @@
-using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
-using Avalonia.Input;
 using LViz.App.ViewModels;
 
 namespace LViz.App.Views;
@@ -35,14 +33,6 @@ public partial class SettingsWindow : Window
     {
         if (DataContext is SettingsViewModel vm)
             vm.RefreshRunningProcesses();
-    }
-
-    // TextBlock has no built-in click command, so the update-link's
-    // PointerPressed handler lives here in the code-behind.
-    private void OnUpdateLinkClick(object? sender, PointerPressedEventArgs e)
-    {
-        if (DataContext is SettingsViewModel vm && vm.UpdateUrl is { } url)
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
     }
 
     // ListBox row selection → drop the process name into the new-rule textbox

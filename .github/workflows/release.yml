@@ -29,6 +29,9 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      - name: Install Velopack CLI
+        run: dotnet tool install -g vpk
+
       - name: Resolve version
         id: ver
         shell: bash
@@ -48,18 +51,25 @@ jobs:
             -p:PublishSingleFile=false \
             -p:Version=${{ steps.ver.outputs.version }}
 
-      - name: Package zip
-        shell: pwsh
+      - name: Pack with Velopack
+        shell: bash
         run: |
-          $publish = "src/LViz.App/bin/Release/net10.0/win-x64/publish"
-          $zip = "LViz-${{ steps.ver.outputs.version }}-windows-x64.zip"
-          Compress-Archive -Path "$publish/*" -DestinationPath $zip -Force
-          Get-Item $zip | Format-List Name, Length
+          publish="src/LViz.App/bin/Release/net10.0/win-x64/publish"
+          vpk pack \
+            --packId LViz \
+            --packVersion ${{ steps.ver.outputs.version }} \
+            --packDir "$publish" \
+            --mainExe LViz.App.exe \
+            --packTitle "LViz" \
+            --packAuthors "LViz contributors" \
+            --channel win-x64 \
+            --outputDir ./vpk-output
+          ls -lh ./vpk-output
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x64
-          path: LViz-*-windows-x64.zip
+          path: vpk-output/**
           if-no-files-found: error
 
   build-macos:
@@ -77,6 +87,9 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install Velopack CLI
+        run: dotnet tool install -g vpk
 
       - name: Resolve version
         id: ver
@@ -105,19 +118,24 @@ jobs:
           # to re-grant Accessibility after upgrades — see README macOS notes.
           scripts/build-mac-app.sh -c Release -r ${{ matrix.rid }} -v ${{ steps.ver.outputs.version }}
 
-      - name: Package zip (ditto)
+      - name: Pack with Velopack
         run: |
-          APP="src/LViz.App/bin/macos-bundle/LViz.app"
-          ZIP="LViz-${{ steps.ver.outputs.version }}-macos-${{ steps.ver.outputs.arch }}.zip"
-          # ditto preserves bundle structure, symlinks, extended attrs, and
-          # the codesign signature, which `zip` does not.
-          ditto -c -k --keepParent "$APP" "$ZIP"
-          ls -lh "$ZIP"
+          app="src/LViz.App/bin/macos-bundle/LViz.app"
+          vpk pack \
+            --packId LViz \
+            --packVersion ${{ steps.ver.outputs.version }} \
+            --packDir "$app" \
+            --mainExe LViz \
+            --packTitle "LViz" \
+            --packAuthors "LViz contributors" \
+            --channel osx-${{ steps.ver.outputs.arch }} \
+            --outputDir ./vpk-output
+          ls -lh ./vpk-output
 
       - uses: actions/upload-artifact@v4
         with:
           name: macos-${{ steps.ver.outputs.arch }}
-          path: LViz-*-macos-${{ steps.ver.outputs.arch }}.zip
+          path: vpk-output/**
           if-no-files-found: error
 
   build-linux:
@@ -131,6 +149,9 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install Velopack CLI
+        run: dotnet tool install -g vpk
 
       - name: Resolve version
         id: ver
@@ -151,20 +172,25 @@ jobs:
             -p:PublishSingleFile=false \
             -p:Version=${{ steps.ver.outputs.version }}
 
-      - name: Package tarball
+      - name: Pack with Velopack (AppImage)
         shell: bash
         run: |
-          # tar (not zip) preserves the +x bit on the launcher binary so
-          # users don't have to chmod after extracting.
           publish="src/LViz.App/bin/Release/net10.0/linux-x64/publish"
-          tarball="LViz-${{ steps.ver.outputs.version }}-linux-x64.tar.gz"
-          tar -czf "$tarball" -C "$publish" .
-          ls -lh "$tarball"
+          vpk [linux] pack \
+            --packId LViz \
+            --packVersion ${{ steps.ver.outputs.version }} \
+            --packDir "$publish" \
+            --mainExe LViz.App \
+            --packTitle "LViz" \
+            --packAuthors "LViz contributors" \
+            --channel linux-x64 \
+            --outputDir ./vpk-output
+          ls -lh ./vpk-output
 
       - uses: actions/upload-artifact@v4
         with:
           name: linux-x64
-          path: LViz-*-linux-x64.tar.gz
+          path: vpk-output/**
           if-no-files-found: error
 
   release:
@@ -179,13 +205,12 @@ jobs:
           merge-multiple: true
 
       - name: List artifacts
-        run: ls -lh artifacts
+        run: ls -lhR artifacts
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/LViz-*.zip
-            artifacts/LViz-*.tar.gz
+            artifacts/**
           generate_release_notes: true
           fail_on_unmatched_files: true

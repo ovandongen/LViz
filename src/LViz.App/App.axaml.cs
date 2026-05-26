@@ -317,6 +317,26 @@ public partial class App : Application
             // Restore the last-loaded layout (or show a "pick a file" prompt).
             Dispatcher.UIThread.Post(() => viewModel.InitializeAsync(), DispatcherPriority.Background);
 
+            // One-shot background update check ~5s after launch. No-ops when
+            // not running as a Velopack install (dev / dotnet run); silently
+            // 404s while the source repo is private.
+            if (initialSettings.AutoCheckForUpdates)
+            {
+                var updateService = services.GetRequiredService<UpdateService>();
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(5));
+                        await updateService.CheckForUpdatesAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        DiagnosticLog.Warn("Update", $"Background check threw: {ex.Message}");
+                    }
+                });
+            }
+
             DataContext = viewModel;
             DiagnosticLog.Info("Startup", "OnFrameworkInitializationCompleted done");
         }

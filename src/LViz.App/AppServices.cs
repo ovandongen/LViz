@@ -43,6 +43,7 @@ internal static class AppServices
         services.AddSingleton<INativeHotkeyRegistry>(_ => NativeHotkeyRegistryFactory.Create());
         services.AddSingleton<IMouseIdleMonitor>(_ => MouseIdleMonitorFactory.Create());
         services.AddSingleton<IGlobalHotkeyService, GlobalHotkeyService>();
+        services.AddSingleton<UpdateService>();
 
         // Active-window monitor can fail to construct on some platforms
         // (missing permissions, headless test runners, …). We register it
@@ -77,7 +78,8 @@ internal static class AppServices
         services.AddTransient<SettingsViewModel>(sp =>
             new SettingsViewModel(
                 sp.GetRequiredService<ISettingsService>(),
-                sp.GetRequiredService<MainWindowViewModel>()));
+                sp.GetRequiredService<MainWindowViewModel>(),
+                sp.GetRequiredService<UpdateService>()));
 
         return services.BuildServiceProvider();
     }

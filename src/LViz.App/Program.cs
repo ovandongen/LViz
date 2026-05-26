@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Avalonia;
 using LViz.Core.Diagnostics;
 using LViz.Core.Settings;
+using Velopack;
 
 namespace LViz.App;
 
@@ -10,6 +11,12 @@ class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // Must run before the single-instance mutex: Velopack reinvokes the
+        // exe with --veloapp-* arguments during install/update/uninstall hooks,
+        // and those subprocesses would otherwise be blocked by the mutex held
+        // by the primary running instance.
+        VelopackApp.Build().SetArgs(args).Run();
+
         using var mutex = new Mutex(true, "LViz-SingleInstance", out bool isNew);
         if (!isNew) return;
 

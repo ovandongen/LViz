@@ -219,4 +219,17 @@ public record UserSettings
     /// the configured target.
     /// </summary>
     public Dictionary<string, MouseLayerSettings> MouseLayer { get; init; } = new();
+
+    /// <summary>
+    /// When true, the app checks for updates a few seconds after launch and
+    /// notifies the user if one is available. Manual "Check now" in Settings
+    /// works regardless.
+    /// </summary>
+    public bool AutoCheckForUpdates { get; init; } = true;
+
+    /// <summary>
+    /// Last time the app checked for updates (UTC). Null = never. Surfaced in
+    /// Settings so users can see when the last check ran.
+    /// </summary>
+    public DateTime? LastUpdateCheckUtc { get; init; }
 }

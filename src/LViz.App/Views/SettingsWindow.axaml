@@ -17,30 +17,13 @@
 
     <DockPanel Margin="8">
 
-        <!-- Version & update-check footer: docked at the bottom so it stays
-             visible across both tabs and any future tabs. The check button
-             swaps for an italic "Checking…" label while the request is in
-             flight; the result text is clickable when an update is found
-             (the link click handler lives in the code-behind because
-             TextBlock has no built-in command for PointerPressed). -->
+        <!-- Slim version footer: docked at the bottom so the current version
+             stays visible across all tabs. The interactive "Check now" /
+             auto-check toggle lives in the General tab's Updates section. -->
         <Border DockPanel.Dock="Bottom" Height="1" Background="{StaticResource BgSurface0}" Margin="0,8,0,0" />
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="8,8,8,4" Spacing="8">
             <TextBlock Text="{Binding AppVersion}" Foreground="{StaticResource TextMuted}" FontSize="11"
                        VerticalAlignment="Center" />
-            <Button Content="{Binding [Settings_CheckForUpdates], Source={StaticResource Loc}}"
-                    Command="{Binding CheckForUpdatesCommand}"
-                    IsVisible="{Binding !IsCheckingForUpdates}"
-                    Padding="4,1" FontSize="11" Background="Transparent"
-                    Foreground="{StaticResource AccentBlue}" BorderThickness="0" Cursor="Hand" />
-            <TextBlock Text="{Binding [Settings_Checking], Source={StaticResource Loc}}"
-                       IsVisible="{Binding IsCheckingForUpdates}"
-                       Foreground="{StaticResource TextMuted}" FontSize="11" FontStyle="Italic"
-                       VerticalAlignment="Center" />
-            <TextBlock Text="{Binding UpdateMessage}" Foreground="{StaticResource AccentGreen}" FontSize="11"
-                       VerticalAlignment="Center" TextWrapping="Wrap"
-                       IsVisible="{Binding UpdateMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                       Cursor="Hand" TextDecorations="Underline"
-                       Name="UpdateLink" PointerPressed="OnUpdateLinkClick" />
         </StackPanel>
 
         <TabControl>
@@ -157,6 +140,34 @@
                                       ItemsSource="{Binding AvailableTopHands}"
                                       SelectedItem="{Binding MainViewModel.StackedTopHand, Mode=TwoWay}" />
                         </StackPanel>
+                    </StackPanel>
+
+                    <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+                    <!-- Updates: auto-check toggle, manual "Check now", status
+                         readout, restart-to-install button when staged. -->
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding [Settings_Updates], Source={StaticResource Loc}}"
+                                   FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                        <CheckBox Content="{Binding [Settings_AutoCheckForUpdates], Source={StaticResource Loc}}"
+                                  IsChecked="{Binding AutoCheckForUpdates, Mode=TwoWay}" />
+                        <TextBlock Text="{Binding [Settings_AutoCheckHint], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                            <Button Content="{Binding [Settings_CheckNow], Source={StaticResource Loc}}"
+                                    Command="{Binding CheckForUpdatesCommand}"
+                                    IsEnabled="{Binding !IsCheckingForUpdates}" />
+                            <Button Content="{Binding [Settings_RestartToInstall], Source={StaticResource Loc}}"
+                                    Command="{Binding RestartToInstallCommand}"
+                                    IsVisible="{Binding CanRestartToInstall}" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding UpdateStatusMessage}"
+                                   Foreground="{StaticResource AccentGreen}" FontSize="11"
+                                   TextWrapping="Wrap"
+                                   IsVisible="{Binding HasUpdateStatus}" />
+                        <TextBlock Text="{Binding LastCheckedDisplay}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="11"
+                                   IsVisible="{Binding LastCheckedDisplay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     </StackPanel>
 
                 </StackPanel>
