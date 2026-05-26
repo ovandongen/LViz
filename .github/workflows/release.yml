@@ -51,6 +51,22 @@ jobs:
             -p:PublishSingleFile=false \
             -p:Version=${{ steps.ver.outputs.version }}
 
+      - name: Download previous releases for delta baseline
+        shell: bash
+        # vpk pack only computes a delta if previous full.nupkg files are
+        # present in --outputDir. On the very first release this finds
+        # nothing — that's fine; continue-on-error lets the job proceed.
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p ./vpk-output
+          vpk download github \
+            --repoUrl https://github.com/ovandongen/LViz \
+            --channel win-x64 \
+            --outputDir ./vpk-output \
+            --token "$GITHUB_TOKEN"
+
       - name: Pack with Velopack
         shell: bash
         run: |
@@ -64,6 +80,17 @@ jobs:
             --packAuthors "LViz contributors" \
             --channel win-x64 \
             --outputDir ./vpk-output
+          ls -lh ./vpk-output
+
+      - name: Prune older-version nupkgs
+        shell: bash
+        # vpk download pulled prior releases' full.nupkg as the delta
+        # baseline; the pack step has now consumed them. Strip anything
+        # not stamped with the current version so the Release page only
+        # shows v${ver} assets.
+        run: |
+          ver="${{ steps.ver.outputs.version }}"
+          find ./vpk-output -name "LViz-*.nupkg" ! -name "LViz-${ver}-*" -delete
           ls -lh ./vpk-output
 
       - uses: actions/upload-artifact@v4
@@ -118,6 +145,18 @@ jobs:
           # to re-grant Accessibility after upgrades — see README macOS notes.
           scripts/build-mac-app.sh -c Release -r ${{ matrix.rid }} -v ${{ steps.ver.outputs.version }}
 
+      - name: Download previous releases for delta baseline
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p ./vpk-output
+          vpk download github \
+            --repoUrl https://github.com/ovandongen/LViz \
+            --channel osx-${{ steps.ver.outputs.arch }} \
+            --outputDir ./vpk-output \
+            --token "$GITHUB_TOKEN"
+
       - name: Pack with Velopack
         run: |
           app="src/LViz.App/bin/macos-bundle/LViz.app"
@@ -130,6 +169,12 @@ jobs:
             --packAuthors "LViz contributors" \
             --channel osx-${{ steps.ver.outputs.arch }} \
             --outputDir ./vpk-output
+          ls -lh ./vpk-output
+
+      - name: Prune older-version nupkgs
+        run: |
+          ver="${{ steps.ver.outputs.version }}"
+          find ./vpk-output -name "LViz-*.nupkg" ! -name "LViz-${ver}-*" -delete
           ls -lh ./vpk-output
 
       - uses: actions/upload-artifact@v4
@@ -172,6 +217,19 @@ jobs:
             -p:PublishSingleFile=false \
             -p:Version=${{ steps.ver.outputs.version }}
 
+      - name: Download previous releases for delta baseline
+        shell: bash
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p ./vpk-output
+          vpk download github \
+            --repoUrl https://github.com/ovandongen/LViz \
+            --channel linux-x64 \
+            --outputDir ./vpk-output \
+            --token "$GITHUB_TOKEN"
+
       - name: Pack with Velopack (AppImage)
         shell: bash
         run: |
@@ -185,6 +243,13 @@ jobs:
             --packAuthors "LViz contributors" \
             --channel linux-x64 \
             --outputDir ./vpk-output
+          ls -lh ./vpk-output
+
+      - name: Prune older-version nupkgs
+        shell: bash
+        run: |
+          ver="${{ steps.ver.outputs.version }}"
+          find ./vpk-output -name "LViz-*.nupkg" ! -name "LViz-${ver}-*" -delete
           ls -lh ./vpk-output
 
       - uses: actions/upload-artifact@v4
