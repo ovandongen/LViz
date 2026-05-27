@@ -917,11 +917,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// <summary>Gracefully stops live tracking; idempotent. Called on window close / quit.</summary>
     public void Shutdown()
     {
-        // If the mouse-layer engine is mid-push, revert *before* tearing down
-        // HID so we don't leave the keyboard pinned to the mouse layer after
-        // we're no longer in control. Synchronous + bounded so a stuck HID
-        // write can't hang shutdown.
-        _push.RevertMouseLayerForShutdown(TimeSpan.FromMilliseconds(500));
         StopKeyEventTracking();
         _push.Shutdown();
         _push.Dispose();

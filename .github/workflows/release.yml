@@ -241,6 +241,7 @@ jobs:
             --mainExe LViz.App \
             --packTitle "LViz" \
             --packAuthors "LViz contributors" \
+            --icon src/LViz.App/Assets/icon.png \
             --channel linux-x64 \
             --outputDir ./vpk-output
           ls -lh ./vpk-output
