@@ -47,6 +47,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         _updateService = updateService;
         HotkeyKeyChoices = PlatformCapabilities.GetAvailableFKeys(mainViewModel.HotkeyKey);
         _mainViewModel.PropertyChanged += OnMainPropertyChanged;
+        _mainViewModel.AutoSwitch.PropertyChanged += OnAutoSwitchPropertyChanged;
         _mainViewModel.Layers.CollectionChanged += OnLayersCollectionChanged;
 
         // Seed the auto-check toggle from disk so the UI reflects the persisted
@@ -59,10 +60,10 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         _updateService.DownloadProgress += OnDownloadProgress;
         _updateService.UpdateReadyToRestart += OnUpdateReadyToRestart;
 
-        // Seed the edit buffer from the committed list. The engine reads
-        // _mainViewModel.AppLayerRules; this VM reads/writes EditingRules.
+        // Seed the edit buffer from the committed list. The engine owns
+        // AutoSwitch.AppLayerRules; this VM reads/writes EditingRules.
         // CommitAppLayerRules() pushes the buffer back on window close.
-        foreach (var r in _mainViewModel.AppLayerRules)
+        foreach (var r in _mainViewModel.AutoSwitch.AppLayerRules)
             EditingRules.Add(r);
         EditingRules.CollectionChanged += OnEditingRulesChanged;
 
@@ -124,11 +125,11 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
 
     public bool IsFallbackPrevious
     {
-        get => _mainViewModel.AutoSwitchFallbackMode == AutoSwitchFallbackMode.Previous;
+        get => _mainViewModel.AutoSwitch.FallbackMode == AutoSwitchFallbackMode.Previous;
         set
         {
             if (!value || IsFallbackPrevious) return;
-            _mainViewModel.AutoSwitchFallbackMode = AutoSwitchFallbackMode.Previous;
+            _mainViewModel.AutoSwitch.FallbackMode = AutoSwitchFallbackMode.Previous;
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsFallbackBase));
         }
@@ -136,11 +137,11 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
 
     public bool IsFallbackBase
     {
-        get => _mainViewModel.AutoSwitchFallbackMode == AutoSwitchFallbackMode.Base;
+        get => _mainViewModel.AutoSwitch.FallbackMode == AutoSwitchFallbackMode.Base;
         set
         {
             if (!value || IsFallbackBase) return;
-            _mainViewModel.AutoSwitchFallbackMode = AutoSwitchFallbackMode.Base;
+            _mainViewModel.AutoSwitch.FallbackMode = AutoSwitchFallbackMode.Base;
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsFallbackPrevious));
         }
@@ -154,11 +155,11 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     /// </summary>
     public bool IsAutoSwitchExitOnTransparentKey
     {
-        get => _mainViewModel.AutoSwitchExitOnTransparentKey;
+        get => _mainViewModel.AutoSwitch.ExitOnTransparentKey;
         set
         {
-            if (_mainViewModel.AutoSwitchExitOnTransparentKey == value) return;
-            _mainViewModel.AutoSwitchExitOnTransparentKey = value;
+            if (_mainViewModel.AutoSwitch.ExitOnTransparentKey == value) return;
+            _mainViewModel.AutoSwitch.ExitOnTransparentKey = value;
             OnPropertyChanged();
         }
     }
@@ -170,11 +171,11 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     /// </summary>
     public bool IsAutoSwitchExitOnEmptyKey
     {
-        get => _mainViewModel.AutoSwitchExitOnEmptyKey;
+        get => _mainViewModel.AutoSwitch.ExitOnEmptyKey;
         set
         {
-            if (_mainViewModel.AutoSwitchExitOnEmptyKey == value) return;
-            _mainViewModel.AutoSwitchExitOnEmptyKey = value;
+            if (_mainViewModel.AutoSwitch.ExitOnEmptyKey == value) return;
+            _mainViewModel.AutoSwitch.ExitOnEmptyKey = value;
             OnPropertyChanged();
         }
     }
@@ -186,7 +187,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     {
         get
         {
-            var key = _mainViewModel.ExitTapKey;
+            var key = _mainViewModel.AutoSwitch.ExitTapKey;
             if (key is null) return Loc.Instance["Settings_AutoSwitch_ExitKeysNone"];
             return $"#{key.Value}";
         }
@@ -194,22 +195,22 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
 
     /// <summary>True when an exit-tap key is configured for the active
     /// keyboard. Drives the IsEnabled state of the Clear button.</summary>
-    public bool HasExitTap => _mainViewModel.ExitTapKey is not null;
+    public bool HasExitTap => _mainViewModel.AutoSwitch.ExitTapKey is not null;
 
     /// <summary>Snapshot of the currently-configured exit-tap key, used by
     /// the SettingsWindow code-behind to seed the picker dialog.</summary>
-    public int? ExitTapKey => _mainViewModel.ExitTapKey;
+    public int? ExitTapKey => _mainViewModel.AutoSwitch.ExitTapKey;
 
     /// <summary>Applies a freshly-picked exit-tap key. Called by the
     /// SettingsWindow code-behind after the picker dialog closes with an
     /// OK result.</summary>
     public void ApplyExitTapKey(int? index)
     {
-        _mainViewModel.SetExitTapKey(index);
+        _mainViewModel.AutoSwitch.SetExitTapKey(index);
     }
 
     [RelayCommand]
-    private void ClearExitTap() => _mainViewModel.SetExitTapKey(null);
+    private void ClearExitTap() => _mainViewModel.AutoSwitch.SetExitTapKey(null);
 
     /// <summary>Active keyboard profile. The SettingsWindow code-behind reads
     /// this when building an <see cref="ExitKeyPickerViewModel"/> so the
@@ -264,7 +265,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     /// </summary>
     public void CommitAppLayerRules()
     {
-        _mainViewModel.ApplyAppLayerRules(EditingRules);
+        _mainViewModel.AutoSwitch.ApplyAppLayerRules(EditingRules);
     }
 
     /// <summary>Text typed into the "new rule" process-name field. Capped at
@@ -338,7 +339,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     {
         get
         {
-            var match = AppLayerRuleMatcher.Match(_mainViewModel.ActiveWindow, EditingRules);
+            var match = AppLayerRuleMatcher.Match(_mainViewModel.AutoSwitch.ActiveWindow, EditingRules);
             if (match is null) return Loc.Instance["Settings_AutoSwitch_WouldFireNone"];
             return Loc.Instance.Format("Settings_AutoSwitch_WouldFireFormat", FormatLayerLabel(match.LayerIndex));
         }
@@ -445,6 +446,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         if (_disposed) return;
         _disposed = true;
         _mainViewModel.PropertyChanged -= OnMainPropertyChanged;
+        _mainViewModel.AutoSwitch.PropertyChanged -= OnAutoSwitchPropertyChanged;
         _mainViewModel.Layers.CollectionChanged -= OnLayersCollectionChanged;
         EditingRules.CollectionChanged -= OnEditingRulesChanged;
         _updateService.UpdateAvailable -= OnUpdateAvailable;
@@ -506,10 +508,11 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     // Dispatch table for re-raising derived/transforming SettingsVM
     // properties when their underlying MainWindowViewModel properties
     // change. Pass-through properties (BackgroundOpacity, HotkeyKey,
-    // IsStackedLayout, StackedTopHand, IsAutoSwitchKeyboardLayerEnabled,
-    // Layers) are bound straight to MainViewModel in XAML and need no
-    // entry here. Only properties this VM still owns — formatted labels,
-    // radio booleans over an enum, per-profile rebuilds — appear below.
+    // IsStackedLayout, StackedTopHand, Layers) are bound straight to
+    // MainViewModel in XAML and need no entry here; auto-switch engine state
+    // is handled by _autoSwitchPropagators below. Only properties this VM
+    // still owns — formatted labels, radio booleans over an enum, per-profile
+    // rebuilds — appear here.
     private static readonly Dictionary<string, Action<SettingsViewModel>> _mainPropagators = new()
     {
         [nameof(MainWindowViewModel.BackgroundOpacity)] = s => s.OnPropertyChanged(nameof(BackgroundOpacityPercent)),
@@ -531,20 +534,28 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
             s.ReloadMouseLayerSnapshot();
         },
         [nameof(MainWindowViewModel.LayerSourceHint)] = s => s.OnPropertyChanged(nameof(LayerSourceStatus)),
-        // ActiveWindow (not MatchedAppLayerRule) drives the WouldFire preview now —
-        // the preview is computed locally against the edit buffer, so the engine's
-        // cached match is the wrong signal.
-        [nameof(MainWindowViewModel.ActiveWindow)] = s => s.OnPropertyChanged(nameof(WouldFireText)),
-        [nameof(MainWindowViewModel.AutoSwitchFallbackMode)] = s =>
+    };
+
+    // Re-raises derived SettingsVM properties off the auto-switch engine's own
+    // PropertyChanged. SettingsVM binds the engine directly now (no MainVM
+    // pass-through facade), so it subscribes to AutoSwitch.PropertyChanged and
+    // translates here exactly as _mainPropagators does for MainVM properties.
+    private static readonly Dictionary<string, Action<SettingsViewModel>> _autoSwitchPropagators = new()
+    {
+        // ActiveWindow (not MatchedAppLayerRule) drives the WouldFire preview —
+        // the preview is computed locally against the edit buffer, so the
+        // engine's cached match is the wrong signal.
+        [nameof(AutoSwitchEngine.ActiveWindow)] = s => s.OnPropertyChanged(nameof(WouldFireText)),
+        [nameof(AutoSwitchEngine.FallbackMode)] = s =>
         {
             s.OnPropertyChanged(nameof(IsFallbackPrevious));
             s.OnPropertyChanged(nameof(IsFallbackBase));
         },
-        [nameof(MainWindowViewModel.AutoSwitchExitOnTransparentKey)] = s =>
+        [nameof(AutoSwitchEngine.ExitOnTransparentKey)] = s =>
             s.OnPropertyChanged(nameof(IsAutoSwitchExitOnTransparentKey)),
-        [nameof(MainWindowViewModel.AutoSwitchExitOnEmptyKey)] = s =>
+        [nameof(AutoSwitchEngine.ExitOnEmptyKey)] = s =>
             s.OnPropertyChanged(nameof(IsAutoSwitchExitOnEmptyKey)),
-        [nameof(MainWindowViewModel.ExitTapKey)] = s =>
+        [nameof(AutoSwitchEngine.ExitTapKey)] = s =>
         {
             s.OnPropertyChanged(nameof(ExitTapKey));
             s.OnPropertyChanged(nameof(ExitTapSummary));
@@ -555,6 +566,12 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     private void OnMainPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is { } name && _mainPropagators.TryGetValue(name, out var propagate))
+            propagate(this);
+    }
+
+    private void OnAutoSwitchPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is { } name && _autoSwitchPropagators.TryGetValue(name, out var propagate))
             propagate(this);
     }
 

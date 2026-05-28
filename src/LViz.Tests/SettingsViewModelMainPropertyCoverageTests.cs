@@ -46,8 +46,11 @@ public class SettingsViewModelMainPropertyCoverageTests
         "ColorTrayIconByActiveLayer",
         "IsLiveHighlightingEnabled",
         "IsAutoLayerSwitchEnabled",
-        "IsAutoSwitchKeyboardLayerEnabled",
         "IsAlwaysOnTop",
+
+        // The auto-switch engine, exposed directly (SettingsVM binds its
+        // observable state without a MainVM facade).
+        "AutoSwitch",
 
         // Pure derived / geometry / display-only — not user-facing in settings.
         "LoadInfoTooltip",
@@ -71,15 +74,9 @@ public class SettingsViewModelMainPropertyCoverageTests
 
         // Transient main-window UI state — settings doesn't render these.
         "StatusMessage",
-        "ToastMessage",
-        "IsToastVisible",
+        "Toast",
         "HasLayoutLoaded",
         "IsHidSourceActive",
-
-        // Engine-derived state surfaced through MainVM but already covered
-        // by the propagator entries that change WouldFire / app-rules
-        // matching (ActiveWindow drives WouldFireText).
-        "MatchedAppLayerRule",
     };
 
     [Fact]

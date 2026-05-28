@@ -422,7 +422,7 @@
              IsHitTestVisible is gated on the same class so clicks pass through
              to the board when the toast isn't shown. -->
         <Border Grid.Row="1"
-                Classes.show="{Binding IsToastVisible}"
+                Classes.show="{Binding Toast.IsVisible}"
                 HorizontalAlignment="Center" VerticalAlignment="Top"
                 Margin="0,12,0,0"
                 Padding="16,10"
@@ -444,11 +444,11 @@
                     <Setter Property="IsHitTestVisible" Value="True" />
                 </Style>
             </Border.Styles>
-            <Button Command="{Binding DismissToastCommand}"
+            <Button Command="{Binding Toast.DismissCommand}"
                     Background="Transparent" BorderThickness="0"
                     Padding="0" Cursor="Hand"
                     Focusable="False">
-                <TextBlock Text="{Binding ToastMessage}"
+                <TextBlock Text="{Binding Toast.Message}"
                            Foreground="{StaticResource ErrorText}"
                            TextWrapping="Wrap"
                            HorizontalAlignment="Center" />

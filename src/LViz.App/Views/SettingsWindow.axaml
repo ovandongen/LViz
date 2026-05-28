@@ -238,7 +238,7 @@
                                    Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
 
                         <CheckBox Content="{Binding [Settings_AutoSwitch_Enable], Source={StaticResource Loc}}"
-                                  IsChecked="{Binding MainViewModel.IsAutoSwitchKeyboardLayerEnabled, Mode=TwoWay}"
+                                  IsChecked="{Binding MainViewModel.AutoSwitch.IsEnabled, Mode=TwoWay}"
                                   Foreground="{StaticResource Text}"
                                   Margin="0,4,0,0" />
 
@@ -556,11 +556,11 @@
                                Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
                     <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto" Margin="0,4,0,0">
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="ProcessName" Foreground="{StaticResource TextMuted}" />
-                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding MainViewModel.ActiveWindow.ProcessName, FallbackValue='(none)', TargetNullValue='(none)'}" Foreground="{StaticResource Text}" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding MainViewModel.AutoSwitch.ActiveWindow.ProcessName, FallbackValue='(none)', TargetNullValue='(none)'}" Foreground="{StaticResource Text}" />
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="BundleId" Foreground="{StaticResource TextMuted}" />
-                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding MainViewModel.ActiveWindow.BundleId, FallbackValue='(none)', TargetNullValue='(none)'}" Foreground="{StaticResource Text}" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding MainViewModel.AutoSwitch.ActiveWindow.BundleId, FallbackValue='(none)', TargetNullValue='(none)'}" Foreground="{StaticResource Text}" />
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="WindowTitle" Foreground="{StaticResource TextMuted}" />
-                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding MainViewModel.ActiveWindow.WindowTitle, FallbackValue='(none)', TargetNullValue='(none)'}" Foreground="{StaticResource Text}" TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding MainViewModel.AutoSwitch.ActiveWindow.WindowTitle, FallbackValue='(none)', TargetNullValue='(none)'}" Foreground="{StaticResource Text}" TextWrapping="Wrap" />
                     </Grid>
                 </StackPanel>
             </ScrollViewer>

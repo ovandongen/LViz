@@ -10,7 +10,6 @@ using LViz.App.Services.MouseIdle;
 using LViz.Core.Diagnostics;
 using LViz.Core.Input;
 using LViz.Core.Keymap;
-using LViz.Core.Keymap.Parser;
 using LViz.Core.Layout;
 using LViz.Core.Models;
 using LViz.Core.Settings;
@@ -65,18 +64,14 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     private readonly ISettingsService _settingsService;
 
+    // Owns the loaded keymap + resolution. Null Current means no layout loaded
+    // (callers treat that as "every binding is Transparent").
+    private readonly IKeymapStateService _keymap;
+
     private IKeyboardProfile _profile;
-    private KeyboardConfig? _config;
-    private string? _loadedLayoutPath;
-    private string? _lastLoadError;
     // Last successful load's status text. Null when the current StatusMessage
     // is something else (error, transient, etc).
     private string? _loadStatusBase;
-
-    // Resolves &trans fall-through via a precomputed predecessor graph.
-    // Rebuilt on every layout load / profile switch; null when no layout
-    // is loaded (callers treat that as "every binding is Transparent").
-    private LayerBindingResolver? _bindingResolver;
 
     private readonly IHidPipeline _hid;
     private readonly ILayerPushCoordinator _push;
@@ -134,12 +129,10 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     [ObservableProperty] private bool _isLiveHighlightingEnabled;
     [ObservableProperty] private bool _isAutoLayerSwitchEnabled;
     [ObservableProperty] private bool _hasLayoutLoaded;
-    [ObservableProperty] private string _toastMessage = "";
-    [ObservableProperty] private bool _isToastVisible;
 
-    // Cancels the auto-dismiss timer on a re-shown toast or manual dismiss.
-    private CancellationTokenSource? _toastCts;
-    private const int ToastDurationMs = 4000;
+    /// <summary>Transient auto-dismissing toast banner (load errors, etc.).</summary>
+    public ToastController Toast { get; } = new();
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ActiveLayerTintColor))]
     private int _activeLayerIndex;
@@ -258,7 +251,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             layer.TabColor = LayerColorPalette.GetColor(profileId, layer.Index);
         // Re-resolve every key's fill — &lt / &mo keys reference arbitrary
         // layer colors, so changing layer 2's tint repaints layer 0's view too.
-        if (_config is not null)
+        if (_keymap.HasLayout)
             ApplyActiveLayer(ActiveLayerIndex);
         OnPropertyChanged(nameof(ActiveLayerTintColor));
     }
@@ -277,7 +270,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         KeyLabelOverrides.Set(_profile.Id, layerIndex, keyIndex, value);
         PersistSetting(s => s with { KeyLabelOverrides = KeyLabelOverrides.Snapshot() });
 
-        if (_config is not null && layerIndex == ActiveLayerIndex)
+        if (_keymap.HasLayout && layerIndex == ActiveLayerIndex)
             ApplyActiveLayer(ActiveLayerIndex);
     }
 
@@ -316,25 +309,18 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// </summary>
     public (string DefaultHint, KeyLabelOverride? Existing)? GetKeyLabelEditContext(int layerIndex, int keyIndex)
     {
-        if (_config is null) return null;
-        if (layerIndex < 0 || layerIndex >= _config.Layers.Count) return null;
+        var km = _keymap.Current;
+        if (km is null) return null;
+        if (layerIndex < 0 || layerIndex >= km.LayerCount) return null;
         if (keyIndex < 0 || keyIndex >= Keys.Count) return null;
 
-        var holdTapByName = _config.HoldTaps.ToDictionary(h => h.Name, StringComparer.Ordinal);
-        var macrosByName = _config.Macros.ToDictionary(m => m.Name, StringComparer.Ordinal);
-        var binding = _bindingResolver?.ResolveEffectiveBinding(layerIndex, keyIndex) ?? KeyBinding.Transparent;
-        holdTapByName.TryGetValue(binding.Behavior, out var holdTap);
-        var targetLayer = LayerBindingResolver.ResolveTargetLayer(binding, holdTap);
-        var targetLayerName = targetLayer is int tl && tl >= 0 && tl < _config.Layers.Count
-            ? _config.Layers[tl].Name
-            : null;
-
-        var (label, sub, top) = KeyLabelFormatter.FormatBinding(binding, targetLayerName, holdTap, macrosByName);
+        var r = km.Resolve(layerIndex, keyIndex);
+        var (label, sub, top) = KeyLabelFormatter.FormatBinding(r.Binding, r.TargetLayerName, r.HoldTap, km.MacrosByName);
         var parts = new List<string>();
         if (!string.IsNullOrEmpty(top)) parts.Add($"[{top}]");
         if (!string.IsNullOrEmpty(label)) parts.Add(label);
         if (!string.IsNullOrEmpty(sub)) parts.Add($"({sub})");
-        var hint = parts.Count > 0 ? string.Join(" ", parts) : binding.Display;
+        var hint = parts.Count > 0 ? string.Join(" ", parts) : r.Binding.Display;
 
         var existing = KeyLabelOverrides.Get(_profile.Id, layerIndex, keyIndex);
         return (hint, existing);
@@ -353,10 +339,13 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     private (double MinX, double MinY, double MaxX, double MaxY) _leftBounds;
     private (double MinX, double MinY, double MaxX, double MaxY) _rightBounds;
 
-    /// <summary>Margin around the bounding boxes in stacked mode.</summary>
-    private const double StackedMargin = 30;
-    /// <summary>Vertical gap between the two halves in stacked mode.</summary>
-    private const double StackedGap = 60;
+    /// <summary>Current placement math for the board halves. Rebuilt on read
+    /// from the live bounds + layout toggles; the stacked formulas live on
+    /// <see cref="BoardLayoutGeometry"/>.</summary>
+    private BoardLayoutGeometry Geometry => new(
+        _leftBounds, _rightBounds,
+        _profile.CanvasWidth, _profile.CanvasHeight,
+        IsStackedLayout, StackedTopHand == "Right");
 
     /// <summary>When true, the two halves render stacked vertically instead of side-by-side. Persisted across launches.</summary>
     [ObservableProperty]
@@ -409,20 +398,15 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         PersistSetting(s => s with { ModifierStyle = value ? "Windows" : "Mac" });
         // Same redraw hook SetLayerColorOverride uses: rebuilds every key's
         // labels against the freshly-set static.
-        if (_config is not null) ApplyActiveLayer(ActiveLayerIndex);
+        if (_keymap.HasLayout) ApplyActiveLayer(ActiveLayerIndex);
     }
 
     [RelayCommand]
     private void ToggleWindowsModifierStyle() => IsWindowsModifierStyle = !IsWindowsModifierStyle;
 
     /// <summary>Canvas size for the current keyboard profile and layout mode (drives BoardView's Canvas width/height).</summary>
-    public double CanvasWidth => IsStackedLayout
-        ? Math.Max(_leftBounds.MaxX - _leftBounds.MinX, _rightBounds.MaxX - _rightBounds.MinX) + 2 * StackedMargin
-        : _profile.CanvasWidth;
-
-    public double CanvasHeight => IsStackedLayout
-        ? (_leftBounds.MaxY - _leftBounds.MinY) + (_rightBounds.MaxY - _rightBounds.MinY) + StackedGap + 2 * StackedMargin
-        : _profile.CanvasHeight;
+    public double CanvasWidth => Geometry.CanvasWidth;
+    public double CanvasHeight => Geometry.CanvasHeight;
 
     /// <summary>
     /// Per-hand drawing surface size, independent of layout mode. Each per-hand
@@ -431,28 +415,14 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// using the original profile coordinates, and the surrounding Canvas.Left/
     /// Top translates the whole surface for stacked mode.
     /// </summary>
-    public double BoardSurfaceWidth => _profile.CanvasWidth;
-    public double BoardSurfaceHeight => _profile.CanvasHeight;
+    public double BoardSurfaceWidth => Geometry.BoardSurfaceWidth;
+    public double BoardSurfaceHeight => Geometry.BoardSurfaceHeight;
 
-    /// <summary>X translation applied to the left-hand container.</summary>
-    public double LeftHandX => IsStackedLayout ? StackedMargin - _leftBounds.MinX : 0;
-
-    /// <summary>Y translation applied to the left-hand container. Goes below the right hand if "Right" is on top.</summary>
-    public double LeftHandY => !IsStackedLayout
-        ? 0
-        : (StackedTopHand == "Right"
-            ? StackedMargin + (_rightBounds.MaxY - _rightBounds.MinY) + StackedGap - _leftBounds.MinY
-            : StackedMargin - _leftBounds.MinY);
-
-    /// <summary>X translation applied to the right-hand container.</summary>
-    public double RightHandX => IsStackedLayout ? StackedMargin - _rightBounds.MinX : 0;
-
-    /// <summary>Y translation applied to the right-hand container. Goes below the left hand by default.</summary>
-    public double RightHandY => !IsStackedLayout
-        ? 0
-        : (StackedTopHand == "Right"
-            ? StackedMargin - _rightBounds.MinY
-            : StackedMargin + (_leftBounds.MaxY - _leftBounds.MinY) + StackedGap - _rightBounds.MinY);
+    /// <summary>Translation applied to each hand's container (0 in horizontal mode).</summary>
+    public double LeftHandX => Geometry.LeftHandX;
+    public double LeftHandY => Geometry.LeftHandY;
+    public double RightHandX => Geometry.RightHandX;
+    public double RightHandY => Geometry.RightHandY;
 
     [RelayCommand]
     private void ToggleStackedLayout() => IsStackedLayout = !IsStackedLayout;
@@ -550,7 +520,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public Action? OpenSettingsRequested { get; set; }
 
     /// <summary>Path of the layout JSON the user currently has loaded, or null if none.</summary>
-    public string? LoadedLayoutPath => _loadedLayoutPath;
+    public string? LoadedLayoutPath => _keymap.LoadedPath;
 
     // --- Commands ---
     public IRelayCommand QuitCommand { get; }
@@ -562,55 +532,16 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public IRelayCommand OpenLogFolderCommand { get; }
     public IRelayCommand CopyDiagnosticsCommand { get; }
     public IRelayCommand<IKeyboardProfile> SelectKeyboardCommand { get; }
-    public IRelayCommand DismissToastCommand { get; }
     public IRelayCommand OpenSettingsCommand { get; }
 
-    /// <inheritdoc cref="AutoSwitchEngine.ExitTapKey"/>
-    public int? ExitTapKey => _push.AutoSwitch.ExitTapKey;
-
-    /// <inheritdoc cref="AutoSwitchEngine.SetExitTapKey"/>
-    public void SetExitTapKey(int? index) => _push.AutoSwitch.SetExitTapKey(index);
-
-    /// <inheritdoc cref="AutoSwitchEngine.ActiveWindow"/>
-    public ActiveWindowInfo? ActiveWindow => _push.AutoSwitch.ActiveWindow;
-
-    /// <inheritdoc cref="AutoSwitchEngine.AppLayerRules"/>
-    public ObservableCollection<AppLayerRule> AppLayerRules => _push.AutoSwitch.AppLayerRules;
-
-    /// <inheritdoc cref="AutoSwitchEngine.IsEnabled"/>
-    public bool IsAutoSwitchKeyboardLayerEnabled
-    {
-        get => _push.AutoSwitch.IsEnabled;
-        set => _push.AutoSwitch.IsEnabled = value;
-    }
-
-    /// <inheritdoc cref="AutoSwitchEngine.FallbackMode"/>
-    public AutoSwitchFallbackMode AutoSwitchFallbackMode
-    {
-        get => _push.AutoSwitch.FallbackMode;
-        set => _push.AutoSwitch.FallbackMode = value;
-    }
-
-    /// <inheritdoc cref="AutoSwitchEngine.ExitOnTransparentKey"/>
-    public bool AutoSwitchExitOnTransparentKey
-    {
-        get => _push.AutoSwitch.ExitOnTransparentKey;
-        set => _push.AutoSwitch.ExitOnTransparentKey = value;
-    }
-
-    /// <inheritdoc cref="AutoSwitchEngine.ExitOnEmptyKey"/>
-    public bool AutoSwitchExitOnEmptyKey
-    {
-        get => _push.AutoSwitch.ExitOnEmptyKey;
-        set => _push.AutoSwitch.ExitOnEmptyKey = value;
-    }
-
-    /// <inheritdoc cref="AutoSwitchEngine.MatchedAppLayerRule"/>
-    public AppLayerRule? MatchedAppLayerRule => _push.AutoSwitch.MatchedAppLayerRule;
-
-    /// <inheritdoc cref="AutoSwitchEngine.ApplyAppLayerRules"/>
-    public void ApplyAppLayerRules(IReadOnlyList<AppLayerRule> rules) =>
-        _push.AutoSwitch.ApplyAppLayerRules(rules);
+    /// <summary>
+    /// The app→layer auto-switch engine, exposed directly. The settings VM and
+    /// window bind straight to its observable state — the engine is already an
+    /// ObservableObject and everything here is App-layer, so the old
+    /// pass-through facade (and the PropertyChanged relay that fed it) bought
+    /// nothing but a redundant hop.
+    /// </summary>
+    public AutoSwitchEngine AutoSwitch => _push.AutoSwitch;
 
     /// <summary>
     /// Returns the active profile's mouse-layer settings. Falls back to a
@@ -636,9 +567,11 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public MainWindowViewModel(
         ISettingsService settingsService,
         IActiveWindowMonitor? activeWindowMonitor = null,
-        IMouseIdleMonitor? mouseIdleMonitor = null)
+        IMouseIdleMonitor? mouseIdleMonitor = null,
+        IKeymapStateService? keymapState = null)
     {
         _settingsService = settingsService;
+        _keymap = keymapState ?? new KeymapStateService();
         var s = settingsService.Load();
         _profile = KeyboardProfileRegistry.TryResolve(s.Keyboard, out var p) ? p : new CorneProfile();
         _selectedKeyboard = _profile;
@@ -688,22 +621,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         _push.KeyPositionForUi += OnKeyPositionForHighlight;
         // Transparent-key exit predicate reads the currently-loaded config at
         // call time, so swapping layouts or profiles needs no re-binding.
-        _push.SetTransparencyPredicate(ClassifyBindingOnLayer);
-        _push.AutoSwitch.PropertyChanged += (_, e) =>
-        {
-            var relay = e.PropertyName switch
-            {
-                nameof(AutoSwitchEngine.IsEnabled) => nameof(IsAutoSwitchKeyboardLayerEnabled),
-                nameof(AutoSwitchEngine.FallbackMode) => nameof(AutoSwitchFallbackMode),
-                nameof(AutoSwitchEngine.ActiveWindow) => nameof(ActiveWindow),
-                nameof(AutoSwitchEngine.MatchedAppLayerRule) => nameof(MatchedAppLayerRule),
-                nameof(AutoSwitchEngine.ExitTapKey) => nameof(ExitTapKey),
-                nameof(AutoSwitchEngine.ExitOnTransparentKey) => nameof(AutoSwitchExitOnTransparentKey),
-                nameof(AutoSwitchEngine.ExitOnEmptyKey) => nameof(AutoSwitchExitOnEmptyKey),
-                _ => null,
-            };
-            if (relay is not null) OnPropertyChanged(relay);
-        };
+        _push.SetTransparencyPredicate(_keymap.ClassifyBinding);
+        // The settings VM subscribes to _push.AutoSwitch.PropertyChanged
+        // directly (via the AutoSwitch property), so no relay is needed here.
 
         QuitCommand = new RelayCommand(() => QuitRequested?.Invoke());
         ShowCommand = new RelayCommand(() => ShowWindowRequested?.Invoke());
@@ -744,7 +664,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             if (CopyDiagnosticsRequested is not null) await CopyDiagnosticsRequested();
         });
         SelectKeyboardCommand = new RelayCommand<IKeyboardProfile>(SelectKeyboard);
-        DismissToastCommand = new RelayCommand(DismissToast);
         OpenSettingsCommand = new RelayCommand(() => OpenSettingsRequested?.Invoke());
 
         BuildKeysFromProfile();
@@ -773,116 +692,71 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     public void LoadLayoutFromPath(string path)
     {
-        try
+        // Parse + commit happens first and is the only fallible step. On failure
+        // nothing else runs, so the profile / settings are never half-mutated.
+        var result = _keymap.Load(path, _profile.Id);
+        if (result is not KeymapLoadResult.Success loaded)
         {
-            var config = ZmkKeymapLoader.Load(path, _profile.Id);
-            var bindingCount = config.LayerCount > 0 ? config.Layers[0].Bindings.Count : 0;
-            var keyCountMismatch = config.LayerCount > 0 && bindingCount != _profile.KeyCount;
-            IKeyboardProfile? autoSwitchedTo = null;
-            IKeyboardProfile? unmatchedProfile = null;
-            if (keyCountMismatch)
-            {
-                var matching = KeyboardProfileRegistry.All
-                    .FirstOrDefault(p => p.KeyCount == bindingCount);
-                if (matching is not null)
-                {
-                    unmatchedProfile = _profile;
-                    _profile = matching;
-                    SelectedKeyboard = matching;
-                    BuildKeysFromProfile();
-                    PersistSetting(s => s with { Keyboard = matching.Id });
-                    // Re-scope HID discovery — see SelectKeyboard for context.
-                    _hid.SetActiveProfile(matching);
-                    autoSwitchedTo = matching;
-                    DiagnosticLog.Info("MainVM",
-                        $"Auto-switched profile to {matching.Id} ({bindingCount} keys) on load");
-                }
-                else
-                {
-                    DiagnosticLog.Warn("MainVM",
-                        $"Loaded layout has {bindingCount} keys but no profile matches; staying on {_profile.Id}");
-                }
-            }
-
-            _config = config;
-            _bindingResolver = new LayerBindingResolver(config);
-
-            RebuildLayers();
-            ApplyActiveLayer(0);
-            BuildCombosForConfig();
-            HasLayoutLoaded = true;
-            _loadedLayoutPath = path;
-            _lastLoadError = null;
-
-            PersistSetting(s =>
-            {
-                var paths = new Dictionary<string, string>(s.LayoutJsonPaths) { [_profile.Id] = path };
-                return s with { LayoutJsonPaths = paths };
-            });
-
-            var baseMsg = Loc.Instance.Format("Status_Loaded",
-                Path.GetFileName(path), config.LayerCount);
-            if (autoSwitchedTo is not null)
-            {
-                baseMsg += " — " + Loc.Instance.Format("Status_AutoSwitchedKeyboard",
-                    autoSwitchedTo.DisplayName);
-            }
-            else if (keyCountMismatch)
-            {
-                baseMsg += " — " + Loc.Instance.Format("Status_LoadKeyCountMismatch",
-                    bindingCount, _profile.DisplayName, _profile.KeyCount);
-            }
-            SetLoadStatusBase(baseMsg);
-            StatusMessage = baseMsg;
-            DiagnosticLog.Info("MainVM", $"Loaded '{path}'");
-        }
-        catch (Exception ex)
-        {
+            var error = ((KeymapLoadResult.Failure)result).Error;
             SetLoadStatusBase(null);
-            StatusMessage = Loc.Instance.Format("Status_LoadErrorFormat", ex.Message);
-            _lastLoadError = $"{path}: {ex.GetType().Name}: {ex.Message}";
-            DiagnosticLog.Error("MainVM", $"Load failed: {ex}");
-            ShowToast(Loc.Instance.Format("Toast_LoadFailedFormat", Path.GetFileName(path), ex.Message));
+            StatusMessage = Loc.Instance.Format("Status_LoadErrorFormat", error.Message);
+            DiagnosticLog.Error("MainVM", $"Load failed: {error}");
+            Toast.Show(Loc.Instance.Format("Toast_LoadFailedFormat", Path.GetFileName(path), error.Message));
+            return;
         }
-    }
 
-    /// <summary>
-    /// Shows a transient toast banner that auto-dismisses after
-    /// <see cref="ToastDurationMs"/>. Re-entry cancels the previous timer so
-    /// the new message gets the full display window. Click on the toast
-    /// dismisses early via <see cref="DismissToastCommand"/>.
-    /// </summary>
-    public void ShowToast(string message)
-    {
-        _toastCts?.Cancel();
-        _toastCts?.Dispose();
-        var cts = new CancellationTokenSource();
-        _toastCts = cts;
-
-        ToastMessage = message;
-        IsToastVisible = true;
-
-        _ = Task.Delay(ToastDurationMs, cts.Token).ContinueWith(t =>
+        var bindingCount = loaded.FirstLayerBindingCount;
+        var keyCountMismatch = loaded.LayerCount > 0 && bindingCount != _profile.KeyCount;
+        IKeyboardProfile? autoSwitchedTo = null;
+        if (keyCountMismatch)
         {
-            if (t.IsCanceled) return;
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            var matching = KeyboardProfileRegistry.All
+                .FirstOrDefault(p => p.KeyCount == bindingCount);
+            if (matching is not null)
             {
-                if (_toastCts == cts)
-                {
-                    IsToastVisible = false;
-                    _toastCts = null;
-                    cts.Dispose();
-                }
-            });
-        }, TaskScheduler.Default);
-    }
+                _profile = matching;
+                SelectedKeyboard = matching;
+                BuildKeysFromProfile();
+                PersistSetting(s => s with { Keyboard = matching.Id });
+                // Re-scope HID discovery — see SelectKeyboard for context.
+                _hid.SetActiveProfile(matching);
+                autoSwitchedTo = matching;
+                DiagnosticLog.Info("MainVM",
+                    $"Auto-switched profile to {matching.Id} ({bindingCount} keys) on load");
+            }
+            else
+            {
+                DiagnosticLog.Warn("MainVM",
+                    $"Loaded layout has {bindingCount} keys but no profile matches; staying on {_profile.Id}");
+            }
+        }
 
-    private void DismissToast()
-    {
-        _toastCts?.Cancel();
-        _toastCts?.Dispose();
-        _toastCts = null;
-        IsToastVisible = false;
+        RebuildLayers();
+        ApplyActiveLayer(0);
+        BuildCombosForConfig();
+        HasLayoutLoaded = true;
+
+        PersistSetting(s =>
+        {
+            var paths = new Dictionary<string, string>(s.LayoutJsonPaths) { [_profile.Id] = path };
+            return s with { LayoutJsonPaths = paths };
+        });
+
+        var baseMsg = Loc.Instance.Format("Status_Loaded",
+            Path.GetFileName(path), loaded.LayerCount);
+        if (autoSwitchedTo is not null)
+        {
+            baseMsg += " — " + Loc.Instance.Format("Status_AutoSwitchedKeyboard",
+                autoSwitchedTo.DisplayName);
+        }
+        else if (keyCountMismatch)
+        {
+            baseMsg += " — " + Loc.Instance.Format("Status_LoadKeyCountMismatch",
+                bindingCount, _profile.DisplayName, _profile.KeyCount);
+        }
+        SetLoadStatusBase(baseMsg);
+        StatusMessage = baseMsg;
+        DiagnosticLog.Info("MainVM", $"Loaded '{path}'");
     }
 
     /// <summary>
@@ -908,8 +782,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
         sb.AppendLine("--- Active Keyboard ---");
         sb.AppendLine($"Profile: {_profile.DisplayName} ({_profile.Id}), {_profile.KeyCount} keys");
-        sb.AppendLine($"Loaded layout: {_loadedLayoutPath ?? "(none)"}");
-        sb.AppendLine($"Last load error: {_lastLoadError ?? "(none)"}");
+        sb.AppendLine($"Loaded layout: {_keymap.LoadedPath ?? "(none)"}");
+        sb.AppendLine($"Last load error: {_keymap.LastLoadError ?? "(none)"}");
 
         return sb.ToString();
     }
@@ -964,21 +838,21 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         BuildKeysFromProfile();
         _push.SetActiveProfile(profile);
 
-        var layoutFits = _config is not null
-            && _config.LayerCount > 0
-            && _config.Layers[0].Bindings.Count == profile.KeyCount;
+        var km = _keymap.Current;
+        var layoutFits = km is not null
+            && km.LayerCount > 0
+            && km.Layers[0].Bindings.Count == profile.KeyCount;
 
-        if (_config is not null && !layoutFits)
+        if (km is not null && !layoutFits)
         {
-            _config = null;
-            _bindingResolver = null;
+            _keymap.Clear();
             Layers.Clear();
             ActiveLayerIndex = 0;
             HasLayoutLoaded = false;
             SetLoadStatusBase(null);
             StatusMessage = Loc.Instance.Format("Status_KeyboardSwitchedUnloaded", profile.DisplayName);
         }
-        else if (_config is not null)
+        else if (km is not null)
         {
             ApplyActiveLayer(ActiveLayerIndex);
             SetLoadStatusBase(null);
@@ -1037,8 +911,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     private void RebuildLayers()
     {
         Layers.Clear();
-        if (_config is null) return;
-        foreach (var layer in _config.Layers)
+        var km = _keymap.Current;
+        if (km is null) return;
+        foreach (var layer in km.Layers)
         {
             Layers.Add(new LayerViewModel(
                 layer.Index,
@@ -1055,30 +930,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     /// <summary>Routes a layer push through the HID pipeline. Test-tab plumbing for SettingsViewModel.</summary>
     public void PushLayerToKeyboard(int index) => _hid.PushLayer(index);
-
-    /// <summary>
-    /// Classifies the currently-loaded config's binding at
-    /// (<paramref name="layer"/>, <paramref name="key"/>) as
-    /// <see cref="TransparentBindingKind.Transparent"/> for <c>&amp;trans</c>,
-    /// <see cref="TransparentBindingKind.Empty"/> for <c>&amp;none</c>, or
-    /// null for anything else (including when no config is loaded or indices
-    /// are out of range). No fall-through walk — exit fires on the visible
-    /// binding only.
-    /// </summary>
-    private TransparentBindingKind? ClassifyBindingOnLayer(int layer, int key)
-    {
-        var cfg = _config;
-        if (cfg is null) return null;
-        if (layer < 0 || layer >= cfg.Layers.Count) return null;
-        var bindings = cfg.Layers[layer].Bindings;
-        if (key < 0 || key >= bindings.Count) return null;
-        return bindings[key].Behavior switch
-        {
-            "&trans" => TransparentBindingKind.Transparent,
-            "&none" => TransparentBindingKind.Empty,
-            _ => null,
-        };
-    }
 
     /// <summary>
     /// Sends a 0xFD GetDeviceInfo request and awaits the 0xFE reply.
@@ -1099,35 +950,25 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     private void ApplyActiveLayer(int index)
     {
-        if (_config is null) return;
-        if (index < 0 || index >= _config.Layers.Count) return;
+        var km = _keymap.Current;
+        if (km is null) return;
+        if (index < 0 || index >= km.LayerCount) return;
 
         ActiveLayerIndex = index;
-        var layer = _config.Layers[index];
-
-        var holdTapByName = _config.HoldTaps.ToDictionary(h => h.Name, StringComparer.Ordinal);
-        var macrosByName = _config.Macros.ToDictionary(m => m.Name, StringComparer.Ordinal);
 
         for (int i = 0; i < Keys.Count; i++)
         {
-            // Resolve the effective binding by walking the predecessor graph:
-            // `&trans` falls through to the layer that can activate this one
-            // (recursively) until a non-transparent binding is found.
-            var binding = _bindingResolver?.ResolveEffectiveBinding(layer.Index, i) ?? KeyBinding.Transparent;
-
-            holdTapByName.TryGetValue(binding.Behavior, out var holdTap);
-            var targetLayer = LayerBindingResolver.ResolveTargetLayer(binding, holdTap);
-            var targetLayerName = targetLayer is int tl && tl >= 0 && tl < _config.Layers.Count
-                ? _config.Layers[tl].Name
-                : null;
+            // Resolution (including &trans fall-through) lives on LoadedKeymap;
+            // here we just paint the resolved binding onto the key VM.
+            var r = km.Resolve(index, i);
             Keys[i].ApplyBinding(
-                binding,
-                activeLayerIndex: layer.Index,
-                targetLayer: targetLayer,
-                targetLayerName: targetLayerName,
+                r.Binding,
+                activeLayerIndex: index,
+                targetLayer: r.TargetLayer,
+                targetLayerName: r.TargetLayerName,
                 profileId: _profile.Id,
-                holdTap: holdTap,
-                macros: macrosByName);
+                holdTap: r.HoldTap,
+                macros: km.MacrosByName);
         }
 
         for (int i = 0; i < Layers.Count; i++)
@@ -1135,7 +976,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     }
 
     /// <summary>
-    /// Walks <see cref="_config"/>'s combos once and populates the legend
+    /// Walks the loaded keymap's combos once and populates the legend
     /// collection plus each key's <see cref="KeyViewModel.SetCombos"/>.
     /// Called once per keymap load from <see cref="LoadLayoutFromPath"/>
     /// after the initial <see cref="ApplyActiveLayer"/> — combos aren't
@@ -1149,14 +990,15 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         SetHighlightedCombos(Array.Empty<int>());
         Combos.Clear();
 
-        if (_config is null)
+        var km = _keymap.Current;
+        if (km is null)
         {
             for (var i = 0; i < Keys.Count; i++)
                 Keys[i].SetCombos(Array.Empty<ZmkCombo>(), Array.Empty<int>(), _ => "");
             return;
         }
 
-        var allCombos = _config.Combos;
+        var allCombos = km.Combos;
         var combosByKey = new Dictionary<int, List<ZmkCombo>>();
         var numbersByKey = new Dictionary<int, List<int>>();
         for (var i = 0; i < allCombos.Count; i++)
@@ -1184,13 +1026,12 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                 Keys[i].SetCombos(Array.Empty<ZmkCombo>(), Array.Empty<int>(), LabelLookup);
         }
 
-        var macrosByName = _config.Macros.ToDictionary(m => m.Name, StringComparer.Ordinal);
         for (var i = 0; i < allCombos.Count; i++)
         {
             var combo = allCombos[i];
             var key = ComboLabelOverrides.KeyPositionsToKey(combo.KeyPositions);
             var ov = ComboLabelOverrides.Get(_profile.Id, key);
-            Combos.Add(new ComboViewModel(i + 1, combo, LabelLookup, macrosByName, ov));
+            Combos.Add(new ComboViewModel(i + 1, combo, LabelLookup, km.MacrosByName, ov));
         }
     }
 
