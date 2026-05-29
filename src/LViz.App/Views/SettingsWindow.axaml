@@ -133,12 +133,12 @@
                         <TextBlock Text="{Binding [Settings_Layout], Source={StaticResource Loc}}"
                                    FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                         <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0"
-                                    IsEnabled="{Binding MainViewModel.IsStackedLayout}">
+                                    IsEnabled="{Binding MainViewModel.BoardLayout.IsStackedLayout}">
                             <TextBlock Text="{Binding [Settings_TopHand], Source={StaticResource Loc}}"
                                        VerticalAlignment="Center" Foreground="{StaticResource TextSubtle}" FontSize="12" />
                             <ComboBox MinWidth="100"
                                       ItemsSource="{Binding AvailableTopHands}"
-                                      SelectedItem="{Binding MainViewModel.StackedTopHand, Mode=TwoWay}" />
+                                      SelectedItem="{Binding MainViewModel.BoardLayout.StackedTopHand, Mode=TwoWay}" />
                         </StackPanel>
                     </StackPanel>
 

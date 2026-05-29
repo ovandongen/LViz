@@ -28,6 +28,12 @@ public partial class ExitKeyPickerViewModel : ObservableObject, IBoardSurface
     public ExitKeyPickerViewModel(IKeyboardProfile profile, int? initialSelection)
     {
         _profile = profile;
+        // Picker never persists and never stacks; it uses a fixed press palette
+        // (no settings service passed → BoardStyle/BoardLayout don't write back).
+        BoardLayout = new BoardLayoutViewModel(profile);
+        BoardStyle = new BoardStyleViewModel(
+            AppTheme.PressHighlightDefaultHex,
+            strokeOverride: AppTheme.PickerPressStrokeHex);
 
         foreach (var pos in _profile.Keys)
         {
@@ -68,21 +74,11 @@ public partial class ExitKeyPickerViewModel : ObservableObject, IBoardSurface
     public ObservableCollection<KeyViewModel> LeftKeys { get; } = new();
     public ObservableCollection<KeyViewModel> RightKeys { get; } = new();
 
-    // IBoardSurface — picker always renders in horizontal (non-stacked) mode
-    // so the hand offsets are zero and the canvas size matches the profile.
-    public double CanvasWidth => _profile.CanvasWidth;
-    public double CanvasHeight => _profile.CanvasHeight;
-    public double BoardSurfaceWidth => _profile.CanvasWidth;
-    public double BoardSurfaceHeight => _profile.CanvasHeight;
-    public double LeftHandX => 0;
-    public double LeftHandY => 0;
-    public double RightHandX => 0;
-    public double RightHandY => 0;
-
-    // Press dots aren't pulsed in the picker (IsPressed is never set), but
-    // BoardView binds these regardless so the brush parses cleanly.
-    public string PressHighlightColor => AppTheme.PressHighlightDefaultHex;
-    public string PressHighlightStrokeColor => AppTheme.PickerPressStrokeHex;
+    // IBoardSurface — geometry + press style come from the two child VMs,
+    // constructed above with no settings service (picker never persists) and a
+    // fixed picker press palette.
+    public BoardLayoutViewModel BoardLayout { get; }
+    public BoardStyleViewModel BoardStyle { get; }
 
     // Picker has no combos — overlay always off so the indicator stays
     // hidden (no combo earmarks here) and pointer events don't bind.

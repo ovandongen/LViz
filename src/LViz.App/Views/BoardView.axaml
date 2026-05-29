@@ -50,8 +50,8 @@
                          VerticalAlignment="Top"
                          Margin="0,5,5,0"
                          IsHitTestVisible="False"
-                         Fill="{Binding DataContext.PressHighlightColor, ElementName=Board, Converter={x:Static convApp:HexColorToBrushConverter.Instance}}"
-                         Stroke="{Binding DataContext.PressHighlightStrokeColor, ElementName=Board, Converter={x:Static convApp:HexColorToBrushConverter.Instance}}"
+                         Fill="{Binding DataContext.BoardStyle.PressHighlightColor, ElementName=Board, Converter={x:Static convApp:HexColorToBrushConverter.Instance}}"
+                         Stroke="{Binding DataContext.BoardStyle.PressHighlightStrokeColor, ElementName=Board, Converter={x:Static convApp:HexColorToBrushConverter.Instance}}"
                          StrokeThickness="1" />
 
                 <!-- Combo-indicator earmark: right triangle hugging the
@@ -183,13 +183,13 @@
          variant doesn't rebind reliably per item in Avalonia 11, which
          collapses every key to (0,0). -->
     <Viewbox Stretch="Uniform" StretchDirection="Both" ClipToBounds="False">
-        <Canvas Width="{Binding CanvasWidth}" Height="{Binding CanvasHeight}"
+        <Canvas Width="{Binding BoardLayout.CanvasWidth}" Height="{Binding BoardLayout.CanvasHeight}"
                 Background="Transparent" ClipToBounds="False">
             <ItemsControl ItemsSource="{Binding LeftKeys}"
-                          Width="{Binding BoardSurfaceWidth}"
-                          Height="{Binding BoardSurfaceHeight}"
-                          Canvas.Left="{Binding LeftHandX}"
-                          Canvas.Top="{Binding LeftHandY}"
+                          Width="{Binding BoardLayout.BoardSurfaceWidth}"
+                          Height="{Binding BoardLayout.BoardSurfaceHeight}"
+                          Canvas.Left="{Binding BoardLayout.LeftHandX}"
+                          Canvas.Top="{Binding BoardLayout.LeftHandY}"
                           ClipToBounds="False"
                           ItemTemplate="{StaticResource KeyTemplate}">
                 <ItemsControl.ItemsPanel>
@@ -244,10 +244,10 @@
             </ItemsControl>
 
             <ItemsControl ItemsSource="{Binding RightKeys}"
-                          Width="{Binding BoardSurfaceWidth}"
-                          Height="{Binding BoardSurfaceHeight}"
-                          Canvas.Left="{Binding RightHandX}"
-                          Canvas.Top="{Binding RightHandY}"
+                          Width="{Binding BoardLayout.BoardSurfaceWidth}"
+                          Height="{Binding BoardLayout.BoardSurfaceHeight}"
+                          Canvas.Left="{Binding BoardLayout.RightHandX}"
+                          Canvas.Top="{Binding BoardLayout.RightHandY}"
                           ClipToBounds="False"
                           ItemTemplate="{StaticResource KeyTemplate}">
                 <ItemsControl.ItemsPanel>

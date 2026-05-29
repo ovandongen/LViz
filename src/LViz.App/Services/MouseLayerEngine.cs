@@ -122,12 +122,7 @@ public sealed class MouseLayerEngine : IMouseLayerEngine
         _settings = settings;
         _monitor.IdleTimeoutMs = settings.IdleTimeoutMs;
         var profileId = _profile.Id;
-        PersistSetting(s =>
-        {
-            var clone = new Dictionary<string, MouseLayerSettings>(s.MouseLayer);
-            clone[profileId] = settings;
-            return s with { MouseLayer = clone };
-        });
+        PersistSetting(s => s with { MouseLayer = PerProfile.Set(s.MouseLayer, profileId, settings) });
         // Stop+Start cycle (not just Start) so the monitor's internal state
         // machine resets — Start() is a no-op when already running, which
         // would otherwise leave _moving / _lastMoveTicks stale across the
@@ -223,9 +218,7 @@ public sealed class MouseLayerEngine : IMouseLayerEngine
     private MouseLayerSettings LoadSettingsForProfile(string profileId)
     {
         var s = _settingsService.Load();
-        return s.MouseLayer.TryGetValue(profileId, out var loaded)
-            ? loaded
-            : new MouseLayerSettings();
+        return s.MouseLayer.GetForProfile(profileId, new MouseLayerSettings());
     }
 
     private void ReevaluateMonitorState()
@@ -264,16 +257,9 @@ public sealed class MouseLayerEngine : IMouseLayerEngine
         _preMoveLayer = null;
     }
 
-    private void PersistSetting(Func<UserSettings, UserSettings> update)
-    {
-        try
-        {
-            var s = _settingsService.Load();
-            _settingsService.Save(update(s));
-        }
-        catch (Exception ex)
-        {
-            DiagnosticLog.Warn("MouseLayer", $"persist failed: {ex.Message}");
-        }
-    }
+    // Thin wrapper over SettingsServiceExtensions.Update so the "MouseLayer"
+    // diagnostic subsystem tag is named once; the shared helper owns the
+    // load→mutate→save and error-swallow.
+    private void PersistSetting(Func<UserSettings, UserSettings> update) =>
+        _settingsService.Update(update, "MouseLayer");
 }

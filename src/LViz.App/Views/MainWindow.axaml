@@ -187,9 +187,9 @@
 
                         <!-- Stacked / horizontal layout toggle -->
                         <Button x:Name="StackedLayoutButton"
-                                Command="{Binding ToggleStackedLayoutCommand}"
+                                Command="{Binding BoardLayout.ToggleStackedLayoutCommand}"
                                 Classes="toggle"
-                                Classes.active="{Binding IsStackedLayout}"
+                                Classes.active="{Binding BoardLayout.IsStackedLayout}"
                                 Padding="8,4"
                                 ToolTip.Tip="{Binding [Tooltip_StackedLayout], Source={StaticResource Loc}}">
                             <PathIcon Width="14" Height="14"
@@ -333,14 +333,14 @@
                                 </Style>
                                 <Style Selector="Button.comboTile:pointerover /template/ ContentPresenter">
                                     <Setter Property="Background" Value="{StaticResource ComboStroke}" />
-                                    <Setter Property="BorderBrush" Value="{Binding DataContext.PressHighlightColor, ElementName=MainWin, Converter={StaticResource HexToBrush}}" />
+                                    <Setter Property="BorderBrush" Value="{Binding DataContext.BoardStyle.PressHighlightColor, ElementName=MainWin, Converter={StaticResource HexToBrush}}" />
                                 </Style>
                                 <Style Selector="Button.comboTile:pointerover TextBlock">
                                     <Setter Property="Foreground" Value="{StaticResource Text}" />
                                 </Style>
                                 <Style Selector="Button.comboTile.active /template/ ContentPresenter">
                                     <Setter Property="Background" Value="{StaticResource ComboStroke}" />
-                                    <Setter Property="BorderBrush" Value="{Binding DataContext.PressHighlightColor, ElementName=MainWin, Converter={StaticResource HexToBrush}}" />
+                                    <Setter Property="BorderBrush" Value="{Binding DataContext.BoardStyle.PressHighlightColor, ElementName=MainWin, Converter={StaticResource HexToBrush}}" />
                                 </Style>
                                 <Style Selector="Button.comboTile.active TextBlock">
                                     <Setter Property="Foreground" Value="{StaticResource Text}" />

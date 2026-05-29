@@ -48,6 +48,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         HotkeyKeyChoices = PlatformCapabilities.GetAvailableFKeys(mainViewModel.HotkeyKey);
         _mainViewModel.PropertyChanged += OnMainPropertyChanged;
         _mainViewModel.AutoSwitch.PropertyChanged += OnAutoSwitchPropertyChanged;
+        _mainViewModel.BoardStyle.PropertyChanged += OnBoardStylePropertyChanged;
         _mainViewModel.Layers.CollectionChanged += OnLayersCollectionChanged;
 
         // Seed the auto-check toggle from disk so the UI reflects the persisted
@@ -447,6 +448,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         _disposed = true;
         _mainViewModel.PropertyChanged -= OnMainPropertyChanged;
         _mainViewModel.AutoSwitch.PropertyChanged -= OnAutoSwitchPropertyChanged;
+        _mainViewModel.BoardStyle.PropertyChanged -= OnBoardStylePropertyChanged;
         _mainViewModel.Layers.CollectionChanged -= OnLayersCollectionChanged;
         EditingRules.CollectionChanged -= OnEditingRulesChanged;
         _updateService.UpdateAvailable -= OnUpdateAvailable;
@@ -466,12 +468,12 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     /// </summary>
     public Color PressHighlightColor
     {
-        get => Color.TryParse(_mainViewModel.PressHighlightColor, out var c) ? c : Colors.Yellow;
-        set => _mainViewModel.PressHighlightColor = $"#{value.R:X2}{value.G:X2}{value.B:X2}";
+        get => Color.TryParse(_mainViewModel.BoardStyle.PressHighlightColor, out var c) ? c : Colors.Yellow;
+        set => _mainViewModel.BoardStyle.PressHighlightColor = $"#{value.R:X2}{value.G:X2}{value.B:X2}";
     }
 
     /// <summary>Hex string for the swatch preview Border in the picker button.</summary>
-    public string PressHighlightColorHex => _mainViewModel.PressHighlightColor;
+    public string PressHighlightColorHex => _mainViewModel.BoardStyle.PressHighlightColor;
 
     /// <summary>F-key choices offered for the global hotkey. F13–F24 first
     /// (effectively always free), then F1–F12. Filtered per OS — macOS
@@ -516,11 +518,6 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     private static readonly Dictionary<string, Action<SettingsViewModel>> _mainPropagators = new()
     {
         [nameof(MainWindowViewModel.BackgroundOpacity)] = s => s.OnPropertyChanged(nameof(BackgroundOpacityPercent)),
-        [nameof(MainWindowViewModel.PressHighlightColor)] = s =>
-        {
-            s.OnPropertyChanged(nameof(PressHighlightColor));
-            s.OnPropertyChanged(nameof(PressHighlightColorHex));
-        },
         [nameof(MainWindowViewModel.SelectedKeyboard)] = s =>
         {
             s.RebuildLayerEntries();
@@ -575,6 +572,24 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
             propagate(this);
     }
 
+    // Re-raises the SettingsVM press-color properties off the board-style VM's
+    // own PropertyChanged. SettingsVM binds BoardStyle directly (no MainVM
+    // pass-through), so it subscribes here exactly as it does for AutoSwitch.
+    private static readonly Dictionary<string, Action<SettingsViewModel>> _boardStylePropagators = new()
+    {
+        [nameof(BoardStyleViewModel.PressHighlightColor)] = s =>
+        {
+            s.OnPropertyChanged(nameof(PressHighlightColor));
+            s.OnPropertyChanged(nameof(PressHighlightColorHex));
+        },
+    };
+
+    private void OnBoardStylePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is { } name && _boardStylePropagators.TryGetValue(name, out var propagate))
+            propagate(this);
+    }
+
     /// <summary>Test-only handle on the propagator dispatch table. The
     /// SettingsViewModelMainPropertyCoverageTests guard against silent
     /// drift when new MainViewModel properties are added.</summary>
@@ -620,16 +635,17 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     }
 
     // ── Mouse-layer (per-profile) ─────────────────────────────────────────
-    // Backed by MainViewModel.GetActiveMouseLayerSettings / ApplyMouseLayerSettings.
-    // Setters apply immediately (no commit-on-close) — same UX pattern the
-    // auto-switch fallback uses, since the underlying state is a small,
-    // self-contained record.
+    // Reads/writes MainViewModel.MouseLayer (the engine) directly — no MainVM
+    // facade. Setters apply immediately (no commit-on-close) — same UX pattern
+    // the auto-switch fallback uses, since the underlying state is a small,
+    // self-contained record. When the engine is absent (tests), the snapshot
+    // falls back to the persisted per-profile settings.
 
     private MouseLayerSettings _mouseLayerSnapshot = new();
 
     private void ReloadMouseLayerSnapshot()
     {
-        _mouseLayerSnapshot = _mainViewModel.GetActiveMouseLayerSettings();
+        _mouseLayerSnapshot = _mainViewModel.MouseLayer?.CurrentSettings ?? LoadPersistedMouseLayerSettings();
         OnPropertyChanged(nameof(IsMouseLayerEnabled));
         OnPropertyChanged(nameof(SelectedMouseLayer));
         OnPropertyChanged(nameof(MouseLayerIdleTimeoutMs));
@@ -642,8 +658,15 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     private void UpdateMouseLayerSnapshot(MouseLayerSettings next)
     {
         _mouseLayerSnapshot = next;
-        _mainViewModel.ApplyMouseLayerSettings(next);
+        _mainViewModel.MouseLayer?.ApplySettings(next);
     }
+
+    /// <summary>Per-profile mouse-layer settings straight from disk — the
+    /// fallback used when no engine is wired up (tests). Mirrors the load the
+    /// engine itself does on construction.</summary>
+    private MouseLayerSettings LoadPersistedMouseLayerSettings() =>
+        _settingsService.Load().MouseLayer
+            .GetForProfile(_mainViewModel.SelectedKeyboard.Id, new MouseLayerSettings());
 
     public bool IsMouseLayerEnabled
     {

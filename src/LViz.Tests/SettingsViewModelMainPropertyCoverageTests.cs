@@ -39,9 +39,7 @@ public class SettingsViewModelMainPropertyCoverageTests
         // Bound directly in SettingsWindow.axaml — no SettingsVM transform needed.
         "HotkeyKey",
         "HotkeyModifiers",
-        "IsStackedLayout",
         "IsComboOverlayVisible",
-        "StackedTopHand",
         "IsWindowsModifierStyle",
         "ColorTrayIconByActiveLayer",
         "IsLiveHighlightingEnabled",
@@ -52,22 +50,23 @@ public class SettingsViewModelMainPropertyCoverageTests
         // observable state without a MainVM facade).
         "AutoSwitch",
 
+        // Board geometry + press-style child VMs, exposed directly. BoardLayout
+        // is bound in XAML; BoardStyle changes propagate via SettingsVM's
+        // BoardStyle.PropertyChanged subscription (not a MainVM facade).
+        "BoardLayout",
+        "BoardStyle",
+
+        // The mouse-layer engine, exposed directly (SettingsVM reads/writes it
+        // without a MainVM facade); not surfaced as a derived SettingsVM prop.
+        "MouseLayer",
+
         // Pure derived / geometry / display-only — not user-facing in settings.
         "LoadInfoTooltip",
         "ActiveLayerTintColor",
         "ActiveLayerIndex",
         "BoardBackground",
         "TabBackground",
-        "PressHighlightStrokeColor",
         "ModifierStyleIconData",
-        "CanvasWidth",
-        "CanvasHeight",
-        "BoardSurfaceWidth",
-        "BoardSurfaceHeight",
-        "LeftHandX",
-        "LeftHandY",
-        "RightHandX",
-        "RightHandY",
         "KeyboardStatusHint",
         "IsAppRulesTabVisible",
         "LoadedLayoutPath",

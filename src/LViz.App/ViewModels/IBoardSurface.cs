@@ -19,17 +19,11 @@ public interface IBoardSurface
     ObservableCollection<KeyViewModel> LeftKeys { get; }
     ObservableCollection<KeyViewModel> RightKeys { get; }
 
-    double CanvasWidth { get; }
-    double CanvasHeight { get; }
-    double BoardSurfaceWidth { get; }
-    double BoardSurfaceHeight { get; }
-    double LeftHandX { get; }
-    double LeftHandY { get; }
-    double RightHandX { get; }
-    double RightHandY { get; }
+    /// <summary>Canvas geometry + stacked-mode offsets the BoardView binds against.</summary>
+    BoardLayoutViewModel BoardLayout { get; }
 
-    string PressHighlightColor { get; }
-    string PressHighlightStrokeColor { get; }
+    /// <summary>Press-highlight fill/stroke colors for the per-key press dot.</summary>
+    BoardStyleViewModel BoardStyle { get; }
 
     /// <summary>
     /// When true, combo keys render a numbered badge instead of the static

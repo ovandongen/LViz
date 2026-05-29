@@ -169,27 +169,14 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     partial void OnColorTrayIconByActiveLayerChanged(bool value) =>
         PersistSetting(s => s with { ColorTrayIconByActiveLayer = value });
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PressHighlightStrokeColor))]
-    private string _pressHighlightColor = AppTheme.PressHighlightDefaultHex;
+    /// <summary>Canvas geometry + stacked-mode offsets for the board render
+    /// surface, extracted into its own VM. Bound by BoardView and the settings
+    /// window; owns the persisted stacked-layout toggles.</summary>
+    public BoardLayoutViewModel BoardLayout { get; }
 
-    /// <summary>
-    /// Rim color for the press dot — darkened version of <see cref="PressHighlightColor"/>
-    /// so the dot reads against light layer fills. Multiplies each channel by 0.55
-    /// to roughly mimic the original yellow→olive pairing in <see cref="AppTheme"/>.
-    /// </summary>
-    public string PressHighlightStrokeColor
-    {
-        get
-        {
-            if (LViz.Core.Colors.HexRgb.TryParse(PressHighlightColor, out var r, out var g, out var b))
-                return $"#{(int)(r * 0.55):X2}{(int)(g * 0.55):X2}{(int)(b * 0.55):X2}";
-            return AppTheme.PressHighlightStrokeFallbackHex;
-        }
-    }
-
-    partial void OnPressHighlightColorChanged(string value) =>
-        PersistSetting(s => s with { PressHighlightColor = value });
+    /// <summary>Press-highlight fill/stroke colors for the per-key press dot,
+    /// extracted into its own VM. Owns the persisted highlight color.</summary>
+    public BoardStyleViewModel BoardStyle { get; }
 
     /// <summary>
     /// Global show/hide hotkey key name (e.g. "F12"). Modifier handling
@@ -223,28 +210,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         var profileId = _profile.Id;
         LayerColorPalette.SetOverride(profileId, layerIndex, hex);
 
-        PersistSetting(s =>
-        {
-            var clone = new Dictionary<string, Dictionary<int, string>>();
-            foreach (var (pid, perLayer) in s.LayerColors)
-                clone[pid] = new Dictionary<int, string>(perLayer);
-
-            if (string.IsNullOrWhiteSpace(hex))
-            {
-                if (clone.TryGetValue(profileId, out var inner))
-                {
-                    inner.Remove(layerIndex);
-                    if (inner.Count == 0) clone.Remove(profileId);
-                }
-            }
-            else
-            {
-                if (!clone.TryGetValue(profileId, out var inner))
-                    clone[profileId] = inner = new Dictionary<int, string>();
-                inner[layerIndex] = hex!;
-            }
-            return s with { LayerColors = clone };
-        });
+        PersistSetting(s => string.IsNullOrWhiteSpace(hex)
+            ? s with { LayerColors = PerProfile.RemoveInner(s.LayerColors, profileId, layerIndex) }
+            : s with { LayerColors = PerProfile.SetInner(s.LayerColors, profileId, layerIndex, hex!) });
 
         // Repaint tab swatches in place (re-creating Layers would steal selection focus).
         foreach (var layer in Layers)
@@ -333,44 +301,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public ObservableCollection<KeyViewModel> RightKeys { get; } = new();
     public ObservableCollection<LayerViewModel> Layers { get; } = new();
 
-    // Per-profile bounding boxes for each hand, recomputed on profile change.
-    // Used to translate each half's container in stacked mode so the bounding
-    // box starts at the canvas-edge margin.
-    private (double MinX, double MinY, double MaxX, double MaxY) _leftBounds;
-    private (double MinX, double MinY, double MaxX, double MaxY) _rightBounds;
-
-    /// <summary>Current placement math for the board halves. Rebuilt on read
-    /// from the live bounds + layout toggles; the stacked formulas live on
-    /// <see cref="BoardLayoutGeometry"/>.</summary>
-    private BoardLayoutGeometry Geometry => new(
-        _leftBounds, _rightBounds,
-        _profile.CanvasWidth, _profile.CanvasHeight,
-        IsStackedLayout, StackedTopHand == "Right");
-
-    /// <summary>When true, the two halves render stacked vertically instead of side-by-side. Persisted across launches.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanvasWidth))]
-    [NotifyPropertyChangedFor(nameof(CanvasHeight))]
-    [NotifyPropertyChangedFor(nameof(LeftHandX))]
-    [NotifyPropertyChangedFor(nameof(LeftHandY))]
-    [NotifyPropertyChangedFor(nameof(RightHandX))]
-    [NotifyPropertyChangedFor(nameof(RightHandY))]
-    private bool _isStackedLayout;
-
-    partial void OnIsStackedLayoutChanged(bool value) =>
-        PersistSetting(s => s with { StackedLayout = value });
-
-    /// <summary>Which half ("Left"/"Right") sits on top in stacked mode. Ignored in horizontal mode.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(LeftHandX))]
-    [NotifyPropertyChangedFor(nameof(LeftHandY))]
-    [NotifyPropertyChangedFor(nameof(RightHandX))]
-    [NotifyPropertyChangedFor(nameof(RightHandY))]
-    private string _stackedTopHand = "Left";
-
-    partial void OnStackedTopHandChanged(string value) =>
-        PersistSetting(s => s with { StackedTopHand = value });
-
     /// <summary>
     /// True when the board renders Windows-style modifier glyphs (⊞ Alt Ctrl ⇧)
     /// instead of the default Mac set (⌘ ⌥ ⌃ ⇪). User-controlled via the
@@ -403,29 +333,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     [RelayCommand]
     private void ToggleWindowsModifierStyle() => IsWindowsModifierStyle = !IsWindowsModifierStyle;
-
-    /// <summary>Canvas size for the current keyboard profile and layout mode (drives BoardView's Canvas width/height).</summary>
-    public double CanvasWidth => Geometry.CanvasWidth;
-    public double CanvasHeight => Geometry.CanvasHeight;
-
-    /// <summary>
-    /// Per-hand drawing surface size, independent of layout mode. Each per-hand
-    /// ItemsControl in BoardView binds Width/Height to these so it has a
-    /// non-zero render box — keys position themselves absolutely within it
-    /// using the original profile coordinates, and the surrounding Canvas.Left/
-    /// Top translates the whole surface for stacked mode.
-    /// </summary>
-    public double BoardSurfaceWidth => Geometry.BoardSurfaceWidth;
-    public double BoardSurfaceHeight => Geometry.BoardSurfaceHeight;
-
-    /// <summary>Translation applied to each hand's container (0 in horizontal mode).</summary>
-    public double LeftHandX => Geometry.LeftHandX;
-    public double LeftHandY => Geometry.LeftHandY;
-    public double RightHandX => Geometry.RightHandX;
-    public double RightHandY => Geometry.RightHandY;
-
-    [RelayCommand]
-    private void ToggleStackedLayout() => IsStackedLayout = !IsStackedLayout;
 
     /// <summary>
     /// When true, combo keys show numbered indicators (e.g. <c>"1"</c>,
@@ -544,25 +451,14 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public AutoSwitchEngine AutoSwitch => _push.AutoSwitch;
 
     /// <summary>
-    /// Returns the active profile's mouse-layer settings. Falls back to a
-    /// fresh disabled default when no engine is wired up (tests) or no
-    /// override has been persisted for the active profile yet.
+    /// The mouse-movement → layer push engine, exposed directly (mirrors
+    /// <see cref="AutoSwitch"/>). The settings VM reads its
+    /// <see cref="IMouseLayerEngine.CurrentSettings"/> and calls
+    /// <see cref="IMouseLayerEngine.ApplySettings"/> on it directly — no MainVM
+    /// pass-through facade. Null when no mouse-idle monitor is wired up (tests);
+    /// callers fall back to the persisted per-profile settings in that case.
     /// </summary>
-    public MouseLayerSettings GetActiveMouseLayerSettings()
-    {
-        if (_push.MouseLayer is not null) return _push.MouseLayer.CurrentSettings;
-        var s = _settingsService.Load();
-        return s.MouseLayer.TryGetValue(_profile.Id, out var loaded)
-            ? loaded
-            : new MouseLayerSettings();
-    }
-
-    /// <summary>
-    /// Persists the active profile's mouse-layer settings and re-arms the
-    /// engine (idle timeout + enabled-state reconciliation).
-    /// </summary>
-    public void ApplyMouseLayerSettings(MouseLayerSettings settings) =>
-        _push.MouseLayer?.ApplySettings(settings);
+    public IMouseLayerEngine? MouseLayer => _push.MouseLayer;
 
     public MainWindowViewModel(
         ISettingsService settingsService,
@@ -580,13 +476,21 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         _isLiveHighlightingEnabled = s.LiveKeyHighlighting;
         _isAutoLayerSwitchEnabled = s.AutoLayerSwitch;
         _backgroundOpacity = Math.Clamp(s.BackgroundOpacity, 0.0, 1.0);
-        if (!string.IsNullOrWhiteSpace(s.PressHighlightColor))
-            _pressHighlightColor = s.PressHighlightColor;
         if (!string.IsNullOrWhiteSpace(s.HotkeyKey))
             _hotkeyKey = s.HotkeyKey;
-        _isStackedLayout = s.StackedLayout;
         _isComboOverlayVisible = s.ComboOverlayVisible;
-        _stackedTopHand = string.IsNullOrWhiteSpace(s.StackedTopHand) ? "Left" : s.StackedTopHand;
+
+        // Board geometry + press-style live in their own VMs now; seed them from
+        // the same settings load. Each owns its own persistence (StackedLayout /
+        // StackedTopHand / PressHighlightColor) via the injected settings service.
+        BoardLayout = new BoardLayoutViewModel(
+            _profile, settingsService, s.StackedLayout,
+            string.IsNullOrWhiteSpace(s.StackedTopHand) ? "Left" : s.StackedTopHand);
+        BoardStyle = new BoardStyleViewModel(
+            string.IsNullOrWhiteSpace(s.PressHighlightColor)
+                ? AppTheme.PressHighlightDefaultHex
+                : s.PressHighlightColor,
+            settingsService);
         _isWindowsModifierStyle = string.Equals(s.ModifierStyle, "Windows", StringComparison.OrdinalIgnoreCase);
         // Seed the static *before* the first ApplyActiveLayer so initial render
         // already uses the persisted glyph set (the partial change handler is
@@ -812,20 +716,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             (pos.Hand == Hand.Left ? LeftKeys : RightKeys).Add(vm);
         }
 
-        // Rotated bounds matter for boards like Glove80 whose shared-pivot thumb
-        // cluster swings far outside the unrotated (X, Y, W, H) rect.
-        _leftBounds = _profile.Keys.Where(k => k.Hand == Hand.Left).RotatedBounds();
-        _rightBounds = _profile.Keys.Where(k => k.Hand == Hand.Right).RotatedBounds();
-
-        // Layout-derived properties depend on the freshly-computed bounds.
-        OnPropertyChanged(nameof(CanvasWidth));
-        OnPropertyChanged(nameof(CanvasHeight));
-        OnPropertyChanged(nameof(BoardSurfaceWidth));
-        OnPropertyChanged(nameof(BoardSurfaceHeight));
-        OnPropertyChanged(nameof(LeftHandX));
-        OnPropertyChanged(nameof(LeftHandY));
-        OnPropertyChanged(nameof(RightHandX));
-        OnPropertyChanged(nameof(RightHandY));
+        // The board-layout VM owns the per-hand bounds + geometry; hand it the
+        // active profile so it recomputes and raises its own geometry changes.
+        BoardLayout.SetProfile(_profile);
     }
 
     private void SelectKeyboard(IKeyboardProfile? profile)
@@ -1128,16 +1021,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         ApplyActiveLayer(0);
     }
 
-    private void PersistSetting(Func<UserSettings, UserSettings> update)
-    {
-        try
-        {
-            var s = _settingsService.Load();
-            _settingsService.Save(update(s));
-        }
-        catch (Exception ex)
-        {
-            DiagnosticLog.Warn("MainVM", $"Persist settings failed: {ex.Message}");
-        }
-    }
+    // Thin wrapper over the shared SettingsServiceExtensions.Update so every
+    // MainVM persist names the "MainVM" diagnostic subsystem in one place; the
+    // load→mutate→save + error-swallow lives in the extension.
+    private void PersistSetting(Func<UserSettings, UserSettings> update) =>
+        _settingsService.Update(update, "MainVM");
 }
