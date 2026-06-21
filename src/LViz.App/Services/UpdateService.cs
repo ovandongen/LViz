@@ -18,6 +18,9 @@ public sealed class UpdateService
     // calls will 404 silently until release assets exist.
     private const string GitHubRepoUrl = "https://github.com/ovandongen/LViz";
 
+    /// <summary>Public documentation wiki — surfaced by the in-app Help link.</summary>
+    public const string WikiUrl = GitHubRepoUrl + "/wiki";
+
     private readonly ISettingsService _settingsService;
     private readonly Lazy<UpdateManager?> _updateManager;
 

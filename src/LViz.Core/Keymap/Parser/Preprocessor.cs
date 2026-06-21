@@ -27,8 +27,61 @@ public static class Preprocessor
     public static string Process(string source)
     {
         var withoutComments = StripComments(source);
-        var (withoutConditionals, defines) = ApplyConditionalsAndCollectDefines(withoutComments);
+        var joined = JoinDirectiveContinuations(withoutComments);
+        var (withoutConditionals, defines) = ApplyConditionalsAndCollectDefines(joined);
         return SubstituteDefines(withoutConditionals, defines);
+    }
+
+    /// <summary>
+    /// Joins backslash-continued directive lines (multi-line <c>#define</c>s,
+    /// zmk-helpers style) into one logical line so the directive handlers see
+    /// the whole definition — otherwise the continuation lines would leak into
+    /// the devicetree token stream as top-level junk. Consumed lines are
+    /// replaced with blanks to keep line numbers aligned. Only lines that
+    /// start a directive participate; devicetree text never legitimately uses
+    /// continuations, and this keeps string literals out of scope.
+    /// </summary>
+    private static string JoinDirectiveContinuations(string source)
+    {
+        if (!source.Contains('\\')) return source;
+
+        var lines = source.Split('\n');
+        var sb = new StringBuilder(source.Length);
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            bool isLast = i == lines.Length - 1;
+
+            if (DirectiveRegex.IsMatch(line) && EndsWithBackslash(line) && !isLast)
+            {
+                var logical = new StringBuilder();
+                int consumed = 0;
+                var current = line;
+                while (EndsWithBackslash(current) && i + 1 < lines.Length)
+                {
+                    var trimmed = current.TrimEnd();
+                    logical.Append(trimmed, 0, trimmed.Length - 1).Append(' ');
+                    i++;
+                    consumed++;
+                    current = lines[i];
+                }
+                logical.Append(current);
+                sb.Append(logical);
+                if (i < lines.Length - 1) sb.Append('\n');
+                for (int b = 0; b < consumed; b++) sb.Append('\n');
+                continue;
+            }
+
+            sb.Append(line);
+            if (!isLast) sb.Append('\n');
+        }
+        return sb.ToString();
+    }
+
+    private static bool EndsWithBackslash(string line)
+    {
+        var t = line.TrimEnd();
+        return t.Length > 0 && t[^1] == '\\';
     }
 
     private static string StripComments(string source)

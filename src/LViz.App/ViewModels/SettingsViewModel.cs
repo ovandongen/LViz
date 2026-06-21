@@ -25,6 +25,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     private readonly ISettingsService _settingsService;
     private readonly MainWindowViewModel _mainViewModel;
     private readonly UpdateService _updateService;
+    private readonly ICliToolInstaller _cliToolInstaller;
     private UpdateInfo? _pendingUpdate;
     private bool _disposed;
 
@@ -37,14 +38,41 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     /// </summary>
     public MainWindowViewModel MainViewModel => _mainViewModel;
 
+    /// <summary>
+    /// Device Routing tab VM: observes the long-lived
+    /// <see cref="MainWindowViewModel.CapabilityRouter"/> while Settings is open
+    /// (inventory + routing table) and drives app-originated control. Disposed
+    /// with this VM so the router doesn't retain a closed window's observer.
+    /// </summary>
+    public DeviceRoutingViewModel DeviceRouting { get; }
+
+    /// <summary>
+    /// Action Pipelines tab VM: edits the named pipeline library + signal
+    /// bindings, observing the same <see cref="MainWindowViewModel.CapabilityRouter"/>
+    /// for device-step targets. Commit-on-close via <see cref="CommitActionPipelines"/>;
+    /// disposed with this VM.
+    /// </summary>
+    public ActionPipelinesViewModel ActionPipelines { get; }
+
     public SettingsViewModel(
         ISettingsService settingsService,
         MainWindowViewModel mainViewModel,
-        UpdateService updateService)
+        UpdateService updateService,
+        ICapabilityControl? capabilityControl = null,
+        ICliToolInstaller? cliToolInstaller = null)
     {
         _settingsService = settingsService;
         _mainViewModel = mainViewModel;
         _updateService = updateService;
+        _cliToolInstaller = cliToolInstaller ?? new CliToolInstaller();
+        DeviceRouting = new DeviceRoutingViewModel(
+            mainViewModel.CapabilityRouter,
+            capabilityControl ?? new CapabilityControl(),
+            settingsService);
+        ActionPipelines = new ActionPipelinesViewModel(
+            mainViewModel.CapabilityRouter,
+            settingsService,
+            mainViewModel);
         HotkeyKeyChoices = PlatformCapabilities.GetAvailableFKeys(mainViewModel.HotkeyKey);
         _mainViewModel.PropertyChanged += OnMainPropertyChanged;
         _mainViewModel.AutoSwitch.PropertyChanged += OnAutoSwitchPropertyChanged;
@@ -71,6 +99,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         ReloadMouseLayerSnapshot();
         RebuildLayerEntries();
         RefreshRunningProcesses();
+        RefreshCliToolStatus();
     }
 
     /// <summary>HID source label ("Raw HID (Go60 Left)" or "Raw HID (Go60 Left) (searching)"). Updated live as the coordinator's connection changes.</summary>
@@ -269,6 +298,11 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         _mainViewModel.AutoSwitch.ApplyAppLayerRules(EditingRules);
     }
 
+    /// <summary>Persists the Action Pipelines tab's edits. Called by
+    /// <see cref="Views.SettingsWindow"/> on close alongside
+    /// <see cref="CommitAppLayerRules"/>.</summary>
+    public void CommitActionPipelines() => ActionPipelines.Commit();
+
     /// <summary>Text typed into the "new rule" process-name field. Capped at
     /// 200 chars in the XAML; keeps the settings file from ballooning on
     /// malformed input.</summary>
@@ -451,6 +485,8 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         _mainViewModel.BoardStyle.PropertyChanged -= OnBoardStylePropertyChanged;
         _mainViewModel.Layers.CollectionChanged -= OnLayersCollectionChanged;
         EditingRules.CollectionChanged -= OnEditingRulesChanged;
+        DeviceRouting.Dispose();
+        ActionPipelines.Dispose();
         _updateService.UpdateAvailable -= OnUpdateAvailable;
         _updateService.DownloadProgress -= OnDownloadProgress;
         _updateService.UpdateReadyToRestart -= OnUpdateReadyToRestart;
@@ -799,6 +835,49 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
             UpdateMouseLayerSnapshot(_mouseLayerSnapshot with { ExitOnEmptyKey = value });
             OnPropertyChanged();
         }
+    }
+
+    // ── Command-line tool (lviz) ─────────────────────────────────────────
+    // Surfaces ICliToolInstaller: a button that symlinks `lviz` onto PATH so
+    // scripts can drive the running app (see lviz-host-agent-cli-spec.md §8).
+    // Hidden in dev / on Windows where the installer or the shim owns PATH.
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsCliToolInstalled))]
+    [NotifyPropertyChangedFor(nameof(IsCliToolActionAvailable))]
+    private CliToolState _cliToolState = CliToolState.Unsupported;
+
+    [ObservableProperty]
+    private string _cliToolDetail = "";
+
+    /// <summary>Whether the CLI install/remove controls apply on this build (false in dev / on Windows).</summary>
+    public bool IsCliToolActionAvailable => CliToolState != CliToolState.Unsupported;
+
+    public bool IsCliToolInstalled => CliToolState == CliToolState.Installed;
+
+    private void RefreshCliToolStatus()
+    {
+        var status = _cliToolInstaller.GetStatus();
+        CliToolState = status.State;
+        CliToolDetail = status.Detail;
+    }
+
+    [RelayCommand]
+    private void InstallCliTool()
+    {
+        var result = _cliToolInstaller.Install();
+        RefreshCliToolStatus();
+        // On success show the fresh status ("Installed: …"); on failure keep the
+        // error (with its sudo hint) over the re-read status line.
+        if (!result.Success) CliToolDetail = result.Message;
+    }
+
+    [RelayCommand]
+    private void UninstallCliTool()
+    {
+        var result = _cliToolInstaller.Uninstall();
+        RefreshCliToolStatus();
+        if (!result.Success) CliToolDetail = result.Message;
     }
 
     // ── Version & Updates ────────────────────────────────────────────────

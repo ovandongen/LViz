@@ -21,7 +21,10 @@ public partial class SettingsWindow : Window
     {
         base.OnClosing(e);
         if (DataContext is SettingsViewModel vm)
+        {
             vm.CommitAppLayerRules();
+            vm.CommitActionPipelines();
+        }
     }
 
     /// <summary>
@@ -68,5 +71,32 @@ public partial class SettingsWindow : Window
         var result = await window.ShowDialog<(bool ok, int? selection)>(this);
         if (!result.ok) return;
         vm.ApplyExitTapKey(result.selection);
+    }
+
+    /// <summary>"New pipeline" button → open the editor popup with a blank pipeline.</summary>
+    private void OnNewPipelineClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => EditPipeline(null);
+
+    /// <summary>A pipeline card click → open the editor popup for that pipeline.</summary>
+    private void OnEditPipelineClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is Control { Tag: PipelineEditRow row })
+            EditPipeline(row);
+    }
+
+    /// <summary>
+    /// Shows the single-screen pipeline editor as a modal and feeds the outcome
+    /// (Save / Delete / Cancel) back into the Action Pipelines VM, which applies it
+    /// to the in-memory library. Persistence still happens on window close via
+    /// <see cref="SettingsViewModel.CommitActionPipelines"/>.
+    /// </summary>
+    private async void EditPipeline(PipelineEditRow? source)
+    {
+        if (DataContext is not SettingsViewModel vm) return;
+        var editor = vm.ActionPipelines.CreateEditor(source);
+        var dlg = new EditPipelineDialog { DataContext = editor };
+        var outcome = await dlg.ShowDialog<PipelineEditorOutcome>(this);
+        vm.ActionPipelines.ApplyEditorResult(source, outcome, editor);
+        editor.Dispose();
     }
 }

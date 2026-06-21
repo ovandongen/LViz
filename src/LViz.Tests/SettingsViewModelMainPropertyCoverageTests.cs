@@ -60,6 +60,12 @@ public class SettingsViewModelMainPropertyCoverageTests
         // without a MainVM facade); not surfaced as a derived SettingsVM prop.
         "MouseLayer",
 
+        // The capability router, exposed directly (the Device Routing settings
+        // section binds its inventory/table without a MainVM facade);
+        // IsDeviceRoutingAvailable is a derived availability flag bound directly.
+        "CapabilityRouter",
+        "IsDeviceRoutingAvailable",
+
         // Pure derived / geometry / display-only — not user-facing in settings.
         "LoadInfoTooltip",
         "ActiveLayerTintColor",

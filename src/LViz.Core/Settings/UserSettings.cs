@@ -221,6 +221,58 @@ public record UserSettings
     public Dictionary<string, MouseLayerSettings> MouseLayer { get; init; } = new();
 
     /// <summary>
+    /// Master opt-in for cross-device capability routing. Default off: even
+    /// with ≥2 protocol-capable devices present, the capability bus discovers
+    /// and inventories them but forwards nothing until the user turns this on.
+    /// Global, not per-profile — routing is about physical devices, not the
+    /// rendered keyboard.
+    /// </summary>
+    public bool DeviceRoutingEnabled { get; init; } = false;
+
+    /// <summary>
+    /// Capability-routing overrides (each keyed by stable device key inside the
+    /// <see cref="RoutingRule"/>). Empty list + <see cref="DeviceRoutingEnabled"/>
+    /// on = full auto-routing: a trigger with a single handler routes with zero
+    /// config. A rule only disambiguates (multiple handlers for one capability)
+    /// or disables a specific route (<see cref="RoutingRule.Enabled"/> = false).
+    /// Global, not per-profile.
+    /// </summary>
+    public List<RoutingRule> RoutingRules { get; init; } = new();
+
+    /// <summary>
+    /// The reusable action-pipeline library: named ordered step lists a trigger
+    /// can run. Authored on the Action Pipelines settings tab; referenced by name
+    /// from <see cref="SignalBindings"/> (and, in a later phase, app-focus).
+    /// Global, not per-profile — pipelines drive physical devices + the host, not
+    /// the rendered keyboard.
+    /// </summary>
+    public List<ActionPipeline> ActionPipelines { get; init; } = new();
+
+    /// <summary>
+    /// Inbound <c>signal.fire</c> (source device, id) → <see cref="ActionPipeline.Name"/>
+    /// bindings. The id space is per-device: the same id from two devices is two
+    /// distinct bindings (see <see cref="SignalBinding.SourceDeviceKey"/>).
+    /// </summary>
+    public List<SignalBinding> SignalBindings { get; init; } = new();
+
+    /// <summary>
+    /// Inbound host <em>event</em> id → <see cref="ActionPipeline.Name"/> bindings —
+    /// the string-keyed sibling of <see cref="SignalBindings"/>. A CLI/script fires
+    /// an opaque string id over IPC (<c>lviz event ci:ok</c>) and LViz runs the bound
+    /// pipeline (see <c>lviz-host-agent-cli-spec.md</c>). Global, not per-profile.
+    /// </summary>
+    public List<EventBinding> EventBindings { get; init; } = new();
+
+    /// <summary>
+    /// App-focus auto-switch lifecycle moment → <see cref="ActionPipeline.Name"/>
+    /// bindings — the local sibling of <see cref="SignalBindings"/> /
+    /// <see cref="EventBindings"/>. The auto-switch engine raises a moment
+    /// (enter/leave/exit/re-enter) as it pushes/reverts the keyboard layer; the
+    /// bound pipeline runs alongside that push. Global, not per-profile.
+    /// </summary>
+    public List<AppLayerBinding> AppLayerBindings { get; init; } = new();
+
+    /// <summary>
     /// When true, the app checks for updates a few seconds after launch and
     /// notifies the user if one is available. Manual "Check now" in Settings
     /// works regardless.

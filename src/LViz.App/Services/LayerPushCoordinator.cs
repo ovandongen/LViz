@@ -25,6 +25,7 @@ public interface ILayerPushCoordinator : IDisposable
     void SetActiveProfile(IKeyboardProfile profile);
     void OnHidConnectionChanged();
     void RevertMouseLayerForShutdown(TimeSpan timeout);
+    void ForceBaseLayerOnExit(TimeSpan timeout);
     void Shutdown();
 }
 
@@ -145,6 +146,26 @@ public sealed class LayerPushCoordinator : ILayerPushCoordinator
                 $"shutdown: keyboard still on app-pushed mouse layer {mouseIdx}, reverting to base");
             _hid.PushLayerSync(0, timeout);
         }
+    }
+
+    /// <summary>
+    /// On app exit, unconditionally return the keyboard to the base layer (0).
+    /// The keyboard otherwise has no way to know LViz is gone, so any layer an
+    /// engine (or the user via the action UI) pushed would stay pinned after the
+    /// app closes — leaving the board stuck on a non-base layer with no overlay
+    /// to explain it. Unlike <see cref="RevertMouseLayerForShutdown"/> this is an
+    /// absolute rule: it ignores which engine pushed last and what layer is
+    /// current. Synchronous + bounded so the report reaches the firmware before
+    /// the host tears HID down. No-op when no keyboard is connected.
+    /// </summary>
+    public void ForceBaseLayerOnExit(TimeSpan timeout)
+    {
+        if (!_hid.IsConnected) return;
+        DiagnosticLog.Info("LayerPush", "exit: forcing keyboard to base layer 0");
+        _hid.PushLayerSync(0, timeout);
+        // Keep the mouse engine from issuing a second, conflicting revert as it
+        // disposes right after — base is the final word on exit.
+        MouseLayer?.ClearPushedState();
     }
 
     public void Shutdown()

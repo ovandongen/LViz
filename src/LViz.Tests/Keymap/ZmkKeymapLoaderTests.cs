@@ -1,4 +1,3 @@
-using System.Reflection;
 using LViz.Core.Keymap.Parser;
 using LViz.Core.Models;
 using Xunit;
@@ -7,17 +6,7 @@ namespace LViz.Tests.Keymap;
 
 public class ZmkKeymapLoaderTests
 {
-    private static string LoadFixture(string name)
-    {
-        var asm = typeof(ZmkKeymapLoaderTests).Assembly;
-        var resourceName = $"LViz.Tests.Keymap.Fixtures.{name}";
-        using var stream = asm.GetManifestResourceStream(resourceName)
-            ?? throw new InvalidOperationException(
-                $"Embedded fixture '{resourceName}' not found. Available: "
-                + string.Join(", ", asm.GetManifestResourceNames()));
-        using var reader = new StreamReader(stream);
-        return reader.ReadToEnd();
-    }
+    private static string LoadFixture(string name) => KeymapFixtures.Read(name);
 
     // ---- minimal.keymap ----------------------------------------------------
 

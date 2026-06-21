@@ -1,5 +1,7 @@
+using LViz.App.Localization;
 using LViz.Core.Keymap;
 using LViz.Core.Keymap.Parser;
+using LViz.Core.Layout;
 using LViz.Core.Models;
 
 namespace LViz.App.Services;
@@ -62,7 +64,22 @@ public sealed class KeymapStateService : IKeymapStateService
     {
         try
         {
-            var config = ZmkKeymapLoader.Load(path, profileId);
+            // Route by file type: Moergo boards accept both formats; every other
+            // board is .keymap-only. The .json path is the only one gated — it
+            // requires a Moergo profile to be active.
+            var isJson = Path.GetExtension(path).Equals(".json", StringComparison.OrdinalIgnoreCase);
+            KeyboardConfig config;
+            if (isJson)
+            {
+                if (!MoergoBoards.IsMoergoProfileId(profileId))
+                    throw new ZmkKeymapParseException(Loc.Instance["Load_JsonMoergoOnly"], path);
+                config = MoergoJsonKeymapLoader.Load(path, profileId);
+            }
+            else
+            {
+                config = ZmkKeymapLoader.Load(path, profileId);
+            }
+
             var keymap = new LoadedKeymap(config);
             Current = keymap;
             LoadedPath = path;

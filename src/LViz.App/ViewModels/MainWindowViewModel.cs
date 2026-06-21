@@ -15,6 +15,7 @@ using LViz.Core.Models;
 using LViz.Core.Settings;
 using ZmkHidProtocol.ActiveWindow;
 using ZmkHidProtocol.Protocol;
+using ZmkHidProtocol.Transport;
 
 namespace LViz.App.ViewModels;
 
@@ -76,6 +77,32 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     private readonly IHidPipeline _hid;
     private readonly ILayerPushCoordinator _push;
 
+    // Cross-device capability bus + router. The bus owns the *other* raw-HID
+    // devices (the keyboard is never opened twice — the router gets it as an
+    // adapter over _hid); the router brokers capability traffic between them.
+    // Started/stopped/disposed alongside HID, re-scanned on profile change.
+    private readonly RawHidDeviceBus _deviceBus;
+    private readonly ICapabilityRouter _router;
+    private readonly IHostActionExecutor _hostActionExecutor;
+
+    // Signal.fire → action-pipeline plumbing. The dispatcher listens for inbound
+    // signal reports across every router device and runs the bound pipeline; the
+    // runner executes a pipeline's steps (layer push, RGB/pointing to a bus
+    // device, launch/shell, delay). Both ride the same live-tracking lifecycle as
+    // the router/bus (Start/Stop in StartKeyEventTracking).
+    private readonly IPipelineRunner _pipelineRunner;
+    private readonly ISignalDispatcher _signalDispatcher;
+    private readonly AppLayerPipelineDispatcher _appLayerDispatcher;
+
+    // Local IPC surface for the CLI / host scripts (lviz-host-agent-cli-spec.md).
+    // The command service resolves an inbound string event id to a pipeline (the
+    // string-keyed sibling of the signal dispatcher) and reports device status; the
+    // server runs the named-pipe accept loop. Unlike the signal dispatcher it rides
+    // the *app* lifetime, not the live-tracking toggle — the CLI must reach a
+    // running LViz whether or not highlighting is on (Start in the ctor, Stop in
+    // Shutdown). Device-step pipelines still need the router started, same as signals.
+    private readonly LvizIpcServer _ipcServer;
+
     // Press-highlight pipeline: per-layer (mod-set + keycode) → KeyViewModel
     // lookup, held-modifier set, modifier-grace deferral, per-key pulse.
     // Built lazily once the Keys collection is populated.
@@ -123,6 +150,16 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public bool IsAppRulesTabVisible => !OperatingSystem.IsLinux() && IsHidSourceActive;
 
     partial void OnIsHidSourceActiveChanged(bool value) => OnPropertyChanged(nameof(IsAppRulesTabVisible));
+
+    /// <summary>
+    /// Cross-device capability router — the device inventory + routing table the
+    /// Settings UI binds to directly (no MainVM pass-through). Lives as long as
+    /// the VM; active only while HID tracking is on.
+    /// </summary>
+    public ICapabilityRouter CapabilityRouter => _router;
+
+    /// <summary>True when ≥2 protocol-capable devices expose a routable trigger→handler pair.</summary>
+    public bool IsDeviceRoutingAvailable => _router.IsRoutingAvailable;
 
     [ObservableProperty] private bool _isAlwaysOnTop;
     [ObservableProperty] private bool _colorTrayIconByActiveLayer;
@@ -438,6 +475,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public IRelayCommand ToggleLiveHighlightingCommand { get; }
     public IRelayCommand OpenLogFolderCommand { get; }
     public IRelayCommand CopyDiagnosticsCommand { get; }
+    public IRelayCommand OpenHelpCommand { get; }
     public IRelayCommand<IKeyboardProfile> SelectKeyboardCommand { get; }
     public IRelayCommand OpenSettingsCommand { get; }
 
@@ -464,7 +502,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         ISettingsService settingsService,
         IActiveWindowMonitor? activeWindowMonitor = null,
         IMouseIdleMonitor? mouseIdleMonitor = null,
-        IKeymapStateService? keymapState = null)
+        IKeymapStateService? keymapState = null,
+        ICapabilityControl? capabilityControl = null,
+        IHostActionExecutor? hostActionExecutor = null)
     {
         _settingsService = settingsService;
         _keymap = keymapState ?? new KeymapStateService();
@@ -510,6 +550,38 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         _hid.ActiveLayerChanged += OnActiveLayerChanged;
         _hid.ConnectionChanged += OnActiveSourceChanged;
 
+        // Capability bus excludes the keyboard via its live profile matcher (the
+        // open-path is a defensive secondary exclusion); the router consumes the
+        // keyboard as an adapter over _hid's already-open handle plus the bus's
+        // other devices. Constructed eagerly; opens nothing until Start().
+        _deviceBus = new RawHidDeviceBus(_hid.KeyboardMatcher, () => _hid.OpenDevicePath);
+        _router = new CapabilityRouter(
+            new KeyboardCapabilityDevice(_hid),
+            _deviceBus,
+            settingsService);
+        _router.RoutesChanged += OnCapabilityRoutesChanged;
+
+        // signal.fire → action-pipeline. The runner drives bus devices through
+        // capability control + the keyboard through the HID layer-push path; the
+        // dispatcher resolves inbound signal ids to pipelines and runs them off
+        // the read thread. CapabilityControl is stateless (own ConfirmTracker per
+        // instance), so a private one here doesn't conflict with the DI singleton.
+        _hostActionExecutor = hostActionExecutor ?? new HostActionExecutor();
+        _pipelineRunner = new PipelineRunner(
+            _router,
+            capabilityControl ?? new CapabilityControl(),
+            _hostActionExecutor,
+            _hid.PushLayer,
+            () => settingsService.Load().ActionPipelines);
+        _signalDispatcher = new SignalDispatcher(_router, settingsService, _pipelineRunner);
+
+        // Host IPC: the CLI ('lviz event …', 'status', 'devices') forwards a line to
+        // this app over a named pipe. Started here so it's live for the app's whole
+        // lifetime, independent of the live-tracking toggle.
+        var ipcCommands = new IpcCommandService(settingsService, _router, _pipelineRunner);
+        _ipcServer = new LvizIpcServer(ipcCommands.Handle);
+        _ipcServer.Start();
+
         // Push coordinator owns AutoSwitch + MouseLayer and the handoff between
         // them. Routes both engines' pushes through _hid; redirects AutoSwitch
         // pushes into MouseLayer's revert target while a mouse push is in
@@ -522,6 +594,11 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             settingsService,
             activeWindowMonitor,
             mouseIdleMonitor);
+        // App-focus auto-switch lifecycle → action-pipeline. Sibling of
+        // _signalDispatcher / the IPC event path: the engine raises a moment as it
+        // pushes/reverts layers, this runs the bound pipeline alongside it. No
+        // Start/Stop — the engine only raises while auto-switch is enabled.
+        _appLayerDispatcher = new AppLayerPipelineDispatcher(_push.AutoSwitch, settingsService, _pipelineRunner);
         _push.KeyPositionForUi += OnKeyPositionForHighlight;
         // Transparent-key exit predicate reads the currently-loaded config at
         // call time, so swapping layouts or profiles needs no re-binding.
@@ -569,6 +646,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         });
         SelectKeyboardCommand = new RelayCommand<IKeyboardProfile>(SelectKeyboard);
         OpenSettingsCommand = new RelayCommand(() => OpenSettingsRequested?.Invoke());
+        OpenHelpCommand = new RelayCommand(() => _hostActionExecutor.Launch(UpdateService.WikiUrl));
 
         BuildKeysFromProfile();
     }
@@ -695,9 +773,21 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// <summary>Gracefully stops live tracking; idempotent. Called on window close / quit.</summary>
     public void Shutdown()
     {
-        StopKeyEventTracking();
+        StopKeyEventTracking(isAppExit: true);
+        // Stop accepting CLI connections before tearing down the router it queries.
+        _ipcServer.Dispose();
+        // Dispatcher before the push coordinator: it holds a subscription on the
+        // coordinator's AutoSwitch engine.
+        _appLayerDispatcher.Dispose();
         _push.Shutdown();
         _push.Dispose();
+        // Dispatcher before the router: it holds per-device report subscriptions
+        // sourced from the router's inventory.
+        _signalDispatcher.Dispose();
+        // Router before the bus and _hid: it unsubscribes from the keyboard
+        // adapter (which rides _hid's report stream) and the bus devices.
+        _router.Dispose();
+        _deviceBus.Dispose();
         _hid.Dispose();
     }
 
@@ -765,6 +855,13 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         // disabled or the source isn't running.
         _hid.SetActiveProfile(profile);
 
+        // The keyboard's manifest/handlers change with the profile, and the new
+        // profile excludes a different keyboard from the bus — update the matcher
+        // and rebuild the routing table. Fire-and-forget; the router serializes
+        // and self-logs scan failures.
+        _deviceBus.SetKeyboardMatcher(_hid.KeyboardMatcher);
+        _ = _router.RescanAsync();
+
         // Auto-load whichever JSON the user last associated with this keyboard.
         // If the previously-loaded layout already fits, leave it alone.
         if (!HasLayoutLoaded
@@ -823,6 +920,21 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     /// <summary>Routes a layer push through the HID pipeline. Test-tab plumbing for SettingsViewModel.</summary>
     public void PushLayerToKeyboard(int index) => _hid.PushLayer(index);
+
+    /// <summary>
+    /// Runs an action pipeline off the UI thread (steps await I/O + delays).
+    /// The Test button in the pipeline editor calls this with the in-progress
+    /// (possibly unsaved) pipeline, so testing exercises the real runner without
+    /// persisting first. Same path an inbound signal.fire takes.
+    /// </summary>
+    public void RunPipeline(ActionPipeline pipeline)
+    {
+        _ = Task.Run(async () =>
+        {
+            try { await _pipelineRunner.RunAsync(pipeline).ConfigureAwait(false); }
+            catch (Exception ex) { DiagnosticLog.Warn("Pipeline", $"test run '{pipeline.Name}' failed: {ex.Message}"); }
+        });
+    }
 
     /// <summary>
     /// Sends a 0xFD GetDeviceInfo request and awaits the 0xFE reply.
@@ -966,19 +1078,41 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     private void StartKeyEventTracking()
     {
         _hid.Start();
+        // Cross-device discovery rides the same live-tracking lifecycle as HID.
+        // The bus discovers (and the router builds the inventory) regardless of
+        // the master routing toggle — the toggle only gates forwarding — so the
+        // Settings UI can surface availability with routing still off.
+        _deviceBus.Start();
+        _router.Start();
+        // Signal listening rides the same lifecycle: it attaches per-device
+        // handlers off the router's inventory (reconciled on RoutesChanged) and
+        // runs the bound pipeline on an inbound signal.fire.
+        _signalDispatcher.Start();
         // Initial label sync — the source may already have settled the
         // active state before our subscription was attached above.
         OnActiveSourceChanged();
     }
 
-    private void StopKeyEventTracking()
+    private void StopKeyEventTracking(bool isAppExit = false)
     {
-        // Revert any in-flight mouse-layer push *before* tearing down HID.
-        // Otherwise the engine's _preMoveLayer stays set across the stop,
-        // and the next enable captures the (still-held) mouse layer as
-        // the new pre-move layer — getting stuck pushing/reverting onto
-        // the mouse layer.
-        _push.RevertMouseLayerForShutdown(TimeSpan.FromMilliseconds(500));
+        // On app exit, always return the keyboard to the base layer — once LViz
+        // is gone the board has no way to leave an app-pushed layer, so it would
+        // otherwise stay stuck on a non-base layer. This is an absolute rule and
+        // supersedes the mouse-layer revert. On a plain live-tracking toggle-off
+        // (re-enable possible) we instead revert any in-flight mouse-layer push
+        // *before* tearing down HID — otherwise the engine's _preMoveLayer stays
+        // set across the stop and the next enable captures the (still-held) mouse
+        // layer as the new pre-move layer, getting stuck pushing/reverting onto it.
+        if (isAppExit)
+            _push.ForceBaseLayerOnExit(TimeSpan.FromMilliseconds(500));
+        else
+            _push.RevertMouseLayerForShutdown(TimeSpan.FromMilliseconds(500));
+        // Stop signal listening first (it holds per-device subscriptions), then
+        // the router before the bus so forwarding/subscriptions are torn down
+        // before the underlying handles close.
+        _signalDispatcher.Stop();
+        _router.Stop();
+        _deviceBus.Stop();
         _hid.Stop();
         IsHidSourceActive = false;
         LayerSourceHint = "";
@@ -989,6 +1123,12 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         if (!IsAutoLayerSwitchEnabled) return;
         Avalonia.Threading.Dispatcher.UIThread.Post(() => ApplyActiveLayer(layer));
     }
+
+    // RoutesChanged fires on a background scan thread; marshal the availability
+    // notification onto the UI thread so bindings update safely. The inventory
+    // itself is read on demand from the router (immutable snapshot).
+    private void OnCapabilityRoutesChanged()
+        => Avalonia.Threading.Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(IsDeviceRoutingAvailable)));
 
     private void OnActiveSourceChanged()
     {

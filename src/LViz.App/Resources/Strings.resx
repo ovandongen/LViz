@@ -257,6 +257,14 @@
     <value>ZMK keymap</value>
     <comment/>
   </data>
+  <data name="LoadDialog_FileTypeMoergoJson" xml:space="preserve">
+    <value>Moergo layout (JSON)</value>
+    <comment/>
+  </data>
+  <data name="Load_JsonMoergoOnly" xml:space="preserve">
+    <value>JSON layouts are only supported on Moergo boards — switch to Glove80 or GO60 first.</value>
+    <comment/>
+  </data>
   <data name="Settings_KeyboardProfile" xml:space="preserve">
     <value>Keyboard profile</value>
     <comment/>
@@ -525,6 +533,22 @@
     <value>Updates</value>
     <comment/>
   </data>
+  <data name="Settings_CliTool" xml:space="preserve">
+    <value>Command-line tool</value>
+    <comment/>
+  </data>
+  <data name="Settings_CliTool_Hint" xml:space="preserve">
+    <value>Install the 'lviz' command so scripts can drive LViz (e.g. lviz event ci:ok).</value>
+    <comment/>
+  </data>
+  <data name="Settings_CliTool_Install" xml:space="preserve">
+    <value>Install command-line tool</value>
+    <comment/>
+  </data>
+  <data name="Settings_CliTool_Remove" xml:space="preserve">
+    <value>Remove command-line tool</value>
+    <comment/>
+  </data>
   <data name="Settings_AutoCheckForUpdates" xml:space="preserve">
     <value>Check for updates automatically</value>
     <comment/>
@@ -671,6 +695,430 @@
   </data>
   <data name="IconPicker_Cancel" xml:space="preserve">
     <value>Cancel</value>
+    <comment/>
+  </data>
+  <data name="Settings_Tab_DeviceRouting" xml:space="preserve">
+    <value>Device routing</value>
+    <comment/>
+  </data>
+  <data name="Settings_Tab_ActionPipelines" xml:space="preserve">
+    <value>Action pipelines</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Hint" xml:space="preserve">
+    <value>A pipeline is a named list of steps run in order: push a keyboard layer, set a device's RGB or pointing options, launch an app or shell command, or wait. Bind a pipeline to a signal a key fires to run it from the keyboard.</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_SectionLibrary" xml:space="preserve">
+    <value>Pipelines</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_NewName" xml:space="preserve">
+    <value>New pipeline name</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Add" xml:space="preserve">
+    <value>Add</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Empty" xml:space="preserve">
+    <value>No pipelines yet. Add one above, then add steps to it.</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Remove" xml:space="preserve">
+    <value>Remove</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Test" xml:space="preserve">
+    <value>Test</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_New" xml:space="preserve">
+    <value>New pipeline</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_EditTitle" xml:space="preserve">
+    <value>Edit pipeline</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_NewTitle" xml:space="preserve">
+    <value>New pipeline</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Name" xml:space="preserve">
+    <value>Name</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_NoSteps" xml:space="preserve">
+    <value>(no steps yet)</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Save" xml:space="preserve">
+    <value>Save</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Delete" xml:space="preserve">
+    <value>Delete</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_SectionSteps" xml:space="preserve">
+    <value>Steps</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_NoSelection" xml:space="preserve">
+    <value>Select a pipeline to edit its steps.</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_AddStep" xml:space="preserve">
+    <value>Add step</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_StepKind" xml:space="preserve">
+    <value>Kind</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Layer" xml:space="preserve">
+    <value>Layer</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_TargetDevice" xml:space="preserve">
+    <value>Device</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_VisualizedKeyboard" xml:space="preserve">
+    <value>Visualized keyboard</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_LayerActionLabel" xml:space="preserve">
+    <value>Layer action</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_LayerAction_SetBase" xml:space="preserve">
+    <value>Set base</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_LayerAction_Activate" xml:space="preserve">
+    <value>Activate</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_LayerAction_Deactivate" xml:space="preserve">
+    <value>Deactivate</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_SourceDevice" xml:space="preserve">
+    <value>From</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_PointingAction" xml:space="preserve">
+    <value>Action</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_PointingValue" xml:space="preserve">
+    <value>Value</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_LaunchTarget" xml:space="preserve">
+    <value>App, file or URL</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_ShellCommand" xml:space="preserve">
+    <value>Shell command</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_DelayMs" xml:space="preserve">
+    <value>Delay (ms)</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_MoveUp" xml:space="preserve">
+    <value>Move step up</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_MoveDown" xml:space="preserve">
+    <value>Move step down</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_SectionBindings" xml:space="preserve">
+    <value>Signal bindings</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_BindingsHint" xml:space="preserve">
+    <value>Map a signal id a key fires (signal.fire) to a pipeline. The id is opaque on the wire — its meaning lives here.</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_SignalId" xml:space="preserve">
+    <value>Signal id</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_BindingPipeline" xml:space="preserve">
+    <value>Pipeline</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_AddBinding" xml:space="preserve">
+    <value>Add binding</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_NoBindings" xml:space="preserve">
+    <value>No signal bindings yet.</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_SectionEventBindings" xml:space="preserve">
+    <value>Event bindings</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_EventBindingsHint" xml:space="preserve">
+    <value>Map a host event id a script fires (lviz event &lt;id&gt;) to a pipeline. The id is an opaque string — its meaning lives here.</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_EventId" xml:space="preserve">
+    <value>Event id</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_NoEventBindings" xml:space="preserve">
+    <value>No event bindings yet.</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_SectionAppLayerBindings" xml:space="preserve">
+    <value>App layer</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_AppLayerBindingsHint" xml:space="preserve">
+    <value>Run a pipeline when an auto-switch rule enters, leaves, exits, or re-enters its layer. Triggers come from your auto-switch rules (set those up first); the pipeline runs alongside the layer change, not instead of it. One pipeline per trigger.</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_NoAppLayerBindings" xml:space="preserve">
+    <value>No app-layer bindings yet.</value>
+    <comment/>
+  </data>
+  <data name="AppLayerMoment_Enter" xml:space="preserve">
+    <value>Enter</value>
+    <comment/>
+  </data>
+  <data name="AppLayerMoment_Leave" xml:space="preserve">
+    <value>Leave</value>
+    <comment/>
+  </data>
+  <data name="AppLayerMoment_Exit" xml:space="preserve">
+    <value>Exit</value>
+    <comment/>
+  </data>
+  <data name="AppLayerMoment_Reenter" xml:space="preserve">
+    <value>Re-enter</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Kind_KeyboardLayer" xml:space="preserve">
+    <value>Keyboard layer</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Kind_Rgb" xml:space="preserve">
+    <value>RGB</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Kind_Pointing" xml:space="preserve">
+    <value>Pointing</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Kind_Launch" xml:space="preserve">
+    <value>Launch app</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Kind_Shell" xml:space="preserve">
+    <value>Shell command</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Kind_Delay" xml:space="preserve">
+    <value>Delay</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Kind_Pipeline" xml:space="preserve">
+    <value>Run pipeline</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_SubPipeline" xml:space="preserve">
+    <value>Pipeline</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_CycleError" xml:space="preserve">
+    <value>This would create a loop: {0}</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_SectionMaster" xml:space="preserve">
+    <value>Cross-device routing</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Hint" xml:space="preserve">
+    <value>Forward an action one device emits (e.g. a key bound to “set DPI”) to whatever other device handles it. The keyboard and the handler never talk directly — LViz brokers between them. Discovery runs whenever the keyboard is connected; this switch only controls forwarding.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Enable" xml:space="preserve">
+    <value>Forward capabilities between devices</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Available" xml:space="preserve">
+    <value>Routing available — a trigger has a matching handler on another device.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_ControlReady" xml:space="preserve">
+    <value>A compatible device is connected — send actions to it under “Send action to device” below. Connect a second device where one triggers what the other handles to route between them.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_NoProtocol" xml:space="preserve">
+    <value>No connected device speaks the capability protocol yet.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_SectionDevices" xml:space="preserve">
+    <value>Discovered devices</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_NoDevices" xml:space="preserve">
+    <value>No capability-protocol devices discovered yet.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_KeyboardBadge" xml:space="preserve">
+    <value>keyboard</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_NoManifest" xml:space="preserve">
+    <value>(did not answer the capability scan)</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Triggers" xml:space="preserve">
+    <value>Triggers</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Handles" xml:space="preserve">
+    <value>Handles</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_SectionRoutes" xml:space="preserve">
+    <value>Routes</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_NoRoutes" xml:space="preserve">
+    <value>No routes — a device must trigger a capability another device handles.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_RouteTitleFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_SectionControl" xml:space="preserve">
+    <value>Send action to a device</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_ControlHint" xml:space="preserve">
+    <value>Advanced: have LViz originate an action itself, instead of forwarding one. Handy for testing a handler device.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_ControlTarget" xml:space="preserve">
+    <value>Target</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Dpi" xml:space="preserve">
+    <value>DPI</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Send" xml:space="preserve">
+    <value>Send</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_On" xml:space="preserve">
+    <value>On</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_PointingDpiIndex" xml:space="preserve">
+    <value>DPI index</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_PointingDragScroll" xml:space="preserve">
+    <value>Drag-scroll</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_PointingSnipe" xml:space="preserve">
+    <value>Snipe</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Rgb" xml:space="preserve">
+    <value>RGB</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_RgbOn" xml:space="preserve">
+    <value>On/off</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_RgbColor" xml:space="preserve">
+    <value>Color</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_RgbBrightness" xml:space="preserve">
+    <value>Brightness</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_RgbEffect" xml:space="preserve">
+    <value>Effect</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_ControlPickTarget" xml:space="preserve">
+    <value>Pick a target device above to see the actions it accepts.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_ControlNone" xml:space="preserve">
+    <value>This device exposes no actions LViz can send directly.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Layer" xml:space="preserve">
+    <value>Layer</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_SetBase" xml:space="preserve">
+    <value>Set base</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Activate" xml:space="preserve">
+    <value>Activate</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Deactivate" xml:space="preserve">
+    <value>Deactivate</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_ControlNoTarget" xml:space="preserve">
+    <value>Pick a target device first.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_ControlGone" xml:space="preserve">
+    <value>That device is no longer connected.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_ControlStatusFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_OutcomeSending" xml:space="preserve">
+    <value>sending…</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_OutcomeSent" xml:space="preserve">
+    <value>sent</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_OutcomeConfirmed" xml:space="preserve">
+    <value>confirmed</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_OutcomeTimedOut" xml:space="preserve">
+    <value>no confirmation (timed out)</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_OutcomeFailed" xml:space="preserve">
+    <value>failed</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_OutcomeFailedDetail" xml:space="preserve">
+    <value>failed — {0}</value>
     <comment/>
   </data>
 </root>

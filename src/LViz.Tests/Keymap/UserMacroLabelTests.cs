@@ -100,6 +100,36 @@ public class UserMacroLabelTests
     }
 
     [Fact]
+    public void SingleBindingNonKpMacro_RendersInnerBindingLabel()
+    {
+        // Moergo's rgb_ug_status_macro pattern: the body is one non-&kp
+        // binding. The key should show the inner binding's label ("Status"),
+        // not the macro's long node name.
+        var src = @"
+            / {
+                macros {
+                    rgb_ug_status_macro: rgb_ug_status_macro {
+                        compatible = ""zmk,behavior-macro"";
+                        #binding-cells = <0>;
+                        bindings = <&rgb_ug RGB_STATUS>;
+                    };
+                };
+                keymap {
+                    compatible = ""zmk,keymap"";
+                    default_layer { bindings = <&rgb_ug_status_macro>; };
+                };
+            };";
+        var config = ZmkKeymapLoader.LoadFromText(src, "test");
+        var macros = config.Macros.ToDictionary(m => m.Name, StringComparer.Ordinal);
+        var binding = config.Layers[0].Bindings[0];
+
+        var (label, _, top) = KeyLabelFormatter.FormatBinding(binding, null, holdTap: null, macros: macros);
+
+        Assert.Equal("Status", label);
+        Assert.Equal("Macro", top);
+    }
+
+    [Fact]
     public void NoMacrosArgument_DoesNotChangeFallbackBehavior()
     {
         var binding = new KeyBinding("&BracketC", Array.Empty<string>());

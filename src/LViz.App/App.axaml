@@ -7,6 +7,80 @@
     <Application.Styles>
         <FluentTheme />
         <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml" />
+
+        <!-- Compact numeric steppers app-wide. Fluent's default NumericUpDown is
+             tall, and a MinHeight floor alone doesn't tame it (a disabled stepper
+             still renders at the theme's tall default). Pin an explicit Height so
+             every stepper — enabled or disabled — is a consistent 28px, then trim
+             the inner spinner/text box/repeat buttons to fit. The text box and
+             repeat buttons are reached via /template/ so this only touches
+             NumericUpDown internals, not standalone TextBoxes or scrollbars. -->
+        <Style Selector="NumericUpDown">
+            <Setter Property="Height" Value="28" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style Selector="NumericUpDown /template/ ButtonSpinner">
+            <Setter Property="MinHeight" Value="0" />
+        </Style>
+        <Style Selector="NumericUpDown /template/ TextBox">
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="ButtonSpinner /template/ RepeatButton">
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="4,0" />
+        </Style>
+
+        <!-- Compact input controls app-wide (lifted from the pipeline editor).
+             Fluent's defaults are tall and the text rides high; trim the heights,
+             shrink the font, and centre content. Type selectors match the exact
+             type only, so these don't reach the spinner RepeatButtons or ComboBox
+             toggle internals. Controls that set these properties inline keep their
+             own values (a local value wins over a style setter). -->
+        <Style Selector="ComboBox">
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="CheckBox">
+            <Setter Property="MinHeight" Value="20" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style Selector="Button">
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="Padding" Value="10,3" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+
+        <!-- Trim the CheckBox / RadioButton glyphs (Fluent defaults are 20px,
+             which looks heavy next to the 12px text). Part names are from the
+             Fluent control templates; the checkbox box and the radio rings shrink
+             to 16px, the radio's inner dot from 8 to 6. -->
+        <Style Selector="CheckBox /template/ Border#NormalRectangle">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="16" />
+        </Style>
+        <Style Selector="RadioButton /template/ Ellipse#OuterEllipse">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="16" />
+        </Style>
+        <Style Selector="RadioButton /template/ Ellipse#CheckOuterEllipse">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="16" />
+        </Style>
+        <Style Selector="RadioButton /template/ Ellipse#CheckGlyph">
+            <Setter Property="Width" Value="6" />
+            <Setter Property="Height" Value="6" />
+        </Style>
     </Application.Styles>
 
     <Application.Resources>

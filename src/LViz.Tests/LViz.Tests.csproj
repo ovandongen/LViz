@@ -25,6 +25,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <EmbeddedResource Include="Keymap\Fixtures\*.keymap" />
+    <EmbeddedResource Include="Keymap\Fixtures\*.json" />
   </ItemGroup>
 
 </Project>

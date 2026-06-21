@@ -208,6 +208,14 @@ public partial class App : Application
                             MimeTypes = ["text/plain"],
                             AppleUniformTypeIdentifiers = ["public.plain-text"],
                         },
+                        // Moergo Layout Editor exports — accepted only on the
+                        // Glove80 / GO60 profiles (gated in KeymapStateService).
+                        new FilePickerFileType(Loc.Instance["LoadDialog_FileTypeMoergoJson"])
+                        {
+                            Patterns = ["*.json"],
+                            MimeTypes = ["application/json"],
+                            AppleUniformTypeIdentifiers = ["public.json"],
+                        },
                         FilePickerFileTypes.All,
                     ],
                 });

@@ -34,7 +34,30 @@ public interface IHidPipeline : IDisposable
     /// <summary>Fires on the HID source's thread when <see cref="IsConnected"/> changes.</summary>
     event Action? ConnectionChanged;
 
+    /// <summary>
+    /// Raised for every received 32-byte report, forwarded verbatim from the
+    /// underlying HID source. Fires on the source's read-loop thread (any
+    /// thread); quiet while the pipeline is stopped. The capability layer
+    /// reassembles manifests / confirms off this — the visualization path uses
+    /// the parsed <see cref="ActiveLayerChanged"/> / <see cref="KeyPositionEvent"/> instead.
+    /// </summary>
+    event Action<ReadOnlyMemory<byte>>? ReportReceived;
+
     bool IsConnected { get; }
+
+    /// <summary>
+    /// hidapi path of the keyboard's currently open handle, or null when not
+    /// connected. The capability bus reads this to defensively exclude the
+    /// keyboard from the raw-HID devices it opens — so it is never opened twice.
+    /// </summary>
+    string? OpenDevicePath { get; }
+
+    /// <summary>
+    /// Matcher for the active keyboard profile's HID device, reflecting the
+    /// current profile across <see cref="SetActiveProfile"/>. The capability
+    /// bus uses it to exclude the keyboard from the devices it enumerates.
+    /// </summary>
+    IDeviceMatcher KeyboardMatcher { get; }
 
     /// <summary>Status-bar label ("Raw HID (Go60 Left)" / "Raw HID (searching)"). Empty before <see cref="Start"/>.</summary>
     string SourceLabel { get; }
@@ -62,12 +85,21 @@ public interface IHidPipeline : IDisposable
 
     Task<DeviceInfo?> QueryDeviceInfoAsync(TimeSpan timeout, CancellationToken ct);
     Task<string?> QueryConfigIdAsync(TimeSpan timeout, CancellationToken ct);
+
+    /// <summary>
+    /// Writes one raw report to the keyboard over its already-open handle, so
+    /// the capability layer can drive the keyboard (manifest query, routed
+    /// actions) without opening a second handle. Throws if the pipeline is
+    /// stopped; the caller drops the write on a dead handle.
+    /// </summary>
+    ValueTask SendReportAsync(ReadOnlyMemory<byte> report, CancellationToken ct);
 }
 
 public sealed class HidPipeline : IHidPipeline
 {
     private IKeyboardProfile _profile;
     private ILayerSource? _source;
+    private ICommandSink? _sink;
     private CommandSender? _sender;
     private LayerStateTracker? _tracker;
     private bool _started;
@@ -76,6 +108,7 @@ public sealed class HidPipeline : IHidPipeline
     public event Action<int>? ActiveLayerChanged;
     public event Action<int, bool>? KeyPositionEvent;
     public event Action? ConnectionChanged;
+    public event Action<ReadOnlyMemory<byte>>? ReportReceived;
 
     public HidPipeline(IKeyboardProfile profile)
     {
@@ -85,6 +118,8 @@ public sealed class HidPipeline : IHidPipeline
     public bool IsConnected => _source?.IsConnected ?? false;
     public int CurrentLayer => _source?.CurrentLayer ?? 0;
     public bool IsLastChangeAppControlled => _tracker?.IsAppControlled ?? false;
+    public string? OpenDevicePath => (_source as RawHidLayerSource)?.OpenDevicePath;
+    public IDeviceMatcher KeyboardMatcher => new KeyboardProfileMatcher(_profile);
 
     public string SourceLabel
     {
@@ -100,9 +135,11 @@ public sealed class HidPipeline : IHidPipeline
         if (_started) return;
         var (source, sink) = LayerSourceFactory.Create(new KeyboardProfileMatcher(_profile));
         _source = source;
+        _sink = sink;
         _sender = new CommandSender(source, sink);
         _tracker = new LayerStateTracker();
         _source.ReportReceived += _tracker.OnReport;
+        _source.ReportReceived += OnSourceReport;
         _tracker.StateChanged += OnLayerStateConfirmed;
         _source.LayerChanged += OnLayerChanged;
         _source.KeyPositionEvent += OnKeyPosition;
@@ -117,10 +154,12 @@ public sealed class HidPipeline : IHidPipeline
         _started = false;
         _sender?.Dispose();
         _sender = null;
+        _sink = null;
         if (_source is not null)
         {
             _source.Stop();
             _source.ReportReceived -= _tracker!.OnReport;
+            _source.ReportReceived -= OnSourceReport;
             _source.LayerChanged -= OnLayerChanged;
             _source.KeyPositionEvent -= OnKeyPosition;
             _source.ConnectionChanged -= OnSourceConnectionChanged;
@@ -205,6 +244,14 @@ public sealed class HidPipeline : IHidPipeline
         }
     }
 
+    public ValueTask SendReportAsync(ReadOnlyMemory<byte> report, CancellationToken ct)
+    {
+        var sink = _sink;
+        if (sink is null)
+            throw new InvalidOperationException("HidPipeline: not started.");
+        return sink.SendReportAsync(report, ct);
+    }
+
     public void Dispose()
     {
         if (_disposed) return;
@@ -236,4 +283,5 @@ public sealed class HidPipeline : IHidPipeline
 
     private void OnLayerChanged(int layer) => ActiveLayerChanged?.Invoke(layer);
     private void OnKeyPosition(int pos, bool pressed) => KeyPositionEvent?.Invoke(pos, pressed);
+    private void OnSourceReport(ReadOnlyMemory<byte> report) => ReportReceived?.Invoke(report);
 }

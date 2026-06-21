@@ -24,6 +24,10 @@ public static class BehaviorArityTable
         ["&mt"] = 2,
 
         ["&out"] = 1,
+        ["&rgb_ug"] = 1,
+        ["&mkp"] = 1,
+        ["&msc"] = 1,
+        ["&mmv"] = 1,
         ["&sys_reset"] = 0,
         ["&bootloader"] = 0,
         ["&reset"] = 0,

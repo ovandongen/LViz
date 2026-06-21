@@ -257,6 +257,14 @@
     <value>ZMK keymap</value>
     <comment/>
   </data>
+  <data name="LoadDialog_FileTypeMoergoJson" xml:space="preserve">
+    <value>Moergo-indeling (JSON)</value>
+    <comment/>
+  </data>
+  <data name="Load_JsonMoergoOnly" xml:space="preserve">
+    <value>JSON-indelingen worden alleen ondersteund op Moergo-borden — wissel eerst naar Glove80 of GO60.</value>
+    <comment/>
+  </data>
   <data name="Settings_KeyboardProfile" xml:space="preserve">
     <value>Toetsenbordprofiel</value>
     <comment/>
@@ -525,6 +533,22 @@
     <value>Updates</value>
     <comment/>
   </data>
+  <data name="Settings_CliTool" xml:space="preserve">
+    <value>Opdrachtregelprogramma</value>
+    <comment/>
+  </data>
+  <data name="Settings_CliTool_Hint" xml:space="preserve">
+    <value>Installeer het 'lviz'-commando zodat scripts LViz kunnen aansturen (bijv. lviz event ci:ok).</value>
+    <comment/>
+  </data>
+  <data name="Settings_CliTool_Install" xml:space="preserve">
+    <value>Opdrachtregelprogramma installeren</value>
+    <comment/>
+  </data>
+  <data name="Settings_CliTool_Remove" xml:space="preserve">
+    <value>Opdrachtregelprogramma verwijderen</value>
+    <comment/>
+  </data>
   <data name="Settings_AutoCheckForUpdates" xml:space="preserve">
     <value>Automatisch controleren op updates</value>
     <comment/>
@@ -671,6 +695,430 @@
   </data>
   <data name="IconPicker_Cancel" xml:space="preserve">
     <value>Annuleren</value>
+    <comment/>
+  </data>
+  <data name="Settings_Tab_DeviceRouting" xml:space="preserve">
+    <value>Apparaatroutering</value>
+    <comment/>
+  </data>
+  <data name="Settings_Tab_ActionPipelines" xml:space="preserve">
+    <value>Actiepijplijnen</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Hint" xml:space="preserve">
+    <value>Een pijplijn is een benoemde lijst stappen die op volgorde worden uitgevoerd: een toetsenbordlaag activeren, de RGB of pointing-opties van een apparaat instellen, een app of shell-commando starten, of wachten. Koppel een pijplijn aan een signaal dat een toets afvuurt om hem vanaf het toetsenbord te draaien.</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_SectionLibrary" xml:space="preserve">
+    <value>Pijplijnen</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_NewName" xml:space="preserve">
+    <value>Naam nieuwe pijplijn</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Add" xml:space="preserve">
+    <value>Toevoegen</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Empty" xml:space="preserve">
+    <value>Nog geen pijplijnen. Voeg er hierboven een toe en voeg er stappen aan toe.</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Remove" xml:space="preserve">
+    <value>Verwijderen</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Test" xml:space="preserve">
+    <value>Testen</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_New" xml:space="preserve">
+    <value>Nieuwe pijplijn</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_EditTitle" xml:space="preserve">
+    <value>Pijplijn bewerken</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_NewTitle" xml:space="preserve">
+    <value>Nieuwe pijplijn</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Name" xml:space="preserve">
+    <value>Naam</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_NoSteps" xml:space="preserve">
+    <value>(nog geen stappen)</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Save" xml:space="preserve">
+    <value>Opslaan</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Cancel" xml:space="preserve">
+    <value>Annuleren</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Delete" xml:space="preserve">
+    <value>Verwijderen</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_SectionSteps" xml:space="preserve">
+    <value>Stappen</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_NoSelection" xml:space="preserve">
+    <value>Selecteer een pijplijn om de stappen te bewerken.</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_AddStep" xml:space="preserve">
+    <value>Stap toevoegen</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_StepKind" xml:space="preserve">
+    <value>Soort</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Layer" xml:space="preserve">
+    <value>Laag</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_TargetDevice" xml:space="preserve">
+    <value>Apparaat</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_VisualizedKeyboard" xml:space="preserve">
+    <value>Gevisualiseerd toetsenbord</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_LayerActionLabel" xml:space="preserve">
+    <value>Laagactie</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_LayerAction_SetBase" xml:space="preserve">
+    <value>Basis instellen</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_LayerAction_Activate" xml:space="preserve">
+    <value>Activeren</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_LayerAction_Deactivate" xml:space="preserve">
+    <value>Deactiveren</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_SourceDevice" xml:space="preserve">
+    <value>Van</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_PointingAction" xml:space="preserve">
+    <value>Actie</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_PointingValue" xml:space="preserve">
+    <value>Waarde</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_LaunchTarget" xml:space="preserve">
+    <value>App, bestand of URL</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_ShellCommand" xml:space="preserve">
+    <value>Shell-commando</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_DelayMs" xml:space="preserve">
+    <value>Vertraging (ms)</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_MoveUp" xml:space="preserve">
+    <value>Stap omhoog</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_MoveDown" xml:space="preserve">
+    <value>Stap omlaag</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_SectionBindings" xml:space="preserve">
+    <value>Signaalkoppelingen</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_BindingsHint" xml:space="preserve">
+    <value>Koppel een signaal-id dat een toets afvuurt (signal.fire) aan een pijplijn. De id is betekenisloos op de verbinding — de betekenis leeft hier.</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_SignalId" xml:space="preserve">
+    <value>Signaal-id</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_BindingPipeline" xml:space="preserve">
+    <value>Pijplijn</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_AddBinding" xml:space="preserve">
+    <value>Koppeling toevoegen</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_NoBindings" xml:space="preserve">
+    <value>Nog geen signaalkoppelingen.</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_SectionEventBindings" xml:space="preserve">
+    <value>Gebeurteniskoppelingen</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_EventBindingsHint" xml:space="preserve">
+    <value>Koppel een host-gebeurtenis-id dat een script afvuurt (lviz event &lt;id&gt;) aan een pijplijn. De id is een betekenisloze tekst — de betekenis leeft hier.</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_EventId" xml:space="preserve">
+    <value>Gebeurtenis-id</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_NoEventBindings" xml:space="preserve">
+    <value>Nog geen gebeurteniskoppelingen.</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_SectionAppLayerBindings" xml:space="preserve">
+    <value>App-laag</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_AppLayerBindingsHint" xml:space="preserve">
+    <value>Voer een pijplijn uit wanneer een auto-switch-regel zijn laag opent, verlaat, afsluit of opnieuw activeert. Triggers komen uit je auto-switch-regels (stel die eerst in); de pijplijn draait naast de laagwisseling, niet in plaats daarvan. Eén pijplijn per trigger.</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_NoAppLayerBindings" xml:space="preserve">
+    <value>Nog geen app-laagkoppelingen.</value>
+    <comment/>
+  </data>
+  <data name="AppLayerMoment_Enter" xml:space="preserve">
+    <value>Openen</value>
+    <comment/>
+  </data>
+  <data name="AppLayerMoment_Leave" xml:space="preserve">
+    <value>Verlaten</value>
+    <comment/>
+  </data>
+  <data name="AppLayerMoment_Exit" xml:space="preserve">
+    <value>Afsluiten</value>
+    <comment/>
+  </data>
+  <data name="AppLayerMoment_Reenter" xml:space="preserve">
+    <value>Opnieuw activeren</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Kind_KeyboardLayer" xml:space="preserve">
+    <value>Toetsenbordlaag</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Kind_Rgb" xml:space="preserve">
+    <value>RGB</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Kind_Pointing" xml:space="preserve">
+    <value>Pointing</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Kind_Launch" xml:space="preserve">
+    <value>App starten</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Kind_Shell" xml:space="preserve">
+    <value>Shell-commando</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Kind_Delay" xml:space="preserve">
+    <value>Vertraging</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_Kind_Pipeline" xml:space="preserve">
+    <value>Pijplijn uitvoeren</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_SubPipeline" xml:space="preserve">
+    <value>Pijplijn</value>
+    <comment/>
+  </data>
+  <data name="Settings_Pipeline_CycleError" xml:space="preserve">
+    <value>Dit zou een lus maken: {0}</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_SectionMaster" xml:space="preserve">
+    <value>Routering tussen apparaten</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Hint" xml:space="preserve">
+    <value>Stuur een actie die één apparaat verstuurt (bijv. een toets gekoppeld aan “DPI instellen”) door naar het apparaat dat die actie afhandelt. Het toetsenbord en het afhandelende apparaat praten nooit rechtstreeks — LViz bemiddelt. Detectie loopt zodra het toetsenbord verbonden is; deze schakelaar regelt alleen het doorsturen.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Enable" xml:space="preserve">
+    <value>Capaciteiten tussen apparaten doorsturen</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Available" xml:space="preserve">
+    <value>Routering beschikbaar — een trigger heeft een passende afhandelaar op een ander apparaat.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_ControlReady" xml:space="preserve">
+    <value>Er is een compatibel apparaat verbonden — stuur er hieronder acties naartoe onder “Actie naar apparaat sturen”. Verbind een tweede apparaat waarbij het ene triggert wat het andere afhandelt om ertussen te routeren.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_NoProtocol" xml:space="preserve">
+    <value>Nog geen verbonden apparaat dat het capability-protocol ondersteunt.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_SectionDevices" xml:space="preserve">
+    <value>Gevonden apparaten</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_NoDevices" xml:space="preserve">
+    <value>Nog geen apparaten met capaciteitsprotocol gevonden.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_KeyboardBadge" xml:space="preserve">
+    <value>toetsenbord</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_NoManifest" xml:space="preserve">
+    <value>(reageerde niet op de capaciteitsscan)</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Triggers" xml:space="preserve">
+    <value>Triggert</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Handles" xml:space="preserve">
+    <value>Handelt af</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_SectionRoutes" xml:space="preserve">
+    <value>Routes</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_NoRoutes" xml:space="preserve">
+    <value>Geen routes — een apparaat moet een capaciteit triggeren die een ander apparaat afhandelt.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_RouteTitleFormat" xml:space="preserve">
+    <value>{0} · {1}</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_SectionControl" xml:space="preserve">
+    <value>Actie naar een apparaat sturen</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_ControlHint" xml:space="preserve">
+    <value>Geavanceerd: laat LViz zelf een actie versturen in plaats van er één door te sturen. Handig om een afhandelend apparaat te testen.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_ControlTarget" xml:space="preserve">
+    <value>Doel</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Dpi" xml:space="preserve">
+    <value>DPI</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Send" xml:space="preserve">
+    <value>Sturen</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_On" xml:space="preserve">
+    <value>Aan</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_PointingDpiIndex" xml:space="preserve">
+    <value>DPI-index</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_PointingDragScroll" xml:space="preserve">
+    <value>Sleepscrollen</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_PointingSnipe" xml:space="preserve">
+    <value>Sniping</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Rgb" xml:space="preserve">
+    <value>RGB</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_RgbOn" xml:space="preserve">
+    <value>Aan/uit</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_RgbColor" xml:space="preserve">
+    <value>Kleur</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_RgbBrightness" xml:space="preserve">
+    <value>Helderheid</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_RgbEffect" xml:space="preserve">
+    <value>Effect</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_ControlPickTarget" xml:space="preserve">
+    <value>Kies hierboven een doelapparaat om te zien welke acties het accepteert.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_ControlNone" xml:space="preserve">
+    <value>Dit apparaat biedt geen acties die LViz rechtstreeks kan versturen.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Layer" xml:space="preserve">
+    <value>Laag</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_SetBase" xml:space="preserve">
+    <value>Basis instellen</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Activate" xml:space="preserve">
+    <value>Activeren</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_Deactivate" xml:space="preserve">
+    <value>Deactiveren</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_ControlNoTarget" xml:space="preserve">
+    <value>Kies eerst een doelapparaat.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_ControlGone" xml:space="preserve">
+    <value>Dat apparaat is niet meer verbonden.</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_ControlStatusFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_OutcomeSending" xml:space="preserve">
+    <value>versturen…</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_OutcomeSent" xml:space="preserve">
+    <value>verstuurd</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_OutcomeConfirmed" xml:space="preserve">
+    <value>bevestigd</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_OutcomeTimedOut" xml:space="preserve">
+    <value>geen bevestiging (time-out)</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_OutcomeFailed" xml:space="preserve">
+    <value>mislukt</value>
+    <comment/>
+  </data>
+  <data name="Settings_DeviceRouting_OutcomeFailedDetail" xml:space="preserve">
+    <value>mislukt — {0}</value>
     <comment/>
   </data>
 </root>

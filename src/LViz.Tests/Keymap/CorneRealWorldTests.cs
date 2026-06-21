@@ -9,16 +9,7 @@ namespace LViz.Tests.Keymap;
 /// </summary>
 public class CorneRealWorldTests
 {
-    private static string LoadFixture(string name)
-    {
-        var asm = typeof(CorneRealWorldTests).Assembly;
-        var resourceName = $"LViz.Tests.Keymap.Fixtures.{name}";
-        using var stream = asm.GetManifestResourceStream(resourceName)
-            ?? throw new InvalidOperationException(
-                $"Embedded fixture '{resourceName}' not found.");
-        using var reader = new StreamReader(stream);
-        return reader.ReadToEnd();
-    }
+    private static string LoadFixture(string name) => KeymapFixtures.Read(name);
 
     [Fact]
     public void CorneKeymap_LoadsFourLayers()

@@ -39,6 +39,12 @@ public sealed partial class AutoSwitchEngine : ObservableObject
     /// channel (see <c>MainWindowViewModel.PushLayerToKeyboard</c>).</summary>
     public event Action<int>? PushLayerRequested;
 
+    /// <summary>Raised alongside <see cref="PushLayerRequested"/> as a session
+    /// crosses a lifecycle moment (enter/leave/exit/re-enter), carrying the rule
+    /// involved. Purely informational — drives the app-layer pipeline dispatcher;
+    /// the layer push/revert is unaffected by whether anyone listens.</summary>
+    public event Action<AppLayerMoment, AppLayerRule>? AppLayerTransition;
+
     public AutoSwitchEngine(
         ISettingsService settingsService,
         IActiveWindowMonitor? activeWindowMonitor,
@@ -206,6 +212,7 @@ public sealed partial class AutoSwitchEngine : ObservableObject
             if (target != activeLayer)
                 PushLayerRequested?.Invoke(target);
             _session = s with { UserExited = true };
+            AppLayerTransition?.Invoke(AppLayerMoment.Exit, s.LastFiredRule);
             DiagnosticLog.Info("AutoSwitch",
                 $"{reason}: fell back to layer {target} (rule was '{s.LastFiredRule.ProcessMatch}' → {s.LastFiredRule.LayerIndex})");
         });
@@ -308,6 +315,7 @@ public sealed partial class AutoSwitchEngine : ObservableObject
                     LastPushedLayer: match.LayerIndex,
                     UserExited: false);
                 PushLayerRequested?.Invoke(match.LayerIndex);
+                AppLayerTransition?.Invoke(AppLayerMoment.Enter, match);
                 return;
 
             case (AutoSwitchSession.InSession s, null):
@@ -318,12 +326,20 @@ public sealed partial class AutoSwitchEngine : ObservableObject
                     if (target != activeLayer)
                         PushLayerRequested?.Invoke(target);
                 }
+                // Fire Leave unconditionally on focus loss out of a session, even
+                // when the push was suppressed (user override / already exited) —
+                // a Leave pipeline should still run when the app loses focus.
+                AppLayerTransition?.Invoke(AppLayerMoment.Leave, s.LastFiredRule);
                 _session = new AutoSwitchSession.Idle();
                 return;
 
             case (AutoSwitchSession.InSession s, not null):
                 if (match.Equals(s.LastFiredRule) && !s.UserExited) return;
                 PushLayerRequested?.Invoke(match.LayerIndex);
+                // A direct app→app switch is a Leave of the old rule and an Enter
+                // of the new (no Idle in between).
+                AppLayerTransition?.Invoke(AppLayerMoment.Leave, s.LastFiredRule);
+                AppLayerTransition?.Invoke(AppLayerMoment.Enter, match);
                 _session = s with
                 {
                     LastFiredRule = match,
@@ -360,6 +376,7 @@ public sealed partial class AutoSwitchEngine : ObservableObject
                 LastPushedLayer = match.LayerIndex,
                 UserExited = false,
             };
+            AppLayerTransition?.Invoke(AppLayerMoment.Reenter, match);
             DiagnosticLog.Info("AutoSwitch", $"exit tap: re-entered rule '{match.ProcessMatch}' → layer {match.LayerIndex}");
         });
     }

@@ -73,6 +73,42 @@ public class PreprocessorTests
     }
 
     [Fact]
+    public void MultiLineFunctionLikeDefineIsSkippedEntirely()
+    {
+        // zmk-helpers style: a function-like #define continued across lines
+        // with trailing backslashes. The whole definition must vanish —
+        // leaked continuation lines would inject (here: unbalanced) braces
+        // into the devicetree token stream.
+        var src = "#define ZMK_BEHAVIOR(name, type, ...) \\\n" +
+                  "    name: name { \\\n" +
+                  "        compatible = \"zmk,behavior-tap-dance\"; \\\n" +
+                  "        __VA_ARGS__\n" +
+                  "body";
+        var result = Preprocessor.Process(src);
+        Assert.DoesNotContain("compatible", result);
+        Assert.DoesNotContain("{", result);
+        Assert.Contains("body", result);
+    }
+
+    [Fact]
+    public void MultiLineObjectLikeDefineJoinsValue()
+    {
+        var result = Preprocessor.Process("#define FOO \\\n    42\n&mo FOO");
+        Assert.Contains("&mo 42", result);
+    }
+
+    [Fact]
+    public void ContinuationLinesPreserveLineNumbers()
+    {
+        // Three physical lines collapse into one directive; the two consumed
+        // lines must become blanks so downstream error lines still align.
+        var src = "#define X(a) \\\n  one \\\n  two\nmarker";
+        var result = Preprocessor.Process(src);
+        var lines = result.Split('\n');
+        Assert.Contains("marker", lines[3]);
+    }
+
+    [Fact]
     public void IfdefBlockIsStrippedWhenUndefined()
     {
         var src = "#ifdef CONFIG_FOO\nhidden\n#endif\nvisible";

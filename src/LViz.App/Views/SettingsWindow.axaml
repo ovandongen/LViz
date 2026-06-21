@@ -2,12 +2,13 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:LViz.App.ViewModels"
         xmlns:conv="using:LViz.App.Converters"
+        xmlns:i="https://github.com/projektanker/icons.avalonia"
         x:Class="LViz.App.Views.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
         Name="SettingsRoot"
         Title="{Binding [Title_Settings], Source={StaticResource Loc}}"
-        Width="560" Height="640"
-        MinWidth="420" MinHeight="320"
+        Width="760" Height="640"
+        MinWidth="640" MinHeight="320"
         WindowStartupLocation="CenterOwner">
 
     <Window.Resources>
@@ -22,22 +23,69 @@
              auto-check toggle lives in the General tab's Updates section. -->
         <Border DockPanel.Dock="Bottom" Height="1" Background="{StaticResource BgSurface0}" Margin="0,8,0,0" />
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="8,8,8,4" Spacing="8">
-            <TextBlock Text="{Binding AppVersion}" Foreground="{StaticResource TextMuted}" FontSize="11"
+            <TextBlock Text="{Binding AppVersion}" Foreground="{StaticResource TextMuted}" FontSize="12"
                        VerticalAlignment="Center" />
         </StackPanel>
 
         <TabControl>
 
+        <!-- The headers no longer all fit at the window's min width. Rather than
+             wrap them onto a second row or force the window wider, shrink the
+             header font/padding and keep them on one horizontally scrollable
+             row: a horizontal StackPanel for the strip, wrapped in a ScrollViewer
+             by the template override below. -->
+        <TabControl.Styles>
+            <Style Selector="TabItem">
+                <Setter Property="FontSize" Value="17" />
+                <Setter Property="Padding" Value="12,8" />
+                <Setter Property="MinHeight" Value="0" />
+            </Style>
+        </TabControl.Styles>
+
+        <TabControl.ItemsPanel>
+            <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" />
+            </ItemsPanelTemplate>
+        </TabControl.ItemsPanel>
+
+        <!-- Mirrors the Fluent TabControl template (Border › DockPanel ›
+             ItemsPresenter + selected-content host), with the header
+             ItemsPresenter wrapped in a horizontal ScrollViewer so an
+             overflowing strip scrolls instead of clipping or widening. -->
+        <TabControl.Template>
+            <ControlTemplate TargetType="TabControl">
+                <Border BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="{TemplateBinding CornerRadius}">
+                    <DockPanel>
+                        <ScrollViewer DockPanel.Dock="Top"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Disabled">
+                            <ItemsPresenter Name="PART_ItemsPresenter"
+                                            ItemsPanel="{TemplateBinding ItemsPanel}" />
+                        </ScrollViewer>
+                        <ContentPresenter Name="PART_SelectedContentHost"
+                                          Margin="{TemplateBinding Padding}"
+                                          HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          Content="{TemplateBinding SelectedContent}"
+                                          ContentTemplate="{TemplateBinding SelectedContentTemplate}" />
+                    </DockPanel>
+                </Border>
+            </ControlTemplate>
+        </TabControl.Template>
+
         <!-- General tab: app-wide settings (not scoped per layer). -->
         <TabItem Header="{Binding [Settings_Tab_General], Source={StaticResource Loc}}">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <StackPanel Margin="20" Spacing="16">
+                <StackPanel Margin="20" Spacing="8">
 
-                    <StackPanel Spacing="6">
+                    <StackPanel Spacing="4">
                         <TextBlock Text="{Binding [Settings_KeyboardProfile], Source={StaticResource Loc}}"
                                    FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                         <TextBlock Text="{Binding [Settings_KeyboardProfileHint], Source={StaticResource Loc}}"
-                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
                         <ComboBox MinWidth="200" Margin="0,4,0,0"
                                   HorizontalAlignment="Left"
                                   ItemsSource="{Binding KeyboardChoices}"
@@ -53,11 +101,11 @@
                     <Border Height="1" Background="{StaticResource BgSurface0}" />
 
                     <!-- Background opacity -->
-                    <StackPanel Spacing="6">
+                    <StackPanel Spacing="4">
                         <TextBlock Text="{Binding [Settings_BackgroundOpacity], Source={StaticResource Loc}}"
                                    FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                         <TextBlock Text="{Binding [Settings_BackgroundOpacityHint], Source={StaticResource Loc}}"
-                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
                         <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
                             <Slider Grid.Column="0"
                                     Minimum="0" Maximum="1"
@@ -78,11 +126,11 @@
                     <Border Height="1" Background="{StaticResource BgSurface0}" />
 
                     <!-- Press-highlight color -->
-                    <StackPanel Spacing="6">
+                    <StackPanel Spacing="4">
                         <TextBlock Text="{Binding [Settings_PressHighlight], Source={StaticResource Loc}}"
                                    FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                         <TextBlock Text="{Binding [Settings_PressHighlightHint], Source={StaticResource Loc}}"
-                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
                         <Button Padding="2" Margin="0,4,0,0"
                                 HorizontalAlignment="Left"
                                 Background="Transparent" BorderThickness="0">
@@ -104,11 +152,11 @@
                          the chosen key is auto-excluded from the layer-key picker on the
                          Layers tab so the two can't collide. Hidden on Linux —
                          Wayland blocks global hooks from unfocused windows. -->
-                    <StackPanel Spacing="6" IsVisible="{Binding IsGlobalHotkeySupported}">
+                    <StackPanel Spacing="4" IsVisible="{Binding IsGlobalHotkeySupported}">
                         <TextBlock Text="{Binding [Settings_GlobalHotkey], Source={StaticResource Loc}}"
                                    FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                         <TextBlock Text="{Binding [Settings_GlobalHotkeyHint], Source={StaticResource Loc}}"
-                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
                         <ComboBox MinWidth="120" Margin="0,4,0,0"
                                   HorizontalAlignment="Left"
                                   ItemsSource="{Binding HotkeyKeyChoices}"
@@ -118,18 +166,18 @@
                     <Border Height="1" Background="{StaticResource BgSurface0}" IsVisible="{Binding IsGlobalHotkeySupported}" />
 
                     <!-- Tray icon active-layer tint -->
-                    <StackPanel Spacing="6">
+                    <StackPanel Spacing="4">
                         <CheckBox Content="{Binding [Settings_ColorTrayIcon], Source={StaticResource Loc}}"
                                   IsChecked="{Binding MainViewModel.ColorTrayIconByActiveLayer, Mode=TwoWay}" />
                         <TextBlock Text="{Binding [Settings_ColorTrayIconHint], Source={StaticResource Loc}}"
-                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
                     </StackPanel>
 
                     <Border Height="1" Background="{StaticResource BgSurface0}" />
 
                     <!-- Layout: top-hand picker for stacked mode. Greyed out
                          until the user enables stacked layout via the toolbar. -->
-                    <StackPanel Spacing="6">
+                    <StackPanel Spacing="4">
                         <TextBlock Text="{Binding [Settings_Layout], Source={StaticResource Loc}}"
                                    FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                         <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0"
@@ -146,13 +194,13 @@
 
                     <!-- Updates: auto-check toggle, manual "Check now", status
                          readout, restart-to-install button when staged. -->
-                    <StackPanel Spacing="6">
+                    <StackPanel Spacing="4">
                         <TextBlock Text="{Binding [Settings_Updates], Source={StaticResource Loc}}"
                                    FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                         <CheckBox Content="{Binding [Settings_AutoCheckForUpdates], Source={StaticResource Loc}}"
                                   IsChecked="{Binding AutoCheckForUpdates, Mode=TwoWay}" />
                         <TextBlock Text="{Binding [Settings_AutoCheckHint], Source={StaticResource Loc}}"
-                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
                         <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
                             <Button Content="{Binding [Settings_CheckNow], Source={StaticResource Loc}}"
                                     Command="{Binding CheckForUpdatesCommand}"
@@ -162,12 +210,38 @@
                                     IsVisible="{Binding CanRestartToInstall}" />
                         </StackPanel>
                         <TextBlock Text="{Binding UpdateStatusMessage}"
-                                   Foreground="{StaticResource AccentGreen}" FontSize="11"
+                                   Foreground="{StaticResource AccentGreen}" FontSize="12"
                                    TextWrapping="Wrap"
                                    IsVisible="{Binding HasUpdateStatus}" />
                         <TextBlock Text="{Binding LastCheckedDisplay}"
-                                   Foreground="{StaticResource TextMuted}" FontSize="11"
+                                   Foreground="{StaticResource TextMuted}" FontSize="12"
                                    IsVisible="{Binding LastCheckedDisplay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+
+                    <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+                    <!-- Command-line tool: symlinks `lviz` onto PATH so scripts can
+                         drive the running app. Buttons appear only on builds where
+                         the app can install it (installed build, macOS/Linux); the
+                         detail line always explains the current state. -->
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{Binding [Settings_CliTool], Source={StaticResource Loc}}"
+                                   FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                        <TextBlock Text="{Binding [Settings_CliTool_Hint], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0"
+                                    IsVisible="{Binding IsCliToolActionAvailable}">
+                            <Button Content="{Binding [Settings_CliTool_Install], Source={StaticResource Loc}}"
+                                    Command="{Binding InstallCliToolCommand}"
+                                    IsVisible="{Binding !IsCliToolInstalled}" />
+                            <Button Content="{Binding [Settings_CliTool_Remove], Source={StaticResource Loc}}"
+                                    Command="{Binding UninstallCliToolCommand}"
+                                    IsVisible="{Binding IsCliToolInstalled}" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding CliToolDetail}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="12"
+                                   TextWrapping="Wrap"
+                                   IsVisible="{Binding CliToolDetail, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     </StackPanel>
 
                 </StackPanel>
@@ -183,7 +257,7 @@
                     <TextBlock Text="{Binding LayersHeader}"
                                FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                     <TextBlock Text="{Binding [Settings_LayersHint], Source={StaticResource Loc}}"
-                               Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                               Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
 
                     <ItemsControl ItemsSource="{Binding LayerEntries}"
                                   IsVisible="{Binding HasLayoutForLayers}">
@@ -235,7 +309,7 @@
                         <TextBlock Text="{Binding [Settings_AutoSwitch_SectionEngine], Source={StaticResource Loc}}"
                                    FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                         <TextBlock Text="{Binding [Settings_AutoSwitch_Hint], Source={StaticResource Loc}}"
-                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
 
                         <CheckBox Content="{Binding [Settings_AutoSwitch_Enable], Source={StaticResource Loc}}"
                                   IsChecked="{Binding MainViewModel.AutoSwitch.IsEnabled, Mode=TwoWay}"
@@ -270,7 +344,7 @@
                         <TextBlock Text="{Binding [Settings_AutoSwitch_SectionExitKey], Source={StaticResource Loc}}"
                                    FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                         <TextBlock Text="{Binding [Settings_AutoSwitch_ExitKeysHint], Source={StaticResource Loc}}"
-                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
                         <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
                             <TextBlock Text="{Binding ExitTapSummary}"
                                        Foreground="{StaticResource AccentGreen}" FontSize="12" FontWeight="SemiBold"
@@ -291,7 +365,7 @@
                                   IsChecked="{Binding IsAutoSwitchExitOnEmptyKey, Mode=TwoWay}"
                                   Foreground="{StaticResource Text}" />
                         <TextBlock Text="{Binding [Settings_AutoSwitch_ExitOnTransparent_Hint], Source={StaticResource Loc}}"
-                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
                     </StackPanel>
 
                     <Border Height="1" Background="{StaticResource BgSurface0}" />
@@ -357,7 +431,7 @@
 
                     <!-- Empty-state hint -->
                     <TextBlock Text="{Binding [Settings_AutoSwitch_Empty], Source={StaticResource Loc}}"
-                               Foreground="{StaticResource TextMuted}" FontSize="11" FontStyle="Italic"
+                               Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic"
                                IsVisible="{Binding HasNoEditingRules}" />
 
                     <!-- Existing rules. Each row's DataContext is the underlying
@@ -397,9 +471,11 @@
                                             Command="{Binding DataContext.MoveAppLayerRuleDownCommand, ElementName=SettingsRoot}"
                                             CommandParameter="{Binding}" />
                                     <Button Grid.Column="4" Margin="8,0,0,0"
-                                            Content="{Binding [Settings_AutoSwitch_Remove], Source={StaticResource Loc}}"
+                                            ToolTip.Tip="{Binding [Settings_AutoSwitch_Remove], Source={StaticResource Loc}}"
                                             Command="{Binding DataContext.RemoveAppLayerRuleCommand, ElementName=SettingsRoot}"
-                                            CommandParameter="{Binding}" />
+                                            CommandParameter="{Binding}">
+                                        <i:Icon Value="fa-solid fa-trash-can" />
+                                    </Button>
                                 </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -428,7 +504,7 @@
                     <TextBlock Text="{Binding [Settings_MouseLayer_Title], Source={StaticResource Loc}}"
                                FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                     <TextBlock Text="{Binding [Settings_MouseLayer_Hint], Source={StaticResource Loc}}"
-                               Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                               Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
 
                     <CheckBox Content="{Binding [Settings_MouseLayer_Enable], Source={StaticResource Loc}}"
                               IsChecked="{Binding IsMouseLayerEnabled, Mode=TwoWay}"
@@ -479,7 +555,7 @@
                                   IsChecked="{Binding IsMouseLayerEndlessTimeout, Mode=TwoWay}"
                                   Foreground="{StaticResource Text}" />
                         <TextBlock Text="{Binding [Settings_MouseLayer_EndlessTimeout_Hint], Source={StaticResource Loc}}"
-                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
                     </StackPanel>
 
                     <!-- Transparent (&trans) and empty (&none) keypress
@@ -495,11 +571,488 @@
                                   IsChecked="{Binding IsMouseLayerExitOnEmptyKey, Mode=TwoWay}"
                                   Foreground="{StaticResource Text}" />
                         <TextBlock Text="{Binding [Settings_MouseLayer_ExitOnTransparent_Hint], Source={StaticResource Loc}}"
-                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
                     </StackPanel>
 
                 </StackPanel>
             </ScrollViewer>
+        </TabItem>
+
+        <!-- Device routing tab: cross-device capability bus. Gated on
+             IsHidSourceActive — the bus + router only discover while live
+             tracking is on, so there's no inventory to show until then. -->
+        <TabItem Header="{Binding [Settings_Tab_DeviceRouting], Source={StaticResource Loc}}"
+                 IsVisible="{Binding MainViewModel.IsHidSourceActive}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="20" Spacing="16">
+
+                    <!-- Master opt-in + availability status. -->
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding [Settings_DeviceRouting_SectionMaster], Source={StaticResource Loc}}"
+                                   FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                        <TextBlock Text="{Binding [Settings_DeviceRouting_Hint], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+                        <CheckBox Content="{Binding [Settings_DeviceRouting_Enable], Source={StaticResource Loc}}"
+                                  IsChecked="{Binding DeviceRouting.RoutingEnabled, Mode=TwoWay}"
+                                  Foreground="{StaticResource Text}"
+                                  Margin="0,4,0,0" />
+                        <!-- Lights up (green) as soon as one device speaks the
+                             protocol; muted until then. -->
+                        <TextBlock Text="{Binding DeviceRouting.RoutingStatus}"
+                                   Foreground="{StaticResource AccentGreen}" FontSize="12" TextWrapping="Wrap"
+                                   IsVisible="{Binding DeviceRouting.HasCapableDevice}" />
+                        <TextBlock Text="{Binding [Settings_DeviceRouting_NoProtocol], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap"
+                                   IsVisible="{Binding DeviceRouting.HasNoCapableDevice}" />
+                    </StackPanel>
+
+                    <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+                    <!-- Discovered devices + their capability surface. -->
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding [Settings_DeviceRouting_SectionDevices], Source={StaticResource Loc}}"
+                                   FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                        <TextBlock Text="{Binding [Settings_DeviceRouting_NoDevices], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic" TextWrapping="Wrap"
+                                   IsVisible="{Binding DeviceRouting.HasNoDevices}" />
+                        <ItemsControl ItemsSource="{Binding DeviceRouting.Devices}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RoutedDeviceRow">
+                                    <Border Margin="0,3,0,3" Padding="8" CornerRadius="4"
+                                            Background="{StaticResource BgSurface0}">
+                                        <StackPanel Spacing="2">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           Foreground="{StaticResource Text}" FontWeight="SemiBold" />
+                                                <Border Background="{StaticResource BgSurface1}" CornerRadius="3"
+                                                        Padding="4,0" VerticalAlignment="Center"
+                                                        IsVisible="{Binding IsKeyboard}">
+                                                    <TextBlock Text="{Binding [Settings_DeviceRouting_KeyboardBadge], Source={StaticResource Loc}}"
+                                                               Foreground="{StaticResource TextSubtle}" FontSize="10" />
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding [Settings_DeviceRouting_NoManifest], Source={StaticResource Loc}}"
+                                                       Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic"
+                                                       IsVisible="{Binding !HasManifest}" />
+                                            <Grid ColumnDefinitions="64,*" IsVisible="{Binding HasManifest}">
+                                                <TextBlock Grid.Column="0"
+                                                           Text="{Binding [Settings_DeviceRouting_Triggers], Source={StaticResource Loc}}"
+                                                           Foreground="{StaticResource TextMuted}" FontSize="12" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Triggers}"
+                                                           Foreground="{StaticResource TextSubtle}" FontSize="12"
+                                                           TextWrapping="Wrap" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="64,*" IsVisible="{Binding HasManifest}">
+                                                <TextBlock Grid.Column="0"
+                                                           Text="{Binding [Settings_DeviceRouting_Handles], Source={StaticResource Loc}}"
+                                                           Foreground="{StaticResource TextMuted}" FontSize="12" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Handles}"
+                                                           Foreground="{StaticResource TextSubtle}" FontSize="12"
+                                                           TextWrapping="Wrap" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+                    <!-- Routing table: per (source, capability) group, an
+                         enable/disable checkbox per candidate handler. -->
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding [Settings_DeviceRouting_SectionRoutes], Source={StaticResource Loc}}"
+                                   FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                        <TextBlock Text="{Binding [Settings_DeviceRouting_NoRoutes], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic" TextWrapping="Wrap"
+                                   IsVisible="{Binding DeviceRouting.HasNoRoutes}" />
+                        <ItemsControl ItemsSource="{Binding DeviceRouting.Routes}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RouteRow">
+                                    <StackPanel Spacing="2" Margin="0,3,0,6">
+                                        <TextBlock Text="{Binding Title}"
+                                                   Foreground="{StaticResource Text}" FontSize="12" FontWeight="SemiBold" />
+                                        <ItemsControl ItemsSource="{Binding Handlers}" Margin="12,0,0,0">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:RouteHandlerRow">
+                                                    <CheckBox Content="{Binding DisplayName}"
+                                                              IsChecked="{Binding Routed, Mode=TwoWay}"
+                                                              Foreground="{StaticResource Text}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+                    <!-- App-originated control: have LViz send an action to a
+                         device directly (advanced / handler testing). -->
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding [Settings_DeviceRouting_SectionControl], Source={StaticResource Loc}}"
+                                   FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                        <TextBlock Text="{Binding [Settings_DeviceRouting_ControlHint], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                            <TextBlock Text="{Binding [Settings_DeviceRouting_ControlTarget], Source={StaticResource Loc}}"
+                                       Foreground="{StaticResource Text}" FontSize="12" VerticalAlignment="Center" />
+                            <ComboBox MinWidth="200"
+                                      ItemsSource="{Binding DeviceRouting.Devices}"
+                                      SelectedItem="{Binding DeviceRouting.ControlTarget, Mode=TwoWay}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:RoutedDeviceRow">
+                                        <TextBlock Text="{Binding DisplayName}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <!-- Prompt until a target is chosen. -->
+                        <TextBlock Text="{Binding [Settings_DeviceRouting_ControlPickTarget], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic" TextWrapping="Wrap"
+                                   IsVisible="{Binding DeviceRouting.NoTargetSelected}" />
+
+                        <!-- Pointing actions the target handles — one row each. -->
+                        <ItemsControl ItemsSource="{Binding DeviceRouting.PointingControls}"
+                                      IsVisible="{Binding DeviceRouting.HasPointingControls}" Margin="0,4,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:PointingControlRow">
+                                    <Grid ColumnDefinitions="120,140,Auto" ColumnSpacing="8" Margin="0,3,0,0">
+                                        <TextBlock Grid.Column="0" Text="{Binding Label}"
+                                                   Foreground="{StaticResource Text}" FontSize="12" VerticalAlignment="Center" />
+                                        <!-- Toggle actions (snipe, drag-scroll): on/off checkbox. -->
+                                        <CheckBox Grid.Column="1" VerticalAlignment="Center"
+                                                  IsVisible="{Binding IsToggle}"
+                                                  IsChecked="{Binding IsOn, Mode=TwoWay}"
+                                                  Content="{Binding [Settings_DeviceRouting_On], Source={StaticResource Loc}}" />
+                                        <!-- Count / index actions (DPI, DPI index): numeric field. -->
+                                        <NumericUpDown Grid.Column="1"
+                                                       IsVisible="{Binding IsNumeric}"
+                                                       Minimum="0" Maximum="2147483647" Increment="1" FormatString="0"
+                                                       Value="{Binding Value, Mode=TwoWay}" />
+                                        <Button Grid.Column="2"
+                                                Content="{Binding [Settings_DeviceRouting_Send], Source={StaticResource Loc}}"
+                                                Command="{Binding SendCommand}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- RGB (core.rgb.set): a single multi-field editor with
+                             its own send logic. Each field has an Include toggle
+                             (left) gating its value (right); only included fields
+                             are sent, honouring the wire presence mask. -->
+                        <StackPanel Spacing="3" Margin="0,8,0,0"
+                                    IsVisible="{Binding DeviceRouting.HasRgbControl}">
+                            <TextBlock Text="{Binding [Settings_DeviceRouting_Rgb], Source={StaticResource Loc}}"
+                                       Foreground="{StaticResource Text}" FontSize="12" FontWeight="SemiBold" />
+                            <!-- On/off -->
+                            <Grid ColumnDefinitions="120,140" ColumnSpacing="8">
+                                <CheckBox Grid.Column="0" VerticalAlignment="Center"
+                                          Content="{Binding [Settings_DeviceRouting_RgbOn], Source={StaticResource Loc}}"
+                                          IsChecked="{Binding DeviceRouting.RgbControl.IncludeOn, Mode=TwoWay}" />
+                                <CheckBox Grid.Column="1" VerticalAlignment="Center"
+                                          IsEnabled="{Binding DeviceRouting.RgbControl.IncludeOn}"
+                                          IsChecked="{Binding DeviceRouting.RgbControl.On, Mode=TwoWay}"
+                                          Content="{Binding [Settings_DeviceRouting_On], Source={StaticResource Loc}}" />
+                            </Grid>
+                            <!-- Colour: hue + saturation + brightness picked
+                                 together (the ColorView flyout has a brightness
+                                 slider); decoded to the wire HSB on send. -->
+                            <Grid ColumnDefinitions="120,140" ColumnSpacing="8">
+                                <CheckBox Grid.Column="0" VerticalAlignment="Center"
+                                          Content="{Binding [Settings_DeviceRouting_RgbColor], Source={StaticResource Loc}}"
+                                          IsChecked="{Binding DeviceRouting.RgbControl.IncludeColor, Mode=TwoWay}" />
+                                <Button Grid.Column="1" Padding="3" HorizontalAlignment="Left"
+                                        IsEnabled="{Binding DeviceRouting.RgbControl.IncludeColor}">
+                                    <Border Width="56" Height="22" CornerRadius="3"
+                                            Background="{Binding DeviceRouting.RgbControl.ColorHex, Converter={StaticResource HexToBrush}}"
+                                            BorderBrush="{StaticResource BgSurface1}" BorderThickness="1" />
+                                    <Button.Flyout>
+                                        <Flyout Placement="BottomEdgeAlignedLeft">
+                                            <ColorView Color="{Binding DeviceRouting.RgbControl.Color, Mode=TwoWay}"
+                                                       IsAlphaVisible="False" />
+                                        </Flyout>
+                                    </Button.Flyout>
+                                </Button>
+                            </Grid>
+                            <!-- Brightness: a separate dimmer, independent of the
+                                 picked colour. -->
+                            <Grid ColumnDefinitions="120,140" ColumnSpacing="8">
+                                <CheckBox Grid.Column="0" VerticalAlignment="Center"
+                                          Content="{Binding [Settings_DeviceRouting_RgbBrightness], Source={StaticResource Loc}}"
+                                          IsChecked="{Binding DeviceRouting.RgbControl.IncludeBrightness, Mode=TwoWay}" />
+                                <Slider Grid.Column="1" Minimum="0" Maximum="100"
+                                        VerticalAlignment="Center"
+                                        IsEnabled="{Binding DeviceRouting.RgbControl.IncludeBrightness}"
+                                        Value="{Binding DeviceRouting.RgbControl.Brightness, Mode=TwoWay}" />
+                            </Grid>
+                            <!-- Effect index -->
+                            <Grid ColumnDefinitions="120,140,Auto" ColumnSpacing="8">
+                                <CheckBox Grid.Column="0" VerticalAlignment="Center"
+                                          Content="{Binding [Settings_DeviceRouting_RgbEffect], Source={StaticResource Loc}}"
+                                          IsChecked="{Binding DeviceRouting.RgbControl.IncludeEffect, Mode=TwoWay}" />
+                                <NumericUpDown Grid.Column="1" Minimum="0" Maximum="255" Increment="1" FormatString="0"
+                                               IsEnabled="{Binding DeviceRouting.RgbControl.IncludeEffect}"
+                                               Value="{Binding DeviceRouting.RgbControl.Effect, Mode=TwoWay}" />
+                                <Button Grid.Column="2" VerticalAlignment="Center"
+                                        Content="{Binding [Settings_DeviceRouting_Send], Source={StaticResource Loc}}"
+                                        Command="{Binding DeviceRouting.RgbControl.SendCommand}" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Layer actions: a shared layer index + only the
+                             buttons the target advertises handling. -->
+                        <Grid ColumnDefinitions="120,140,*" ColumnSpacing="8" Margin="0,8,0,0"
+                              IsVisible="{Binding DeviceRouting.HasLayerControls}">
+                            <TextBlock Grid.Column="0" Text="{Binding [Settings_DeviceRouting_Layer], Source={StaticResource Loc}}"
+                                       Foreground="{StaticResource Text}" FontSize="12" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Column="1"
+                                           Minimum="0" Maximum="255" Increment="1" FormatString="0"
+                                           Value="{Binding DeviceRouting.ControlLayerIndex, Mode=TwoWay}" />
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Left"
+                                        VerticalAlignment="Center">
+                                <Button Content="{Binding [Settings_DeviceRouting_SetBase], Source={StaticResource Loc}}"
+                                        Command="{Binding DeviceRouting.SetBaseLayerCommand}"
+                                        IsVisible="{Binding DeviceRouting.CanSetBase}" />
+                                <Button Content="{Binding [Settings_DeviceRouting_Activate], Source={StaticResource Loc}}"
+                                        Command="{Binding DeviceRouting.ActivateLayerCommand}"
+                                        IsVisible="{Binding DeviceRouting.CanActivate}" />
+                                <Button Content="{Binding [Settings_DeviceRouting_Deactivate], Source={StaticResource Loc}}"
+                                        Command="{Binding DeviceRouting.DeactivateLayerCommand}"
+                                        IsVisible="{Binding DeviceRouting.CanDeactivate}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Target selected, but nothing LViz can originate. -->
+                        <TextBlock Text="{Binding [Settings_DeviceRouting_ControlNone], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic" TextWrapping="Wrap"
+                                   IsVisible="{Binding DeviceRouting.ShowControlPlaceholder}" />
+
+                        <TextBlock Text="{Binding DeviceRouting.ControlStatus}"
+                                   Foreground="{StaticResource AccentGreen}" FontSize="12" TextWrapping="Wrap"
+                                   IsVisible="{Binding DeviceRouting.ControlStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- Action Pipelines tab: author named step pipelines + bind signals to
+             them. Gated on a live HID source (same as Device Routing) since the
+             device-step targets come from the capability router. -->
+        <TabItem Header="{Binding [Settings_Tab_ActionPipelines], Source={StaticResource Loc}}"
+                 IsVisible="{Binding MainViewModel.IsHidSourceActive}">
+            <!-- Three sub-tabs: the pipeline library, plus the two trigger-binding
+                 tables (signal id / host event id) that reference it. Same VM
+                 (ActionPipelines); split only for navigation. -->
+            <TabControl>
+
+                <!-- Pipeline library: compact click-to-edit cards. Creating and
+                     editing a pipeline happens in the EditPipelineDialog popup
+                     (launched from code-behind via OnNewPipelineClick /
+                     OnEditPipelineClick), keeping the tab a lightweight overview. -->
+                <TabItem Header="{Binding [Settings_Pipeline_SectionLibrary], Source={StaticResource Loc}}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="20" Spacing="8">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                                           Text="{Binding [Settings_Pipeline_Hint], Source={StaticResource Loc}}"
+                                           Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+                                <Button Grid.Column="1" VerticalAlignment="Top"
+                                        Content="{Binding [Settings_Pipeline_New], Source={StaticResource Loc}}"
+                                        Click="OnNewPipelineClick" />
+                            </Grid>
+
+                            <TextBlock Text="{Binding [Settings_Pipeline_Empty], Source={StaticResource Loc}}"
+                                       Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic"
+                                       IsVisible="{Binding ActionPipelines.HasNoPipelines}" />
+
+                            <ItemsControl ItemsSource="{Binding ActionPipelines.Pipelines}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:PipelineEditRow">
+                                        <!-- Compact one-line card: name only. The step
+                                             summary moves to the tooltip to save vertical
+                                             space; the body text was the EditHint. -->
+                                        <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                                Margin="0,2,0,2" Padding="10,5"
+                                                Background="{StaticResource BgSurface0}"
+                                                Tag="{Binding}" Click="OnEditPipelineClick"
+                                                ToolTip.Tip="{Binding Summary}">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource Text}" FontSize="13" />
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- Signal bindings: id → pipeline. -->
+                <TabItem Header="{Binding [Settings_Pipeline_SectionBindings], Source={StaticResource Loc}}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="20" Spacing="6">
+                            <TextBlock Text="{Binding [Settings_Pipeline_BindingsHint], Source={StaticResource Loc}}"
+                                       Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+
+                            <Grid ColumnDefinitions="Auto,120,Auto" ColumnSpacing="8" Margin="0,4,0,0">
+                                <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                                           Text="{Binding [Settings_Pipeline_SignalId], Source={StaticResource Loc}}"
+                                           Foreground="{StaticResource Text}" FontSize="12" />
+                                <NumericUpDown Grid.Column="1" Minimum="0" Maximum="255" Increment="1" FormatString="0"
+                                               Value="{Binding ActionPipelines.NewBindingSignalId, Mode=TwoWay}" />
+                                <Button Grid.Column="2"
+                                        Content="{Binding [Settings_Pipeline_AddBinding], Source={StaticResource Loc}}"
+                                        Command="{Binding ActionPipelines.AddBindingCommand}" />
+                            </Grid>
+
+                            <TextBlock Text="{Binding [Settings_Pipeline_NoBindings], Source={StaticResource Loc}}"
+                                       Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic"
+                                       IsVisible="{Binding ActionPipelines.HasNoBindings}" />
+
+                            <ItemsControl ItemsSource="{Binding ActionPipelines.SignalBindings}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:SignalBindingRow">
+                                        <Grid ColumnDefinitions="Auto,170,Auto,120,*,Auto" ColumnSpacing="8" Margin="0,3,0,3">
+                                            <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                                                       Text="{Binding [Settings_Pipeline_SourceDevice], Source={StaticResource Loc}}"
+                                                       Foreground="{StaticResource TextMuted}" FontSize="12" />
+                                            <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                                                      ItemsSource="{Binding DeviceOptions}"
+                                                      SelectedItem="{Binding SelectedSourceDevice, Mode=TwoWay}">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:PipelineTargetOption">
+                                                        <TextBlock Text="{Binding DisplayName}" />
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+                                            <TextBlock Grid.Column="2" VerticalAlignment="Center"
+                                                       Text="{Binding [Settings_Pipeline_SignalId], Source={StaticResource Loc}}"
+                                                       Foreground="{StaticResource TextMuted}" FontSize="12" />
+                                            <NumericUpDown Grid.Column="3" Minimum="0" Maximum="255" Increment="1" FormatString="0"
+                                                           Value="{Binding SignalId, Mode=TwoWay}" />
+                                            <ComboBox Grid.Column="4" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                                                      ItemsSource="{Binding PipelineNames}"
+                                                      SelectedItem="{Binding PipelineName, Mode=TwoWay}" />
+                                            <Button Grid.Column="5"
+                                                    ToolTip.Tip="{Binding [Settings_Pipeline_Remove], Source={StaticResource Loc}}"
+                                                    Command="{Binding DataContext.ActionPipelines.RemoveBindingCommand, ElementName=SettingsRoot}"
+                                                    CommandParameter="{Binding}">
+                                                <i:Icon Value="fa-solid fa-trash-can" />
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- Event bindings: host event id (string) → pipeline. The CLI
+                     ('lviz event <id>') fires these over IPC; same pipeline
+                     library as the signal bindings, keyed by string. -->
+                <TabItem Header="{Binding [Settings_Pipeline_SectionEventBindings], Source={StaticResource Loc}}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="20" Spacing="6">
+                            <TextBlock Text="{Binding [Settings_Pipeline_EventBindingsHint], Source={StaticResource Loc}}"
+                                       Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+
+                            <Grid ColumnDefinitions="Auto,160,Auto" ColumnSpacing="8" Margin="0,4,0,0">
+                                <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                                           Text="{Binding [Settings_Pipeline_EventId], Source={StaticResource Loc}}"
+                                           Foreground="{StaticResource Text}" FontSize="12" />
+                                <TextBox Grid.Column="1" Watermark="ci:ok"
+                                         Text="{Binding ActionPipelines.NewBindingEventId, Mode=TwoWay}" />
+                                <Button Grid.Column="2"
+                                        Content="{Binding [Settings_Pipeline_AddBinding], Source={StaticResource Loc}}"
+                                        Command="{Binding ActionPipelines.AddEventBindingCommand}" />
+                            </Grid>
+
+                            <TextBlock Text="{Binding [Settings_Pipeline_NoEventBindings], Source={StaticResource Loc}}"
+                                       Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic"
+                                       IsVisible="{Binding ActionPipelines.HasNoEventBindings}" />
+
+                            <ItemsControl ItemsSource="{Binding ActionPipelines.EventBindings}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:EventBindingRow">
+                                        <Grid ColumnDefinitions="Auto,140,*,Auto" ColumnSpacing="8" Margin="0,3,0,3">
+                                            <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                                                       Text="{Binding [Settings_Pipeline_EventId], Source={StaticResource Loc}}"
+                                                       Foreground="{StaticResource TextMuted}" FontSize="12" />
+                                            <TextBox Grid.Column="1" Watermark="ci:ok"
+                                                     Text="{Binding EventId, Mode=TwoWay}" />
+                                            <ComboBox Grid.Column="2" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                                                      ItemsSource="{Binding PipelineNames}"
+                                                      SelectedItem="{Binding PipelineName, Mode=TwoWay}" />
+                                            <Button Grid.Column="3"
+                                                    ToolTip.Tip="{Binding [Settings_Pipeline_Remove], Source={StaticResource Loc}}"
+                                                    Command="{Binding DataContext.ActionPipelines.RemoveEventBindingCommand, ElementName=SettingsRoot}"
+                                                    CommandParameter="{Binding}">
+                                                <i:Icon Value="fa-solid fa-trash-can" />
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- App-layer bindings: an app-focus auto-switch lifecycle moment
+                     (enter/leave/exit/re-enter) → pipeline. Runs alongside the
+                     layer push the auto-switch engine already performs; an empty
+                     process filter fires for any rule-matched app. -->
+                <TabItem Header="{Binding [Settings_Pipeline_SectionAppLayerBindings], Source={StaticResource Loc}}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="20" Spacing="6">
+                            <TextBlock Text="{Binding [Settings_Pipeline_AppLayerBindingsHint], Source={StaticResource Loc}}"
+                                       Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+
+                            <Button HorizontalAlignment="Left" Margin="0,4,0,0"
+                                    Content="{Binding [Settings_Pipeline_AddBinding], Source={StaticResource Loc}}"
+                                    Command="{Binding ActionPipelines.AddAppLayerBindingCommand}" />
+
+                            <TextBlock Text="{Binding [Settings_Pipeline_NoAppLayerBindings], Source={StaticResource Loc}}"
+                                       Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic"
+                                       IsVisible="{Binding ActionPipelines.HasNoAppLayerBindings}" />
+
+                            <ItemsControl ItemsSource="{Binding ActionPipelines.AppLayerBindings}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:AppLayerBindingRow">
+                                        <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="8" Margin="0,3,0,3">
+                                            <ComboBox Grid.Column="0" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                                                      ItemsSource="{Binding AvailableTriggers}"
+                                                      SelectedItem="{Binding SelectedTrigger, Mode=TwoWay}">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:AppLayerTriggerOption">
+                                                        <TextBlock Text="{Binding Label}" />
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+                                            <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                                                      ItemsSource="{Binding PipelineNames}"
+                                                      SelectedItem="{Binding PipelineName, Mode=TwoWay}" />
+                                            <Button Grid.Column="2"
+                                                    ToolTip.Tip="{Binding [Settings_Pipeline_Remove], Source={StaticResource Loc}}"
+                                                    Command="{Binding DataContext.ActionPipelines.RemoveAppLayerBindingCommand, ElementName=SettingsRoot}"
+                                                    CommandParameter="{Binding}">
+                                                <i:Icon Value="fa-solid fa-trash-can" />
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+            </TabControl>
         </TabItem>
 
         <!-- Testing tab: temporary scratch area for HID push tests. Remove when done. -->
@@ -509,7 +1062,7 @@
                     <TextBlock Text="Push layer to keyboard"
                                FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                     <TextBlock Text="Selecting a layer fires SetLayerStateAsync immediately. See log for app push acknowledged / external change events."
-                               Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                               Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
                     <ComboBox MinWidth="220"
                               HorizontalAlignment="Left"
                               ItemsSource="{Binding MainViewModel.Layers}"
@@ -526,7 +1079,7 @@
                     <TextBlock Text="HID queries (shared module)"
                                FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                     <TextBlock Text="Sends 0xFD GetDeviceInfo / 0xFB GetConfigId and waits up to 1s for the matching reply."
-                               Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                               Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
                     <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto" Margin="0,4,0,0" ColumnSpacing="8" RowSpacing="6">
                         <Button Grid.Row="0" Grid.Column="0"
                                 Content="Query device info"
@@ -553,7 +1106,7 @@
                     <TextBlock Text="Active window (focus follows OS)"
                                FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                     <TextBlock Text="Updates within ~500 ms of focus change. WindowTitle is null on macOS by design (no Accessibility entitlement)."
-                               Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                               Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
                     <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto" Margin="0,4,0,0">
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="ProcessName" Foreground="{StaticResource TextMuted}" />
                         <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding MainViewModel.AutoSwitch.ActiveWindow.ProcessName, FallbackValue='(none)', TargetNullValue='(none)'}" Foreground="{StaticResource Text}" />

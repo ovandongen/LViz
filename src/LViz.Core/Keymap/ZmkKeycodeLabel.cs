@@ -101,6 +101,7 @@ public static class ZmkKeycodeLabel
         ["PSCRN"] = "PrtSc", ["PRINTSCREEN"] = "PrtSc",
         ["SLCK"] = "ScrLk", ["SCROLLLOCK"] = "ScrLk",
         ["PAUSE_BREAK"] = "Pause", ["PAUSE"] = "Pause",
+        ["K_APP"] = "Menu", ["K_APPLICATION"] = "Menu", ["K_CMENU"] = "Menu", ["K_CONTEXT_MENU"] = "Menu",
 
         // Arrows — thin monochrome variants (the heavy forms ⬆⬇⬅➡ render as
         // color emoji in many fonts). KeyViewModel.LabelFontSize gives these

@@ -5,19 +5,34 @@ the active layer of your ZMK keyboard in real time over Raw HID.
 
 ![LViz overlaid on a browser, with the profile picker open](pics/3.png)
 
+> 📖 **Documentation** — how everything works (the overlay, device routing,
+> action pipelines, the `lviz` CLI, and the wire protocol, with flow diagrams)
+> lives in the **[project wiki](https://github.com/ovandongen/LViz/wiki)**. This
+> README stays focused on install and build.
+
 ## What it does
 
 LViz watches your keyboard's Raw HID endpoint and renders the live
 layer state as a floating, transparency-aware overlay on your desktop.
 It ships with physical layouts for seven popular ZMK boards, parses
 your `.keymap` to label the keys, draws combos on top, and lets you
-override any label by hand. It also pushes layer state **back** to the
+override any label by hand. On the two Moergo boards (Glove80 / GO60)
+it also loads the Layout Editor's `.json` export directly. It also pushes layer state **back** to the
 firmware: per-app auto-switch rules and a mouse-idle layer push are
 both first-class features.
 
 Forked from
 [moergo-layer-viz](https://github.com/ovandongen/moergo-layer-viz) and
 generalized so the engine can host arbitrary ZMK boards.
+
+### Beyond the overlay
+
+Over the same Raw HID transport, LViz also runs a cross-device **capability
+bus**: it discovers what each connected HID device can do, **routes** actions
+between devices (Device Routing), runs **action pipelines** triggered by keyboard
+signals / host events / app focus, and exposes a small **`lviz` CLI** to drive it
+all from scripts. See the
+[wiki](https://github.com/ovandongen/LViz/wiki) for the full guide.
 
 ## Status
 
@@ -53,6 +68,8 @@ template to copy.
   `#define` macros, recursive custom-behavior resolution, and
   `/delete-node/` aren't supported yet, so heavily macro'd keymaps may
   need flattening first
+- Moergo Layout Editor `.json` import (Glove80 / GO60 only) — load a
+  glove80.com / go60 export directly, no `.keymap` conversion needed
 - Per-app auto-switch rules with a configurable double-tap exit key
 - Mouse-idle layer push (e.g. flip to a Mouse layer while you're
   moving the pointer; revert when it goes idle)
@@ -134,6 +151,15 @@ Simplest setup is to add two modules to your ZMK `west` manifest:
 
 …and enable `CONFIG_RAW_HID=y` in your shield config.
 
+That covers the **layer overlay**, which is the ZMK side. The **capability bus**
+(device routing, pointing, RGB, signals) is firmware-agnostic: any device that
+exposes the same Raw HID interface and answers the capability manifest can join —
+including **QMK** pointing devices and lighting (per-key RGB is QMK-only). For QMK
+that's the [ovandongen/qmk_modules](https://github.com/ovandongen/qmk_modules)
+`capability_bus` module, with worked Ploopy examples in
+[ovandongen/qmk_userspace](https://github.com/ovandongen/qmk_userspace). See the
+[Firmware guide](https://github.com/ovandongen/LViz/wiki/Firmware) for both paths.
+
 Profile selection is by case-insensitive substring match against the
 HID product name (see
 [DtsiKeyboardProfile.cs](src/LViz.Core/Layout/DtsiKeyboardProfile.cs)) —
@@ -165,9 +191,9 @@ dotnet run --project src/LViz.App
 ```
 LViz.sln
 src/
-  LViz.Core/    pure .NET — .keymap parser pipeline, physical-layout
-                profiles, Raw HID protocol parser, settings, diagnostics.
-                No Avalonia.
+  LViz.Core/    pure .NET — .keymap parser pipeline, Moergo .json
+                loader, physical-layout profiles, Raw HID protocol
+                parser, settings, diagnostics. No Avalonia.
   LViz.App/     Avalonia 11 UI, MVVM, HID pipeline, auto-switch &
                 mouse-layer engines, per-key label overrides, native
                 show/hide hotkey (Carbon on macOS, User32 on Windows),

@@ -45,6 +45,21 @@ internal static class AppServices
         services.AddSingleton<IGlobalHotkeyService, GlobalHotkeyService>();
         services.AddSingleton<UpdateService>();
 
+        // App-originated capability control (layer + pointing actions, confirm
+        // plane). Stateless, so it lives in the container — unlike the capability
+        // *router*, which needs the live keyboard pipeline + device bus and is
+        // therefore MainWindowViewModel-scoped (same reason as the four
+        // interfaces noted below).
+        services.AddSingleton<ICapabilityControl>(_ => new CapabilityControl());
+
+        // Host-process spawner for the Launch/Shell action-pipeline steps.
+        // Stateless and platform-branching, so it lives in the container.
+        services.AddSingleton<IHostActionExecutor, HostActionExecutor>();
+
+        // Installs the `lviz` CLI symlink onto PATH (Settings button). Stateless +
+        // platform-branching, same rationale as the host executor above.
+        services.AddSingleton<ICliToolInstaller, CliToolInstaller>();
+
         // Active-window monitor can fail to construct on some platforms
         // (missing permissions, headless test runners, …). We register it
         // only when construction succeeds; consumers resolve via
@@ -73,13 +88,18 @@ internal static class AppServices
             new MainWindowViewModel(
                 sp.GetRequiredService<ISettingsService>(),
                 sp.GetService<IActiveWindowMonitor>(),
-                sp.GetService<IMouseIdleMonitor>()));
+                sp.GetService<IMouseIdleMonitor>(),
+                keymapState: null,
+                capabilityControl: sp.GetRequiredService<ICapabilityControl>(),
+                hostActionExecutor: sp.GetRequiredService<IHostActionExecutor>()));
 
         services.AddTransient<SettingsViewModel>(sp =>
             new SettingsViewModel(
                 sp.GetRequiredService<ISettingsService>(),
                 sp.GetRequiredService<MainWindowViewModel>(),
-                sp.GetRequiredService<UpdateService>()));
+                sp.GetRequiredService<UpdateService>(),
+                sp.GetRequiredService<ICapabilityControl>(),
+                sp.GetRequiredService<ICliToolInstaller>()));
 
         return services.BuildServiceProvider();
     }

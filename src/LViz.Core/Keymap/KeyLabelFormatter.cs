@@ -37,7 +37,7 @@ public static class KeyLabelFormatter
         var layerName = targetLayerName is null ? null : FormatLayerName(targetLayerName);
 
         if (holdTap is not null)
-            return FormatHoldTap(b, holdTap, targetLayerName, layerName);
+            return FormatHoldTap(b, holdTap, targetLayerName, layerName, macros);
 
         return TryFormatStandardBehavior(b, layerName)
             ?? TryFormatMacroConvention(b)
@@ -54,11 +54,12 @@ public static class KeyLabelFormatter
     /// consistently here.
     /// </summary>
     private static (string Label, string Subscript, string TopLeft) FormatHoldTap(
-        KeyBinding b, HoldTap holdTap, string? rawLayerName, string? formattedLayerName)
+        KeyBinding b, HoldTap holdTap, string? rawLayerName, string? formattedLayerName,
+        IReadOnlyDictionary<string, ZmkMacro>? macros)
     {
         var (holdParams, tapParams) = SplitHoldTapParams(b.Params, holdTap);
-        var tap = FormatBinding(new KeyBinding(holdTap.TapBinding, tapParams), null);
-        var hold = FormatBinding(new KeyBinding(holdTap.HoldBinding, holdParams), rawLayerName);
+        var tap = FormatBinding(new KeyBinding(holdTap.TapBinding, tapParams), null, macros: macros);
+        var hold = FormatBinding(new KeyBinding(holdTap.HoldBinding, holdParams), rawLayerName, macros: macros);
         var sub = !string.IsNullOrEmpty(formattedLayerName) ? formattedLayerName : hold.Label;
         return (tap.Label, sub, "Hold-Tap");
     }
@@ -96,6 +97,13 @@ public static class KeyLabelFormatter
             "&bootloader"                         => ("Boot",                          "", "System"),
             "&ext_power" when b.Params.Count >= 1 => (FormatExtPowerParam(b.Params[0]), "", "Ext Power"),
             "&rgb_ug"    when b.Params.Count >= 1 => (FormatRgbParam(b.Params[0]),     "", "Underglow"),
+
+            "&caps_word"                          => ("Caps Word", "", ""),
+            "&key_repeat"                         => ("Repeat",    "", ""),
+
+            "&mkp" when b.Params.Count >= 1 => (FormatMouseButtonParam(b.Params[0]),    "", "Click"),
+            "&msc" when b.Params.Count >= 1 => (FormatMouseDirectionParam(b.Params[0]), "", "Scroll"),
+            "&mmv" when b.Params.Count >= 1 => (FormatMouseDirectionParam(b.Params[0]), "", "Mouse"),
 
             _ => null,
         };
@@ -156,7 +164,21 @@ public static class KeyLabelFormatter
             if (++kpCount >= 4) break;
         }
 
-        return kpCount == 0 ? null : (label.ToString(), "", "Macro");
+        if (kpCount == 0)
+        {
+            // Not a keycode chain. A single-binding macro (e.g. Moergo's
+            // rgb_ug_status_macro wrapping one &rgb_ug call) still has an
+            // obvious label — the inner binding's own. macros stays null on
+            // the recursion so a self-referencing macro can't loop.
+            if (macro.Bindings.Count == 1)
+            {
+                var inner = FormatBinding(macro.Bindings[0], null);
+                if (!string.IsNullOrEmpty(inner.Label)) return (inner.Label, "", "Macro");
+            }
+            return null;
+        }
+
+        return (label.ToString(), "", "Macro");
     }
 
     private static (string Label, string Subscript, string TopLeft) FormatFallback(KeyBinding b) =>
@@ -334,6 +356,26 @@ public static class KeyLabelFormatter
         "RGB_BRD" => "Bri −",
         "RGB_SPI" => "Spd +",
         "RGB_SPD" => "Spd −",
+        "RGB_STATUS" => "Status",
+        _ => p,
+    };
+
+    private static string FormatMouseButtonParam(string p) => p switch
+    {
+        "LCLK" or "MB1" => "L Clk",
+        "RCLK" or "MB2" => "R Clk",
+        "MCLK" or "MB3" => "M Clk",
+        "MB4" => "M4",
+        "MB5" => "M5",
+        _ => p,
+    };
+
+    private static string FormatMouseDirectionParam(string p) => p switch
+    {
+        "MOVE_UP"   or "SCRL_UP"    => "↑",
+        "MOVE_DOWN" or "SCRL_DOWN"  => "↓",
+        "MOVE_LEFT" or "SCRL_LEFT"  => "←",
+        "MOVE_RIGHT" or "SCRL_RIGHT" => "→",
         _ => p,
     };
 

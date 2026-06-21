@@ -557,4 +557,68 @@ public class AutoSwitchEngineTests
         Assert.True(settings.Current.AutoSwitchExitOnEmpty[profile.Id]);
         Assert.False(settings.Current.AutoSwitchExitOnTransparent.ContainsKey(profile.Id));
     }
+
+    // ─── AppLayerTransition lifecycle events ──────────────────────────────
+    // Enter/Leave fire synchronously from the ActiveWindow setter (no
+    // dispatcher), so they're directly observable. Exit/Re-enter go through
+    // Dispatcher.UIThread.Post and stay out of this surface, same as exit-tap.
+
+    private static List<(AppLayerMoment Moment, string Process)> CaptureTransitions(AutoSwitchEngine engine)
+    {
+        var captured = new List<(AppLayerMoment, string)>();
+        engine.AppLayerTransition += (m, rule) => captured.Add((m, rule.ProcessMatch));
+        return captured;
+    }
+
+    [Fact]
+    public void Transition_Enter_FiresOnMatch()
+    {
+        var (engine, _, _) = NewEngine(new[] { Rule("Code", 3) });
+        var t = CaptureTransitions(engine);
+
+        engine.ActiveWindow = Window("Code");
+
+        Assert.Equal(new[] { (AppLayerMoment.Enter, "Code") }, t);
+    }
+
+    [Fact]
+    public void Transition_Leave_FiresOnFocusLoss()
+    {
+        var (engine, _, _) = NewEngine(new[] { Rule("Code", 3) });
+        var t = CaptureTransitions(engine);
+
+        engine.ActiveWindow = Window("Code");
+        engine.ActiveWindow = Window("firefox");
+
+        Assert.Equal(new[] { (AppLayerMoment.Enter, "Code"), (AppLayerMoment.Leave, "Code") }, t);
+    }
+
+    [Fact]
+    public void Transition_DirectAppSwitch_FiresLeaveThenEnter()
+    {
+        var (engine, _, _) = NewEngine(new[] { Rule("Code", 3), Rule("firefox", 2) });
+        var t = CaptureTransitions(engine);
+
+        engine.ActiveWindow = Window("Code");
+        t.Clear();
+        engine.ActiveWindow = Window("firefox"); // matches a different rule, no Idle in between
+
+        Assert.Equal(new[] { (AppLayerMoment.Leave, "Code"), (AppLayerMoment.Enter, "firefox") }, t);
+    }
+
+    [Fact]
+    public void Transition_Leave_FiresEvenWhenUserOverrodeLayer()
+    {
+        // User manually changed layer mid-session → the fallback push is
+        // suppressed, but a Leave pipeline should still run on focus loss.
+        var activeLayer = 3;
+        var (engine, _, _) = NewEngine(new[] { Rule("Code", 3) }, getActiveLayer: () => activeLayer);
+        var t = CaptureTransitions(engine);
+
+        engine.ActiveWindow = Window("Code");
+        activeLayer = 5; // user toggled to some other layer themselves
+        engine.ActiveWindow = Window("firefox");
+
+        Assert.Contains((AppLayerMoment.Leave, "Code"), t);
+    }
 }
