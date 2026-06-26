@@ -190,7 +190,7 @@ public sealed class HidPipeline : IHidPipeline
             try
             {
                 await sender.SetLayerStateAsync(bitmask, CancellationToken.None);
-                DiagnosticLog.Info("LayerPush", $"sent layer {index} (mask 0x{bitmask:X})");
+                DiagnosticLog.Debug("LayerPush", $"sent layer {index} (mask 0x{bitmask:X})");
             }
             catch (Exception ex)
             {
@@ -208,7 +208,7 @@ public sealed class HidPipeline : IHidPipeline
         {
             using var cts = new CancellationTokenSource(timeout);
             _sender.SetLayerStateAsync(bitmask, cts.Token).GetAwaiter().GetResult();
-            DiagnosticLog.Info("LayerPush", $"sync sent layer {index} (mask 0x{bitmask:X})");
+            DiagnosticLog.Debug("LayerPush", $"sync sent layer {index} (mask 0x{bitmask:X})");
         }
         catch (Exception ex)
         {
@@ -263,9 +263,9 @@ public sealed class HidPipeline : IHidPipeline
     {
         if (_tracker is null) return;
         if (_tracker.IsAppControlled)
-            DiagnosticLog.Info("LayerState", $"app push acknowledged: layer {_tracker.HighestActiveLayer} (mask 0x{bitmask:X})");
+            DiagnosticLog.Debug("LayerState", $"app push acknowledged: layer {_tracker.HighestActiveLayer} (mask 0x{bitmask:X})");
         else
-            DiagnosticLog.Info("LayerState", $"external change: layer {_tracker.HighestActiveLayer} (mask 0x{bitmask:X})");
+            DiagnosticLog.Debug("LayerState", $"external change: layer {_tracker.HighestActiveLayer} (mask 0x{bitmask:X})");
     }
 
     private void OnSourceConnectionChanged()

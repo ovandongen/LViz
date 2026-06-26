@@ -185,7 +185,7 @@ public sealed class MouseLayerEngine : IMouseLayerEngine
     public bool TryRedirectPendingPush(int layer)
     {
         if (_preMoveLayer is null) return false;
-        DiagnosticLog.Info("MouseLayer",
+        DiagnosticLog.Debug("MouseLayer",
             $"redirect: pre-move {_preMoveLayer} → {layer} (mouse keeps pushing until idle)");
         _preMoveLayer = layer;
         return true;
@@ -210,7 +210,7 @@ public sealed class MouseLayerEngine : IMouseLayerEngine
     {
         if (!_preMoveLayer.HasValue) return;
         var target = _preMoveLayer.Value;
-        DiagnosticLog.Info("MouseLayer", $"{reason} → revert to layer {target}");
+        DiagnosticLog.Debug("MouseLayer", $"{reason} → revert to layer {target}");
         PushLayerRequested?.Invoke(target);
         _preMoveLayer = null;
     }
@@ -224,7 +224,7 @@ public sealed class MouseLayerEngine : IMouseLayerEngine
     private void ReevaluateMonitorState()
     {
         var active = IsActive;
-        DiagnosticLog.Info("MouseLayer",
+        DiagnosticLog.Debug("MouseLayer",
             $"reevaluate: enabled={_settings.Enabled} idx={_settings.MouseLayerIndex} hid={_isHidConnected()} → active={active}");
         if (active) _monitor.Start();
         else _monitor.Stop();
@@ -235,7 +235,7 @@ public sealed class MouseLayerEngine : IMouseLayerEngine
         if (!IsActive) return;
         var target = _settings.MouseLayerIndex!.Value;
         _preMoveLayer = _getActiveLayer();
-        DiagnosticLog.Info("MouseLayer",
+        DiagnosticLog.Debug("MouseLayer",
             $"move start → push layer {target} (was {_preMoveLayer})");
         PushLayerRequested?.Invoke(target);
     }
@@ -252,7 +252,7 @@ public sealed class MouseLayerEngine : IMouseLayerEngine
         // (settings change / profile switch) — firing layer 0 would jump the
         // keyboard to base unexpectedly.
         if (_preMoveLayer is not int target) return;
-        DiagnosticLog.Info("MouseLayer", $"move stop → push layer {target}");
+        DiagnosticLog.Debug("MouseLayer", $"move stop → push layer {target}");
         PushLayerRequested?.Invoke(target);
         _preMoveLayer = null;
     }
