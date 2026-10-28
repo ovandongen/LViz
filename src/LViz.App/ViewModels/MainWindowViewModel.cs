@@ -16,6 +16,9 @@ using LViz.Core.Settings;
 using ZmkHidProtocol.ActiveWindow;
 using ZmkHidProtocol.Protocol;
 using ZmkHidProtocol.Transport;
+// The RecentKeymaps property below shadows the Core helper type of the same
+// name inside this class; the bookkeeping stays reachable through this alias.
+using RecentKeymapHistory = LViz.Core.Settings.RecentKeymaps;
 
 namespace LViz.App.ViewModels;
 
@@ -466,6 +469,18 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// <summary>Path of the layout JSON the user currently has loaded, or null if none.</summary>
     public string? LoadedLayoutPath => _keymap.LoadedPath;
 
+    /// <summary>
+    /// Recent keymap paths for the active profile, most-recent-first (empty
+    /// when none). Backs the future recents menu — no UI is wired to it yet.
+    /// Raises <c>PropertyChanged</c> after every load (success or failure)
+    /// and after a keyboard-profile switch. Each read re-loads settings, so
+    /// the list is a snapshot, not a live view; treat it as read-only.
+    /// </summary>
+    public IReadOnlyList<string> RecentKeymaps =>
+        _settingsService.Load().RecentKeymapPaths.TryGetValue(_profile.Id, out var paths)
+            ? paths
+            : Array.Empty<string>();
+
     // --- Commands ---
     public IRelayCommand QuitCommand { get; }
     public IRelayCommand ShowCommand { get; }
@@ -684,6 +699,22 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             StatusMessage = Loc.Instance.Format("Status_LoadErrorFormat", error.Message);
             DiagnosticLog.Error("MainVM", $"Load failed: {error}");
             Toast.Show(Loc.Instance.Format("Toast_LoadFailedFormat", Path.GetFileName(path), error.Message));
+            // A keymap file that no longer loads shouldn't linger in "recent".
+            // Skip the write entirely when the path isn't listed.
+            if (RecentKeymaps.Contains(path, StringComparer.Ordinal))
+            {
+                PersistSetting(s =>
+                {
+                    if (!s.RecentKeymapPaths.TryGetValue(_profile.Id, out var recents))
+                        return s;
+                    var recentPaths = new Dictionary<string, List<string>>(s.RecentKeymapPaths)
+                    {
+                        [_profile.Id] = RecentKeymapHistory.Remove(recents, path),
+                    };
+                    return s with { RecentKeymapPaths = recentPaths };
+                });
+            }
+            OnPropertyChanged(nameof(RecentKeymaps));
             return;
         }
 
@@ -718,11 +749,23 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         BuildCombosForConfig();
         HasLayoutLoaded = true;
 
+        // One write for both dicts: the single last-used path and the
+        // per-profile recents list, always for the profile the keymap ended
+        // up on (_profile is already the auto-switch target when one ran).
         PersistSetting(s =>
         {
             var paths = new Dictionary<string, string>(s.LayoutJsonPaths) { [_profile.Id] = path };
-            return s with { LayoutJsonPaths = paths };
+            var recentPaths = new Dictionary<string, List<string>>(s.RecentKeymapPaths)
+            {
+                [_profile.Id] = RecentKeymapHistory.Push(
+                    s.RecentKeymapPaths.TryGetValue(_profile.Id, out var recents)
+                        ? recents
+                        : Array.Empty<string>(),
+                    path),
+            };
+            return s with { LayoutJsonPaths = paths, RecentKeymapPaths = recentPaths };
         });
+        OnPropertyChanged(nameof(RecentKeymaps));
 
         var baseMsg = Loc.Instance.Format("Status_Loaded",
             Path.GetFileName(path), loaded.LayerCount);
@@ -848,6 +891,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         }
 
         PersistSetting(s => s with { Keyboard = profile.Id });
+        // Recents are per-profile; the surfaced list changed with the profile.
+        OnPropertyChanged(nameof(RecentKeymaps));
         DiagnosticLog.Info("MainVM", $"Keyboard profile switched to {profile.Id}");
 
         // Re-scope HID discovery to the new profile so a Go60 stops feeding

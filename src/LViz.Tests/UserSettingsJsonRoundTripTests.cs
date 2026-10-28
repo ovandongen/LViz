@@ -149,6 +149,73 @@ public class UserSettingsJsonRoundTripTests
     }
 
     [Fact]
+    public void Load_MissingRecentKeymapPaths_ResolvesToEmpty()
+    {
+        // Settings files written before the recents feature (schema v1) have
+        // no RecentKeymapPaths key. The default initializer should kick in.
+        var json = """{"SchemaVersion": 1, "Keyboard": "GO60"}""";
+
+        var parsed = JsonSerializer.Deserialize<UserSettings>(json, Options);
+
+        Assert.NotNull(parsed);
+        Assert.NotNull(parsed!.RecentKeymapPaths);
+        Assert.Empty(parsed.RecentKeymapPaths);
+    }
+
+    [Fact]
+    public void RoundTrip_PreservesRecentKeymapPaths()
+    {
+        var original = new UserSettings
+        {
+            RecentKeymapPaths = new Dictionary<string, List<string>>
+            {
+                ["Corne"] = new() { "/keymaps/corne-latest.keymap", "/keymaps/corne-old.keymap" },
+                ["Glove80"] = new() { "/keymaps/glove.keymap" },
+            },
+        };
+
+        var json = JsonSerializer.Serialize(original, Options);
+        var rehydrated = JsonSerializer.Deserialize<UserSettings>(json, Options);
+
+        Assert.NotNull(rehydrated);
+        Assert.Equal(2, rehydrated!.RecentKeymapPaths.Count);
+        Assert.Equal(original.RecentKeymapPaths["Corne"], rehydrated.RecentKeymapPaths["Corne"]);
+        Assert.Equal(original.RecentKeymapPaths["Glove80"], rehydrated.RecentKeymapPaths["Glove80"]);
+    }
+
+    [Fact]
+    public void SettingsService_LoadFromV1File_SeedsRecentsFromLayoutJsonPaths()
+    {
+        // v1 files remember only one path per profile in LayoutJsonPaths.
+        // The v1 → v2 migration turns each into a one-item recents list and
+        // rewrites the file at the new schema version.
+        var path = Path.Combine(Path.GetTempPath(), $"lviz-settings-{Guid.NewGuid()}.json");
+        try
+        {
+            File.WriteAllText(path, """
+                {
+                    "SchemaVersion": 1,
+                    "LayoutJsonPaths": {"Corne": "/keymaps/corne.keymap", "GO60": "/keymaps/go60.keymap"}
+                }
+                """);
+            var svc = new SettingsService(path);
+
+            var loaded = svc.Load();
+
+            Assert.Equal(UserSettings.CurrentSchemaVersion, loaded.SchemaVersion);
+            Assert.Equal(new[] { "/keymaps/corne.keymap" }, loaded.RecentKeymapPaths["Corne"]);
+            Assert.Equal(new[] { "/keymaps/go60.keymap" }, loaded.RecentKeymapPaths["GO60"]);
+            // Migration persists, so the upgraded shape survives a reload.
+            var reloaded = svc.Load();
+            Assert.Equal(loaded.RecentKeymapPaths["Corne"], reloaded.RecentKeymapPaths["Corne"]);
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Load_MissingRoutingFields_ResolveToDefaults()
     {
         // Settings files written before the capability-bus feature carry neither

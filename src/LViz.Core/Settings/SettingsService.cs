@@ -101,10 +101,27 @@ public class SettingsService : ISettingsService
 
     /// <summary>
     /// Applies forward migrations from <c>parsed.SchemaVersion</c> up to
-    /// <see cref="UserSettings.CurrentSchemaVersion"/>. Currently a no-op.
+    /// <see cref="UserSettings.CurrentSchemaVersion"/>.
     /// </summary>
-    private static UserSettings MigrateSettings(UserSettings parsed) =>
-        parsed with { SchemaVersion = UserSettings.CurrentSchemaVersion };
+    private static UserSettings MigrateSettings(UserSettings parsed)
+    {
+        // v1 → v2: RecentKeymapPaths was introduced; seed each profile's list
+        // with its single last-used LayoutJsonPaths entry. A profile that
+        // already carries a recents list keeps it (makes the step idempotent).
+        var recent = new Dictionary<string, List<string>>(parsed.RecentKeymapPaths);
+        foreach (var (profileId, path) in parsed.LayoutJsonPaths)
+        {
+            if (string.IsNullOrWhiteSpace(path) || recent.ContainsKey(profileId))
+                continue;
+            recent[profileId] = new List<string> { path };
+        }
+
+        return parsed with
+        {
+            SchemaVersion = UserSettings.CurrentSchemaVersion,
+            RecentKeymapPaths = recent,
+        };
+    }
 
     public void Save(UserSettings settings)
     {

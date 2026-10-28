@@ -2,6 +2,7 @@ using LViz.App.Services;
 using LViz.App.ViewModels;
 using LViz.Core.Keymap;
 using LViz.Core.Keymap.Parser;
+using LViz.Core.Layout;
 using LViz.Core.Models;
 using LViz.Core.Settings;
 using Xunit;
@@ -114,5 +115,124 @@ public class MainWindowViewModelLoadTests
         Assert.Equal("Glove80", vm.SelectedKeyboard.Id);
         Assert.Equal("Glove80", settings.Current.Keyboard);
         Assert.True(vm.HasLayoutLoaded);
+    }
+
+    [Fact]
+    public void LoadLayoutFromPath_Success_RecordsPathAtFrontOfActiveProfileRecents()
+    {
+        var settings = new InMemorySettingsService();
+        var ok = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "first.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
+        var vm = new MainWindowViewModel(settings, keymapState: ok);
+
+        vm.LoadLayoutFromPath("first.keymap");
+
+        Assert.Equal(new[] { "first.keymap" }, settings.Current.RecentKeymapPaths["Corne"]);
+        Assert.Equal(new[] { "first.keymap" }, vm.RecentKeymaps);
+    }
+
+    [Fact]
+    public void LoadLayoutFromPath_AutoSwitch_RecordsPathUnderNewProfile()
+    {
+        var settings = new InMemorySettingsService();
+        // 80 bindings matches the Glove80 profile → the load auto-switches.
+        var ok = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "glove.keymap", LayerCount: 2, FirstLayerBindingCount: 80));
+        var vm = new MainWindowViewModel(settings, keymapState: ok);
+
+        vm.LoadLayoutFromPath("glove.keymap");
+
+        Assert.Equal("Glove80", vm.SelectedKeyboard.Id);
+        // The recents entry rides the auto-switch: recorded under Glove80,
+        // never under the profile the user was on when picking the file.
+        Assert.Equal(new[] { "glove.keymap" }, settings.Current.RecentKeymapPaths["Glove80"]);
+        Assert.False(settings.Current.RecentKeymapPaths.ContainsKey("Corne"));
+        Assert.Equal(new[] { "glove.keymap" }, vm.RecentKeymaps);
+    }
+
+    [Fact]
+    public void LoadLayoutFromPath_Failure_RemovesPathFromProfileRecents()
+    {
+        var settings = new InMemorySettingsService
+        {
+            Current = new UserSettings
+            {
+                RecentKeymapPaths = new Dictionary<string, List<string>>
+                {
+                    ["Corne"] = new() { "gone.keymap", "still.keymap" },
+                },
+            },
+        };
+        var failing = new FakeKeymapStateService(
+            new KeymapLoadResult.Failure("gone.keymap", new InvalidOperationException("boom")));
+        var vm = new MainWindowViewModel(settings, keymapState: failing);
+
+        vm.LoadLayoutFromPath("gone.keymap");
+
+        Assert.Equal(new[] { "still.keymap" }, settings.Current.RecentKeymapPaths["Corne"]);
+        Assert.Equal(new[] { "still.keymap" }, vm.RecentKeymaps);
+    }
+
+    [Fact]
+    public void LoadLayoutFromPath_Success_RaisesPropertyChangedForRecentKeymaps()
+    {
+        var settings = new InMemorySettingsService();
+        var ok = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
+        var vm = new MainWindowViewModel(settings, keymapState: ok);
+
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        vm.LoadLayoutFromPath("ok.keymap");
+
+        Assert.Contains("RecentKeymaps", raised);
+    }
+
+    [Fact]
+    public void LoadLayoutFromPath_Failure_RaisesPropertyChangedForRecentKeymaps()
+    {
+        var settings = new InMemorySettingsService();
+        var failing = new FakeKeymapStateService(
+            new KeymapLoadResult.Failure("bad.keymap", new InvalidOperationException("boom")));
+        var vm = new MainWindowViewModel(settings, keymapState: failing);
+
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        vm.LoadLayoutFromPath("bad.keymap");
+
+        Assert.Contains("RecentKeymaps", raised);
+    }
+
+    [Fact]
+    public void LoadLayoutFromPath_Failure_UnlistedPath_SkipsSettingsWrite()
+    {
+        var settings = new InMemorySettingsService();
+        var failing = new FakeKeymapStateService(
+            new KeymapLoadResult.Failure("bad.keymap", new InvalidOperationException("boom")));
+        var vm = new MainWindowViewModel(settings, keymapState: failing);
+        var original = settings.Current;
+
+        vm.LoadLayoutFromPath("bad.keymap");
+
+        // No recents entry to prune → no save, so the stored object is untouched.
+        Assert.Same(original, settings.Current);
+    }
+
+    [Fact]
+    public void SelectKeyboard_RaisesPropertyChangedForRecentKeymaps()
+    {
+        var settings = new InMemorySettingsService();
+        var ok = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
+        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        var glove80 = KeyboardProfileRegistry.All.First(p => p.Id == "Glove80");
+
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        vm.SelectKeyboardCommand.Execute(glove80);
+
+        Assert.Contains("RecentKeymaps", raised);
+        // The surfaced list follows the new profile — Corne's recents don't leak.
+        Assert.Empty(vm.RecentKeymaps);
     }
 }

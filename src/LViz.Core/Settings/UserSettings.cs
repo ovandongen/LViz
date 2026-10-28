@@ -11,7 +11,7 @@ public record UserSettings
     /// to dispatch migrations and to refuse files written by a newer version
     /// rather than silently nuking them.
     /// </summary>
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     /// <summary>Schema version of the persisted settings file. Defaults to current for new files.</summary>
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
@@ -32,6 +32,17 @@ public record UserSettings
     /// blank if none yet).
     /// </summary>
     public Dictionary<string, string> LayoutJsonPaths { get; init; } = new();
+
+    /// <summary>
+    /// Recent keymap paths per keyboard profile. Key = profile id (e.g.
+    /// "Corne", "GO60", "Glove80"), Value = absolute paths, most-recent-first.
+    /// Maintained by <see cref="RecentKeymaps"/> on every load: pushed to the
+    /// front on success, dropped on failure, capped at
+    /// <see cref="RecentKeymaps.MaxEntries"/>. The actively-loaded keymap per
+    /// profile is still <see cref="LayoutJsonPaths"/>; this list only backs
+    /// the recents menu.
+    /// </summary>
+    public Dictionary<string, List<string>> RecentKeymapPaths { get; init; } = new();
 
     /// <summary>
     /// Per-layer color overrides, scoped per keyboard profile.
