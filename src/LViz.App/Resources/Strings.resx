@@ -201,6 +201,22 @@
     <value>No combos on this layer</value>
     <comment/>
   </data>
+  <data name="RecentKeymaps_Browse" xml:space="preserve">
+    <value>Browse…</value>
+    <comment/>
+  </data>
+  <data name="RecentKeymaps_Empty" xml:space="preserve">
+    <value>No recent keymaps</value>
+    <comment/>
+  </data>
+  <data name="RecentKeymaps_Clear" xml:space="preserve">
+    <value>Clear list</value>
+    <comment/>
+  </data>
+  <data name="RecentKeymaps_Missing" xml:space="preserve">
+    <value>File not found</value>
+    <comment/>
+  </data>
   <data name="Status_Ready" xml:space="preserve">
     <value>Ready</value>
     <comment/>
@@ -243,6 +259,10 @@
   </data>
   <data name="Status_AutoSwitchedKeyboard" xml:space="preserve">
     <value>auto-switched to {0}</value>
+    <comment/>
+  </data>
+  <data name="Status_RecentKeymapRemovedFormat" xml:space="preserve">
+    <value>Removed {0} from recent keymaps (file not found)</value>
     <comment/>
   </data>
   <data name="Toast_LoadFailedFormat" xml:space="preserve">

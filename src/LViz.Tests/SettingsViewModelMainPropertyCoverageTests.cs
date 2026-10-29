@@ -82,6 +82,10 @@ public class SettingsViewModelMainPropertyCoverageTests
         "Toast",
         "HasLayoutLoaded",
         "IsHidSourceActive",
+
+        // Recents-menu emptiness flag, bound directly in the main window's
+        // recents flyout (part 2); settings never renders recents.
+        "HasRecentKeymaps",
     };
 
     [Fact]

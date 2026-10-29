@@ -1,3 +1,4 @@
+using LViz.App.Localization;
 using LViz.App.Services;
 using LViz.App.ViewModels;
 using LViz.Core.Keymap;
@@ -19,8 +20,13 @@ public class MainWindowViewModelLoadTests
     private sealed class InMemorySettingsService : ISettingsService
     {
         public UserSettings Current { get; set; } = new();
+        public int SaveCount { get; private set; }
         public UserSettings Load() => Current;
-        public void Save(UserSettings settings) => Current = settings;
+        public void Save(UserSettings settings)
+        {
+            Current = settings;
+            SaveCount++;
+        }
     }
 
     // Returns a canned result and records state the way the real service does.
@@ -33,12 +39,14 @@ public class MainWindowViewModelLoadTests
         public bool HasLayout => Current is not null;
         public string? LoadedPath { get; private set; }
         public string? LastLoadError { get; private set; }
+        public int LoadCallCount { get; private set; }
 
         public TransparentBindingKind? ClassifyBinding(int layer, int key)
             => Current?.ClassifyBinding(layer, key);
 
         public KeymapLoadResult Load(string path, string profileId)
         {
+            LoadCallCount++;
             if (_result is KeymapLoadResult.Success s)
             {
                 Current = s.Keymap;
@@ -234,5 +242,226 @@ public class MainWindowViewModelLoadTests
         Assert.Contains("RecentKeymaps", raised);
         // The surfaced list follows the new profile — Corne's recents don't leak.
         Assert.Empty(vm.RecentKeymaps);
+    }
+
+    // --- Recents flyout surface: RecentKeymapItems / HasRecentKeymaps / commands ---
+
+    [Fact]
+    public void RecentKeymapItems_MapsPathsInOrderWithDisplayFields()
+    {
+        var settings = new InMemorySettingsService
+        {
+            Current = new UserSettings
+            {
+                RecentKeymapPaths = new Dictionary<string, List<string>>
+                {
+                    ["Corne"] = new() { "/keymaps/one.keymap", "/keymaps/gone.keymap" },
+                },
+            },
+        };
+        var ok = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "one.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
+        var vm = new MainWindowViewModel(settings, keymapState: ok)
+        {
+            FileExists = p => p != "/keymaps/gone.keymap",
+        };
+
+        vm.LoadLayoutFromPath("/keymaps/one.keymap");
+
+        var items = vm.RecentKeymapItems;
+        Assert.Equal(2, items.Count);
+
+        Assert.Equal("/keymaps/one.keymap", items[0].Path);
+        Assert.Equal("one.keymap", items[0].FileName);
+        Assert.Equal("/keymaps", items[0].Folder);
+        Assert.True(items[0].Exists);
+        // Only the loaded path is current.
+        Assert.True(items[0].IsCurrent);
+
+        Assert.Equal("/keymaps/gone.keymap", items[1].Path);
+        Assert.Equal("gone.keymap", items[1].FileName);
+        Assert.Equal("/keymaps", items[1].Folder);
+        Assert.False(items[1].Exists);
+        Assert.False(items[1].IsCurrent);
+    }
+
+    [Fact]
+    public void HasRecentKeymaps_TracksActiveProfileList()
+    {
+        var settings = new InMemorySettingsService();
+        var ok = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
+        var vm = new MainWindowViewModel(settings, keymapState: ok);
+
+        Assert.False(vm.HasRecentKeymaps);
+
+        vm.LoadLayoutFromPath("ok.keymap");
+
+        Assert.True(vm.HasRecentKeymaps);
+    }
+
+    [Fact]
+    public void OpenRecentKeymap_ExistingFile_LoadsAndMovesToFront()
+    {
+        var settings = new InMemorySettingsService
+        {
+            Current = new UserSettings
+            {
+                RecentKeymapPaths = new Dictionary<string, List<string>>
+                {
+                    ["Corne"] = new() { "/keymaps/first.keymap", "/keymaps/second.keymap" },
+                },
+            },
+        };
+        var ok = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "second.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
+        var vm = new MainWindowViewModel(settings, keymapState: ok) { FileExists = _ => true };
+
+        var target = vm.RecentKeymapItems.First(i => i.Path == "/keymaps/second.keymap");
+        vm.OpenRecentKeymapCommand.Execute(target);
+
+        Assert.Equal("/keymaps/second.keymap", vm.LoadedLayoutPath);
+        Assert.Equal(
+            new[] { "/keymaps/second.keymap", "/keymaps/first.keymap" },
+            vm.RecentKeymaps);
+        Assert.True(vm.RecentKeymapItems[0].IsCurrent);
+    }
+
+    [Fact]
+    public void OpenRecentKeymap_MissingFile_RemovesWithoutLoading()
+    {
+        var settings = new InMemorySettingsService
+        {
+            Current = new UserSettings
+            {
+                RecentKeymapPaths = new Dictionary<string, List<string>>
+                {
+                    ["Corne"] = new() { "/keymaps/gone.keymap", "/keymaps/kept.keymap" },
+                },
+            },
+        };
+        var ok = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "kept.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
+        var vm = new MainWindowViewModel(settings, keymapState: ok)
+        {
+            FileExists = p => p == "/keymaps/kept.keymap",
+        };
+
+        var target = vm.RecentKeymapItems.First(i => i.Path == "/keymaps/gone.keymap");
+        vm.OpenRecentKeymapCommand.Execute(target);
+
+        Assert.Equal(new[] { "/keymaps/kept.keymap" }, settings.Current.RecentKeymapPaths["Corne"]);
+        // The load path was never entered — the stale entry was pruned.
+        Assert.Equal(0, ok.LoadCallCount);
+        Assert.False(vm.HasLayoutLoaded);
+        // Literal check (not Loc.Format of the same key) so a missing resx
+        // entry can't pass by cancelling out on both sides.
+        Assert.Equal(
+            "Removed gone.keymap from recent keymaps (file not found)",
+            vm.StatusMessage);
+    }
+
+    [Fact]
+    public void OpenRecentKeymap_NullParameter_DoesNothing()
+    {
+        var settings = new InMemorySettingsService
+        {
+            Current = new UserSettings
+            {
+                RecentKeymapPaths = new Dictionary<string, List<string>>
+                {
+                    ["Corne"] = new() { "/keymaps/one.keymap" },
+                },
+            },
+        };
+        var ok = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "one.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
+        // Nothing exists — a null click must not fall through to the prune path.
+        var vm = new MainWindowViewModel(settings, keymapState: ok) { FileExists = _ => false };
+        var savesBefore = settings.SaveCount;
+
+        vm.OpenRecentKeymapCommand.Execute(null);
+
+        Assert.Equal(savesBefore, settings.SaveCount);
+        Assert.Equal(0, ok.LoadCallCount);
+        Assert.Equal(new[] { "/keymaps/one.keymap" }, vm.RecentKeymaps);
+    }
+
+    [Fact]
+    public void ClearRecentKeymaps_EmptiesActiveProfileAndKeepsOthers()
+    {
+        var settings = new InMemorySettingsService
+        {
+            Current = new UserSettings
+            {
+                RecentKeymapPaths = new Dictionary<string, List<string>>
+                {
+                    ["Corne"] = new() { "/keymaps/one.keymap", "/keymaps/two.keymap" },
+                    ["Glove80"] = new() { "/keymaps/glove.keymap" },
+                },
+            },
+        };
+        var ok = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
+        var vm = new MainWindowViewModel(settings, keymapState: ok) { FileExists = _ => true };
+
+        vm.ClearRecentKeymapsCommand.Execute(null);
+
+        Assert.False(settings.Current.RecentKeymapPaths.ContainsKey("Corne"));
+        Assert.Equal(new[] { "/keymaps/glove.keymap" }, settings.Current.RecentKeymapPaths["Glove80"]);
+        Assert.False(vm.HasRecentKeymaps);
+        Assert.Empty(vm.RecentKeymapItems);
+    }
+
+    [Fact]
+    public void ClearRecentKeymaps_EmptyList_SkipsSettingsWrite()
+    {
+        var settings = new InMemorySettingsService();
+        var ok = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
+        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        var savesBefore = settings.SaveCount;
+        var currentBefore = settings.Current;
+
+        vm.ClearRecentKeymapsCommand.Execute(null);
+
+        Assert.Equal(savesBefore, settings.SaveCount);
+        Assert.Same(currentBefore, settings.Current);
+    }
+
+    [Fact]
+    public void RefreshRecentKeymapsCommand_RaisesPropertyChangedForRecentKeymapItems()
+    {
+        var settings = new InMemorySettingsService();
+        var ok = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
+        var vm = new MainWindowViewModel(settings, keymapState: ok);
+
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        vm.RefreshRecentKeymapsCommand.Execute(null);
+
+        Assert.Contains("RecentKeymapItems", raised);
+        Assert.Contains("HasRecentKeymaps", raised);
+        Assert.Contains("RecentKeymaps", raised);
+    }
+
+    [Fact]
+    public void LoadLayoutFromPath_Failure_RaisesPropertyChangedForDerivedRecentSurfaces()
+    {
+        var settings = new InMemorySettingsService();
+        var failing = new FakeKeymapStateService(
+            new KeymapLoadResult.Failure("bad.keymap", new InvalidOperationException("boom")));
+        var vm = new MainWindowViewModel(settings, keymapState: failing);
+
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        vm.LoadLayoutFromPath("bad.keymap");
+
+        // The "RecentKeymaps" raise on this path is pinned by
+        // LoadLayoutFromPath_Failure_RaisesPropertyChangedForRecentKeymaps;
+        // the derived flyout members must ride along with it.
+        Assert.Contains("RecentKeymapItems", raised);
+        Assert.Contains("HasRecentKeymaps", raised);
     }
 }

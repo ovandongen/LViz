@@ -481,6 +481,41 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             ? paths
             : Array.Empty<string>();
 
+    /// <summary>
+    /// File-existence seam for the recents surface — tests fake the disk
+    /// here; production is <see cref="File.Exists"/>. The startup stored-path
+    /// prune (<see cref="TryGetStoredPathForProfile"/>) deliberately keeps
+    /// checking the disk directly.
+    /// </summary>
+    internal Func<string, bool> FileExists { get; set; } = File.Exists;
+
+    /// <summary>
+    /// <see cref="RecentKeymaps"/> in flyout-ready shape: one item per path
+    /// in the same order, each stamped at read time with whether the file is
+    /// still on disk and whether it is the loaded keymap. Snapshot, like the
+    /// raw list — rebuilt on every read.
+    /// </summary>
+    public IReadOnlyList<RecentKeymapItem> RecentKeymapItems
+    {
+        get
+        {
+            var current = LoadedLayoutPath;
+            var paths = RecentKeymaps;
+            var items = new List<RecentKeymapItem>(paths.Count);
+            foreach (var path in paths)
+                items.Add(new RecentKeymapItem(
+                    path,
+                    Path.GetFileName(path),
+                    Path.GetDirectoryName(path) ?? "",
+                    FileExists(path),
+                    string.Equals(path, current, StringComparison.Ordinal)));
+            return items;
+        }
+    }
+
+    /// <summary>True when the active profile has at least one recent keymap.</summary>
+    public bool HasRecentKeymaps => RecentKeymaps.Count > 0;
+
     // --- Commands ---
     public IRelayCommand QuitCommand { get; }
     public IRelayCommand ShowCommand { get; }
@@ -493,6 +528,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public IRelayCommand OpenHelpCommand { get; }
     public IRelayCommand<IKeyboardProfile> SelectKeyboardCommand { get; }
     public IRelayCommand OpenSettingsCommand { get; }
+    public IRelayCommand RefreshRecentKeymapsCommand { get; }
+    public IRelayCommand<RecentKeymapItem> OpenRecentKeymapCommand { get; }
+    public IRelayCommand ClearRecentKeymapsCommand { get; }
 
     /// <summary>
     /// The app→layer auto-switch engine, exposed directly. The settings VM and
@@ -662,6 +700,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         SelectKeyboardCommand = new RelayCommand<IKeyboardProfile>(SelectKeyboard);
         OpenSettingsCommand = new RelayCommand(() => OpenSettingsRequested?.Invoke());
         OpenHelpCommand = new RelayCommand(() => _hostActionExecutor.Launch(UpdateService.WikiUrl));
+        RefreshRecentKeymapsCommand = new RelayCommand(RaiseRecentKeymapsChanged);
+        OpenRecentKeymapCommand = new RelayCommand<RecentKeymapItem>(OpenRecentKeymap);
+        ClearRecentKeymapsCommand = new RelayCommand(ClearRecentKeymaps);
 
         BuildKeysFromProfile();
     }
@@ -714,7 +755,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                     return s with { RecentKeymapPaths = recentPaths };
                 });
             }
-            OnPropertyChanged(nameof(RecentKeymaps));
+            RaiseRecentKeymapsChanged();
             return;
         }
 
@@ -765,7 +806,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             };
             return s with { LayoutJsonPaths = paths, RecentKeymapPaths = recentPaths };
         });
-        OnPropertyChanged(nameof(RecentKeymaps));
+        RaiseRecentKeymapsChanged();
 
         var baseMsg = Loc.Instance.Format("Status_Loaded",
             Path.GetFileName(path), loaded.LayerCount);
@@ -782,6 +823,75 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         SetLoadStatusBase(baseMsg);
         StatusMessage = baseMsg;
         DiagnosticLog.Info("MainVM", $"Loaded '{path}'");
+    }
+
+    // The recents flyout binds RecentKeymaps + the two derived members;
+    // every mutation site raises all three so an open flyout refreshes in
+    // one step.
+    private void RaiseRecentKeymapsChanged()
+    {
+        OnPropertyChanged(nameof(RecentKeymaps));
+        OnPropertyChanged(nameof(RecentKeymapItems));
+        OnPropertyChanged(nameof(HasRecentKeymaps));
+    }
+
+    /// <summary>
+    /// Recents flyout row click: load a still-present keymap through the
+    /// normal path, or — when its file has gone missing — prune it from the
+    /// active profile's list instead. The disk is re-checked at click time
+    /// because the row's <see cref="RecentKeymapItem.Exists"/> is only a
+    /// snapshot from when the flyout built its list.
+    /// </summary>
+    private void OpenRecentKeymap(RecentKeymapItem? item)
+    {
+        if (item is null) return;
+
+        if (FileExists(item.Path))
+        {
+            // Success bookkeeping (recents move-to-front, status, recents
+            // notifications) lives in the load path itself.
+            LoadLayoutFromPath(item.Path);
+            return;
+        }
+
+        // Stale entry — drop it from the list; skip the write entirely when
+        // settings no longer list the path (mirrors the load-failure prune).
+        if (RecentKeymaps.Contains(item.Path, StringComparer.Ordinal))
+        {
+            PersistSetting(s =>
+            {
+                if (!s.RecentKeymapPaths.TryGetValue(_profile.Id, out var recents))
+                    return s;
+                var recentPaths = new Dictionary<string, List<string>>(s.RecentKeymapPaths)
+                {
+                    [_profile.Id] = RecentKeymapHistory.Remove(recents, item.Path),
+                };
+                return s with { RecentKeymapPaths = recentPaths };
+            });
+        }
+        RaiseRecentKeymapsChanged();
+        SetLoadStatusBase(null);
+        StatusMessage = Loc.Instance.Format("Status_RecentKeymapRemovedFormat", item.FileName);
+    }
+
+    /// <summary>
+    /// "Clear list" in the recents flyout: drops the active profile's entry
+    /// from the per-profile dict wholesale — sibling profiles keep their own
+    /// history. No write when the list is already empty.
+    /// </summary>
+    private void ClearRecentKeymaps()
+    {
+        if (RecentKeymaps.Count == 0) return;
+
+        PersistSetting(s =>
+        {
+            if (!s.RecentKeymapPaths.ContainsKey(_profile.Id))
+                return s;
+            var recentPaths = new Dictionary<string, List<string>>(s.RecentKeymapPaths);
+            recentPaths.Remove(_profile.Id);
+            return s with { RecentKeymapPaths = recentPaths };
+        });
+        RaiseRecentKeymapsChanged();
     }
 
     /// <summary>
@@ -892,7 +1002,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
         PersistSetting(s => s with { Keyboard = profile.Id });
         // Recents are per-profile; the surfaced list changed with the profile.
-        OnPropertyChanged(nameof(RecentKeymaps));
+        RaiseRecentKeymapsChanged();
         DiagnosticLog.Info("MainVM", $"Keyboard profile switched to {profile.Id}");
 
         // Re-scope HID discovery to the new profile so a Go60 stops feeding

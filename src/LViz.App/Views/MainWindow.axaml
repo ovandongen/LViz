@@ -147,13 +147,101 @@
                             </Button.Flyout>
                         </Button>
 
-                        <!-- Load layout JSON -->
+                        <!-- Load layout JSON — opens a flyout: Browse… + recent keymaps. -->
                         <Button x:Name="LoadLayoutButton"
-                                Command="{Binding LoadLayoutCommand}"
                                 Padding="8,4"
                                 ToolTip.Tip="{Binding [Tooltip_LoadLayout], Source={StaticResource Loc}}">
                             <PathIcon Width="14" Height="14"
                                       Data="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+                            <Button.Flyout>
+                                <!-- Opened → refresh the Exists flags so a file that vanished
+                                     since the last open greys out before the list is shown.
+                                     MinWidth keeps the flyout roomy for typical names, MaxWidth
+                                     makes long folders trim instead of stretching it. -->
+                                <Flyout Placement="Bottom" Opened="OnRecentKeymapsFlyoutOpened">
+                                    <Border Padding="2" MinWidth="280" MaxWidth="384">
+                                        <StackPanel>
+                                            <Button Command="{Binding LoadLayoutCommand}"
+                                                    Click="OnKeymapMenuItemClick"
+                                                    Padding="10,6"
+                                                    HorizontalAlignment="Stretch"
+                                                    HorizontalContentAlignment="Left"
+                                                    Background="Transparent"
+                                                    ToolTip.Tip="{Binding [Tooltip_LoadLayout], Source={StaticResource Loc}}">
+                                                <TextBlock Text="{Binding [RecentKeymaps_Browse], Source={StaticResource Loc}}"
+                                                           VerticalAlignment="Center" />
+                                            </Button>
+
+                                            <Separator Margin="4,2" />
+
+                                            <!-- Recent keymaps of the active profile. Rows mirror the
+                                                 keyboard picker: ✓ column + stretched transparent
+                                                 button. Stale rows (Exists=false) grey out and swap
+                                                 the folder line for "File not found"; clicking one
+                                                 prunes it (command decides load vs prune). -->
+                                            <ItemsControl ItemsSource="{Binding RecentKeymapItems}"
+                                                          IsVisible="{Binding HasRecentKeymaps}">
+                                                <ItemsControl.Styles>
+                                                    <Style Selector="Button.missing">
+                                                        <Setter Property="Opacity" Value="0.45" />
+                                                    </Style>
+                                                </ItemsControl.Styles>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Classes.missing="{Binding !Exists}"
+                                                                Command="{Binding DataContext.OpenRecentKeymapCommand, ElementName=MainWin}"
+                                                                CommandParameter="{Binding}"
+                                                                Click="OnKeymapMenuItemClick"
+                                                                Padding="10,6"
+                                                                HorizontalAlignment="Stretch"
+                                                                HorizontalContentAlignment="Left"
+                                                                Background="Transparent"
+                                                                ToolTip.Tip="{Binding Path}">
+                                                            <Grid ColumnDefinitions="16,*">
+                                                                <TextBlock Grid.Column="0"
+                                                                           Text="✓"
+                                                                           IsVisible="{Binding IsCurrent}"
+                                                                           VerticalAlignment="Center"
+                                                                           FontWeight="Bold" />
+                                                                <StackPanel Grid.Column="1" Spacing="1">
+                                                                    <TextBlock Text="{Binding FileName}"
+                                                                               TextTrimming="CharacterEllipsis" />
+                                                                    <TextBlock Text="{Binding Folder}"
+                                                                               Foreground="{StaticResource TextStatusBar}"
+                                                                               TextTrimming="CharacterEllipsis"
+                                                                               IsVisible="{Binding Exists}" />
+                                                                    <TextBlock Text="{Binding [RecentKeymaps_Missing], Source={StaticResource Loc}}"
+                                                                               Foreground="{StaticResource TextStatusBar}"
+                                                                               IsVisible="{Binding !Exists}" />
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <!-- Emptiness line: a label, not a row — nothing to click. -->
+                                            <TextBlock Text="{Binding [RecentKeymaps_Empty], Source={StaticResource Loc}}"
+                                                       IsVisible="{Binding !HasRecentKeymaps}"
+                                                       Padding="10,6"
+                                                       Foreground="{StaticResource TextStatusBar}" />
+
+                                            <Separator Margin="4,2"
+                                                       IsVisible="{Binding HasRecentKeymaps}" />
+                                            <Button Command="{Binding ClearRecentKeymapsCommand}"
+                                                    Click="OnKeymapMenuItemClick"
+                                                    IsVisible="{Binding HasRecentKeymaps}"
+                                                    Padding="10,6"
+                                                    HorizontalAlignment="Stretch"
+                                                    HorizontalContentAlignment="Left"
+                                                    Background="Transparent">
+                                                <TextBlock Text="{Binding [RecentKeymaps_Clear], Source={StaticResource Loc}}"
+                                                           VerticalAlignment="Center" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Border>
+                                </Flyout>
+                            </Button.Flyout>
                         </Button>
 
                         <!-- Loaded-layout info: icon-only, hover tooltip shows full "Loaded foo.json (N layers) · keyboard hint". -->

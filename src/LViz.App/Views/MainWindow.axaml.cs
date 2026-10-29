@@ -3,6 +3,8 @@ using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LViz.App.Services;
 using LViz.App.ViewModels;
@@ -208,6 +210,28 @@ public partial class MainWindow : Window
     {
         if (DataContext is not MainWindowViewModel vm) return;
         vm.SetHighlightedCombos(Array.Empty<int>());
+    }
+
+    /// <summary>
+    /// The recents flyout opens → re-run the Exists check on the stored paths
+    /// so a file deleted/renamed since the last open greys out immediately.
+    /// (A binding alone can't turn the Flyout.Opened event into a command.)
+    /// </summary>
+    private void OnRecentKeymapsFlyoutOpened(object? sender, EventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+        vm.RefreshRecentKeymapsCommand.Execute(null);
+    }
+
+    /// <summary>
+    /// Any pick inside the recents flyout (Browse, a recent row, Clear list)
+    /// dismisses it. The Hide is posted, not immediate: Button reads its
+    /// Command only after Click returns, and hiding detaches the flyout from
+    /// the logical tree, which would null the DataContext-bound Command first.
+    /// </summary>
+    private void OnKeymapMenuItemClick(object? sender, RoutedEventArgs e)
+    {
+        Dispatcher.UIThread.Post(() => LoadLayoutButton.Flyout?.Hide());
     }
 
     /// <summary>

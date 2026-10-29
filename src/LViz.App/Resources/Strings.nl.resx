@@ -201,6 +201,22 @@
     <value>Geen combo's op deze laag</value>
     <comment/>
   </data>
+  <data name="RecentKeymaps_Browse" xml:space="preserve">
+    <value>Bladeren…</value>
+    <comment/>
+  </data>
+  <data name="RecentKeymaps_Empty" xml:space="preserve">
+    <value>Geen recente keymaps</value>
+    <comment/>
+  </data>
+  <data name="RecentKeymaps_Clear" xml:space="preserve">
+    <value>Lijst wissen</value>
+    <comment/>
+  </data>
+  <data name="RecentKeymaps_Missing" xml:space="preserve">
+    <value>Bestand niet gevonden</value>
+    <comment/>
+  </data>
   <data name="Status_Ready" xml:space="preserve">
     <value>Klaar</value>
     <comment/>
@@ -243,6 +259,10 @@
   </data>
   <data name="Status_AutoSwitchedKeyboard" xml:space="preserve">
     <value>automatisch gewisseld naar {0}</value>
+    <comment/>
+  </data>
+  <data name="Status_RecentKeymapRemovedFormat" xml:space="preserve">
+    <value>{0} verwijderd uit recente keymaps (bestand niet gevonden)</value>
     <comment/>
   </data>
   <data name="Toast_LoadFailedFormat" xml:space="preserve">
