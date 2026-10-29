@@ -184,6 +184,38 @@ public class UserSettingsJsonRoundTripTests
     }
 
     [Fact]
+    public void RoundTrip_PreservesHiddenLayers()
+    {
+        var original = new UserSettings
+        {
+            HiddenLayers = new Dictionary<string, List<int>>
+            {
+                ["Glove80"] = new() { 3, 7 },
+            },
+        };
+
+        var json = JsonSerializer.Serialize(original, Options);
+        var rehydrated = JsonSerializer.Deserialize<UserSettings>(json, Options);
+
+        Assert.NotNull(rehydrated);
+        Assert.Equal(original.HiddenLayers["Glove80"], rehydrated!.HiddenLayers["Glove80"]);
+    }
+
+    [Fact]
+    public void Load_MissingHiddenLayers_ResolvesToEmpty()
+    {
+        // Settings files written before the hidden-layers feature have no
+        // HiddenLayers key. The default initializer should kick in.
+        var json = """{"SchemaVersion": 1, "Keyboard": "GO60"}""";
+
+        var parsed = JsonSerializer.Deserialize<UserSettings>(json, Options);
+
+        Assert.NotNull(parsed);
+        Assert.NotNull(parsed!.HiddenLayers);
+        Assert.Empty(parsed.HiddenLayers);
+    }
+
+    [Fact]
     public void SettingsService_LoadFromV1File_SeedsRecentsFromLayoutJsonPaths()
     {
         // v1 files remember only one path per profile in LayoutJsonPaths.

@@ -265,6 +265,29 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     }
 
     /// <summary>
+    /// Shows or hides one layer's tab button on the main form for the
+    /// currently active keyboard profile. Persists the choice to
+    /// <see cref="UserSettings.HiddenLayers"/> and updates the matching
+    /// <see cref="Layers"/> item in place (no rebuild — that would steal
+    /// selection focus). Layer 0 is always shown, so requests for it are
+    /// ignored. The layer itself stays fully live: auto-follow, Settings
+    /// pickers and keyboard pushes are untouched.
+    /// </summary>
+    public void SetLayerShown(int layerIndex, bool isShown)
+    {
+        if (layerIndex <= 0) return;
+
+        PersistSetting(s => s with
+        {
+            HiddenLayers = HiddenLayers.With(s.HiddenLayers, _profile.Id, layerIndex, hidden: !isShown),
+        });
+
+        foreach (var layer in Layers)
+            if (layer.Index == layerIndex)
+                layer.IsShown = isShown;
+    }
+
+    /// <summary>
     /// Sets or clears a per-(layer, key) label override for the currently
     /// active keyboard profile. Persists to
     /// <see cref="UserSettings.KeyLabelOverrides"/> through the same
@@ -990,6 +1013,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         }
         else if (km is not null)
         {
+            // Same keymap, different board: tab colors and hidden buttons are
+            // per profile, so the tabs must be rebuilt from the new profile.
+            RebuildLayers();
             ApplyActiveLayer(ActiveLayerIndex);
             SetLoadStatusBase(null);
             StatusMessage = Loc.Instance.Format("Status_KeyboardSwitched", profile.DisplayName);
@@ -1058,13 +1084,16 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         Layers.Clear();
         var km = _keymap.Current;
         if (km is null) return;
+        var hiddenLayers = _settingsService.Load().HiddenLayers;
         foreach (var layer in km.Layers)
         {
-            Layers.Add(new LayerViewModel(
+            var layerVm = new LayerViewModel(
                 layer.Index,
                 $"{layer.Index} : {layer.Name}",
                 LayerColorPalette.GetColor(_profile.Id, layer.Index),
-                SelectLayer));
+                SelectLayer);
+            layerVm.IsShown = !HiddenLayers.IsHidden(hiddenLayers, _profile.Id, layer.Index);
+            Layers.Add(layerVm);
         }
     }
 

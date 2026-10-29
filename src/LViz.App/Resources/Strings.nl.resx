@@ -534,7 +534,11 @@
     <comment/>
   </data>
   <data name="Settings_LayersHint" xml:space="preserve">
-    <value>Pas per laag de weergavekleur aan.</value>
+    <value>Kies welke laagknoppen in de lagenbalk staan en pas per laag de kleur aan. Verborgen lagen worden nog steeds getoond als het toetsenbord ernaar overschakelt.</value>
+    <comment/>
+  </data>
+  <data name="Settings_LayerShowTooltip" xml:space="preserve">
+    <value>Knop van deze laag tonen in de lagenbalk</value>
     <comment/>
   </data>
   <data name="Settings_LayerColorsReset" xml:space="preserve">

@@ -492,6 +492,7 @@
                                     MinWidth="48"
                                     Classes="toggle layerTab"
                                     Classes.active="{Binding IsSelected}"
+                                    IsVisible="{Binding IsShown}"
                                     HorizontalContentAlignment="Center"
                                     Padding="8,4">
                                 <StackPanel Orientation="Horizontal" Spacing="6">

@@ -51,6 +51,16 @@ public record UserSettings
     public Dictionary<string, Dictionary<int, string>> LayerColors { get; init; } = new();
 
     /// <summary>
+    /// Hidden layer tab buttons, scoped per keyboard profile. Key = profile
+    /// id, value = hidden layer indexes, sorted ascending, no duplicates,
+    /// never contains 0 (base is always shown). A missing profile — or a
+    /// missing index inside one — means that layer is shown. Hiding affects
+    /// only the main form's tab bar; the layer stays fully functional
+    /// everywhere else. Maintained by <see cref="HiddenLayers"/>.
+    /// </summary>
+    public Dictionary<string, List<int>> HiddenLayers { get; init; } = new();
+
+    /// <summary>
     /// Per-key label overrides — three-level dict: profile id → layer index →
     /// key position index → <see cref="KeyLabelOverride"/>. When an entry
     /// exists, it replaces the entire rendered text of the key on that layer

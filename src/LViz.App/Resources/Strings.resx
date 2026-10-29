@@ -534,7 +534,11 @@
     <comment/>
   </data>
   <data name="Settings_LayersHint" xml:space="preserve">
-    <value>Customize each layer's display color.</value>
+    <value>Choose which layer buttons appear on the layer bar and customize each layer's color. Hidden layers still show when the keyboard switches to them.</value>
+    <comment/>
+  </data>
+  <data name="Settings_LayerShowTooltip" xml:space="preserve">
+    <value>Show this layer's button on the layer bar</value>
     <comment/>
   </data>
   <data name="Settings_LayerColorsReset" xml:space="preserve">

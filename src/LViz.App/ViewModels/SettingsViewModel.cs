@@ -666,7 +666,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
                 _mainViewModel.SetLayerColorOverride,
                 LayerColorPalette.GetDefaultColor);
 
-            LayerEntries.Add(new LayerSettingsEntry(colorEntry));
+            LayerEntries.Add(new LayerSettingsEntry(colorEntry, layer.IsShown, _mainViewModel.SetLayerShown));
         }
     }
 

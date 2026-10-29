@@ -14,6 +14,11 @@ public partial class LayerViewModel : ObservableObject
     [ObservableProperty] private bool _isSelected;
     [ObservableProperty] private string _tabColor;
 
+    /// <summary>False hides this tab button on the main form only — the
+    /// layer itself stays selectable, listed in Settings, and rendered on
+    /// keyboard reports.</summary>
+    [ObservableProperty] private bool _isShown = true;
+
     public int Index { get; }
     public string DisplayName { get; }
     public IRelayCommand SelectCommand { get; }

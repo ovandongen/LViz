@@ -464,4 +464,120 @@ public class MainWindowViewModelLoadTests
         Assert.Contains("RecentKeymapItems", raised);
         Assert.Contains("HasRecentKeymaps", raised);
     }
+
+    // --- Per-layer tab visibility (hidden layer buttons) ---
+
+    [Fact]
+    public void LoadLayoutFromPath_SeededHiddenLayers_HidesOnlyThatTab()
+    {
+        var settings = new InMemorySettingsService
+        {
+            Current = new UserSettings
+            {
+                HiddenLayers = new Dictionary<string, List<int>> { ["Corne"] = new() { 1 } },
+            },
+        };
+        var ok = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
+        var vm = new MainWindowViewModel(settings, keymapState: ok);
+
+        vm.LoadLayoutFromPath("ok.keymap");
+
+        // The hidden layer stays in Layers (Settings pickers + keyboard push
+        // depend on it) — only its button visibility flag flips.
+        Assert.Equal(2, vm.Layers.Count);
+        Assert.True(vm.Layers[0].IsShown);
+        Assert.False(vm.Layers[1].IsShown);
+    }
+
+    [Fact]
+    public void SetLayerShown_HideThenShow_PersistsAndUpdatesTabInPlace()
+    {
+        var settings = new InMemorySettingsService();
+        var ok = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
+        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        vm.LoadLayoutFromPath("ok.keymap");
+
+        vm.SetLayerShown(1, false);
+
+        Assert.Equal(new[] { 1 }, settings.Current.HiddenLayers["Corne"]);
+        Assert.False(vm.Layers[1].IsShown);
+
+        vm.SetLayerShown(1, true);
+
+        Assert.False(settings.Current.HiddenLayers.ContainsKey("Corne"));
+        Assert.True(vm.Layers[1].IsShown);
+    }
+
+    [Fact]
+    public void SetLayerShown_LayerZero_IgnoredWithoutPersisting()
+    {
+        var settings = new InMemorySettingsService();
+        var ok = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
+        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        vm.LoadLayoutFromPath("ok.keymap");
+
+        vm.SetLayerShown(0, false);
+
+        Assert.False(settings.Current.HiddenLayers.ContainsKey("Corne"));
+        Assert.True(vm.Layers[0].IsShown);
+    }
+
+    [Fact]
+    public void SelectKeyboard_SameKeyCountProfile_RestampsHiddenTabsFromNewProfile()
+    {
+        // Sofle and GO60 both have 60 keys, so switching keeps the keymap —
+        // the tabs must still follow the new board's hidden set.
+        var bindings = string.Join(" ", Enumerable.Repeat("&kp A", 60));
+        var source = $$"""
+            / {
+                keymap {
+                    compatible = "zmk,keymap";
+                    default_layer { display-name = "Base"; bindings = <{{bindings}}>; };
+                    lower         { display-name = "Lower"; bindings = <{{bindings}}>; };
+                };
+            };
+            """;
+        var settings = new InMemorySettingsService
+        {
+            Current = new UserSettings
+            {
+                HiddenLayers = new Dictionary<string, List<int>> { ["Sofle"] = new() { 1 } },
+            },
+        };
+        var ok = new FakeKeymapStateService(new KeymapLoadResult.Success(
+            new LoadedKeymap(ZmkKeymapLoader.LoadFromText(source, "test")),
+            "sixty.keymap", LayerCount: 2, FirstLayerBindingCount: 60));
+        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        vm.LoadLayoutFromPath("sixty.keymap");
+        Assert.Equal("Sofle", vm.SelectedKeyboard.Id);
+        Assert.False(vm.Layers[1].IsShown);
+
+        vm.SelectKeyboardCommand.Execute(KeyboardProfileRegistry.All.First(p => p.Id == "GO60"));
+
+        Assert.True(vm.HasLayoutLoaded);
+        Assert.True(vm.Layers[1].IsShown);
+    }
+
+    [Fact]
+    public void SettingsViewModel_LayerEntries_CanHideFlagsAndToggleThroughToMainVm()
+    {
+        var settings = new InMemorySettingsService();
+        var ok = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
+        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        vm.LoadLayoutFromPath("ok.keymap");
+        var settingsVm = new SettingsViewModel(settings, vm, new UpdateService(settings));
+
+        Assert.False(settingsVm.LayerEntries[0].CanHide);
+        Assert.True(settingsVm.LayerEntries[1].CanHide);
+        Assert.True(settingsVm.LayerEntries[1].IsShown);
+
+        settingsVm.LayerEntries[1].IsShown = false;
+
+        Assert.False(vm.Layers[1].IsShown);
+        Assert.Equal(new[] { 1 }, settings.Current.HiddenLayers["Corne"]);
+    }
 }
