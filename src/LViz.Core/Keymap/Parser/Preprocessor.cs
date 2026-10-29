@@ -28,8 +28,30 @@ public static class Preprocessor
     {
         var withoutComments = StripComments(source);
         var joined = JoinDirectiveContinuations(withoutComments);
-        var (withoutConditionals, defines) = ApplyConditionalsAndCollectDefines(joined);
+        var (withoutConditionals, defines, _) = ApplyConditionalsAndCollectDefines(joined);
         return SubstituteDefines(withoutConditionals, defines);
+    }
+
+    /// <summary>
+    /// Runs the same comment-strip, continuation-join and conditional pass as
+    /// <see cref="Process"/> but returns the object-like <c>#define</c>s that
+    /// are still active at end of file instead of the transformed text.
+    /// Entries are ordered by the line of each name's first <c>#define</c>
+    /// (redefinitions keep the original slot and update the value) and carry
+    /// the final value, trimmed. Flag defines (<c>#define FOO</c>) report
+    /// <c>"1"</c>; function-like macros and <c>#undef</c>'d names are absent.
+    /// Used by the keymap writer to name layer numbers with the file's own
+    /// <c>LAYER_*</c>-style defines.
+    /// </summary>
+    public static IReadOnlyList<KeyValuePair<string, string>> CollectDefines(string source)
+    {
+        var withoutComments = StripComments(source);
+        var joined = JoinDirectiveContinuations(withoutComments);
+        var (_, defines, order) = ApplyConditionalsAndCollectDefines(joined);
+        var result = new List<KeyValuePair<string, string>>(order.Count);
+        foreach (var name in order)
+            result.Add(new KeyValuePair<string, string>(name, defines[name]));
+        return result;
     }
 
     /// <summary>
@@ -146,10 +168,13 @@ public static class Preprocessor
 
     private static readonly Regex DirectiveRegex = new(@"^\s*#\s*(\w+)(.*)$", RegexOptions.Compiled);
 
-    private static (string Text, Dictionary<string, string> Defines)
+    private static (string Text, Dictionary<string, string> Defines, List<string> Order)
         ApplyConditionalsAndCollectDefines(string source)
     {
         var defines = new Dictionary<string, string>(StringComparer.Ordinal);
+        // Names in order of their first active #define; redefinition keeps
+        // the slot, #undef drops it (a later #define re-appends).
+        var order = new List<string>();
         var output = new StringBuilder(source.Length);
 
         // Stack of (currentlyActive, anyBranchTaken, parentActive).
@@ -220,10 +245,14 @@ public static class Preprocessor
                         break;
                     }
                     case "define":
-                        if (active) HandleDefine(rest, defines);
+                        if (active) HandleDefine(rest, defines, order);
                         break;
                     case "undef":
-                        if (active) defines.Remove(rest);
+                        if (active)
+                        {
+                            defines.Remove(rest);
+                            order.Remove(rest);
+                        }
                         break;
                     case "include":
                     case "pragma":
@@ -249,10 +278,10 @@ public static class Preprocessor
             output.Append('\n');
         }
 
-        return (output.ToString(), defines);
+        return (output.ToString(), defines, order);
     }
 
-    private static void HandleDefine(string rest, Dictionary<string, string> defines)
+    private static void HandleDefine(string rest, Dictionary<string, string> defines, List<string> order)
     {
         if (string.IsNullOrWhiteSpace(rest)) return;
         // Function-like macros: NAME(args) body. Not supported in v1 — skip.
@@ -260,7 +289,7 @@ public static class Preprocessor
         if (firstSpace < 0)
         {
             // #define NAME — present-with-no-value (used as a flag for #ifdef).
-            defines[rest.Trim()] = "1";
+            AddDefine(rest.Trim(), "1", defines, order);
             return;
         }
         if (rest[firstSpace] == '(')
@@ -271,6 +300,13 @@ public static class Preprocessor
         var name = rest[..firstSpace].Trim();
         var value = rest[firstSpace..].Trim();
         if (name.Length == 0) return;
+        AddDefine(name, value, defines, order);
+    }
+
+    private static void AddDefine(
+        string name, string value, Dictionary<string, string> defines, List<string> order)
+    {
+        if (!defines.ContainsKey(name)) order.Add(name);
         defines[name] = value;
     }
 

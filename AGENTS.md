@@ -104,6 +104,16 @@ dotnet run --project src/LViz.App                  # launch the app
   (see [docs/roadmap.md](docs/roadmap.md) §1). Strict errors throw with
   line/column on malformed input — preserve that loudness; don't try to
   half-render a truncated file.
+- **`Core/Keymap/Writer/` patches the original `.keymap` text, never
+  regenerates it.** `KeymapSourceMap` maps every parsed binding and
+  `display-name` to an exact span in the source and refuses (with a line
+  number) any layer it can't match one-to-one; `KeymapWriter` replaces only
+  the changed spans and re-parses the result as a bug guard. Key indices
+  come from the parsed `KeyboardConfig`, never from counting cells in the
+  text (unknown-arity behaviors and function-like macro calls make the two
+  differ). A layer number is written as a define name only when the file
+  already uses that define as a layer reference (`&mo NAME`, `&lt NAME …`):
+  MoErgo exports define `KB_TYPE_GLOVE_80 1` ahead of `LAYER_Symbol 1`.
 - **Two keymap loaders, one output.** `MoergoJsonKeymapLoader` parses the
   Moergo Layout Editor `.json` export (glove80.com / go60) into the *same*
   `KeyboardConfig` — recursive modifier params flatten depth-first to match
@@ -344,6 +354,10 @@ LViz-specific (extend this list as we hit more):
   (`using RecentKeymapHistory = LViz.Core.Settings.RecentKeymaps;`, top of
   `MainWindowViewModel.cs`). Same applies to any new Core helper whose name
   matches a settings property (e.g. `HiddenLayers`).
+
+- **`KeyBinding` record equality does not compare `Params` contents** (it
+  compares the list reference). Compare `Behavior` plus
+  `Params.SequenceEqual`, in code and in tests.
 
 - **Don't close an Avalonia flyout synchronously from a button inside it.**
   The button resolves and runs its `Command` *after* its `Click` handler; hiding

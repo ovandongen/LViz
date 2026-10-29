@@ -172,4 +172,56 @@ public class PreprocessorTests
         Assert.DoesNotContain("after_inner", result);
         Assert.Contains("bottom", result);
     }
+
+    [Fact]
+    public void CollectDefines_ReturnsObjectLikeDefinesInFirstDefinitionOrder()
+    {
+        var defines = Preprocessor.CollectDefines(KeymapFixtures.Read("with_combos_macros.keymap"));
+        Assert.Equal(
+            new[]
+            {
+                new KeyValuePair<string, string>("DEFAULT", "0"),
+                new KeyValuePair<string, string>("LOWER", "1"),
+            },
+            defines);
+    }
+
+    [Fact]
+    public void CollectDefines_KeepsEarlierValueWhenInactiveBranchRedifines()
+    {
+        // glove80-editor defines LAYER_Lower 2, then
+        // '#ifndef LAYER_Lower / #define LAYER_Lower 0 / #endif' — the
+        // ifndef branch is inactive, so the earlier value must win.
+        var defines = Preprocessor.CollectDefines(KeymapFixtures.Read("glove80-editor.keymap"));
+        var entry = defines.FirstOrDefault(d => d.Key == "LAYER_Lower");
+        Assert.Equal("2", entry.Value);
+    }
+
+    [Fact]
+    public void CollectDefines_SkipsInactiveBranchDefines_AndKeepsFirstSlotOnRedefine()
+    {
+        var src = "#define A 1\n#ifdef NOT_SET\n#define B 9\n#endif\n#ifndef A\n#define C 8\n#endif\n#define D 3\n#define D 4";
+        var defines = Preprocessor.CollectDefines(src);
+        Assert.Equal(
+            new[]
+            {
+                new KeyValuePair<string, string>("A", "1"),
+                new KeyValuePair<string, string>("D", "4"),
+            },
+            defines);
+    }
+
+    [Fact]
+    public void CollectDefines_SkipsFunctionLikeAndUndefdDefines()
+    {
+        var src = "#define GOOD 7\n#define FUNC(x) x\n#define TEMP 3\n#undef TEMP\n#define FLAG";
+        var defines = Preprocessor.CollectDefines(src);
+        Assert.Equal(
+            new[]
+            {
+                new KeyValuePair<string, string>("GOOD", "7"),
+                new KeyValuePair<string, string>("FLAG", "1"),
+            },
+            defines);
+    }
 }
