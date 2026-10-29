@@ -175,6 +175,12 @@ Carried over from the upstream Moergo build and still apply verbatim:
   flyout opens and then crashes with "Unable to resolve type vm:...". Use
   `ElementName=...` bindings without the cast instead. See the picker flyout
   in `MainWindow.axaml`.
+- **Compiled bindings make `dotnet build` the XAML check.** Templates and
+  views set `x:DataType`, so a mistyped property name in a `{Binding}`
+  fails the build instead of silently binding to nothing at runtime. Keep
+  `x:DataType` on every new `DataTemplate`; without it this safety net is
+  gone. (It does not catch `ElementName` or `Source={StaticResource Loc}`
+  indexer keys: a missing `.resx` key still only shows up at runtime.)
 - **macOS Carbon hotkey events pump on Avalonia's main run loop** without
   extra wiring — Avalonia 11's AppKit-based loop sources Carbon events
   through `GetApplicationEventTarget`, so a single `InstallEventHandler`
@@ -329,6 +335,15 @@ LViz-specific (extend this list as we hit more):
   `IgnoredMainProperties` in that test, with a one-line reason. Main-window-only state (e.g.
   `HasRecentKeymaps`) belongs on the ignore list. Plan for this edit when a
   change adds a VM property; it is the one expected change to an existing test.
+
+- **A member named like a Core static helper hides that helper inside the
+  class.** `MainWindowViewModel.RecentKeymaps` (a property) shadows the Core
+  type `LViz.Core.Settings.RecentKeymaps`, so calls to the helper inside the
+  view-model fail to compile or bind to the wrong thing. Reach the helper
+  through a `using` alias instead
+  (`using RecentKeymapHistory = LViz.Core.Settings.RecentKeymaps;`, top of
+  `MainWindowViewModel.cs`). Same applies to any new Core helper whose name
+  matches a settings property (e.g. `HiddenLayers`).
 
 - **Don't close an Avalonia flyout synchronously from a button inside it.**
   The button resolves and runs its `Command` *after* its `Click` handler; hiding
