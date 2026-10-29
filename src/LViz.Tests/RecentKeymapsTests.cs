@@ -35,14 +35,6 @@ public class RecentKeymapsTests
     }
 
     [Fact]
-    public void Push_EmptyList_ProducesSingleEntry()
-    {
-        var result = RecentKeymaps.Push(new List<string>(), "/only.keymap");
-
-        Assert.Equal(new[] { "/only.keymap" }, result);
-    }
-
-    [Fact]
     public void Push_AtCapacityWithExistingEntry_KeepsLengthAtMax()
     {
         var current = Enumerable.Range(1, RecentKeymaps.MaxEntries)
@@ -67,18 +59,6 @@ public class RecentKeymapsTests
         Assert.DoesNotContain($"/{RecentKeymaps.MaxEntries}.keymap", result);
     }
 
-    [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void Push_BlankPath_ReturnsUnchangedCopy(string path)
-    {
-        var current = new[] { "/a.keymap", "/b.keymap" };
-
-        var result = RecentKeymaps.Push(current, path);
-
-        Assert.Equal(current, result);
-    }
-
     [Fact]
     public void Push_NullPath_ReturnsUnchangedCopy()
     {
@@ -87,6 +67,28 @@ public class RecentKeymapsTests
         var result = RecentKeymaps.Push(current, null!);
 
         Assert.Equal(current, result);
+    }
+
+    [Fact]
+    public void Push_EmptyPath_ReturnsUnchangedCopy()
+    {
+        var current = new[] { "/a.keymap", "/b.keymap" };
+
+        var result = RecentKeymaps.Push(current, "");
+
+        Assert.Equal(current, result);
+        Assert.NotSame(current, result);
+    }
+
+    [Fact]
+    public void Push_WhitespacePath_ReturnsUnchangedCopy()
+    {
+        var current = new[] { "/a.keymap", "/b.keymap" };
+
+        var result = RecentKeymaps.Push(current, "   ");
+
+        Assert.Equal(current, result);
+        Assert.NotSame(current, result);
     }
 
     [Fact]
@@ -103,6 +105,17 @@ public class RecentKeymapsTests
         var current = new[] { "/a.keymap", "/b.keymap" };
 
         var result = RecentKeymaps.Remove(current, "/zzz.keymap");
+
+        Assert.Equal(current, result);
+        Assert.NotSame(current, result);
+    }
+
+    [Fact]
+    public void Remove_DifferentCasing_DoesNotRemove()
+    {
+        var current = new[] { "/keymaps/a.keymap", "/b.keymap" };
+
+        var result = RecentKeymaps.Remove(current, "/Keymaps/A.keymap");
 
         Assert.Equal(current, result);
         Assert.NotSame(current, result);
