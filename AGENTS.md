@@ -321,3 +321,19 @@ LViz-specific (extend this list as we hit more):
   Wire assumption: the default-layer mask has exactly one bit — holds for the
   shipped firmware; revisit the guard + its test if a board emits it otherwise.
   See `docs/lviz-dotnet-inbound-validation.md`.
+
+- **Every new public property on `MainWindowViewModel` trips
+  `SettingsViewModelMainPropertyCoverageTests`.** The test enforces that the
+  Settings window doesn't silently miss main-VM changes: a new public property
+  needs either an entry in `SettingsViewModel._mainPropagators` or its name in
+  `IgnoredMainProperties` in that test, with a one-line reason. Main-window-only state (e.g.
+  `HasRecentKeymaps`) belongs on the ignore list. Plan for this edit when a
+  change adds a VM property; it is the one expected change to an existing test.
+
+- **Don't close an Avalonia flyout synchronously from a button inside it.**
+  The button resolves and runs its `Command` *after* its `Click` handler; hiding
+  the flyout in that handler detaches the content from the window first, so the
+  command binding is gone and the click silently does nothing. Close it on the
+  next dispatcher turn instead:
+  `Dispatcher.UIThread.Post(() => SomeButton.Flyout?.Hide())`. See the
+  load-layout flyout in `MainWindow.axaml.cs`.
