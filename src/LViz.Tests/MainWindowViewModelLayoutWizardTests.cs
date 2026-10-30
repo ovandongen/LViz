@@ -1,0 +1,202 @@
+using LViz.App.Services;
+using LViz.App.ViewModels;
+using LViz.Core.Keymap;
+using LViz.Core.Keymap.Parser;
+using LViz.Core.Layout;
+using LViz.Core.Models;
+using LViz.Core.Settings;
+using Xunit;
+
+namespace LViz.Tests;
+
+/// <summary>
+/// Part 5 main-window hooks for the layout wizard: the start command, the
+/// <see cref="MainWindowViewModel.HasUnmatchedKeymap"/> bookkeeping, the
+/// context snapshot handed to the wizard window, and applying its result.
+/// Fake setup mirrors <see cref="MainWindowViewModelLoadTests"/>; the profile
+/// registry is process-global static state, so every test restores it in a
+/// <c>finally</c> (the suite runs sequentially).
+/// </summary>
+public class MainWindowViewModelLayoutWizardTests
+{
+    private sealed class InMemorySettingsService : ISettingsService
+    {
+        public UserSettings Current { get; set; } = new();
+        public UserSettings Load() => Current;
+        public void Save(UserSettings settings) => Current = settings;
+    }
+
+    // Canned load result, swappable between loads so one VM can load twice.
+    private sealed class FakeKeymapStateService : IKeymapStateService
+    {
+        public KeymapLoadResult Result { get; set; } =
+            new KeymapLoadResult.Failure("?", new InvalidOperationException("nothing queued"));
+
+        public LoadedKeymap? Current { get; private set; }
+        public bool HasLayout => Current is not null;
+        public string? LoadedPath { get; private set; }
+        public string? LastLoadError { get; private set; }
+
+        public TransparentBindingKind? ClassifyBinding(int layer, int key)
+            => Current?.ClassifyBinding(layer, key);
+
+        public KeymapLoadResult Load(string path, string profileId)
+        {
+            if (Result is KeymapLoadResult.Success s)
+            {
+                Current = s.Keymap;
+                LoadedPath = path;
+                LastLoadError = null;
+            }
+            else
+            {
+                LastLoadError = path;
+            }
+            return Result;
+        }
+
+        public void Clear() { Current = null; LoadedPath = null; }
+    }
+
+    // A one-layer keymap with exactly `bindings` &kp cells, so the fake
+    // result's FirstLayerBindingCount (built by Success below from the keymap
+    // itself) and SelectKeyboard's fit check (which reads the keymap) agree.
+    private static LoadedKeymap KeymapWith(int bindings)
+    {
+        var cells = string.Join(" ", Enumerable.Range(0, bindings).Select(_ => "&kp A"));
+        var source =
+            "/ { keymap { compatible = \"zmk,keymap\"; " +
+            "default_layer { display-name = \"Base\"; bindings = <" + cells + ">; }; }; };";
+        return new LoadedKeymap(ZmkKeymapLoader.LoadFromText(source, "test"));
+    }
+
+    private static KeymapLoadResult.Success Success(LoadedKeymap keymap, string path) =>
+        new(keymap, path, keymap.LayerCount, keymap.Layers[0].Bindings.Count);
+
+    private static UserLayoutFile Layout(string id, int keyCount) => new(
+        UserLayoutFile.CurrentSchemaVersion,
+        id,
+        "My Board",
+        null,
+        [.. Enumerable.Range(0, keyCount)
+            .Select(i => new UserLayoutKey(i * 100, 0, 100, 100, 0, 0, 0, Hand.Left))]);
+
+    [Fact]
+    public void AddOwnBoardCommand_InvokesCallback()
+    {
+        var vm = new MainWindowViewModel(
+            new InMemorySettingsService(), keymapState: new FakeKeymapStateService());
+
+        var invoked = false;
+        vm.AddOwnBoardRequested = () => invoked = true;
+        vm.AddOwnBoardCommand.Execute(null);
+
+        Assert.True(invoked);
+    }
+
+    [Fact]
+    public void LoadLayoutFromPath_KeyCountNoProfileHas_ArmsFlag_MatchingLoadClearsIt()
+    {
+        var settings = new InMemorySettingsService();
+        var keymap = new FakeKeymapStateService();
+        var vm = new MainWindowViewModel(settings, keymapState: keymap);
+        KeyboardProfileRegistry.SetUserProfiles([]);
+        try
+        {
+            // 7 bindings: no bundled or user profile has 7 keys → orphaned.
+            keymap.Result = Success(KeymapWith(7), "odd.keymap");
+            vm.LoadLayoutFromPath("odd.keymap");
+            Assert.True(vm.HasUnmatchedKeymap);
+
+            // 42 bindings fit Corne → flag drops on the next successful load.
+            keymap.Result = Success(KeymapWith(42), "corne.keymap");
+            vm.LoadLayoutFromPath("corne.keymap");
+            Assert.False(vm.HasUnmatchedKeymap);
+        }
+        finally
+        {
+            KeyboardProfileRegistry.SetUserProfiles([]);
+        }
+    }
+
+    [Fact]
+    public void GetLayoutWizardContext_SnapshotsKeymapUserIdsAndFolder()
+    {
+        var settings = new InMemorySettingsService();
+        var keymap = new FakeKeymapStateService();
+        var vm = new MainWindowViewModel(settings, keymapState: keymap);
+        var loaded = KeymapWith(42);
+        keymap.Result = Success(loaded, "corne.keymap");
+        vm.LoadLayoutFromPath("corne.keymap");
+        KeyboardProfileRegistry.SetUserProfiles([new UserLayoutProfile(Layout("slabwing", 2))]);
+        try
+        {
+            var ctx = vm.GetLayoutWizardContext();
+
+            Assert.Same(loaded, ctx.LoadedKeymap);
+            // Bare ids, no "user:" prefix.
+            Assert.Equal(new[] { "slabwing" }, ctx.ExistingUserLayoutIds);
+            Assert.Equal(UserLayoutStore.DefaultDirectory, ctx.LayoutsDirectory);
+            // Nothing was ever opened on the bus in tests.
+            Assert.Empty(ctx.ConnectedDeviceNames);
+        }
+        finally
+        {
+            KeyboardProfileRegistry.SetUserProfiles([]);
+        }
+    }
+
+    [Fact]
+    public void ApplyLayoutWizardResult_RegistersAndSelects_NewProfile_KeepsFittingKeymap()
+    {
+        var settings = new InMemorySettingsService();
+        var keymap = new FakeKeymapStateService();
+        var vm = new MainWindowViewModel(settings, keymapState: keymap);
+        KeyboardProfileRegistry.SetUserProfiles([]);
+        try
+        {
+            var odd = KeymapWith(7);
+            keymap.Result = Success(odd, "odd.keymap");
+            vm.LoadLayoutFromPath("odd.keymap");
+            Assert.True(vm.HasUnmatchedKeymap);
+
+            var raised = new List<string?>();
+            vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+            vm.ApplyLayoutWizardResult(new LayoutWizardResult(Layout("myboard", 7), KeymapPathToLoad: null));
+
+            var added = Assert.Single(vm.AvailableKeyboards, p => p.Id == "user:myboard");
+            Assert.Equal("user:myboard", vm.SelectedKeyboard.Id);
+            // The 7-binding keymap fits the new 7-key board and stays loaded.
+            Assert.True(vm.HasLayoutLoaded);
+            Assert.Same(odd, keymap.Current);
+            Assert.False(vm.HasUnmatchedKeymap);
+            Assert.Contains("AvailableKeyboards", raised);
+        }
+        finally
+        {
+            KeyboardProfileRegistry.SetUserProfiles([]);
+        }
+    }
+
+    [Fact]
+    public void ApplyLayoutWizardResult_ExistingId_ReplacesProfile()
+    {
+        var settings = new InMemorySettingsService();
+        var vm = new MainWindowViewModel(settings, keymapState: new FakeKeymapStateService());
+        KeyboardProfileRegistry.SetUserProfiles([new UserLayoutProfile(Layout("myboard", 7))]);
+        try
+        {
+            vm.ApplyLayoutWizardResult(new LayoutWizardResult(Layout("myboard", 9), KeymapPathToLoad: null));
+
+            var users = vm.AvailableKeyboards.OfType<UserLayoutProfile>().ToList();
+            var kept = Assert.Single(users);
+            Assert.Equal(9, kept.KeyCount);
+            Assert.Equal("user:myboard", vm.SelectedKeyboard.Id);
+        }
+        finally
+        {
+            KeyboardProfileRegistry.SetUserProfiles([]);
+        }
+    }
+}

@@ -110,39 +110,53 @@
                             </StackPanel>
                             <Button.Flyout>
                                 <Flyout Placement="Bottom">
-                                    <ItemsControl ItemsSource="{Binding AvailableKeyboards}" Padding="2">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Button Command="{Binding DataContext.SelectKeyboardCommand, ElementName=MainWin}"
-                                                        CommandParameter="{Binding}"
-                                                        Padding="10,6"
-                                                        HorizontalAlignment="Stretch"
-                                                        HorizontalContentAlignment="Left"
-                                                        Background="Transparent">
-                                                    <Grid ColumnDefinitions="16,*">
-                                                        <TextBlock Grid.Column="0"
-                                                                   Text="✓"
-                                                                   VerticalAlignment="Center"
-                                                                   FontWeight="Bold">
-                                                            <TextBlock.IsVisible>
-                                                                <MultiBinding Converter="{x:Static conv:EqualityToBoolMultiConverter.Instance}">
-                                                                    <Binding Path="Id" />
-                                                                    <Binding Path="DataContext.SelectedKeyboard.Id" ElementName="MainWin" />
-                                                                </MultiBinding>
-                                                            </TextBlock.IsVisible>
-                                                        </TextBlock>
-                                                        <TextBlock Grid.Column="1"
-                                                                   VerticalAlignment="Center">
-                                                            <Run Text="{Binding DisplayName, Mode=OneWay}" />
-                                                            <Run Text=" — " Foreground="{StaticResource TextStatusBar}" />
-                                                            <Run Text="{Binding KeyCount, Mode=OneWay}" Foreground="{StaticResource TextStatusBar}" />
-                                                            <Run Text=" keys" Foreground="{StaticResource TextStatusBar}" />
-                                                        </TextBlock>
-                                                    </Grid>
-                                                </Button>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
+                                    <StackPanel>
+                                        <ItemsControl ItemsSource="{Binding AvailableKeyboards}" Padding="2">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Command="{Binding DataContext.SelectKeyboardCommand, ElementName=MainWin}"
+                                                            CommandParameter="{Binding}"
+                                                            Padding="10,6"
+                                                            HorizontalAlignment="Stretch"
+                                                            HorizontalContentAlignment="Left"
+                                                            Background="Transparent">
+                                                        <Grid ColumnDefinitions="16,*">
+                                                            <TextBlock Grid.Column="0"
+                                                                       Text="✓"
+                                                                       VerticalAlignment="Center"
+                                                                       FontWeight="Bold">
+                                                                <TextBlock.IsVisible>
+                                                                    <MultiBinding Converter="{x:Static conv:EqualityToBoolMultiConverter.Instance}">
+                                                                        <Binding Path="Id" />
+                                                                        <Binding Path="DataContext.SelectedKeyboard.Id" ElementName="MainWin" />
+                                                                    </MultiBinding>
+                                                                </TextBlock.IsVisible>
+                                                            </TextBlock>
+                                                            <TextBlock Grid.Column="1"
+                                                                       VerticalAlignment="Center">
+                                                                <Run Text="{Binding DisplayName, Mode=OneWay}" />
+                                                                <Run Text=" — " Foreground="{StaticResource TextStatusBar}" />
+                                                                <Run Text="{Binding KeyCount, Mode=OneWay}" Foreground="{StaticResource TextStatusBar}" />
+                                                                <Run Text=" keys" Foreground="{StaticResource TextStatusBar}" />
+                                                            </TextBlock>
+                                                        </Grid>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <Separator Margin="2,4" />
+                                        <!-- Wizard entry point for boards with no bundled layout.
+                                             Hide is posted, not immediate — the button reads its
+                                             Command only after Click returns (see OnKeymapMenuItemClick). -->
+                                        <Button x:Name="AddOwnBoardButton"
+                                                Click="OnAddOwnBoardClick"
+                                                Command="{Binding DataContext.AddOwnBoardCommand, ElementName=MainWin}"
+                                                Padding="10,6"
+                                                HorizontalAlignment="Stretch"
+                                                HorizontalContentAlignment="Left"
+                                                Background="Transparent"
+                                                Content="{Binding [Picker_AddOwnBoard], Source={StaticResource Loc}}" />
+                                    </StackPanel>
                                 </Flyout>
                             </Button.Flyout>
                         </Button>
@@ -358,6 +372,19 @@
                                       Data="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z" />
                         </Button>
                     </StackPanel>
+                    <!-- Wizard entry point when the loaded keymap fits no known
+                         board. Right-docked before the fill child; hidden
+                         otherwise, so the status text is unaffected. -->
+                    <Button DockPanel.Dock="Right"
+                            Command="{Binding AddOwnBoardCommand}"
+                            IsVisible="{Binding HasUnmatchedKeymap}"
+                            Classes="link"
+                            Padding="6,2"
+                            Margin="0,0,8,0"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="{Binding [Status_CreateLayoutLink], Source={StaticResource Loc}}"
+                                   FontSize="12" TextDecorations="Underline" />
+                    </Button>
                     <!-- Fill child: transient/changing status only ("Switched to GO60", "Load error: …").
                          The persistent loaded-info text lives in the InfoButton tooltip on the left. -->
                     <TextBlock VerticalAlignment="Center"

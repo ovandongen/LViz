@@ -82,6 +82,8 @@ public class SettingsViewModelMainPropertyCoverageTests
         "Toast",
         "HasLayoutLoaded",
         "IsHidSourceActive",
+        // Transient main-window UI state; drives the status-bar wizard link.
+        "HasUnmatchedKeymap",
 
         // Recents-menu emptiness flag, bound directly in the main window's
         // recents flyout (part 2); settings never renders recents.
