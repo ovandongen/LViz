@@ -787,8 +787,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         IKeyboardProfile? autoSwitchedTo = null;
         if (keyCountMismatch)
         {
-            var matching = KeyboardProfileRegistry.All
-                .FirstOrDefault(p => p.KeyCount == bindingCount);
+            var matching = KeyboardProfileRegistry.FindByKeyCount(bindingCount);
             if (matching is not null)
             {
                 _profile = matching;
