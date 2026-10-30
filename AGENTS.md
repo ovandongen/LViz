@@ -89,9 +89,12 @@ dotnet run --project src/LViz.App                  # launch the app
   base) and `Strings.nl.resx` live in `App/Resources/`. Bind UI strings via
   `{Binding [Key_Name], Source={StaticResource Loc}}`. If you add a string,
   add it to both `.resx` files.
-- **Diagnostics log at `%APPDATA%/LViz/log.txt`** (path is product-name
-  based; confirm via `DiagnosticLog` when in doubt).
+- **Diagnostics log at `ApplicationData/LViz/diagnostic.log`**
+  (`~/Library/Application Support/LViz/` on macOS; confirm via
+  `DiagnosticLog.GetLogFilePath()`).
   `DiagnosticLog.Info/Warn/Error("Tag", "message")`. Auto-rotates at 2MB.
+  Tests write to the **same real log** — a `dotnet test` run leaves its
+  warnings there, so clear the log before reading it for a manual test.
 - **Svalboard-ported chrome/transparency/bars-swap code lives in
   `MainWindow.axaml.cs`.** It works. Don't rewrite it without a concrete
   reason — the 3-tier transparency fallback, 8-way edge resize, and
@@ -207,7 +210,18 @@ Carried over from the upstream Moergo build and still apply verbatim:
   order, reorder the local copy of the dtsi** (with an inline `// NB:
   local reorder` comment) rather than re-introducing a per-profile
   remap in C#. Resyncing from upstream then requires re-applying the
-  reorder.
+  reorder. `DtsiBackedLayoutBuilder.Build` throws when a profile's
+  `keyCount` differs from the dtsi entry count.
+- **User layouts are `<id>.layout.json` files in
+  `ApplicationData/LViz/layouts/`** (`UserLayoutStore`), keys in ZMK units
+  with an explicit hand per key. A file loads only when its name matches its
+  id; a broken file is skipped with a `Layouts` warning, never a crash.
+  `App.axaml.cs` registers them via `KeyboardProfileRegistry.SetUserProfiles`
+  as `UserLayoutProfile`s with ids `user:<id>`, listed after the bundled
+  boards. Key-count auto-switch must go through
+  `KeyboardProfileRegistry.FindByKeyCount` (user layouts win), never
+  `All.FirstOrDefault`. `All` is a fresh array per read: don't rely on its
+  identity.
 - **Per-key bounds must account for rotation about the explicit pivot.**
   Rotated keys (typical thumb clusters) can swing far outside the
   unrotated `(X, Y, X+W, Y+H)` rect. Call `KeyPosition.RotatedBounds()`

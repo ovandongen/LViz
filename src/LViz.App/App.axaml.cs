@@ -14,6 +14,7 @@ using LViz.App.Services.Hotkeys;
 using LViz.App.ViewModels;
 using LViz.App.Views;
 using LViz.Core.Diagnostics;
+using LViz.Core.Layout;
 using LViz.Core.Settings;
 using Projektanker.Icons.Avalonia;
 using Projektanker.Icons.Avalonia.FontAwesome;
@@ -66,6 +67,12 @@ public partial class App : Application
                 DiagnosticLog.SetMinimumLevel(envLogLevel);
             else if (Enum.TryParse<LogLevel>(initialSettings.LogLevel, true, out var logLevel))
                 DiagnosticLog.SetMinimumLevel(logLevel);
+
+            // User layouts must be in the registry before any view-model
+            // resolves a saved keyboard id or builds a picker list.
+            var userLayouts = UserLayoutStore.LoadAll(UserLayoutStore.DefaultDirectory);
+            KeyboardProfileRegistry.SetUserProfiles(userLayouts.Select(f => new UserLayoutProfile(f)));
+            DiagnosticLog.Info("Layouts", $"Loaded {userLayouts.Count} user layout(s)");
 
             DiagnosticLog.Info("Startup", "Creating MainWindowViewModel...");
             var viewModel = services.GetRequiredService<MainWindowViewModel>();
