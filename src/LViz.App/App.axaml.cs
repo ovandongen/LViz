@@ -296,6 +296,25 @@ public partial class App : Application
                 });
             };
 
+            // Layout wizard: modal, closes with null (cancel) or the saved
+            // layout result, which is registered and selected right here.
+            viewModel.AddOwnBoardRequested = () =>
+            {
+                var ctx = viewModel.GetLayoutWizardContext();
+                var dlgVm = new LayoutWizardViewModel(ctx);
+                var dlg = new LayoutWizardWindow
+                {
+                    DataContext = dlgVm,
+                    Topmost = mainWindow.Topmost,
+                };
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    var result = await dlg.ShowDialog<LayoutWizardResult?>(mainWindow);
+                    if (result is not null)
+                        viewModel.ApplyLayoutWizardResult(result);
+                });
+            };
+
             viewModel.CopyDiagnosticsRequested = async () =>
             {
                 try

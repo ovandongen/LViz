@@ -1,0 +1,165 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LViz.App.ViewModels"
+        xmlns:views="using:LViz.App.Views"
+        x:Class="LViz.App.Views.LayoutWizardWindow"
+        x:DataType="vm:LayoutWizardViewModel"
+        x:Name="WizardWin"
+        Title="{Binding [Wizard_Title], Source={StaticResource Loc}}"
+        Width="780" Height="580"
+        MinWidth="620" MinHeight="460"
+        Topmost="True"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BgBase}">
+
+    <DockPanel Margin="16">
+
+        <!-- Bottom bar: error text left, Cancel / Back / Next / Save right.
+             Back hides on step 0, Next hides on step 2, Save shows only on
+             step 2 — the VM's CanExecute gates when Next/Save are enabled. -->
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="0,12,0,0">
+            <TextBlock Grid.Column="0"
+                       Text="{Binding ErrorMessage}"
+                       Foreground="{StaticResource AccentRed}"
+                       FontSize="12" TextWrapping="Wrap"
+                       VerticalAlignment="Center"
+                       IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <Button Grid.Column="1"
+                    Content="{Binding [Wizard_Cancel], Source={StaticResource Loc}}"
+                    Command="{Binding CancelCommand}"
+                    Margin="8,0,0,0" />
+            <Button Grid.Column="2"
+                    Content="{Binding [Wizard_Back], Source={StaticResource Loc}}"
+                    Command="{Binding BackCommand}"
+                    Margin="8,0,0,0"
+                    IsVisible="{Binding !IsSourceStep}" />
+            <Button Grid.Column="3"
+                    Content="{Binding [Wizard_Next], Source={StaticResource Loc}}"
+                    Command="{Binding NextCommand}"
+                    Margin="8,0,0,0"
+                    IsVisible="{Binding !IsSaveStep}" />
+            <Button Grid.Column="4"
+                    Content="{Binding [Wizard_Save], Source={StaticResource Loc}}"
+                    Command="{Binding SaveCommand}"
+                    Margin="8,0,0,0"
+                    Classes="accent"
+                    IsDefault="True"
+                    IsVisible="{Binding IsSaveStep}" />
+        </Grid>
+
+        <!-- Step 0 — source: scan a zmk-config folder or one board file. -->
+        <DockPanel IsVisible="{Binding IsSourceStep}">
+            <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,10">
+                <TextBlock Text="{Binding [Wizard_Step1Header], Source={StaticResource Loc}}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                <TextBlock Text="{Binding [Wizard_Step1Hint], Source={StaticResource Loc}}"
+                           FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource Text}" />
+                <TextBlock Text="{Binding LoadedKeymapNotice}"
+                           FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource TextSubtle}"
+                           IsVisible="{Binding LoadedKeymapNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="{Binding [Wizard_BrowseFolder], Source={StaticResource Loc}}"
+                            Command="{Binding BrowseFolderCommand}" />
+                    <Button Content="{Binding [Wizard_BrowseFile], Source={StaticResource Loc}}"
+                            Command="{Binding BrowseFileCommand}" />
+                </StackPanel>
+                <TextBlock Text="{Binding SourcePath}"
+                           FontSize="12" Foreground="{StaticResource TextSubtle}"
+                           TextTrimming="CharacterEllipsis"
+                           IsVisible="{Binding SourcePath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsScanning}" />
+            </StackPanel>
+
+            <TextBlock DockPanel.Dock="Bottom"
+                       Text="{Binding SourceInfo}"
+                       FontSize="12" Foreground="{StaticResource TextSubtle}"
+                       TextWrapping="Wrap" Margin="0,8,0,0"
+                       IsVisible="{Binding SourceInfo, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+            <ListBox ItemsSource="{Binding Candidates}"
+                     SelectedItem="{Binding SelectedCandidate, Mode=TwoWay}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:LayoutCandidateItem">
+                        <StackPanel Spacing="2" Margin="0,2">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="{Binding Title}"
+                                           FontSize="12" Foreground="{StaticResource Text}" />
+                                <TextBlock Text="✓"
+                                           FontSize="12" FontWeight="Bold"
+                                           Foreground="{StaticResource AccentGreen}"
+                                           IsVisible="{Binding MatchesKeymap}" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding Detail}"
+                                       FontSize="11" Foreground="{StaticResource TextSubtle}"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </DockPanel>
+
+        <!-- Step 1 — preview: the candidate rendered with base-layer labels. -->
+        <DockPanel IsVisible="{Binding IsPreviewStep}">
+            <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,10">
+                <TextBlock Text="{Binding [Wizard_Step2Header], Source={StaticResource Loc}}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                <TextBlock Text="{Binding [Wizard_Step2Hint], Source={StaticResource Loc}}"
+                           FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource Text}" />
+                <TextBlock Text="{Binding PreviewWarning}"
+                           FontSize="12" TextWrapping="Wrap"
+                           Foreground="{StaticResource AccentYellow}"
+                           IsVisible="{Binding PreviewWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+
+            <Border BorderBrush="{StaticResource BgSurface0}" BorderThickness="1" CornerRadius="6"
+                    Background="{StaticResource BgBase}" Padding="12">
+                <views:BoardView />
+            </Border>
+        </DockPanel>
+
+        <!-- Step 2 — save: name, device name, optional copy into zmk-config. -->
+        <StackPanel IsVisible="{Binding IsSaveStep}" Spacing="10">
+            <TextBlock Text="{Binding [Wizard_Step3Header], Source={StaticResource Loc}}"
+                       FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+
+            <StackPanel Spacing="2">
+                <TextBlock Text="{Binding [Wizard_Name], Source={StaticResource Loc}}"
+                           FontSize="11" Foreground="{StaticResource TextSubtle}" />
+                <TextBox Text="{Binding Name, Mode=TwoWay}" />
+            </StackPanel>
+
+            <StackPanel Spacing="2">
+                <TextBlock Text="{Binding [Wizard_HidName], Source={StaticResource Loc}}"
+                           FontSize="11" Foreground="{StaticResource TextSubtle}" />
+                <TextBox Text="{Binding HidName, Mode=TwoWay}" />
+            </StackPanel>
+
+            <StackPanel Spacing="4"
+                        IsVisible="{Binding ConnectedDeviceNames.Count}">
+                <TextBlock Text="{Binding [Wizard_ConnectedDevices], Source={StaticResource Loc}}"
+                           FontSize="11" Foreground="{StaticResource TextSubtle}" />
+                <ItemsControl ItemsSource="{Binding ConnectedDeviceNames}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <Button Content="{Binding}"
+                                    Command="{Binding DataContext.UseDeviceNameCommand, ElementName=WizardWin}"
+                                    CommandParameter="{Binding}"
+                                    Padding="8,2" Margin="0,0,6,0" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <CheckBox Content="{Binding [Wizard_AlsoSaveToConfig], Source={StaticResource Loc}}"
+                      IsChecked="{Binding AlsoSaveToConfig, Mode=TwoWay}"
+                      IsVisible="{Binding CanSaveToConfig}" />
+        </StackPanel>
+
+    </DockPanel>
+
+</Window>

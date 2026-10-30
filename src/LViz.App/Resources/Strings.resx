@@ -1145,4 +1145,130 @@
     <value>failed — {0}</value>
     <comment/>
   </data>
+  <data name="Wizard_Source_PhysicalLayout" xml:space="preserve">
+    <value>Physical layout</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Source_InfoJson" xml:space="preserve">
+    <value>info.json</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Source_MatrixTransform" xml:space="preserve">
+    <value>Matrix transform (rough)</value>
+    <comment/>
+  </data>
+  <data name="Wizard_CandidateFormat" xml:space="preserve">
+    <value>{0} · {1} · {2} keys</value>
+    <comment/>
+  </data>
+  <data name="Wizard_KeymapUsedFormat" xml:space="preserve">
+    <value>Keymap: {0} ({1} keys)</value>
+    <comment/>
+  </data>
+  <data name="Wizard_KeymapCurrent" xml:space="preserve">
+    <value>the keymap loaded in LViz</value>
+    <comment/>
+  </data>
+  <data name="Wizard_KeymapUnreadableFormat" xml:space="preserve">
+    <value>Couldn't read keymap {0}: {1}</value>
+    <comment/>
+  </data>
+  <data name="Wizard_ProblemsFormat" xml:space="preserve">
+    <value>{0} file(s) could not be read.</value>
+    <comment/>
+  </data>
+  <data name="Wizard_NoCandidates" xml:space="preserve">
+    <value>No layout found here.</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Scanning" xml:space="preserve">
+    <value>Scanning…</value>
+  </data>
+  <data name="Wizard_UsingLoadedKeymapFormat" xml:space="preserve">
+    <value>Using the keymap loaded in LViz ({0} keys).</value>
+  </data>
+  <data name="Wizard_KeyCountMismatchFormat" xml:space="preserve">
+    <value>This layout has {0} keys, the keymap has {1}.</value>
+    <comment/>
+  </data>
+  <data name="Wizard_SaveFailedFormat" xml:space="preserve">
+    <value>Saving failed: {0}</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Title" xml:space="preserve">
+    <value>Add your own board</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Step1Header" xml:space="preserve">
+    <value>1. Where are your board files?</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Step1Hint" xml:space="preserve">
+    <value>Pick your zmk-config folder, or a single .dtsi, .overlay or info.json file.</value>
+    <comment/>
+  </data>
+  <data name="Wizard_BrowseFolder" xml:space="preserve">
+    <value>Choose folder…</value>
+    <comment/>
+  </data>
+  <data name="Wizard_BrowseFile" xml:space="preserve">
+    <value>Choose file…</value>
+    <comment/>
+  </data>
+  <data name="Wizard_FileType" xml:space="preserve">
+    <value>Board files</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Step2Header" xml:space="preserve">
+    <value>2. Check the layout</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Step2Hint" xml:space="preserve">
+    <value>The labels come from your keymap's base layer. If they sit on the right keys, the order is correct.</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Step3Header" xml:space="preserve">
+    <value>3. Save</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Name" xml:space="preserve">
+    <value>Name</value>
+    <comment/>
+  </data>
+  <data name="Wizard_HidName" xml:space="preserve">
+    <value>Device name (for live updates)</value>
+    <comment/>
+  </data>
+  <data name="Wizard_ConnectedDevices" xml:space="preserve">
+    <value>Connected devices:</value>
+    <comment/>
+  </data>
+  <data name="Wizard_AlsoSaveToConfig" xml:space="preserve">
+    <value>Also save in my zmk-config (config folder)</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Back" xml:space="preserve">
+    <value>Back</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Next" xml:space="preserve">
+    <value>Next</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Save" xml:space="preserve">
+    <value>Save</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment/>
+  </data>
+  <data name="Picker_AddOwnBoard" xml:space="preserve">
+    <value>My own board…</value>
+    <comment/>
+  </data>
+  <data name="Status_CreateLayoutLink" xml:space="preserve">
+    <value>Create a layout for this keymap…</value>
+    <comment/>
+  </data>
 </root>

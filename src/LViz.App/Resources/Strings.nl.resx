@@ -1145,4 +1145,130 @@
     <value>mislukt — {0}</value>
     <comment/>
   </data>
+  <data name="Wizard_Source_PhysicalLayout" xml:space="preserve">
+    <value>Fysieke layout</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Source_InfoJson" xml:space="preserve">
+    <value>info.json</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Source_MatrixTransform" xml:space="preserve">
+    <value>Matrixtransformatie (ruw)</value>
+    <comment/>
+  </data>
+  <data name="Wizard_CandidateFormat" xml:space="preserve">
+    <value>{0} · {1} · {2} toetsen</value>
+    <comment/>
+  </data>
+  <data name="Wizard_KeymapUsedFormat" xml:space="preserve">
+    <value>Keymap: {0} ({1} toetsen)</value>
+    <comment/>
+  </data>
+  <data name="Wizard_KeymapCurrent" xml:space="preserve">
+    <value>de keymap die in LViz geladen is</value>
+    <comment/>
+  </data>
+  <data name="Wizard_KeymapUnreadableFormat" xml:space="preserve">
+    <value>Kon keymap {0} niet lezen: {1}</value>
+    <comment/>
+  </data>
+  <data name="Wizard_ProblemsFormat" xml:space="preserve">
+    <value>{0} bestand(en) konden niet worden gelezen.</value>
+    <comment/>
+  </data>
+  <data name="Wizard_NoCandidates" xml:space="preserve">
+    <value>Hier is geen layout gevonden.</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Scanning" xml:space="preserve">
+    <value>Bezig met zoeken…</value>
+  </data>
+  <data name="Wizard_UsingLoadedKeymapFormat" xml:space="preserve">
+    <value>De keymap die in LViz geladen is wordt gebruikt ({0} toetsen).</value>
+  </data>
+  <data name="Wizard_KeyCountMismatchFormat" xml:space="preserve">
+    <value>Deze layout heeft {0} toetsen, de keymap {1}.</value>
+    <comment/>
+  </data>
+  <data name="Wizard_SaveFailedFormat" xml:space="preserve">
+    <value>Opslaan mislukt: {0}</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Title" xml:space="preserve">
+    <value>Eigen toetsenbord toevoegen</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Step1Header" xml:space="preserve">
+    <value>1. Waar staan je boardbestanden?</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Step1Hint" xml:space="preserve">
+    <value>Kies je zmk-config-map, of één .dtsi-, .overlay- of info.json-bestand.</value>
+    <comment/>
+  </data>
+  <data name="Wizard_BrowseFolder" xml:space="preserve">
+    <value>Map kiezen…</value>
+    <comment/>
+  </data>
+  <data name="Wizard_BrowseFile" xml:space="preserve">
+    <value>Bestand kiezen…</value>
+    <comment/>
+  </data>
+  <data name="Wizard_FileType" xml:space="preserve">
+    <value>Boardbestanden</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Step2Header" xml:space="preserve">
+    <value>2. Controleer de layout</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Step2Hint" xml:space="preserve">
+    <value>De labels komen uit de basislaag van je keymap. Staan ze op de juiste toetsen, dan klopt de volgorde.</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Step3Header" xml:space="preserve">
+    <value>3. Opslaan</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Name" xml:space="preserve">
+    <value>Naam</value>
+    <comment/>
+  </data>
+  <data name="Wizard_HidName" xml:space="preserve">
+    <value>Apparaatnaam (voor live updates)</value>
+    <comment/>
+  </data>
+  <data name="Wizard_ConnectedDevices" xml:space="preserve">
+    <value>Verbonden apparaten:</value>
+    <comment/>
+  </data>
+  <data name="Wizard_AlsoSaveToConfig" xml:space="preserve">
+    <value>Ook opslaan in mijn zmk-config (config-map)</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Back" xml:space="preserve">
+    <value>Terug</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Next" xml:space="preserve">
+    <value>Volgende</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Save" xml:space="preserve">
+    <value>Opslaan</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Cancel" xml:space="preserve">
+    <value>Annuleren</value>
+    <comment/>
+  </data>
+  <data name="Picker_AddOwnBoard" xml:space="preserve">
+    <value>Mijn eigen toetsenbord…</value>
+    <comment/>
+  </data>
+  <data name="Status_CreateLayoutLink" xml:space="preserve">
+    <value>Maak een layout voor deze keymap…</value>
+    <comment/>
+  </data>
 </root>

@@ -165,6 +165,11 @@ dotnet run --project src/LViz.App                  # launch the app
   reached with `/template/` selectors. Tune sizing *there*, not per-control —
   and a local property value still overrides these (Avalonia precedence), so a
   control that needs a different size just sets it inline.
+  `Button.accent` (primary dialog button) and `Button.link` (text link) are
+  defined there too. Fluent paints hover/pressed on
+  `/template/ ContentPresenter#PART_ContentPresenter`, so state overrides go on
+  that part. Palette brushes inside `Application.Styles` need `DynamicResource`:
+  `Application.Resources` is parsed after the styles.
 
 ## Before writing code
 
@@ -400,3 +405,10 @@ LViz-specific (extend this list as we hit more):
   `LineNumber + 1` to the user, and check `ValueKind == Object` before every
   `TryGetProperty` on untrusted JSON (root, each nested value). See
   `InfoJsonImporter`.
+
+- **`ErrorText` is the white text on the red error toast, not an error
+  colour.** Inline error text in a dialog uses `AccentRed`.
+
+- **`ZmkKeymapLoader.Load` wraps every failure, file-read errors included, in
+  `ZmkKeymapParseException`.** Catching that one type is complete; don't add
+  extra catches for IO errors.

@@ -235,6 +235,16 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// "My own board…" opens the layout wizard; like the recents flyout the
+    /// Hide is posted so the button's Command still resolves when it runs
+    /// after this handler returns.
+    /// </summary>
+    private void OnAddOwnBoardClick(object? sender, RoutedEventArgs e)
+    {
+        Dispatcher.UIThread.Post(() => KeyboardPickerButton.Flyout?.Hide());
+    }
+
+    /// <summary>
     /// Right-click on a combo legend tile opens the combo-label editor. Editing
     /// is intentionally scoped to the legend only — on-key combo pills are
     /// already crowded with the number badge.

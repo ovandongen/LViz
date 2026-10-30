@@ -61,6 +61,42 @@
             <Setter Property="HorizontalContentAlignment" Value="Center" />
         </Style>
 
+        <!-- Primary dialog button (Classes="accent": Save / OK). Fluent paints
+             hover and pressed on the template's ContentPresenter, so those
+             states are overridden there; disabled keeps Fluent's grey look.
+             DynamicResource: the palette below is loaded after these styles. -->
+        <Style Selector="Button.accent">
+            <Setter Property="Background" Value="{DynamicResource AccentBlue}" />
+            <Setter Property="Foreground" Value="{DynamicResource BgBase}" />
+        </Style>
+        <Style Selector="Button.accent:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentBlue}" />
+            <Setter Property="Foreground" Value="{DynamicResource BgBase}" />
+            <Setter Property="Opacity" Value="0.85" />
+        </Style>
+        <Style Selector="Button.accent:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentBlue}" />
+            <Setter Property="Foreground" Value="{DynamicResource BgBase}" />
+            <Setter Property="Opacity" Value="0.7" />
+        </Style>
+
+        <!-- Text link styled as a button (Classes="link"): no background or
+             border in any state, accent text that brightens on hover. -->
+        <Style Selector="Button.link">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentBlue}" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+        </Style>
+        <Style Selector="Button.link:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+        </Style>
+
         <!-- Trim the CheckBox / RadioButton glyphs (Fluent defaults are 20px,
              which looks heavy next to the 12px text). Part names are from the
              Fluent control templates; the checkbox box and the radio rings shrink

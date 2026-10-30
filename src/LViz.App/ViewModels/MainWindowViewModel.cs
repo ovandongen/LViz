@@ -170,6 +170,13 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     [ObservableProperty] private bool _isAutoLayerSwitchEnabled;
     [ObservableProperty] private bool _hasLayoutLoaded;
 
+    /// <summary>
+    /// True when a keymap loaded successfully but its binding count matches
+    /// no board profile in the registry. Drives the status-bar layout-wizard
+    /// link; false whenever the keymap fits the active board or none is loaded.
+    /// </summary>
+    [ObservableProperty] private bool _hasUnmatchedKeymap;
+
     /// <summary>Transient auto-dismissing toast banner (load errors, etc.).</summary>
     public ToastController Toast { get; } = new();
 
@@ -488,6 +495,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public Func<Task>? LoadLayoutRequested { get; set; }
     public Func<Task>? CopyDiagnosticsRequested { get; set; }
     public Action? OpenSettingsRequested { get; set; }
+    /// <summary>Set by <c>App.axaml.cs</c>: opens the layout-wizard window.</summary>
+    public Action? AddOwnBoardRequested { get; set; }
 
     /// <summary>Path of the layout JSON the user currently has loaded, or null if none.</summary>
     public string? LoadedLayoutPath => _keymap.LoadedPath;
@@ -806,6 +815,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                     $"Loaded layout has {bindingCount} keys but no profile matches; staying on {_profile.Id}");
             }
         }
+        // An orphaned keymap (mismatch, nothing to switch to) arms the
+        // status-bar wizard link; every other successful load disarms it.
+        HasUnmatchedKeymap = keyCountMismatch && autoSwitchedTo is null;
 
         RebuildLayers();
         ApplyActiveLayer(0);
@@ -1007,6 +1019,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             Layers.Clear();
             ActiveLayerIndex = 0;
             HasLayoutLoaded = false;
+            HasUnmatchedKeymap = false;
             SetLoadStatusBase(null);
             StatusMessage = Loc.Instance.Format("Status_KeyboardSwitchedUnloaded", profile.DisplayName);
         }
@@ -1016,6 +1029,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             // per profile, so the tabs must be rebuilt from the new profile.
             RebuildLayers();
             ApplyActiveLayer(ActiveLayerIndex);
+            HasUnmatchedKeymap = false;
             SetLoadStatusBase(null);
             StatusMessage = Loc.Instance.Format("Status_KeyboardSwitched", profile.DisplayName);
         }
@@ -1050,6 +1064,58 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             LoadLayoutFromPath(storedPath);
         }
     }
+
+    // --- Layout wizard ("My own board…", window lives in part 6) ---
+
+    /// <summary>
+    /// Everything the wizard window can't discover itself, read from live VM
+    /// state: the open keymap, the user-layout ids already taken (without the
+    /// <c>user:</c> prefix), the connected devices no profile claims, and the
+    /// folder user layouts live in.
+    /// </summary>
+    public LayoutWizardContext GetLayoutWizardContext()
+    {
+        // One snapshot: All allocates a fresh array per read.
+        var profiles = KeyboardProfileRegistry.All;
+        var existingIds = profiles
+            .OfType<UserLayoutProfile>()
+            .Select(p => p.Source.Id)
+            .ToList();
+        var deviceNames = _deviceBus.Devices
+            .Select(d => d.DisplayName)
+            .Distinct(StringComparer.Ordinal)
+            .Where(name => !profiles.Any(p => p.NameMatches(name)))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+        return new LayoutWizardContext(_keymap.Current, existingIds, deviceNames, UserLayoutStore.DefaultDirectory);
+    }
+
+    /// <summary>
+    /// Registers a saved wizard layout as a user profile (replacing any
+    /// existing layout with the same id), selects it through the normal
+    /// picker path, and loads the keymap the wizard picked when it found one.
+    /// </summary>
+    public void ApplyLayoutWizardResult(LayoutWizardResult result)
+    {
+        var profile = new UserLayoutProfile(result.Layout);
+        KeyboardProfileRegistry.SetUserProfiles(
+            KeyboardProfileRegistry.All
+                .OfType<UserLayoutProfile>()
+                .Where(p => !string.Equals(p.Source.Id, result.Layout.Id, StringComparison.Ordinal))
+                .Append((IKeyboardProfile)profile));
+        OnPropertyChanged(nameof(AvailableKeyboards));
+
+        SelectKeyboard(profile);
+        if (result.KeymapPathToLoad is not null)
+            LoadLayoutFromPath(result.KeymapPathToLoad);
+        HasUnmatchedKeymap = false;
+
+        DiagnosticLog.Info("MainVM", $"Added user layout {profile.Id} ({profile.KeyCount} keys)");
+    }
+
+    /// <summary>Starts the layout wizard via the window callback.</summary>
+    [RelayCommand]
+    private void AddOwnBoard() => AddOwnBoardRequested?.Invoke();
 
     /// <summary>
     /// Returns the persisted JSON path for the given profile if one exists and
