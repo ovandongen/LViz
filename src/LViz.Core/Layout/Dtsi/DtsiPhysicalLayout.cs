@@ -17,17 +17,31 @@ public sealed record DtsiKeyPhysical(
     int Rx,
     int Ry);
 
-/// <summary>Parsed dtsi physical layout: the keys list in dtsi declaration order.
+/// <summary>One parsed <c>zmk,physical-layout</c> node: its devicetree node
+/// name (label prefix stripped), its optional <c>display-name</c>, and the
+/// keys list in dtsi declaration order.
 /// Both shipped boards' local dtsi files are arranged so this order matches
 /// Moergo's JSON <c>bindings[]</c> index. The upstream Go60 dtsi at
 /// <c>~/Desktop/Projects/Moergo/dtsi/go60.dtsi</c> disagrees for the row-5 +
 /// thumb block — a resync must re-apply our local reorder. See CLAUDE.md.</summary>
 public sealed class DtsiPhysicalLayout
 {
+    /// <summary>Node name as written, without a <c>label:</c> prefix
+    /// (e.g. <c>physical_layout_0</c>).</summary>
+    public string NodeName { get; }
+
+    /// <summary>The node's <c>display-name</c> property, or <c>null</c> when absent.</summary>
+    public string? DisplayName { get; }
+
     public IReadOnlyList<DtsiKeyPhysical> Keys { get; }
 
-    public DtsiPhysicalLayout(IReadOnlyList<DtsiKeyPhysical> keys)
+    public DtsiPhysicalLayout(
+        string nodeName,
+        string? displayName,
+        IReadOnlyList<DtsiKeyPhysical> keys)
     {
+        NodeName = nodeName;
+        DisplayName = displayName;
         Keys = keys;
     }
 }

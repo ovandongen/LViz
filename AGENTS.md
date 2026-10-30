@@ -126,6 +126,20 @@ dotnet run --project src/LViz.App                  # launch the app
   `KeyboardConfigValidator` for the layer-count consistency check. Unmapped on
   purpose: `decoration.color`, `inputListeners`, `custom_devicetree`. This is
   the import format the fork originally dropped, re-added scoped to Moergo.
+- **Three layout importers, one result.** `Core/Layout/Import/` turns board
+  files into `ImportedLayout`s (keys as `DtsiKeyPhysical` in ZMK units, in
+  keymap binding order, plus warnings): `PhysicalLayoutImporter`
+  (`zmk,physical-layout` dtsi), `InfoJsonImporter` (keymap-editor/QMK
+  `info.json`, not to be confused with the Moergo `.json` keymap export) and
+  `MatrixTransformImporter` (rough layout from the `map` text, RC grid when
+  it is one line). Malformed input throws `LayoutImportException` with a
+  1-based line; "nothing found" is an empty list. The dtsi-based ones share
+  `Dtsi/DtsiText`: `MaskComments` keeps length and newlines, so offsets and
+  line numbers found on masked text are valid in the original. Bundled
+  board resources still go through `DtsiPhysicalLayoutParser.Parse`, which
+  insists on exactly one physical-layout node. Test fixtures under
+  `LViz.Tests/Layout/Fixtures/` are embedded by wildcard: drop a file in and
+  read it with `LayoutFixtures.Read("<file>")`.
 - **Per-key label overrides are scoped `(profileId, layerIndex, keyIndex)`**
   → `KeyLabelOverride` (main label, subscript, top-left badge, FA icon,
   font size, bold). Persisted via `UserSettings.KeyLabelOverrides` through
@@ -366,3 +380,9 @@ LViz-specific (extend this list as we hit more):
   next dispatcher turn instead:
   `Dispatcher.UIThread.Post(() => SomeButton.Flyout?.Hide())`. See the
   load-layout flyout in `MainWindow.axaml.cs`.
+
+- **`System.Text.Json` on user files: `JsonException.LineNumber` is 0-based,
+  and `JsonElement.TryGetProperty` throws on a non-object.** Report
+  `LineNumber + 1` to the user, and check `ValueKind == Object` before every
+  `TryGetProperty` on untrusted JSON (root, each nested value). See
+  `InfoJsonImporter`.

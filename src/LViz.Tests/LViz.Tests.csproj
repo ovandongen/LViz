@@ -26,6 +26,7 @@
     </None>
     <EmbeddedResource Include="Keymap\Fixtures\*.keymap" />
     <EmbeddedResource Include="Keymap\Fixtures\*.json" />
+    <EmbeddedResource Include="Layout\Fixtures\*" />
   </ItemGroup>
 
 </Project>
