@@ -6,8 +6,8 @@
         x:DataType="vm:LayoutWizardViewModel"
         x:Name="WizardWin"
         Title="{Binding [Wizard_Title], Source={StaticResource Loc}}"
-        Width="780" Height="580"
-        MinWidth="620" MinHeight="460"
+        Width="900" Height="640"
+        MinWidth="700" MinHeight="520"
         Topmost="True"
         WindowStartupLocation="CenterOwner"
         Background="{StaticResource BgBase}">
@@ -47,7 +47,8 @@
                     IsVisible="{Binding IsSaveStep}" />
         </Grid>
 
-        <!-- Step 0 — source: scan a zmk-config folder or one board file. -->
+        <!-- Step 0 — source: scan a zmk-config folder or one board file, or
+             answer the questions (grid source) instead. -->
         <DockPanel IsVisible="{Binding IsSourceStep}">
             <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,10">
                 <TextBlock Text="{Binding [Wizard_Step1Header], Source={StaticResource Loc}}"
@@ -63,42 +64,108 @@
                     <Button Content="{Binding [Wizard_BrowseFile], Source={StaticResource Loc}}"
                             Command="{Binding BrowseFileCommand}" />
                 </StackPanel>
-                <TextBlock Text="{Binding SourcePath}"
-                           FontSize="12" Foreground="{StaticResource TextSubtle}"
-                           TextTrimming="CharacterEllipsis"
-                           IsVisible="{Binding SourcePath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsScanning}" />
+                <Button Classes="link"
+                        Content="{Binding [Wizard_BuildFromQuestions], Source={StaticResource Loc}}"
+                        Command="{Binding UseGridSourceCommand}"
+                        HorizontalAlignment="Left"
+                        IsVisible="{Binding !IsGridSource}" />
             </StackPanel>
 
-            <TextBlock DockPanel.Dock="Bottom"
-                       Text="{Binding SourceInfo}"
-                       FontSize="12" Foreground="{StaticResource TextSubtle}"
-                       TextWrapping="Wrap" Margin="0,8,0,0"
-                       IsVisible="{Binding SourceInfo, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <!-- Grid source — the questions whose answers feed
+                 GridLayoutGenerator through the view-model. -->
+            <StackPanel DockPanel.Dock="Top" Spacing="8" IsVisible="{Binding IsGridSource}">
+                <TextBlock Text="{Binding [Wizard_GridHeader], Source={StaticResource Loc}}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                <CheckBox Content="{Binding [Wizard_GridSplit], Source={StaticResource Loc}}"
+                          IsChecked="{Binding GridSplit, Mode=TwoWay}" />
+                <!-- Same shape as the Settings steppers: label column, then a
+                     140px stepper column, so the number isn't cut off by the
+                     spinner buttons. -->
+                <Grid ColumnDefinitions="Auto,140" RowDefinitions="Auto,Auto,Auto"
+                      ColumnSpacing="8" RowSpacing="6" HorizontalAlignment="Left">
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Text="{Binding [Wizard_GridRows], Source={StaticResource Loc}}"
+                               FontSize="12" Foreground="{StaticResource Text}"
+                               VerticalAlignment="Center" />
+                    <NumericUpDown Grid.Row="0" Grid.Column="1"
+                                   Value="{Binding GridRows, Mode=TwoWay}"
+                                   Minimum="{Binding GridMinRows}" Maximum="{Binding GridMaxRows}"
+                                   Increment="1" FormatString="0" />
+                    <TextBlock Grid.Row="1" Grid.Column="0"
+                               Text="{Binding [Wizard_GridColumns], Source={StaticResource Loc}}"
+                               FontSize="12" Foreground="{StaticResource Text}"
+                               VerticalAlignment="Center" />
+                    <NumericUpDown Grid.Row="1" Grid.Column="1"
+                                   Value="{Binding GridColumns, Mode=TwoWay}"
+                                   Minimum="{Binding GridMinColumns}" Maximum="{Binding GridMaxColumns}"
+                                   Increment="1" FormatString="0" />
+                    <TextBlock Grid.Row="2" Grid.Column="0"
+                               Text="{Binding [Wizard_GridThumbKeys], Source={StaticResource Loc}}"
+                               FontSize="12" Foreground="{StaticResource Text}"
+                               VerticalAlignment="Center" />
+                    <NumericUpDown Grid.Row="2" Grid.Column="1"
+                                   Value="{Binding GridThumbKeys, Mode=TwoWay}"
+                                   Minimum="{Binding GridMinThumbKeys}" Maximum="{Binding GridMaxThumbKeys}"
+                                   Increment="1" FormatString="0" />
+                </Grid>
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="{Binding GridKeyCountText}"
+                               FontSize="12" Foreground="{StaticResource Text}" />
+                    <TextBlock Text="✓"
+                               FontSize="12" FontWeight="Bold"
+                               Foreground="{StaticResource AccentGreen}"
+                               IsVisible="{Binding GridMatchesKeymap}" />
+                </StackPanel>
+                <TextBlock Text="{Binding [Wizard_GridHint], Source={StaticResource Loc}}"
+                           FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource TextSubtle}" />
+                <Button Classes="link"
+                        Content="{Binding [Wizard_UseBoardFiles], Source={StaticResource Loc}}"
+                        Command="{Binding UseFileSourceCommand}"
+                        HorizontalAlignment="Left" />
+            </StackPanel>
 
-            <ListBox ItemsSource="{Binding Candidates}"
-                     SelectedItem="{Binding SelectedCandidate, Mode=TwoWay}">
-                <ListBox.ItemTemplate>
-                    <DataTemplate x:DataType="vm:LayoutCandidateItem">
-                        <StackPanel Spacing="2" Margin="0,2">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock Text="{Binding Title}"
-                                           FontSize="12" Foreground="{StaticResource Text}" />
-                                <TextBlock Text="✓"
-                                           FontSize="12" FontWeight="Bold"
-                                           Foreground="{StaticResource AccentGreen}"
-                                           IsVisible="{Binding MatchesKeymap}" />
+            <!-- File source — the scan of a folder or one board file and
+                 its candidate list; hidden entirely in grid mode. -->
+            <DockPanel IsVisible="{Binding !IsGridSource}">
+                <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,4">
+                    <TextBlock Text="{Binding SourcePath}"
+                               FontSize="12" Foreground="{StaticResource TextSubtle}"
+                               TextTrimming="CharacterEllipsis"
+                               IsVisible="{Binding SourcePath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsScanning}" />
+                </StackPanel>
+
+                <TextBlock DockPanel.Dock="Bottom"
+                           Text="{Binding SourceInfo}"
+                           FontSize="12" Foreground="{StaticResource TextSubtle}"
+                           TextWrapping="Wrap" Margin="0,8,0,0"
+                           IsVisible="{Binding SourceInfo, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                <ListBox ItemsSource="{Binding Candidates}"
+                         SelectedItem="{Binding SelectedCandidate, Mode=TwoWay}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LayoutCandidateItem">
+                            <StackPanel Spacing="2" Margin="0,2">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="{Binding Title}"
+                                               FontSize="12" Foreground="{StaticResource Text}" />
+                                    <TextBlock Text="✓"
+                                               FontSize="12" FontWeight="Bold"
+                                               Foreground="{StaticResource AccentGreen}"
+                                               IsVisible="{Binding MatchesKeymap}" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding Detail}"
+                                           FontSize="11" Foreground="{StaticResource TextSubtle}"
+                                           TextTrimming="CharacterEllipsis" />
                             </StackPanel>
-                            <TextBlock Text="{Binding Detail}"
-                                       FontSize="11" Foreground="{StaticResource TextSubtle}"
-                                       TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
         </DockPanel>
 
-        <!-- Step 1 — preview: the candidate rendered with base-layer labels. -->
+        <!-- Step 1 — adjust: the candidate's keys in the shared editor;
+             pointer and keyboard input go to LayoutEditorCanvas. -->
         <DockPanel IsVisible="{Binding IsPreviewStep}">
             <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,10">
                 <TextBlock Text="{Binding [Wizard_Step2Header], Source={StaticResource Loc}}"
@@ -109,11 +176,15 @@
                            FontSize="12" TextWrapping="Wrap"
                            Foreground="{StaticResource AccentYellow}"
                            IsVisible="{Binding PreviewWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <Button Content="{Binding [Wizard_Reset], Source={StaticResource Loc}}"
+                        Command="{Binding Editor.ResetCommand}"
+                        IsEnabled="{Binding Editor.IsModified}"
+                        HorizontalAlignment="Right" />
             </StackPanel>
 
             <Border BorderBrush="{StaticResource BgSurface0}" BorderThickness="1" CornerRadius="6"
                     Background="{StaticResource BgBase}" Padding="12">
-                <views:BoardView />
+                <views:LayoutEditorCanvas x:Name="EditorCanvas" Editor="{Binding Editor}" />
             </Border>
         </DockPanel>
 

@@ -66,7 +66,7 @@ public static class InfoJsonImporter
         }
 
         var keys = new List<DtsiKeyPhysical>();
-        var warnings = new List<string>();
+        var warnings = new List<LayoutImportWarning>();
         int index = 0;
         foreach (var key in keyArray.EnumerateArray())
         {
@@ -81,7 +81,7 @@ public static class InfoJsonImporter
     }
 
     private static DtsiKeyPhysical ImportKey(
-        string layoutName, int index, JsonElement key, List<string> warnings)
+        string layoutName, int index, JsonElement key, List<LayoutImportWarning> warnings)
     {
         double x = GetNumber(key, "x")
             ?? throw new LayoutImportException(KeyError(layoutName, index, "has no 'x'"));
@@ -102,7 +102,7 @@ public static class InfoJsonImporter
         if (r != 0 && (rx is null || ry is null))
         {
             // No explicit origin: the rotation happens about the key centre.
-            warnings.Add($"Key {index}: rotation without rx/ry, rotating around the key centre");
+            warnings.Add(new LayoutImportWarning(LayoutWarningCode.RotationWithoutPivot, index));
         }
 
         return new DtsiKeyPhysical(

@@ -6,11 +6,14 @@ namespace LViz.Core.Layout.Import;
 
 /// <summary>
 /// Turns the layout the layout wizard picked into a draft
-/// <see cref="UserLayoutFile"/>: a store-legal unique id derived from a
-/// display name, an automatic left/right hand split, and the name suggestion
-/// pre-filled from the scan. The split is a midline through the largest
-/// horizontal gap in the middle band of the board — a draggable midline
-/// replaces it in a later version, which is why it lives behind its own
+/// <see cref="UserLayoutFile"/>: keys copied from an import with their hands
+/// (<see cref="KeysFrom"/> — saved hands when the import carries them,
+/// otherwise an automatic left/right split), a store-legal unique id derived
+/// from a display name, normalised positions (<see cref="Create"/> shifts every
+/// key so the rotated bounding box starts at (0, 0)), and the name suggestion
+/// pre-filled from the scan. The automatic split is a midline through the
+/// largest horizontal gap in the middle band of the board — a draggable split
+/// line replaces it in a later version, which is why it lives behind its own
 /// function. Pure functions over records; saving stays
 /// <see cref="UserLayoutStore.Save"/>'s job.
 /// </summary>
@@ -74,7 +77,7 @@ public static class UserLayoutDraft
         if (keys.Count == 0)
             return 0;
 
-        var centres = keys.Select(RotatedCenterX).ToArray();
+        var centres = keys.Select(key => UserLayoutGeometry.RotatedCenter(key).X).ToArray();
         Array.Sort(centres);
 
         var lo = centres[0];
@@ -104,30 +107,24 @@ public static class UserLayoutDraft
     }
 
     /// <summary>
-    /// Draft layout file for the wizard to save: id from
-    /// <see cref="MakeId"/>, trimmed name, trimmed <paramref name="hidName"/>
-    /// (null when blank), current schema version, and every key copied
-    /// unchanged except for its <see cref="Hand"/> — left when the key's
-    /// rotated centre X falls left of <see cref="FindMidlineCentiU"/>, right
-    /// otherwise.
+    /// <see cref="UserLayoutKey"/>s for an import, geometry unchanged: W/H/X/Y/R
+    /// copied as-is. The hand comes from <see cref="ImportedLayout.Hands"/>
+    /// when it is present and has one entry per key (a saved user layout asked
+    /// for them); otherwise every key is re-handed by the midline rule —
+    /// left when its rotated centre X falls left of
+    /// <see cref="FindMidlineCentiU"/>, right otherwise.
     /// </summary>
-    /// <exception cref="ArgumentException">
-    /// <paramref name="name"/> is blank — every layout needs a display name.
-    /// </exception>
-    public static UserLayoutFile Create(
-        ImportedLayout layout,
-        string name,
-        string? hidName,
-        IEnumerable<string> existingIds)
+    public static IReadOnlyList<UserLayoutKey> KeysFrom(ImportedLayout layout)
     {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("Layout name is blank.", nameof(name));
-
-        var midline = FindMidlineCentiU(layout.Keys);
+        var savedHands = layout.Hands is not null && layout.Hands.Count == layout.Keys.Count
+            ? layout.Hands
+            : null;
+        var midline = savedHands is null ? FindMidlineCentiU(layout.Keys) : 0;
 
         var keys = new List<UserLayoutKey>(layout.Keys.Count);
-        foreach (var key in layout.Keys)
+        for (var i = 0; i < layout.Keys.Count; i++)
         {
+            var key = layout.Keys[i];
             keys.Add(new UserLayoutKey(
                 key.X,
                 key.Y,
@@ -136,8 +133,31 @@ public static class UserLayoutDraft
                 key.Rotation,
                 key.Rx,
                 key.Ry,
-                RotatedCenterX(key) < midline ? Hand.Left : Hand.Right));
+                savedHands?[i]
+                    ?? (UserLayoutGeometry.RotatedCenter(key).X < midline ? Hand.Left : Hand.Right)));
         }
+        return keys;
+    }
+
+    /// <summary>
+    /// Draft layout file for the wizard to save: id from
+    /// <see cref="MakeId"/>, trimmed name, trimmed <paramref name="hidName"/>
+    /// (null when blank), current schema version, and
+    /// <see cref="UserLayoutGeometry.Normalize"/> applied to
+    /// <paramref name="keys"/> — every key shifted by the same offset so the
+    /// rotated bounding box starts at (0, 0), hands kept as given.
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="name"/> is blank — every layout needs a display name.
+    /// </exception>
+    public static UserLayoutFile Create(
+        IReadOnlyList<UserLayoutKey> keys,
+        string name,
+        string? hidName,
+        IEnumerable<string> existingIds)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Layout name is blank.", nameof(name));
 
         var trimmedHidName = hidName?.Trim();
         return new UserLayoutFile(
@@ -145,7 +165,7 @@ public static class UserLayoutDraft
             MakeId(name, existingIds),
             name.Trim(),
             string.IsNullOrEmpty(trimmedHidName) ? null : trimmedHidName,
-            keys);
+            UserLayoutGeometry.Normalize(keys));
     }
 
     /// <summary>
@@ -190,23 +210,5 @@ public static class UserLayoutDraft
 
         var result = slug.ToString().Trim('-');
         return result.Length == 0 ? FallbackId : result;
-    }
-
-    /// <summary>
-    /// Centre of the key after its rotation about (<see cref="DtsiKeyPhysical.Rx"/>,
-    /// <see cref="DtsiKeyPhysical.Ry"/>) — the same transform
-    /// <see cref="KeyPosition.RotatedBounds"/> applies to corners, applied to
-    /// the centre point. Centi-u in, centi-u out.
-    /// </summary>
-    private static double RotatedCenterX(DtsiKeyPhysical key)
-    {
-        var cx = key.X + key.Width / 2.0;
-        if (key.Rotation == 0)
-            return cx;
-
-        var radians = key.Rotation / 100.0 * Math.PI / 180.0;
-        var dx = cx - key.Rx;
-        var dy = key.Y + key.Height / 2.0 - key.Ry;
-        return key.Rx + dx * Math.Cos(radians) - dy * Math.Sin(radians);
     }
 }

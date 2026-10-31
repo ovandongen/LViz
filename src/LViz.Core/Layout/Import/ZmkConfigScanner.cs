@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using LViz.Core.Layout.Dtsi;
 
 namespace LViz.Core.Layout.Import;
 
@@ -42,8 +43,12 @@ public static class ZmkConfigScanner
     private static readonly Regex KconfigDefaultPattern = new(
         @"^default\s+""([^""]*)""", RegexOptions.Compiled);
 
+    /// <summary>Suffix of a <c>&lt;id&gt;.layout.json</c> the wizard saved earlier.</summary>
+    private const string UserLayoutSuffix = ".layout.json";
+
     private enum BoardFileKind
     {
+        UserLayout,
         DtsiLike,
         InfoJson,
         Other,
@@ -52,8 +57,9 @@ public static class ZmkConfigScanner
     /// <summary>
     /// Scan <paramref name="root"/>: walk it (max depth 8, skipping dot-directories
     /// and build/zephyr/zmk/modules/node_modules), import every
-    /// <c>.dtsi</c>/<c>.overlay</c> (physical layouts first, then matrix transforms)
-    /// and every exact-name <c>info.json</c>, then collect keymaps, the keyboard
+    /// <c>.dtsi</c>/<c>.overlay</c> (physical layouts first, then matrix transforms),
+    /// every exact-name <c>info.json</c>, and every <c>&lt;id&gt;.layout.json</c>
+    /// a previous wizard run saved here, then collect keymaps, the keyboard
     /// name and the shield name.
     /// </summary>
     public static ZmkConfigScan ScanFolder(string root)
@@ -119,9 +125,9 @@ public static class ZmkConfigScanner
     /// <summary>
     /// Stable sort: candidates whose key count equals
     /// <paramref name="keymapKeyCount"/> first (no boost when it is null),
-    /// then physical layout &gt; info.json &gt; matrix transform, then file
-    /// path (ordinal). A physical layout in a file therefore always beats
-    /// that same file's matrix transform.
+    /// then saved layout &gt; physical layout &gt; info.json &gt; matrix
+    /// transform, then file path (ordinal). A physical layout in a file
+    /// therefore always beats that same file's matrix transform.
     /// </summary>
     public static IReadOnlyList<LayoutCandidate> Rank(
         IEnumerable<LayoutCandidate> candidates, int? keymapKeyCount) =>
@@ -188,6 +194,11 @@ public static class ZmkConfigScanner
     private static BoardFileKind Classify(string path)
     {
         string name = Path.GetFileName(path);
+        // Checked before the other kinds: a saved layout always wins its
+        // file-name shape over the extension rules.
+        if (name.Length > UserLayoutSuffix.Length &&
+            name.EndsWith(UserLayoutSuffix, StringComparison.OrdinalIgnoreCase))
+            return BoardFileKind.UserLayout;
         if (name.Equals("info.json", StringComparison.OrdinalIgnoreCase))
             return BoardFileKind.InfoJson;
         string ext = Path.GetExtension(name);
@@ -204,11 +215,37 @@ public static class ZmkConfigScanner
         var kind = kindHint ?? Classify(file);
         if (kind == BoardFileKind.Other)
             return result;
+
+        if (kind == BoardFileKind.UserLayout)
+        {
+            // TryLoadFile reads and validates the file itself — don't pre-read it.
+            if (!UserLayoutStore.TryLoadFile(file, out var saved, out var reason))
+            {
+                problems.Add(Problem(file, root, $"layout file: {reason}"));
+                return result;
+            }
+            var keys = saved.Keys
+                .Select(k => new DtsiKeyPhysical(k.W, k.H, k.X, k.Y, k.R, k.Rx, k.Ry))
+                .ToList();
+            var hands = saved.Keys.Select(k => k.Hand).ToList();
+            result.Add(new LayoutCandidate(
+                new ImportedLayout(saved.Name, LayoutSource.UserLayout, keys, [], hands, saved.Id), file));
+            return result;
+        }
+
         if (ReadAllTextSafe(file, root, problems) is not string text)
             return result;
 
         if (kind == BoardFileKind.DtsiLike)
         {
+            // An LViz export next to its own <id>.layout.json only repeats that
+            // layout, minus its hands; the saved layout is the candidate. Without
+            // the twin (deleted), the export is all there is, so it stays in.
+            if (ZmkPhysicalLayoutWriter.IsGeneratedByLviz(text) && File.Exists(
+                    Path.Combine(Path.GetDirectoryName(file) ?? "",
+                        Path.GetFileNameWithoutExtension(file) + UserLayoutSuffix)))
+                return result;
+
             // Physical layouts before matrix transforms: the better source wins.
             result.AddRange(Safe(PhysicalLayoutImporter.Import, file, "physical layout", text, root, problems)
                 .Select(l => new LayoutCandidate(l, file)));
@@ -361,9 +398,10 @@ public static class ZmkConfigScanner
 
     private static int SourceRank(LayoutSource source) => source switch
     {
-        LayoutSource.PhysicalLayout => 0,
-        LayoutSource.InfoJson => 1,
-        _ => 2,
+        LayoutSource.UserLayout => 0,
+        LayoutSource.PhysicalLayout => 1,
+        LayoutSource.InfoJson => 2,
+        _ => 3,
     };
 
     private static List<LayoutCandidate> OrderCandidates(List<LayoutCandidate> candidates) =>

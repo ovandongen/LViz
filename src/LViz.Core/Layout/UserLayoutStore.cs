@@ -82,7 +82,7 @@ public static class UserLayoutStore
 
         foreach (var fileName in fileNames)
         {
-            if (!TryRead(Path.Combine(directory, fileName), out var layout, out var reason))
+            if (!TryLoadFile(Path.Combine(directory, fileName), out var layout, out var reason))
             {
                 DiagnosticLog.Warn(LogTag, $"{fileName}: {reason}");
                 continue;
@@ -118,14 +118,19 @@ public static class UserLayoutStore
 
         Directory.CreateDirectory(directory);
         var json = JsonSerializer.Serialize(StoredLayout.From(layout), JsonOptions);
-        AtomicFile.WriteAllText(Path.Combine(directory, layout.Id + FileSuffix), json);
+        AtomicFile.WriteAllText(PathFor(layout.Id, directory), json);
     }
 
+    /// <summary>Where <see cref="Save"/> writes the layout with this id.</summary>
+    public static string PathFor(string id, string directory) =>
+        Path.Combine(directory, id + FileSuffix);
+
     /// <summary>
-    /// Reads one layout file. False plus a one-line reason when the file is
-    /// unparseable or fails validation — never an exception.
+    /// Reads one <c>&lt;id&gt;.layout.json</c> with the same checks as
+    /// <see cref="LoadAll"/>. Returns false plus a one-line reason when the file
+    /// is unparseable or fails validation — never an exception.
     /// </summary>
-    private static bool TryRead(
+    public static bool TryLoadFile(
         string path,
         [NotNullWhen(true)] out UserLayoutFile? layout,
         out string? reason)

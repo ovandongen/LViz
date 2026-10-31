@@ -156,6 +156,17 @@
                                                 HorizontalContentAlignment="Left"
                                                 Background="Transparent"
                                                 Content="{Binding [Picker_AddOwnBoard], Source={StaticResource Loc}}" />
+                                        <!-- Same treatment for editing the layout already in use;
+                                             only shown when a user layout is the active board. -->
+                                        <Button x:Name="EditLayoutButton"
+                                                Click="OnEditLayoutClick"
+                                                Command="{Binding DataContext.EditLayoutCommand, ElementName=MainWin}"
+                                                Padding="10,6"
+                                                HorizontalAlignment="Stretch"
+                                                HorizontalContentAlignment="Left"
+                                                Background="Transparent"
+                                                IsVisible="{Binding DataContext.CanEditLayout, ElementName=MainWin}"
+                                                Content="{Binding [Picker_EditLayout], Source={StaticResource Loc}}" />
                                     </StackPanel>
                                 </Flyout>
                             </Button.Flyout>

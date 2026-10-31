@@ -107,7 +107,7 @@ public sealed class UserLayoutDraftTests : IDisposable
     [InlineData("go60.info.json")]
     public void Split_KeepsEveryLeftCentreLeftOfEveryRightCentre(string fixture)
     {
-        var file = UserLayoutDraft.Create(Info(fixture), "Test Board", null, []);
+        var file = UserLayoutDraft.Create(UserLayoutDraft.KeysFrom(Info(fixture)), "Test Board", null, []);
 
         var left = file.Keys.Where(k => k.Hand == Hand.Left).Select(CenterX);
         var right = file.Keys.Where(k => k.Hand == Hand.Right).Select(CenterX);
@@ -156,7 +156,7 @@ public sealed class UserLayoutDraftTests : IDisposable
         // inside the band — that gap, not the unrotated position, splits.
         Assert.Equal(450, UserLayoutDraft.FindMidlineCentiU(keys));
 
-        var file = UserLayoutDraft.Create(Imported(keys), "Rotated Demo", null, []);
+        var file = UserLayoutDraft.Create(UserLayoutDraft.KeysFrom(Imported(keys)), "Rotated Demo", null, []);
 
         Assert.Equal(Hand.Right, file.Keys[6].Hand);
         Assert.Equal(
@@ -170,7 +170,8 @@ public sealed class UserLayoutDraftTests : IDisposable
         // Centres 50, 150, 250: no gap midpoint lies in the band, so the
         // midline is the span centre 150 — the key sitting exactly on it goes
         // right (left is strictly below).
-        var file = UserLayoutDraft.Create(Imported([Key(0), Key(100), Key(200)]), "Board", null, []);
+        var file = UserLayoutDraft.Create(
+            UserLayoutDraft.KeysFrom(Imported([Key(0), Key(100), Key(200)])), "Board", null, []);
 
         Assert.Equal(new[] { Hand.Left, Hand.Right, Hand.Right }, file.Keys.Select(k => k.Hand));
     }
@@ -178,11 +179,12 @@ public sealed class UserLayoutDraftTests : IDisposable
     // ── Create ──────────────────────────────────────────────────────────
 
     [Fact]
-    public void Create_CopiesKeysUnchangedAndSetsIdNameHidName()
+    public void Create_NormalizesAndKeepsShape()
     {
         var layout = Info("slabwing.info.json");
+        var keys = UserLayoutDraft.KeysFrom(layout);
 
-        var file = UserLayoutDraft.Create(layout, "  My Slabwing!  ", "  Slabwing  ", ["my-slabwing"]);
+        var file = UserLayoutDraft.Create(keys, "  My Slabwing!  ", "  Slabwing  ", ["my-slabwing"]);
 
         Assert.Equal("my-slabwing-2", file.Id);
         Assert.Equal("My Slabwing!", file.Name);
@@ -190,14 +192,47 @@ public sealed class UserLayoutDraftTests : IDisposable
         Assert.Equal(UserLayoutFile.CurrentSchemaVersion, file.SchemaVersion);
 
         Assert.Equal(layout.Keys.Count, file.Keys.Count);
+        var dx = file.Keys[0].X - layout.Keys[0].X;
+        var dy = file.Keys[0].Y - layout.Keys[0].Y;
         for (var i = 0; i < layout.Keys.Count; i++)
         {
             var src = layout.Keys[i];
             var dst = file.Keys[i];
-            Assert.Equal(
-                (src.X, src.Y, src.Width, src.Height, src.Rotation, src.Rx, src.Ry),
-                (dst.X, dst.Y, dst.W, dst.H, dst.R, dst.Rx, dst.Ry));
+            Assert.Equal(src.Width, dst.W);
+            Assert.Equal(src.Height, dst.H);
+            Assert.Equal(src.Rotation, dst.R);
+            Assert.Equal(keys[i].Hand, dst.Hand);
+            // normalisation only translates — every key moved by the same offset
+            Assert.Equal(dx, dst.X - src.X);
+            Assert.Equal(dy, dst.Y - src.Y);
         }
+
+        var (minX, minY, _, _) = UserLayoutGeometry.RotatedBounds(file.Keys);
+        Assert.True(minX is >= 0 and < 1, $"min rotated X is {minX}");
+        Assert.True(minY is >= 0 and < 1, $"min rotated Y is {minY}");
+    }
+
+    [Fact]
+    public void KeysFrom_UsesSavedHands_WhenTheyCoverEveryKey()
+    {
+        // Centres 50 and 150 split at midline 100 — the saved hands win.
+        var layout = new ImportedLayout(
+            "saved", LayoutSource.UserLayout, [Key(0), Key(100)], [], [Hand.Right, Hand.Right]);
+
+        var keys = UserLayoutDraft.KeysFrom(layout);
+
+        Assert.Equal(new[] { Hand.Right, Hand.Right }, keys.Select(k => k.Hand));
+    }
+
+    [Fact]
+    public void KeysFrom_HandCountMismatch_FallsBackToTheMidline()
+    {
+        var layout = new ImportedLayout(
+            "saved", LayoutSource.UserLayout, [Key(0), Key(100)], [], [Hand.Right]);
+
+        var keys = UserLayoutDraft.KeysFrom(layout);
+
+        Assert.Equal(new[] { Hand.Left, Hand.Right }, keys.Select(k => k.Hand));
     }
 
     [Theory]
@@ -206,7 +241,8 @@ public sealed class UserLayoutDraftTests : IDisposable
     [InlineData("   ")]
     public void Create_BlankHidName_BecomesNull(string? hidName)
     {
-        var file = UserLayoutDraft.Create(Info("go60.info.json"), "Go60", hidName, []);
+        var file = UserLayoutDraft.Create(
+            UserLayoutDraft.KeysFrom(Info("go60.info.json")), "Go60", hidName, []);
 
         Assert.Null(file.HidName);
     }
@@ -217,7 +253,7 @@ public sealed class UserLayoutDraftTests : IDisposable
     public void Create_BlankName_Throws(string name)
     {
         Assert.Throws<ArgumentException>(
-            () => UserLayoutDraft.Create(Info("go60.info.json"), name, null, []));
+            () => UserLayoutDraft.Create(UserLayoutDraft.KeysFrom(Info("go60.info.json")), name, null, []));
     }
 
     [Fact]
@@ -227,7 +263,7 @@ public sealed class UserLayoutDraftTests : IDisposable
         {
             Key(0), Key(300, rotation: 18000, rx: 500, ry: 50), Key(700),
         };
-        var file = UserLayoutDraft.Create(Imported(keys), "Rotated Demo", "Demo HID", []);
+        var file = UserLayoutDraft.Create(UserLayoutDraft.KeysFrom(Imported(keys)), "Rotated Demo", "Demo HID", []);
 
         UserLayoutStore.Save(file, _dir);
 
@@ -284,7 +320,7 @@ public sealed class UserLayoutDraftTests : IDisposable
 
     private static void AssertSplit(ImportedLayout layout, int left, int right)
     {
-        var file = UserLayoutDraft.Create(layout, "Test Board", null, []);
+        var file = UserLayoutDraft.Create(UserLayoutDraft.KeysFrom(layout), "Test Board", null, []);
 
         Assert.Equal(left + right, file.Keys.Count);
         Assert.Equal(left, file.Keys.Count(k => k.Hand == Hand.Left));

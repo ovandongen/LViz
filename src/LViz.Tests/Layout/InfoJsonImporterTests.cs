@@ -125,7 +125,7 @@ public class InfoJsonImporterTests
         Assert.Equal(new DtsiKeyPhysical(150, 100, 100, 200, 3000, 175, 250), layout.Keys[1]);
 
         var warning = Assert.Single(layout.Warnings);
-        Assert.Equal("Key 1: rotation without rx/ry, rotating around the key centre", warning);
+        Assert.Equal(new LayoutImportWarning(LayoutWarningCode.RotationWithoutPivot, 1), warning);
     }
 
     [Fact]
@@ -142,7 +142,7 @@ public class InfoJsonImporterTests
         Assert.Equal(900, layout.Keys[0].Rx);
         Assert.Equal(250, layout.Keys[0].Ry);
         Assert.Equal(
-            "Key 0: rotation without rx/ry, rotating around the key centre",
+            new LayoutImportWarning(LayoutWarningCode.RotationWithoutPivot, 0),
             Assert.Single(layout.Warnings));
     }
 

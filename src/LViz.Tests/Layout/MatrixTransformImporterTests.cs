@@ -12,11 +12,6 @@ namespace LViz.Tests.Layout;
 /// </summary>
 public class MatrixTransformImporterTests
 {
-    private const string VisualWarning =
-        "Rough layout from the matrix transform text. Adjust key positions.";
-    private const string GridWarning =
-        "Matrix transform is on one line, so keys follow the matrix wiring. Adjust key positions.";
-
     // ── real fixtures, visual mode ──────────────────────────────────────
 
     [Fact]
@@ -28,7 +23,7 @@ public class MatrixTransformImporterTests
         Assert.Equal("keymap_transform_0", layout.Name);
         Assert.Equal(LayoutSource.MatrixTransform, layout.Source);
         Assert.Equal(56, layout.Keys.Count);
-        Assert.Equal([VisualWarning], layout.Warnings);
+        Assert.Equal([new LayoutImportWarning(LayoutWarningCode.MatrixTransformRough)], layout.Warnings);
     }
 
     [Fact]
@@ -57,7 +52,7 @@ public class MatrixTransformImporterTests
         Assert.Equal("keymap_transform_0", layout.Name);
         Assert.Equal(LayoutSource.MatrixTransform, layout.Source);
         Assert.Equal(82, layout.Keys.Count);
-        Assert.Equal([VisualWarning], layout.Warnings);
+        Assert.Equal([new LayoutImportWarning(LayoutWarningCode.MatrixTransformRough)], layout.Warnings);
         Assert.Equal(Enumerable.Range(0, 8).Select(r => r * 100),
             layout.Keys.Select(k => k.Y).Distinct());
     }
@@ -104,7 +99,7 @@ public class MatrixTransformImporterTests
             "map = < RC(0,0) RC(0,1) RC(1,0) RC(1,1) >;")));
 
         Assert.Equal(LayoutSource.MatrixTransform, layout.Source);
-        Assert.Equal([GridWarning], layout.Warnings);
+        Assert.Equal([new LayoutImportWarning(LayoutWarningCode.MatrixTransformGrid)], layout.Warnings);
         Assert.Equal(
             [
                 new DtsiKeyPhysical(100, 100, 0, 0, 0, 0, 0),
@@ -136,7 +131,7 @@ public class MatrixTransformImporterTests
         var layout = Assert.Single(MatrixTransformImporter.Import(InlineMap(
             "map = <\n" + map + "\n>;")));
 
-        Assert.Equal(VisualWarning, Assert.Single(layout.Warnings));
+        Assert.Equal([new LayoutImportWarning(LayoutWarningCode.MatrixTransformRough)], layout.Warnings);
         Assert.Equal([0, 100, 0, 100], layout.Keys.Select(k => k.X));
         Assert.Equal([0, 0, 100, 100], layout.Keys.Select(k => k.Y));
     }
