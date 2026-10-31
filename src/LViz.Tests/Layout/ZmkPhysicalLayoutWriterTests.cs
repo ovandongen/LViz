@@ -101,7 +101,7 @@ public sealed class ZmkPhysicalLayoutWriterTests : IDisposable
     [Fact]
     public void RoundTrip_FortyTwoKeyGeneratedGrid_KeepsEveryKeyField()
     {
-        var grid = GridLayoutGenerator.Generate(new(true, 3, 6, 3));
+        var grid = GridLayoutGenerator.Generate(new(true, 18, 6, 3));
         var keys = grid.Keys
             .Select(k => new UserLayoutKey(k.X, k.Y, k.Width, k.Height, k.Rotation, k.Rx, k.Ry, Hand.Left))
             .ToList();

@@ -56,6 +56,7 @@ public sealed class LayoutEditorCanvas : Control
     private static readonly Color FallbackBgBase = Color.Parse("#1E1E2E");
     private static readonly Color FallbackAccentBlue = Color.Parse("#89B4FA");
     private static readonly Color FallbackAccentYellow = Color.Parse("#F9E2AF");
+    private static readonly Color FallbackAccentTeal = Color.Parse("#94E2D5");
 
     public static readonly StyledProperty<LayoutEditorViewModel?> EditorProperty =
         AvaloniaProperty.Register<LayoutEditorCanvas, LayoutEditorViewModel?>(nameof(Editor));
@@ -207,6 +208,7 @@ public sealed class LayoutEditorCanvas : Control
 
         DrawKeys(context, ed);
         DrawSplitLine(context, ed);
+        DrawSnapGuides(context, ed);
         DrawRotateHandle(context, ed);
         DrawSelectionBox(context, ed);
     }
@@ -230,12 +232,22 @@ public sealed class LayoutEditorCanvas : Control
         // `new Typeface()` has no family and FontManager throws on it.
         var typeface = new Typeface(FontFamily.Default);
 
+        // Keys touch in units (the MoErgo convention); the gap is drawn. Like
+        // BoardView's per-key margin, but a slightly clearer inset so the
+        // editor doesn't look crammed. The pivot stays put — rotated keys
+        // still swing about their own rotation point.
+        var inset = Math.Max(1, 2 * _scale / MaxScale);
+
         for (var i = 0; i < keys.Count; i++)
         {
             var key = keys[i];
             var rect = new Rect(
                 ToPixel(key.X, key.Y),
                 new Size(key.W * _scale, key.H * _scale));
+            rect = new Rect(
+                rect.X + inset, rect.Y + inset,
+                Math.Max(0, rect.Width - 2 * inset),
+                Math.Max(0, rect.Height - 2 * inset));
             var fill = key.Hand == Hand.Left ? leftFill : rightFill;
             var textBrush = key.Hand == Hand.Left ? leftText : rightText;
             var pen = ed.Selection.Contains(i) ? selected : stroke;
@@ -282,6 +294,32 @@ public sealed class LayoutEditorCanvas : Control
             DashStyle = new DashStyle([4, 3], 0),
         };
         context.DrawLine(pen, new Point(x, 0), new Point(x, Bounds.Height));
+    }
+
+    /// <summary>The edges/centres the current move drag snapped onto — teal so
+    /// they read as feedback, not as structure. Null (the common case) draws
+    /// nothing; 0 is a legitimate guide value.</summary>
+    private void DrawSnapGuides(DrawingContext context, LayoutEditorViewModel ed)
+    {
+        if (ed.SnapGuideX is null && ed.SnapGuideY is null)
+            return;
+
+        var pen = new Pen(Brush("AccentTeal", FallbackAccentTeal), 1)
+        {
+            DashStyle = new DashStyle([2, 2], 0),
+        };
+
+        if (ed.SnapGuideX is { } guideX)
+        {
+            var x = ToPixel(guideX, 0).X;
+            context.DrawLine(pen, new Point(x, 0), new Point(x, Bounds.Height));
+        }
+
+        if (ed.SnapGuideY is { } guideY)
+        {
+            var y = ToPixel(0, guideY).Y;
+            context.DrawLine(pen, new Point(0, y), new Point(Bounds.Width, y));
+        }
     }
 
     private void DrawRotateHandle(DrawingContext context, LayoutEditorViewModel ed)

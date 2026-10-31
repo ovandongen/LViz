@@ -460,7 +460,7 @@ public sealed class LayoutWizardViewModelTests : IDisposable
     }
 
     [Fact]
-    public void GridSource_MatchingLoadedKeymap_LabelsWithoutWarning_ChangedColumnsWarnWithBothCounts()
+    public void GridSource_MatchingLoadedKeymap_LabelsWithoutWarning_ColumnsKeepTheCount_KeysPerHalfWarnWithBothCounts()
     {
         var vm = CreateVm(loadedKeymap: KeymapWithBindings(42));
         Assert.True(vm.GridMatchesKeymap);
@@ -472,7 +472,13 @@ public sealed class LayoutWizardViewModelTests : IDisposable
         Assert.Null(vm.PreviewWarning);
 
         vm.BackCommand.Execute(null);
+        // Columns no longer decide the count: 18 keys per half in 5 columns
+        // is still 42 keys and still matches.
         vm.GridColumns = 5;
+        Assert.Equal(42, vm.GridKeyCount);
+        Assert.True(vm.GridMatchesKeymap);
+
+        vm.GridKeysPerHalf = 15;
         Assert.Equal(36, vm.GridKeyCount);
         Assert.False(vm.GridMatchesKeymap);
 
@@ -490,10 +496,10 @@ public sealed class LayoutWizardViewModelTests : IDisposable
         var raised = new List<string?>();
         vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
 
-        vm.GridRows = 0;
-        Assert.Equal(1, vm.GridRows);
-        vm.GridRows = 20;
-        Assert.Equal(8, vm.GridRows);
+        vm.GridKeysPerHalf = 0;
+        Assert.Equal(1, vm.GridKeysPerHalf);
+        vm.GridKeysPerHalf = 200;
+        Assert.Equal(96, vm.GridKeysPerHalf);
         vm.GridColumns = 0;
         Assert.Equal(1, vm.GridColumns);
         vm.GridThumbKeys = 99;
@@ -524,7 +530,7 @@ public sealed class LayoutWizardViewModelTests : IDisposable
         Assert.True(vm.Editor!.IsModified);
 
         vm.BackCommand.Execute(null);
-        vm.GridRows = 4;
+        vm.GridKeysPerHalf = 24;
         vm.NextCommand.Execute(null);
 
         Assert.NotNull(vm.Editor);
@@ -560,6 +566,158 @@ public sealed class LayoutWizardViewModelTests : IDisposable
 
         Assert.True(vm.GridMatchesKeymap); // 42 bindings match the default answers
         Assert.Contains(nameof(LayoutWizardViewModel.GridMatchesKeymap), raised);
+    }
+
+    // --- keymap default for the grid answers ---
+
+    [Fact]
+    public void GridDefault_NoKeymap_KeepsEighteenPerHalf()
+    {
+        var vm = CreateVm();
+
+        Assert.Equal(18, vm.GridKeysPerHalf);
+        Assert.Equal(42, vm.GridKeyCount);
+    }
+
+    [Fact]
+    public void GridDefault_LoadedKeymap_KeepsEighteenWhenItAlreadyMatches()
+    {
+        var vm = CreateVm(loadedKeymap: KeymapWithBindings(42));
+
+        // 42 / 2 - 3 = 18: the default answer was already the right one.
+        Assert.Equal(18, vm.GridKeysPerHalf);
+        Assert.Equal(42, vm.GridKeyCount);
+        Assert.True(vm.GridMatchesKeymap);
+    }
+
+    [Fact]
+    public void GridDefault_LoadedKeymap_SizesKeysPerHalfToTheBindingCount()
+    {
+        var vm = CreateVm(loadedKeymap: KeymapWithBindings(40));
+
+        Assert.Equal(17, vm.GridKeysPerHalf); // 40 / 2 - 3
+        Assert.Equal(40, vm.GridKeyCount);
+        Assert.True(vm.GridMatchesKeymap);
+    }
+
+    [Fact]
+    public void GridDefault_LoadedKeymap_OddBindingCountRoundsDownAndStillWarns()
+    {
+        var vm = CreateVm(loadedKeymap: KeymapWithBindings(43));
+
+        // 43 / 2 = 21, minus 3 thumbs = 18 — and 42 generated keys don't fit 43.
+        Assert.Equal(18, vm.GridKeysPerHalf);
+        Assert.Equal(42, vm.GridKeyCount);
+        Assert.False(vm.GridMatchesKeymap);
+    }
+
+    [Fact]
+    public void GridDefault_LoadedKeymap_BelowTheFloor_KeepsTheCurrentCount()
+    {
+        var vm = CreateVm(loadedKeymap: KeymapWithBindings(4));
+
+        // 4 / 2 - 3 = -1 < MinKeysPerHalf: no default, the 18 stays.
+        Assert.Equal(18, vm.GridKeysPerHalf);
+        Assert.Equal(42, vm.GridKeyCount);
+
+        // Exactly 0 is below the floor too (1 would apply): 6 / 2 - 3 = 0.
+        var zero = CreateVm(loadedKeymap: KeymapWithBindings(6));
+        Assert.Equal(18, zero.GridKeysPerHalf);
+    }
+
+    [Fact]
+    public async Task GridDefault_ScanSizesTheAnswers_WhenNothingWasEdited()
+    {
+        var root = CreateSlabwingTree(); // 56-binding keymap
+        var vm = CreateVm();
+
+        await vm.LoadSourceAsync(root, isFolder: true);
+
+        Assert.Equal(25, vm.GridKeysPerHalf); // 56 / 2 - 3
+        Assert.Equal(56, vm.GridKeyCount);
+        Assert.True(vm.GridMatchesKeymap);
+    }
+
+    [Fact]
+    public async Task GridDefault_UserCountBeforeScan_SurvivesTheScan()
+    {
+        var root = CreateSlabwingTree();
+        var vm = CreateVm();
+        vm.GridKeysPerHalf = 10;
+
+        await vm.LoadSourceAsync(root, isFolder: true);
+
+        Assert.Equal(10, vm.GridKeysPerHalf);
+    }
+
+    [Fact]
+    public async Task GridDefault_SplitToggleBeforeScan_UsesTheUnibodyFormula()
+    {
+        var root = CreateSlabwingTree();
+        var vm = CreateVm();
+        vm.GridSplit = false;
+
+        await vm.LoadSourceAsync(root, isFolder: true);
+
+        // The toggle is not an edit: a unibody fits all 56 bindings minus 3 thumbs.
+        Assert.Equal(53, vm.GridKeysPerHalf);
+        Assert.Equal(56, vm.GridKeyCount);
+        Assert.True(vm.GridMatchesKeymap);
+    }
+
+    [Fact]
+    public void GridDefault_SplitToggle_ReappliesTheDefault()
+    {
+        var vm = CreateVm(loadedKeymap: KeymapWithBindings(42));
+
+        vm.GridSplit = false;
+        Assert.Equal(39, vm.GridKeysPerHalf); // 42 - 3
+        Assert.True(vm.GridMatchesKeymap);
+
+        vm.GridSplit = true;
+        Assert.Equal(18, vm.GridKeysPerHalf); // 42 / 2 - 3
+        Assert.True(vm.GridMatchesKeymap);
+    }
+
+    [Fact]
+    public void GridDefault_SplitToggleAfterAUserCount_KeepsTheCount()
+    {
+        var vm = CreateVm(loadedKeymap: KeymapWithBindings(42));
+        vm.GridKeysPerHalf = 10;
+
+        vm.GridSplit = false;
+
+        Assert.Equal(10, vm.GridKeysPerHalf);
+    }
+
+    [Fact]
+    public async Task GridDefault_WriteOfTheSameValue_IsNotAnEdit()
+    {
+        // A two-way binding echoing the current value back must not count as
+        // the user's answer.
+        var root = CreateSlabwingTree();
+        var vm = CreateVm();
+        vm.GridKeysPerHalf = 18;
+        vm.GridColumns = 6;
+        vm.GridThumbKeys = 3;
+
+        await vm.LoadSourceAsync(root, isFolder: true);
+
+        Assert.Equal(25, vm.GridKeysPerHalf);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void GridSource_TellsTheEditorWhetherTheBoardIsSplit(bool split)
+    {
+        var vm = CreateVm();
+        vm.UseGridSourceCommand.Execute(null);
+        vm.GridSplit = split;
+        vm.NextCommand.Execute(null);
+
+        Assert.NotNull(vm.Editor);
+        Assert.Equal(split, vm.Editor.IsSplit);
     }
 
     [Fact]

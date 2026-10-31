@@ -65,6 +65,7 @@ public partial class LayoutWizardViewModel : ObservableObject
         _context = context;
         foreach (var name in context.ConnectedDeviceNames)
             ConnectedDeviceNames.Add(name);
+        ApplyGridDefaultFromKeymap();
     }
 
     /// <summary>Folder picker, wired up by the window. Null → command no-ops.</summary>
@@ -142,19 +143,40 @@ public partial class LayoutWizardViewModel : ObservableObject
     // out-of-range; they are stored clamped so GridKeyCount never throws.
     // [ObservableProperty] hooks see the value already stored, so clamping
     // on the way in needs a hand-written SetProperty setter.
-    private int _gridRows = 3;
+    private int _gridKeysPerHalf = 18;
     private int _gridColumns = 6;
     private int _gridThumbKeys = 3;
 
-    /// <summary>Main rows per half (whole board when unsplit).</summary>
-    public int GridRows
+    // The keymap default (ApplyGridDefaultFromKeymap) runs only while the user
+    // has changed none of the three counts (the split toggle re-runs it);
+    // _applyingGridDefault keeps the default's own write through the public
+    // setters from counting as an edit.
+    private bool _gridEditedByUser;
+    private bool _applyingGridDefault;
+
+    /// <summary>A count the user changed (stepper or typing) wins over the
+    /// keymap default for good; our own default write must not count, and a
+    /// write that leaves the value as it was (a binding echoing it back) is
+    /// not a change at all.</summary>
+    private void MarkGridEditedByUser()
     {
-        get => _gridRows;
+        if (!_applyingGridDefault)
+            _gridEditedByUser = true;
+    }
+
+    /// <summary>Main keys per half without thumb keys (all main keys when
+    /// unsplit); the rows follow from this and <see cref="GridColumns"/>.</summary>
+    public int GridKeysPerHalf
+    {
+        get => _gridKeysPerHalf;
         set
         {
-            if (SetProperty(ref _gridRows,
-                    Math.Clamp(value, GridLayoutGenerator.MinRows, GridLayoutGenerator.MaxRows)))
+            if (SetProperty(ref _gridKeysPerHalf,
+                    Math.Clamp(value, GridLayoutGenerator.MinKeysPerHalf, GridLayoutGenerator.MaxKeysPerHalf)))
+            {
+                MarkGridEditedByUser();
                 NotifyGridSummary();
+            }
         }
     }
 
@@ -166,7 +188,10 @@ public partial class LayoutWizardViewModel : ObservableObject
         {
             if (SetProperty(ref _gridColumns,
                     Math.Clamp(value, GridLayoutGenerator.MinColumns, GridLayoutGenerator.MaxColumns)))
+            {
+                MarkGridEditedByUser();
                 NotifyGridSummary();
+            }
         }
     }
 
@@ -178,13 +203,16 @@ public partial class LayoutWizardViewModel : ObservableObject
         {
             if (SetProperty(ref _gridThumbKeys,
                     Math.Clamp(value, GridLayoutGenerator.MinThumbKeys, GridLayoutGenerator.MaxThumbKeys)))
+            {
+                MarkGridEditedByUser();
                 NotifyGridSummary();
+            }
         }
     }
 
     // The generator's limits, for the view's numeric inputs.
-    public int GridMinRows => GridLayoutGenerator.MinRows;
-    public int GridMaxRows => GridLayoutGenerator.MaxRows;
+    public int GridMinKeysPerHalf => GridLayoutGenerator.MinKeysPerHalf;
+    public int GridMaxKeysPerHalf => GridLayoutGenerator.MaxKeysPerHalf;
     public int GridMinColumns => GridLayoutGenerator.MinColumns;
     public int GridMaxColumns => GridLayoutGenerator.MaxColumns;
     public int GridMinThumbKeys => GridLayoutGenerator.MinThumbKeys;
@@ -199,7 +227,7 @@ public partial class LayoutWizardViewModel : ObservableObject
     /// <summary>The key count dressed for the questions panel.</summary>
     public string GridKeyCountText => Loc.Instance.Format("Wizard_GridKeyCountFormat", GridKeyCount);
 
-    private GridLayoutOptions CurrentGridOptions => new(GridSplit, GridRows, GridColumns, GridThumbKeys);
+    private GridLayoutOptions CurrentGridOptions => new(GridSplit, GridKeysPerHalf, GridColumns, GridThumbKeys);
 
     /// <summary>Re-raises the read-only summary lines after an answer or the
     /// keymap they compare against changed.</summary>
@@ -208,6 +236,43 @@ public partial class LayoutWizardViewModel : ObservableObject
         OnPropertyChanged(nameof(GridKeyCount));
         OnPropertyChanged(nameof(GridMatchesKeymap));
         OnPropertyChanged(nameof(GridKeyCountText));
+    }
+
+    // Split vs unibody changes what the keymap default should be, so the toggle
+    // re-runs it instead of counting as an edit.
+    partial void OnGridSplitChanged(bool value) => ApplyGridDefaultFromKeymap();
+
+    /// <summary>
+    /// Default keys per half to the keymap the wizard has: a split board fits
+    /// half the bindings minus the thumb keys, a unibody all of them minus the
+    /// thumbs. Runs only while the user has changed none of the three counts
+    /// (their own edits win for good) and nowhere the result would fall below
+    /// the generator's floor — there the current value simply stays. Called
+    /// whenever <see cref="Keymap"/> gets a new value and when the split
+    /// toggles, never by anything else.
+    /// </summary>
+    private void ApplyGridDefaultFromKeymap()
+    {
+        if (_gridEditedByUser || KeymapKeyCount is not int keymapKeys)
+            return;
+
+        int perHalf = GridSplit
+            ? keymapKeys / 2 - GridThumbKeys
+            : keymapKeys - GridThumbKeys;
+        if (perHalf < GridLayoutGenerator.MinKeysPerHalf)
+            return;
+
+        _applyingGridDefault = true;
+        try
+        {
+            // The public setter clamps to the maximum.
+            GridKeysPerHalf = perHalf;
+            NotifyGridSummary();
+        }
+        finally
+        {
+            _applyingGridDefault = false;
+        }
     }
 
     // --- save step fields (prefilled here, used when saving) ---
@@ -436,7 +501,8 @@ public partial class LayoutWizardViewModel : ObservableObject
             Editor = new LayoutEditorViewModel(
                 generatedKeys,
                 EditorLabels.For(Keymap, generatedKeys.Count, WizardKeyboardId),
-                UserLayoutGeometry.InitialSplitX(generatedKeys));
+                UserLayoutGeometry.InitialSplitX(generatedKeys),
+                isSplit: options.Split);
             _editorSource = options;
 
             // A generated grid carries no importer warnings; only the count check.
@@ -534,6 +600,10 @@ public partial class LayoutWizardViewModel : ObservableObject
         Scan = scan;
 
         ApplyKeymap(read, out var keymapNote, out var keymapLine);
+
+        // A keymap just arrived: default the grid answers to it unless the
+        // user has already touched them.
+        ApplyGridDefaultFromKeymap();
 
         // The keymap the grid summary compares against just changed.
         NotifyGridSummary();

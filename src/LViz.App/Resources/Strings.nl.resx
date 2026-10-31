@@ -1240,7 +1240,7 @@
     <comment/>
   </data>
   <data name="Wizard_Step2Hint" xml:space="preserve">
-    <value>Sleep toetsen om ze te verplaatsen en het ronde handvat om ze te draaien. Shift-klik of sleep een kader om meerdere toetsen te kiezen, houd Option (Alt) ingedrukt om vrij te verplaatsen. Toetsen links van de stippellijn horen bij de linkerhelft.</value>
+    <value>Sleep toetsen om ze te verplaatsen en het ronde handvat om ze te draaien. Toetsen klikken vast aan de randen en middens van toetsen in de buurt, en een toets die je op een andere laat vallen schuift er strak naast; houd Option (Alt) ingedrukt om vrij te verplaatsen. Shift-klik of sleep een kader om meerdere toetsen te kiezen. Toetsen links van de stippellijn horen bij de linkerhelft.</value>
     <comment/>
   </data>
   <data name="Wizard_Step3Header" xml:space="preserve">
@@ -1299,8 +1299,8 @@
     <value>Gesplitst toetsenbord (twee helften)</value>
     <comment/>
   </data>
-  <data name="Wizard_GridRows" xml:space="preserve">
-    <value>Rijen</value>
+  <data name="Wizard_GridKeysPerHalf" xml:space="preserve">
+    <value>Toetsen per helft, zonder duimtoetsen (alle toetsen als het niet gesplitst is)</value>
     <comment/>
   </data>
   <data name="Wizard_GridColumns" xml:space="preserve">
@@ -1316,7 +1316,7 @@
     <comment/>
   </data>
   <data name="Wizard_GridHint" xml:space="preserve">
-    <value>Verspringing en hoeken stel je hierna in de editor in.</value>
+    <value>Toetsen vullen rijen van het aantal kolommen; een kortere laatste rij komt aan de binnenkant. Verspringing en hoeken stel je hierna in de editor in.</value>
     <comment/>
   </data>
   <data name="Picker_AddOwnBoard" xml:space="preserve">
@@ -1333,6 +1333,18 @@
   </data>
   <data name="Picker_EditLayout" xml:space="preserve">
     <value>Layout bewerken…</value>
+    <comment/>
+  </data>
+  <data name="Editor_MirrorLeftToRight" xml:space="preserve">
+    <value>Spiegel links → rechts</value>
+    <comment/>
+  </data>
+  <data name="Editor_MirrorRightToLeft" xml:space="preserve">
+    <value>Spiegel rechts → links</value>
+    <comment/>
+  </data>
+  <data name="Editor_MirrorUnavailableFormat" xml:space="preserve">
+    <value>Spiegelen kan alleen als beide helften evenveel toetsen hebben (nu {0} links, {1} rechts).</value>
     <comment/>
   </data>
 </root>
