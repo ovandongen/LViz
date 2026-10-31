@@ -84,12 +84,12 @@
                 <Grid ColumnDefinitions="Auto,140" RowDefinitions="Auto,Auto,Auto"
                       ColumnSpacing="8" RowSpacing="6" HorizontalAlignment="Left">
                     <TextBlock Grid.Row="0" Grid.Column="0"
-                               Text="{Binding [Wizard_GridRows], Source={StaticResource Loc}}"
+                               Text="{Binding [Wizard_GridKeysPerHalf], Source={StaticResource Loc}}"
                                FontSize="12" Foreground="{StaticResource Text}"
                                VerticalAlignment="Center" />
                     <NumericUpDown Grid.Row="0" Grid.Column="1"
-                                   Value="{Binding GridRows, Mode=TwoWay}"
-                                   Minimum="{Binding GridMinRows}" Maximum="{Binding GridMaxRows}"
+                                   Value="{Binding GridKeysPerHalf, Mode=TwoWay}"
+                                   Minimum="{Binding GridMinKeysPerHalf}" Maximum="{Binding GridMaxKeysPerHalf}"
                                    Increment="1" FormatString="0" />
                     <TextBlock Grid.Row="1" Grid.Column="0"
                                Text="{Binding [Wizard_GridColumns], Source={StaticResource Loc}}"
@@ -176,10 +176,25 @@
                            FontSize="12" TextWrapping="Wrap"
                            Foreground="{StaticResource AccentYellow}"
                            IsVisible="{Binding PreviewWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                <Button Content="{Binding [Wizard_Reset], Source={StaticResource Loc}}"
-                        Command="{Binding Editor.ResetCommand}"
-                        IsEnabled="{Binding Editor.IsModified}"
-                        HorizontalAlignment="Right" />
+                <DockPanel>
+                    <Button DockPanel.Dock="Right"
+                            Content="{Binding [Wizard_Reset], Source={StaticResource Loc}}"
+                            Command="{Binding Editor.ResetCommand}"
+                            IsEnabled="{Binding Editor.IsModified}" />
+                    <DockPanel IsVisible="{Binding Editor.IsSplit}">
+                        <Button DockPanel.Dock="Left" Margin="0,0,8,0"
+                                Content="{Binding [Editor_MirrorLeftToRight], Source={StaticResource Loc}}"
+                                Command="{Binding Editor.MirrorLeftToRightCommand}" />
+                        <Button DockPanel.Dock="Left" Margin="0,0,8,0"
+                                Content="{Binding [Editor_MirrorRightToLeft], Source={StaticResource Loc}}"
+                                Command="{Binding Editor.MirrorRightToLeftCommand}" />
+                        <TextBlock Text="{Binding Editor.MirrorHint}"
+                                   FontSize="12" TextWrapping="Wrap"
+                                   Foreground="{StaticResource TextSubtle}"
+                                   VerticalAlignment="Center"
+                                   IsVisible="{Binding Editor.MirrorHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </DockPanel>
+                </DockPanel>
             </StackPanel>
 
             <Border BorderBrush="{StaticResource BgSurface0}" BorderThickness="1" CornerRadius="6"

@@ -46,6 +46,24 @@
                    FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource Text}"
                    Margin="0,0,0,10" />
 
+        <!-- Mirror toolbar — the wizard's adjust-step buttons, split boards
+             only; the hint is the VM's reason text, shown only while mirroring
+             is unavailable. -->
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,10"
+                   IsVisible="{Binding Editor.IsSplit}">
+            <Button DockPanel.Dock="Left" Margin="0,0,8,0"
+                    Content="{Binding [Editor_MirrorLeftToRight], Source={StaticResource Loc}}"
+                    Command="{Binding Editor.MirrorLeftToRightCommand}" />
+            <Button DockPanel.Dock="Left" Margin="0,0,8,0"
+                    Content="{Binding [Editor_MirrorRightToLeft], Source={StaticResource Loc}}"
+                    Command="{Binding Editor.MirrorRightToLeftCommand}" />
+            <TextBlock Text="{Binding Editor.MirrorHint}"
+                       FontSize="12" TextWrapping="Wrap"
+                       Foreground="{StaticResource TextSubtle}"
+                       VerticalAlignment="Center"
+                       IsVisible="{Binding Editor.MirrorHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </DockPanel>
+
         <Border BorderBrush="{StaticResource BgSurface0}" BorderThickness="1" CornerRadius="6"
                 Background="{StaticResource BgBase}" Padding="12">
             <views:LayoutEditorCanvas x:Name="Canvas" Editor="{Binding Editor}" />

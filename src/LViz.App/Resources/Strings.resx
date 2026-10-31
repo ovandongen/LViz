@@ -1240,7 +1240,7 @@
     <comment/>
   </data>
   <data name="Wizard_Step2Hint" xml:space="preserve">
-    <value>Drag keys to move them and the round handle to rotate them. Shift-click or drag a box to select several keys, hold Option (Alt) to move without snapping. Keys left of the dashed line belong to the left half.</value>
+    <value>Drag keys to move them and the round handle to rotate them. Keys snap to the edges and centres of nearby keys, and a key dropped onto another is pushed flush against it; hold Option (Alt) to move freely. Shift-click or drag a box to select several keys. Keys left of the dashed line belong to the left half.</value>
     <comment/>
   </data>
   <data name="Wizard_Step3Header" xml:space="preserve">
@@ -1299,8 +1299,8 @@
     <value>Split keyboard (two halves)</value>
     <comment/>
   </data>
-  <data name="Wizard_GridRows" xml:space="preserve">
-    <value>Rows</value>
+  <data name="Wizard_GridKeysPerHalf" xml:space="preserve">
+    <value>Keys per half, without thumb keys (all keys when not split)</value>
     <comment/>
   </data>
   <data name="Wizard_GridColumns" xml:space="preserve">
@@ -1316,7 +1316,7 @@
     <comment/>
   </data>
   <data name="Wizard_GridHint" xml:space="preserve">
-    <value>Stagger and angles come next, in the editor.</value>
+    <value>Keys fill rows of the column count; a shorter last row sits on the inner side. Stagger and angles come next, in the editor.</value>
     <comment/>
   </data>
   <data name="Picker_AddOwnBoard" xml:space="preserve">
@@ -1333,6 +1333,18 @@
   </data>
   <data name="Picker_EditLayout" xml:space="preserve">
     <value>Edit layout…</value>
+    <comment/>
+  </data>
+  <data name="Editor_MirrorLeftToRight" xml:space="preserve">
+    <value>Mirror left → right</value>
+    <comment/>
+  </data>
+  <data name="Editor_MirrorRightToLeft" xml:space="preserve">
+    <value>Mirror right → left</value>
+    <comment/>
+  </data>
+  <data name="Editor_MirrorUnavailableFormat" xml:space="preserve">
+    <value>Mirroring needs the same number of keys on both halves (now {0} left, {1} right).</value>
     <comment/>
   </data>
 </root>

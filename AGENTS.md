@@ -91,7 +91,9 @@ dotnet run --project src/LViz.App                  # launch the app
 - **Localization via `.resx` + `Loc` singleton.** Both `Strings.resx` (EN
   base) and `Strings.nl.resx` live in `App/Resources/`. Bind UI strings via
   `{Binding [Key_Name], Source={StaticResource Loc}}`. If you add a string,
-  add it to both `.resx` files.
+  add it to both `.resx` files. No test compares the two key sets, and `Loc`
+  shows `[Key]` for a missing key instead of failing, so diff the key lists
+  yourself.
 - **Diagnostics log at `ApplicationData/LViz/diagnostic.log`**
   (`~/Library/Application Support/LViz/` on macOS; confirm via
   `DiagnosticLog.GetLogFilePath()`).
@@ -159,6 +161,23 @@ dotnet run --project src/LViz.App                  # launch the app
   only a file with that marker is ever overwritten, and the scanner skips an
   export whose `<id>.layout.json` twin sits next to it. A saved-layout
   candidate (`ImportedLayout.SavedId`) is saved back under its own id.
+- **Layout editor snapping and mirroring.** A move drag goes through
+  `UserLayoutGeometry.SnapMove`: neighbour edges, centres and flush within the
+  press tolerance, else the 0.25u grid, then a move that leaves an *unrotated*
+  key overlapping another is pushed flush the shortest free way. Free
+  (Option/Alt) skips all of it; the arrow-key nudge stays on the grid. So a
+  test that drags a key sideways into a touching neighbour sees it pushed
+  back: drag away from neighbours unless the push is what you test.
+  `Mirror(keys, from)` flips about the middle between the halves' average key
+  centres, not the split line (that only decides hands). The mirror toolbar
+  shows only when `LayoutEditorViewModel.IsSplit`: the wizard's grid path
+  passes its split answer, everything else falls back to `HasSplitGap`
+  (innermost centres ≥ 1.25u apart). Bounding-box gaps don't work for that:
+  Corne's angled inner thumbs overlap in X.
+- **Wizard grid default from the keymap.** Keys per half defaults to the
+  keymap until the user *changes* one of the three counts (a write of the
+  same value, e.g. a binding echo, doesn't count); the split toggle re-runs
+  the default rather than ending it.
 - **Per-key label overrides are scoped `(profileId, layerIndex, keyIndex)`**
   → `KeyLabelOverride` (main label, subscript, top-left badge, FA icon,
   font size, bold). Persisted via `UserSettings.KeyLabelOverrides` through
