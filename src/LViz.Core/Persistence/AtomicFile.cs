@@ -31,12 +31,14 @@ public static class AtomicFile
         }
     }
 
-    public static void WriteAllText(string path, string content)
+    public static void WriteAllText(string path, string content) =>
+        WriteAllBytes(path, Encoding.UTF8.GetBytes(content));
+
+    public static void WriteAllBytes(string path, byte[] bytes)
     {
         var tmp = path + ".tmp";
         try
         {
-            var bytes = Encoding.UTF8.GetBytes(content);
             using (var fs = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 fs.Write(bytes, 0, bytes.Length);

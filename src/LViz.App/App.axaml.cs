@@ -315,6 +315,28 @@ public partial class App : Application
                 });
             };
 
+            // "Edit layout…": modal, closes with null (cancel) or the edited
+            // file, which refreshes the board in place. Nothing to edit when
+            // a bundled board is active.
+            viewModel.EditLayoutRequested = () =>
+            {
+                var ctx = viewModel.GetLayoutEditContext();
+                if (ctx is null)
+                    return;
+                var dlgVm = new LayoutEditWindowViewModel(ctx);
+                var dlg = new LayoutEditWindow
+                {
+                    DataContext = dlgVm,
+                    Topmost = mainWindow.Topmost,
+                };
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    var result = await dlg.ShowDialog<UserLayoutFile?>(mainWindow);
+                    if (result is not null)
+                        viewModel.ApplyEditedLayout(result);
+                });
+            };
+
             viewModel.CopyDiagnosticsRequested = async () =>
             {
                 try

@@ -1,3 +1,5 @@
+using LViz.Core.Layout;
+using LViz.Core.Layout.Dtsi;
 using LViz.Core.Layout.Import;
 using Xunit;
 
@@ -271,6 +273,126 @@ public sealed class ZmkConfigScannerTests : IDisposable
         Assert.Equal("notes.txt: unsupported file type", Assert.Single(scan.Problems));
     }
 
+    // --- saved layouts (*.layout.json from an earlier wizard run) ---
+
+    [Fact]
+    public void ScanFolder_SavedLayout_IsFirstCandidate_AndCarriesNameKeysAndHands()
+    {
+        var root = CreateSlabwingTree();
+        var saved = SavedSlabwingLayout();
+        UserLayoutStore.Save(saved, Path.Combine(root, "config"));
+        var savedPath = Path.Combine(root, "config", "slabwing.layout.json");
+
+        var scan = ZmkConfigScanner.ScanFolder(root);
+
+        var first = scan.Candidates[0];
+        Assert.Equal(LayoutSource.UserLayout, first.Layout.Source);
+        Assert.Equal(savedPath, first.FilePath);
+        Assert.Equal("Slabwing", first.Layout.Name);
+        Assert.Equal(56, first.Layout.Keys.Count);
+        Assert.Equal(saved.Keys.Select(k => k.Hand), first.Layout.Hands);
+        // The old candidates follow in their old order.
+        Assert.Equal(
+            new (LayoutSource, string)[]
+            {
+                (LayoutSource.UserLayout, savedPath),
+                (LayoutSource.InfoJson, Path.Combine(root, "config", "info.json")),
+                (LayoutSource.MatrixTransform,
+                    Path.Combine(root, "boards", "shields", "slabwing", "slabwing.overlay")),
+            },
+            scan.Candidates.Select(c => (c.Layout.Source, c.FilePath)));
+        Assert.Empty(scan.Problems);
+    }
+
+    [Fact]
+    public void ScanFolder_SavedLayout_CarriesItsId()
+    {
+        var root = CreateSlabwingTree();
+        UserLayoutStore.Save(SavedSlabwingLayout(), Path.Combine(root, "config"));
+
+        var scan = ZmkConfigScanner.ScanFolder(root);
+
+        Assert.Equal("slabwing", scan.Candidates[0].Layout.SavedId);
+        Assert.All(scan.Candidates.Skip(1), c => Assert.Null(c.Layout.SavedId));
+    }
+
+    [Fact]
+    public void ScanFolder_GeneratedDtsiNextToItsLayout_IsNoExtraCandidate()
+    {
+        var root = CreateSlabwingTree();
+        var config = Path.Combine(root, "config");
+        UserLayoutStore.Save(SavedSlabwingLayout(), config);
+        ZmkPhysicalLayoutWriter.WriteNextTo(SavedSlabwingLayout(), config, createIfMissing: true);
+
+        var scan = ZmkConfigScanner.ScanFolder(root);
+
+        Assert.Equal(
+            [LayoutSource.UserLayout, LayoutSource.InfoJson, LayoutSource.MatrixTransform],
+            scan.Candidates.Select(c => c.Layout.Source));
+        Assert.Empty(scan.Problems);
+    }
+
+    [Fact]
+    public void ScanFolder_GeneratedDtsiWithoutItsLayout_StaysACandidate()
+    {
+        var root = CreateSlabwingTree();
+        var config = Path.Combine(root, "config");
+        ZmkPhysicalLayoutWriter.WriteNextTo(SavedSlabwingLayout(), config, createIfMissing: true);
+
+        var scan = ZmkConfigScanner.ScanFolder(root);
+
+        Assert.Contains(scan.Candidates, c =>
+            c.Layout.Source == LayoutSource.PhysicalLayout
+            && c.FilePath == Path.Combine(config, "slabwing.dtsi"));
+    }
+
+    [Fact]
+    public void Rank_SavedLayout_StaysFirstWithMatchingKeyCount()
+    {
+        var root = CreateSlabwingTree();
+        UserLayoutStore.Save(SavedSlabwingLayout(), Path.Combine(root, "config"));
+
+        var ranked = ZmkConfigScanner.Rank(ZmkConfigScanner.ScanFolder(root).Candidates, 56);
+
+        Assert.Equal(
+            [LayoutSource.UserLayout, LayoutSource.InfoJson, LayoutSource.MatrixTransform],
+            ranked.Select(c => c.Layout.Source));
+    }
+
+    [Fact]
+    public void ScanFolder_BrokenSavedLayout_IsReportedOnce_AndScanContinues()
+    {
+        var root = CreateSlabwingTree();
+        WriteFile(root, "config/broken.layout.json", "{ this is not json");
+
+        var scan = ZmkConfigScanner.ScanFolder(root);
+
+        var problem = Assert.Single(scan.Problems);
+        Assert.StartsWith(
+            Path.Combine("config", "broken.layout.json") + ": layout file: ", problem);
+        // The other candidates are untouched.
+        Assert.Equal(
+            [LayoutSource.InfoJson, LayoutSource.MatrixTransform],
+            scan.Candidates.Select(c => c.Layout.Source));
+    }
+
+    [Fact]
+    public void ScanFile_LayoutJson_ReturnsThatOneCandidate()
+    {
+        var root = CreateSlabwingTree();
+        UserLayoutStore.Save(SavedSlabwingLayout(), Path.Combine(root, "config"));
+        var savedPath = Path.Combine(root, "config", "slabwing.layout.json");
+
+        var scan = ZmkConfigScanner.ScanFile(savedPath);
+
+        var candidate = Assert.Single(scan.Candidates);
+        Assert.Equal(LayoutSource.UserLayout, candidate.Layout.Source);
+        Assert.Equal(savedPath, candidate.FilePath);
+        Assert.Equal("Slabwing", candidate.Layout.Name);
+        Assert.Equal(56, candidate.Layout.Keys.Count);
+        Assert.Empty(scan.Problems);
+    }
+
     // --- tree builders ---
 
     private string CreateTempRoot()
@@ -302,6 +424,16 @@ public sealed class ZmkConfigScannerTests : IDisposable
         WriteFile(root, "config/slabwing.keymap", "/* keymap */");
         WriteFile(root, "tests/slabwing_matrix_test.keymap", "/* matrix test keymap */");
         return root;
+    }
+
+    /// <summary>A wizard-saved 56-key slabwing layout: 28 left keys, 28 right keys.</summary>
+    private static UserLayoutFile SavedSlabwingLayout()
+    {
+        var keys = new List<UserLayoutKey>();
+        for (var i = 0; i < 56; i++)
+            keys.Add(new UserLayoutKey(i * 100, 0, 100, 100, 0, 0, 0, i < 28 ? Hand.Left : Hand.Right));
+        return new UserLayoutFile(
+            UserLayoutFile.CurrentSchemaVersion, "slabwing", "Slabwing", "Slabwing", keys);
     }
 
     private static string KconfigDefconfig(string name) => $"""

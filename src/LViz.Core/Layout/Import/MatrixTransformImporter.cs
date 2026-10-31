@@ -20,10 +20,6 @@ namespace LViz.Core.Layout.Import;
 public static class MatrixTransformImporter
 {
     private const string Compatible = "zmk,matrix-transform";
-    private const string VisualWarning =
-        "Rough layout from the matrix transform text. Adjust key positions.";
-    private const string GridWarning =
-        "Matrix transform is on one line, so keys follow the matrix wiring. Adjust key positions.";
 
     private static readonly Regex TokenPattern =
         new(@"RC\(\s*\d+\s*,\s*\d+\s*\)", RegexOptions.Compiled);
@@ -88,7 +84,9 @@ public static class MatrixTransformImporter
         var keys = rowStarts.Count >= 2
             ? VisualKeys(placements, rowStarts)
             : GridKeys(placements);
-        var warning = rowStarts.Count >= 2 ? VisualWarning : GridWarning;
+        var warning = rowStarts.Count >= 2
+            ? new LayoutImportWarning(LayoutWarningCode.MatrixTransformRough)
+            : new LayoutImportWarning(LayoutWarningCode.MatrixTransformGrid);
 
         return new ImportedLayout(node.Name, LayoutSource.MatrixTransform, keys, [warning]);
     }

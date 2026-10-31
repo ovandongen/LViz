@@ -81,6 +81,16 @@ public class MainWindowViewModelLayoutWizardTests
         [.. Enumerable.Range(0, keyCount)
             .Select(i => new UserLayoutKey(i * 100, 0, 100, 100, 0, 0, 0, Hand.Left))]);
 
+    // Same "myboard" 7-key row, but key 0 dragged to X 500 — a geometry-only
+    // edit like the "Edit layout…" window produces.
+    private static UserLayoutFile EditedLayout(int key0X) => new(
+        UserLayoutFile.CurrentSchemaVersion,
+        "myboard",
+        "My Board",
+        null,
+        [.. Enumerable.Range(0, 7)
+            .Select(i => new UserLayoutKey(i == 0 ? key0X : i * 100, 0, 100, 100, 0, 0, 0, Hand.Left))]);
+
     [Fact]
     public void AddOwnBoardCommand_InvokesCallback()
     {
@@ -198,5 +208,140 @@ public class MainWindowViewModelLayoutWizardTests
         {
             KeyboardProfileRegistry.SetUserProfiles([]);
         }
+    }
+
+    [Fact]
+    public void CanEditLayout_FalseOnBundledBoard_TrueAfterWizardResult()
+    {
+        var vm = new MainWindowViewModel(
+            new InMemorySettingsService(), keymapState: new FakeKeymapStateService());
+        KeyboardProfileRegistry.SetUserProfiles([]);
+        try
+        {
+            Assert.False(vm.CanEditLayout);
+
+            var raised = new List<string?>();
+            vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+            vm.ApplyLayoutWizardResult(new LayoutWizardResult(Layout("myboard", 7), KeymapPathToLoad: null));
+
+            Assert.True(vm.CanEditLayout);
+            Assert.Contains("CanEditLayout", raised);
+        }
+        finally
+        {
+            KeyboardProfileRegistry.SetUserProfiles([]);
+        }
+    }
+
+    [Fact]
+    public void GetLayoutEditContext_NullOnBundledBoard_SnapshotsUserLayout()
+    {
+        var vm = new MainWindowViewModel(
+            new InMemorySettingsService(), keymapState: new FakeKeymapStateService());
+        KeyboardProfileRegistry.SetUserProfiles([]);
+        try
+        {
+            Assert.Null(vm.GetLayoutEditContext());
+
+            vm.ApplyLayoutWizardResult(new LayoutWizardResult(Layout("myboard", 7), KeymapPathToLoad: null));
+
+            var ctx = vm.GetLayoutEditContext();
+            Assert.NotNull(ctx);
+            Assert.Equal("myboard", ctx.Layout.Id);
+            // No keymap loaded → bare index captions, one per key.
+            Assert.Equal(7, ctx.Labels.Count);
+            Assert.Equal(UserLayoutStore.DefaultDirectory, ctx.LayoutsDirectory);
+        }
+        finally
+        {
+            KeyboardProfileRegistry.SetUserProfiles([]);
+        }
+    }
+
+    [Fact]
+    public void ApplyEditedLayout_SelectedId_ReplacesProfileAndRefreshesGeometry()
+    {
+        var vm = new MainWindowViewModel(
+            new InMemorySettingsService(), keymapState: new FakeKeymapStateService());
+        KeyboardProfileRegistry.SetUserProfiles([]);
+        try
+        {
+            vm.ApplyLayoutWizardResult(new LayoutWizardResult(Layout("myboard", 7), KeymapPathToLoad: null));
+            var old = vm.SelectedKeyboard;
+            var key0X = vm.Keys[0].Position.X;
+
+            // Key 0 at X 500 instead of 0 — a geometry-only edit under the
+            // selected id. SelectKeyboard's same-id early return must NOT
+            // leave the old board on screen.
+            vm.ApplyEditedLayout(EditedLayout(500));
+
+            Assert.NotSame(old, vm.SelectedKeyboard);
+            Assert.Equal("user:myboard", vm.SelectedKeyboard.Id);
+            Assert.NotEqual(key0X, vm.Keys[0].Position.X);
+        }
+        finally
+        {
+            KeyboardProfileRegistry.SetUserProfiles([]);
+        }
+    }
+
+    [Fact]
+    public void ApplyEditedLayout_SelectedId_KeepsFittingKeymapPainted()
+    {
+        var keymap = new FakeKeymapStateService();
+        var vm = new MainWindowViewModel(new InMemorySettingsService(), keymapState: keymap);
+        KeyboardProfileRegistry.SetUserProfiles([]);
+        try
+        {
+            keymap.Result = Success(KeymapWith(7), "odd.keymap");
+            vm.LoadLayoutFromPath("odd.keymap");
+            vm.ApplyLayoutWizardResult(new LayoutWizardResult(Layout("myboard", 7), KeymapPathToLoad: null));
+            Assert.True(vm.HasLayoutLoaded);
+
+            vm.ApplyEditedLayout(Layout("myboard", 7));
+
+            Assert.True(vm.HasLayoutLoaded);
+            // Rebuilt key VMs must come back painted, not blank.
+            Assert.All(vm.Keys, k => Assert.Equal("A", k.Label));
+        }
+        finally
+        {
+            KeyboardProfileRegistry.SetUserProfiles([]);
+        }
+    }
+
+    [Fact]
+    public void ApplyLayoutWizardResult_TwiceSameId_RefreshesKeyCount()
+    {
+        var vm = new MainWindowViewModel(
+            new InMemorySettingsService(), keymapState: new FakeKeymapStateService());
+        KeyboardProfileRegistry.SetUserProfiles([]);
+        try
+        {
+            vm.ApplyLayoutWizardResult(new LayoutWizardResult(Layout("myboard", 7), KeymapPathToLoad: null));
+            Assert.Equal(7, vm.Keys.Count);
+
+            vm.ApplyLayoutWizardResult(new LayoutWizardResult(Layout("myboard", 9), KeymapPathToLoad: null));
+
+            Assert.Equal(9, vm.Keys.Count);
+        }
+        finally
+        {
+            KeyboardProfileRegistry.SetUserProfiles([]);
+        }
+    }
+
+    [Fact]
+    public void EditLayoutCommand_InvokesCallback()
+    {
+        var vm = new MainWindowViewModel(
+            new InMemorySettingsService(), keymapState: new FakeKeymapStateService());
+
+        var invoked = false;
+        vm.EditLayoutRequested = () => invoked = true;
+        vm.EditLayoutCommand.Execute(null);
+
+        Assert.True(invoked);
     }
 }

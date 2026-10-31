@@ -2,11 +2,12 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LViz.App.Localization;
-using LViz.App.Services;
 using LViz.Core.Keymap;
 using LViz.Core.Keymap.Parser;
 using LViz.Core.Layout;
+using LViz.Core.Layout.Dtsi;
 using LViz.Core.Layout.Import;
+using LViz.Core.Persistence;
 
 namespace LViz.App.ViewModels;
 
@@ -38,16 +39,21 @@ public sealed record LayoutCandidateItem(
     bool MatchesKeymap);
 
 /// <summary>
-/// View model behind the three-step layout wizard window (source → preview →
+/// View model behind the three-step layout wizard window (source → adjust →
 /// save). The source step scans a zmk-config folder or file, chooses the
 /// keymap to rank and label against, ranks the candidates, and pre-fills
-/// name, device name and the "also save into the config folder" flag. The
-/// preview step renders the selected candidate through <c>BoardView</c> via
-/// <see cref="IBoardSurface"/> with the keymap's base-layer labels; save
-/// writes the drafted layout through <see cref="UserLayoutStore"/> and closes
-/// with a <see cref="LayoutWizardResult"/>.
+/// name, device name and the "also save into the config folder" flag — or,
+/// when the user has no board files, answers a few "build from questions"
+/// inputs that <see cref="GridLayoutGenerator"/> turns into a plain grid.
+/// The adjust step hosts a <see cref="LayoutEditorViewModel"/> built from
+/// that source (labels from the keymap's base layer, geometry
+/// editable); save writes the edited, normalised keys through
+/// <see cref="UserLayoutStore"/> — plus a <c>.dtsi</c> export via
+/// <see cref="ZmkPhysicalLayoutWriter"/> unless the candidate itself came
+/// from a physical-layout dtsi — and closes with a
+/// <see cref="LayoutWizardResult"/>.
 /// </summary>
-public partial class LayoutWizardViewModel : ObservableObject, IBoardSurface
+public partial class LayoutWizardViewModel : ObservableObject
 {
     /// <summary>Keyboard id given to keymaps the wizard parses for itself.</summary>
     private const string WizardKeyboardId = "layout-wizard";
@@ -59,17 +65,6 @@ public partial class LayoutWizardViewModel : ObservableObject, IBoardSurface
         _context = context;
         foreach (var name in context.ConnectedDeviceNames)
             ConnectedDeviceNames.Add(name);
-
-        // BoardView needs a layout to bind from before the first candidate is
-        // selected; a one-key stand-in keeps the canvas valid until
-        // SetProfile re-targets it in the preview.
-        BoardLayout = new BoardLayoutViewModel(new UserLayoutProfile(new UserLayoutFile(
-            UserLayoutFile.CurrentSchemaVersion,
-            "preview",
-            "preview",
-            null,
-            [new UserLayoutKey(0, 0, 100, 100, 0, 0, 0, Hand.Right)])));
-        BoardStyle = new BoardStyleViewModel(AppTheme.PressHighlightDefaultHex);
     }
 
     /// <summary>Folder picker, wired up by the window. Null → command no-ops.</summary>
@@ -129,6 +124,92 @@ public partial class LayoutWizardViewModel : ObservableObject, IBoardSurface
     [NotifyCanExecuteChangedFor(nameof(NextCommand))]
     private bool _isScanning;
 
+    // --- build from questions (grid source) ---
+
+    /// <summary>True when the layout comes from the questions below instead of
+    /// scanned board files; the toggle is always available on step 0.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(NextCommand))]
+    private bool _isGridSource;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(GridKeyCount))]
+    [NotifyPropertyChangedFor(nameof(GridMatchesKeymap))]
+    [NotifyPropertyChangedFor(nameof(GridKeyCountText))]
+    private bool _gridSplit = true;
+
+    // The three numbers arrive from steppers or typing and may be
+    // out-of-range; they are stored clamped so GridKeyCount never throws.
+    // [ObservableProperty] hooks see the value already stored, so clamping
+    // on the way in needs a hand-written SetProperty setter.
+    private int _gridRows = 3;
+    private int _gridColumns = 6;
+    private int _gridThumbKeys = 3;
+
+    /// <summary>Main rows per half (whole board when unsplit).</summary>
+    public int GridRows
+    {
+        get => _gridRows;
+        set
+        {
+            if (SetProperty(ref _gridRows,
+                    Math.Clamp(value, GridLayoutGenerator.MinRows, GridLayoutGenerator.MaxRows)))
+                NotifyGridSummary();
+        }
+    }
+
+    /// <summary>Columns per half (whole board when unsplit).</summary>
+    public int GridColumns
+    {
+        get => _gridColumns;
+        set
+        {
+            if (SetProperty(ref _gridColumns,
+                    Math.Clamp(value, GridLayoutGenerator.MinColumns, GridLayoutGenerator.MaxColumns)))
+                NotifyGridSummary();
+        }
+    }
+
+    /// <summary>Thumb keys per half (whole board when unsplit).</summary>
+    public int GridThumbKeys
+    {
+        get => _gridThumbKeys;
+        set
+        {
+            if (SetProperty(ref _gridThumbKeys,
+                    Math.Clamp(value, GridLayoutGenerator.MinThumbKeys, GridLayoutGenerator.MaxThumbKeys)))
+                NotifyGridSummary();
+        }
+    }
+
+    // The generator's limits, for the view's numeric inputs.
+    public int GridMinRows => GridLayoutGenerator.MinRows;
+    public int GridMaxRows => GridLayoutGenerator.MaxRows;
+    public int GridMinColumns => GridLayoutGenerator.MinColumns;
+    public int GridMaxColumns => GridLayoutGenerator.MaxColumns;
+    public int GridMinThumbKeys => GridLayoutGenerator.MinThumbKeys;
+    public int GridMaxThumbKeys => GridLayoutGenerator.MaxThumbKeys;
+
+    /// <summary>How many keys the current answers would generate.</summary>
+    public int GridKeyCount => GridLayoutGenerator.KeyCount(CurrentGridOptions);
+
+    /// <summary>Whether the generated board fits the keymap's base layer.</summary>
+    public bool GridMatchesKeymap => KeymapKeyCount == GridKeyCount;
+
+    /// <summary>The key count dressed for the questions panel.</summary>
+    public string GridKeyCountText => Loc.Instance.Format("Wizard_GridKeyCountFormat", GridKeyCount);
+
+    private GridLayoutOptions CurrentGridOptions => new(GridSplit, GridRows, GridColumns, GridThumbKeys);
+
+    /// <summary>Re-raises the read-only summary lines after an answer or the
+    /// keymap they compare against changed.</summary>
+    private void NotifyGridSummary()
+    {
+        OnPropertyChanged(nameof(GridKeyCount));
+        OnPropertyChanged(nameof(GridMatchesKeymap));
+        OnPropertyChanged(nameof(GridKeyCountText));
+    }
+
     // --- save step fields (prefilled here, used when saving) ---
 
     [ObservableProperty]
@@ -149,22 +230,34 @@ public partial class LayoutWizardViewModel : ObservableObject, IBoardSurface
 
     // --- state the preview/save steps read ---
 
-    internal LoadedKeymap? Keymap { get; private set; }
+    /// <summary>The keymap the wizard ranks and labels with: the one LViz
+    /// already has open (from the first breath), else the one the last scan
+    /// parsed for itself (null when even that failed to read).</summary>
+    internal LoadedKeymap? Keymap => _scannedKeymap ?? _context.LoadedKeymap;
+
+    /// <summary>Keymap the last scan parsed; null when it found or read none,
+    /// or when the loaded keymap is in charge.</summary>
+    private LoadedKeymap? _scannedKeymap;
+
     internal string? KeymapPathToLoad { get; private set; }
     internal ZmkConfigScan? Scan { get; private set; }
 
-    // --- preview step (IBoardSurface for BoardView) ---
+    // --- adjust step (shared layout editor) ---
 
-    public ObservableCollection<KeyViewModel> LeftKeys { get; } = [];
-    public ObservableCollection<KeyViewModel> RightKeys { get; } = [];
+    /// <summary>
+    /// The adjust step's editor for the selected candidate. Built when the
+    /// user leaves step 0 (see <see cref="EnsureEditor"/>), kept across
+    /// Back/Next until the candidate or the scan changes, and null again when
+    /// the candidate is dropped.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private LayoutEditorViewModel? _editor;
 
-    public BoardLayoutViewModel BoardLayout { get; }
-    public BoardStyleViewModel BoardStyle { get; }
-
-    // The preview is static — no combo badges, and taps do nothing.
-    public bool IsComboOverlayVisible => false;
-    public Action<int>? OnKeyTapped => null;
-    public Action<int>? OnKeyRightTapped => null;
+    /// <summary>The source the current editor was built from — the selected
+    /// <see cref="LayoutCandidateItem"/> or the grid <see cref="GridLayoutOptions"/>
+    /// record; the rebuild test is equality against it. Null after a fresh scan.</summary>
+    private object? _editorSource;
 
     /// <summary>
     /// Key-count mismatch between the selected candidate and the keymap, plus
@@ -202,12 +295,32 @@ public partial class LayoutWizardViewModel : ObservableObject, IBoardSurface
 
     private bool CanBrowse() => !IsScanning;
 
+    [RelayCommand]
+    private void UseGridSource()
+    {
+        // A blank Name stays blank — questions fill no name in; Save insists on one.
+        IsGridSource = true;
+        NextCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand]
+    private void UseFileSource()
+    {
+        IsGridSource = false;
+        NextCommand.NotifyCanExecuteChanged();
+    }
+
     [RelayCommand(CanExecute = nameof(CanNext))]
-    private void Next() => CurrentStep++;
+    private void Next()
+    {
+        if (CurrentStep == 0)
+            EnsureEditor();
+        CurrentStep++;
+    }
 
     private bool CanNext() => CurrentStep switch
     {
-        0 => SelectedCandidate is not null && !IsScanning,
+        0 => IsGridSource || (SelectedCandidate is not null && !IsScanning),
         1 => true,
         _ => false,
     };
@@ -230,16 +343,46 @@ public partial class LayoutWizardViewModel : ObservableObject, IBoardSurface
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()
     {
+        // What the editor shows, normalised — not the raw import: any
+        // dragging/rotating the user did has to survive into the file.
         var file = UserLayoutDraft.Create(
-            SelectedCandidate!.Candidate.Layout, Name, HidName, _context.ExistingUserLayoutIds);
+            Editor!.Keys, Name, HidName, _context.ExistingUserLayoutIds);
+
+        // A saved layout found in the scan is saved back under its own id, so
+        // it replaces itself instead of piling up <id>-2 copies.
+        if (!IsGridSource && SelectedCandidate!.Candidate.Layout.SavedId is { } savedId)
+            file = file with { Id = savedId };
+
+        // A candidate that already IS a physical-layout dtsi ships its own
+        // source of truth; exporting a twin would only shadow it. The writer
+        // itself never replaces a dtsi LViz did not generate. A generated
+        // grid has no board file, so it always exports.
+        var exportDtsi = IsGridSource
+            || SelectedCandidate!.Candidate.Layout.Source != LayoutSource.PhysicalLayout;
+
+        var directories = new List<string> { _context.LayoutsDirectory };
+        if (AlsoSaveToConfig && CanSaveToConfig && Scan is { } scan)
+            directories.Add(Path.Combine(scan.Root, "config"));
+
+        // All files or none: a failed write puts back the ones already written.
+        FileRollback? rollback = null;
         try
         {
-            UserLayoutStore.Save(file, _context.LayoutsDirectory);
-            if (AlsoSaveToConfig && CanSaveToConfig && Scan is { } scan)
-                UserLayoutStore.Save(file, Path.Combine(scan.Root, "config"));
+            rollback = FileRollback.Capture(directories.SelectMany(dir => new[]
+            {
+                UserLayoutStore.PathFor(file.Id, dir),
+                ZmkPhysicalLayoutWriter.PathFor(file.Id, dir),
+            }));
+            foreach (var dir in directories)
+            {
+                UserLayoutStore.Save(file, dir);
+                if (exportDtsi)
+                    ZmkPhysicalLayoutWriter.WriteNextTo(file, dir, createIfMissing: true);
+            }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            rollback?.Restore();
             ErrorMessage = Loc.Instance.Format("Wizard_SaveFailedFormat", ex.Message);
             return;
         }
@@ -247,71 +390,91 @@ public partial class LayoutWizardViewModel : ObservableObject, IBoardSurface
         CloseRequested?.Invoke(new LayoutWizardResult(file, KeymapPathToLoad));
     }
 
+    // Grid mode needs no candidate — the editor holds the generated keys.
     private bool CanSave() =>
-        CurrentStep == 2 && SelectedCandidate is not null && !string.IsNullOrWhiteSpace(Name);
+        CurrentStep == 2 && Editor is not null
+        && (IsGridSource || SelectedCandidate is not null)
+        && !string.IsNullOrWhiteSpace(Name);
 
     partial void OnCurrentStepChanged(int value) => ErrorMessage = null;
 
-    partial void OnSelectedCandidateChanged(LayoutCandidateItem? value) => BuildPreview(value);
+    partial void OnSelectedCandidateChanged(LayoutCandidateItem? value)
+    {
+        // Dropping the candidate empties the adjust step; picking a new one
+        // builds nothing yet — the editor is created on Next (EnsureEditor).
+        if (value is null)
+        {
+            Editor = null;
+            _editorSource = null;
+            PreviewWarning = null;
+        }
+    }
 
     /// <summary>
-    /// Re-render the preview step for <paramref name="item"/>: a draft profile
-    /// from the candidate's layout (never written to disk — the throwaway id
-    /// exists only to satisfy the draft), caps labelled from the keymap's base
+    /// Build the adjust step's editor for the chosen source — the generated
+    /// grid while <see cref="IsGridSource"/>, <see cref="SelectedCandidate"/>
+    /// otherwise: keys drafted from it, caps labelled from the keymap's base
     /// layer where it has a binding for the index and from the key index
-    /// otherwise, and the mismatch/importer warnings collected into
-    /// <see cref="PreviewWarning"/>. Null clears the surface.
+    /// otherwise, and a split line where the hands currently sit. Called by
+    /// <see cref="Next"/> when leaving step 0. When the source equals the one
+    /// the current editor was already built from the editor (and with it any
+    /// edits the user made) is kept untouched; only a different source
+    /// rebuilds it and recomputes <see cref="PreviewWarning"/>. The grid
+    /// source is the answers record, so the same answers keep the editor and
+    /// any changed answer rebuilds it.
     /// </summary>
-    private void BuildPreview(LayoutCandidateItem? item)
+    private void EnsureEditor()
     {
-        LeftKeys.Clear();
-        RightKeys.Clear();
-        if (item is null)
+        if (IsGridSource)
         {
-            PreviewWarning = null;
+            var options = CurrentGridOptions;
+            if (Equals(options, _editorSource))
+                return;
+
+            var generated = GridLayoutGenerator.Generate(options);
+            var generatedKeys = UserLayoutDraft.KeysFrom(generated);
+            Editor = new LayoutEditorViewModel(
+                generatedKeys,
+                EditorLabels.For(Keymap, generatedKeys.Count, WizardKeyboardId),
+                UserLayoutGeometry.InitialSplitX(generatedKeys));
+            _editorSource = options;
+
+            // A generated grid carries no importer warnings; only the count check.
+            PreviewWarning = KeymapKeyCount is int keymapCount && keymapCount != generatedKeys.Count
+                ? Loc.Instance.Format("Wizard_KeyCountMismatchFormat", generatedKeys.Count, keymapCount)
+                : null;
             return;
         }
 
-        var layout = item.Candidate.Layout;
-        var draft = UserLayoutDraft.Create(
-            layout, string.IsNullOrWhiteSpace(Name) ? "preview" : Name, null, []);
-        var profile = new UserLayoutProfile(draft);
-        BoardLayout.SetProfile(profile);
+        if (SelectedCandidate is not { } candidate || Equals(candidate, _editorSource))
+            return;
 
-        var keymapCount = KeymapKeyCount;
-        for (var i = 0; i < profile.Keys.Count; i++)
-        {
-            var pos = profile.Keys[i];
-            var key = new KeyViewModel(pos);
-            if (Keymap is { } keymap && keymapCount is int bindings && i < bindings)
-            {
-                // Same paint path as MainWindowViewModel.ApplyActiveLayer, pinned to layer 0.
-                var r = keymap.Resolve(0, i);
-                key.ApplyBinding(
-                    r.Binding,
-                    activeLayerIndex: 0,
-                    targetLayer: r.TargetLayer,
-                    targetLayerName: r.TargetLayerName,
-                    profileId: profile.Id,
-                    holdTap: r.HoldTap,
-                    macros: keymap.MacrosByName);
-            }
-            else
-            {
-                key.Label = i.ToString();
-            }
-            (pos.Hand == Hand.Left ? LeftKeys : RightKeys).Add(key);
-        }
+        var layout = candidate.Candidate.Layout;
+        var keys = UserLayoutDraft.KeysFrom(layout);
+        Editor = new LayoutEditorViewModel(
+            keys,
+            EditorLabels.For(Keymap, keys.Count, WizardKeyboardId),
+            UserLayoutGeometry.InitialSplitX(keys));
+        _editorSource = candidate;
 
         var lines = new List<string>();
-        if (keymapCount is int count && count != layout.Keys.Count)
-        {
-            lines.Add(Loc.Instance.Format(
-                "Wizard_KeyCountMismatchFormat", layout.Keys.Count, count));
-        }
-        lines.AddRange(layout.Warnings);
+        if (KeymapKeyCount is int count && count != layout.Keys.Count)
+            lines.Add(Loc.Instance.Format("Wizard_KeyCountMismatchFormat", layout.Keys.Count, count));
+        lines.AddRange(layout.Warnings.Select(FormatWarning));
         PreviewWarning = lines.Count == 0 ? null : string.Join("\n", lines);
     }
+
+    /// <summary>Localized text for one importer warning code.</summary>
+    internal static string FormatWarning(LayoutImportWarning warning) =>
+        warning.Code switch
+        {
+            LayoutWarningCode.MatrixTransformRough =>
+                Loc.Instance["Wizard_Warning_MatrixTransformRough"],
+            LayoutWarningCode.MatrixTransformGrid =>
+                Loc.Instance["Wizard_Warning_MatrixTransformGrid"],
+            _ => Loc.Instance.Format(
+                "Wizard_Warning_RotationWithoutPivotFormat", warning.KeyIndex ?? 0),
+        };
 
     /// <summary>
     /// What the background half of <see cref="LoadSourceAsync"/> reads from
@@ -372,7 +535,13 @@ public partial class LayoutWizardViewModel : ObservableObject, IBoardSurface
 
         ApplyKeymap(read, out var keymapNote, out var keymapLine);
 
+        // The keymap the grid summary compares against just changed.
+        NotifyGridSummary();
+
         var keyCount = KeymapKeyCount;
+        // A new scan means new candidate objects: the editor must rebuild on
+        // the next Next even if the same file ends up selected again.
+        _editorSource = null;
         Candidates.Clear();
         foreach (var candidate in ZmkConfigScanner.Rank(scan.Candidates, keyCount))
         {
@@ -399,14 +568,17 @@ public partial class LayoutWizardViewModel : ObservableObject, IBoardSurface
             lines.Add(Loc.Instance["Wizard_NoCandidates"]);
         SourceInfo = string.Join("\n", lines);
 
-        Name = UserLayoutDraft.SuggestName(scan.KeyboardName, scan.ShieldName, FolderName(scan.Root));
+        // A saved layout on top keeps its own name, since saving replaces it.
+        Name = SelectedCandidate?.Candidate.Layout is { SavedId: not null } saved
+            ? saved.Name
+            : UserLayoutDraft.SuggestName(scan.KeyboardName, scan.ShieldName, FolderName(scan.Root));
         HidName = SuggestDeviceName(scan);
         CanSaveToConfig = Directory.Exists(Path.Combine(scan.Root, "config"));
         AlsoSaveToConfig = false;
     }
 
     /// <summary>
-    /// Pick the keymap the wizard ranks and (in the preview step) labels with:
+    /// Pick the keymap the wizard ranks and (in the adjust step) labels with:
     /// the one LViz already has open wins and stays unloaded; otherwise the
     /// first keymap the scan found, which LViz loads after saving. A keymap
     /// that refuses to parse leaves the wizard keymap-less with a note.
@@ -418,9 +590,9 @@ public partial class LayoutWizardViewModel : ObservableObject, IBoardSurface
         unreadableLine = null;
         keymapLine = null;
 
-        if (_context.LoadedKeymap is LoadedKeymap loaded)
+        if (_context.LoadedKeymap is not null)
         {
-            Keymap = loaded;
+            _scannedKeymap = null;
             KeymapPathToLoad = null;
             keymapLine = Loc.Instance.Format(
                 "Wizard_KeymapUsedFormat",
@@ -429,7 +601,7 @@ public partial class LayoutWizardViewModel : ObservableObject, IBoardSurface
             return;
         }
 
-        Keymap = read.OwnKeymap;
+        _scannedKeymap = read.OwnKeymap;
         KeymapPathToLoad = null;
         if (read.OwnKeymapPath is not string path)
             return;
@@ -475,6 +647,7 @@ public partial class LayoutWizardViewModel : ObservableObject, IBoardSurface
 
     private static string SourceName(LayoutSource source) => source switch
     {
+        LayoutSource.UserLayout => Loc.Instance["Wizard_Source_UserLayout"],
         LayoutSource.PhysicalLayout => Loc.Instance["Wizard_Source_PhysicalLayout"],
         LayoutSource.InfoJson => Loc.Instance["Wizard_Source_InfoJson"],
         _ => Loc.Instance["Wizard_Source_MatrixTransform"],

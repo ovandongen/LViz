@@ -1,6 +1,8 @@
+using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using LViz.App.Localization;
 using LViz.App.ViewModels;
 
@@ -31,6 +33,7 @@ public partial class LayoutWizardWindow : Window
         if (_boundVm is { } old)
         {
             old.CloseRequested -= OnCloseRequested;
+            old.PropertyChanged -= OnViewModelPropertyChanged;
             _boundVm = null;
         }
 
@@ -40,7 +43,21 @@ public partial class LayoutWizardWindow : Window
         vm.PickFolder = PickFolderAsync;
         vm.PickFile = PickFileAsync;
         vm.CloseRequested += OnCloseRequested;
+        vm.PropertyChanged += OnViewModelPropertyChanged;
         _boundVm = vm;
+    }
+
+    /// <summary>
+    /// Gives the editor canvas keyboard focus when the adjust step appears, so
+    /// the arrow keys and Cmd/Ctrl+A work without a click first. Posted so the
+    /// step panel's IsVisible binding has applied and the canvas is focusable.
+    /// The canvas also grabs focus itself on every pointer press.
+    /// </summary>
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(LayoutWizardViewModel.CurrentStep)
+            && _boundVm is { CurrentStep: 1 })
+            Dispatcher.UIThread.Post(() => EditorCanvas.Focus());
     }
 
     private void OnCloseRequested(LayoutWizardResult? result) => Close(result);
@@ -81,7 +98,10 @@ public partial class LayoutWizardWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         if (_boundVm is { } vm)
+        {
             vm.CloseRequested -= OnCloseRequested;
+            vm.PropertyChanged -= OnViewModelPropertyChanged;
+        }
         _boundVm = null;
         base.OnClosed(e);
     }

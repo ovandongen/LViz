@@ -475,7 +475,12 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     [NotifyPropertyChangedFor(nameof(KeyboardStatusHint))]
     [NotifyPropertyChangedFor(nameof(LoadInfoTooltip))]
     [NotifyPropertyChangedFor(nameof(ActiveLayerTintColor))]
+    [NotifyPropertyChangedFor(nameof(CanEditLayout))]
     private IKeyboardProfile _selectedKeyboard = null!;
+
+    /// <summary>True when the selected profile came from a user layout —
+    /// gates the picker flyout's "Edit layout…" item.</summary>
+    public bool CanEditLayout => SelectedKeyboard is UserLayoutProfile;
 
     /// <summary>Right-aligned status-bar hint: "DisplayName · N keys" with layer-source suffix when known.</summary>
     public string KeyboardStatusHint
@@ -497,6 +502,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public Action? OpenSettingsRequested { get; set; }
     /// <summary>Set by <c>App.axaml.cs</c>: opens the layout-wizard window.</summary>
     public Action? AddOwnBoardRequested { get; set; }
+    /// <summary>Set by <c>App.axaml.cs</c>: opens the "Edit layout…" window.</summary>
+    public Action? EditLayoutRequested { get; set; }
 
     /// <summary>Path of the layout JSON the user currently has loaded, or null if none.</summary>
     public string? LoadedLayoutPath => _keymap.LoadedPath;
@@ -1091,21 +1098,74 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     }
 
     /// <summary>
+    /// Everything the "Edit layout…" window can't discover itself: the saved
+    /// layout behind the active user profile, the key captions from the open
+    /// keymap, and the folder user layouts live in. Null unless a user
+    /// layout is the active profile (bundled boards can't be edited).
+    /// </summary>
+    public LayoutEditContext? GetLayoutEditContext() =>
+        _profile is UserLayoutProfile p
+            ? new(p.Source, EditorLabels.For(_keymap.Current, p.KeyCount, p.Id), UserLayoutStore.DefaultDirectory)
+            : null;
+
+    /// <summary>
+    /// Replaces the registry entry with the same id with a fresh profile
+    /// built from <paramref name="layout"/> (appending it when the id is
+    /// new) and refreshes the picker list.
+    /// </summary>
+    private UserLayoutProfile ReplaceUserProfile(UserLayoutFile layout)
+    {
+        var profile = new UserLayoutProfile(layout);
+        KeyboardProfileRegistry.SetUserProfiles(
+            KeyboardProfileRegistry.All
+                .OfType<UserLayoutProfile>()
+                .Where(p => !string.Equals(p.Source.Id, layout.Id, StringComparison.Ordinal))
+                .Append((IKeyboardProfile)profile));
+        OnPropertyChanged(nameof(AvailableKeyboards));
+        return profile;
+    }
+
+    /// <summary>
+    /// Shows a profile the picker could switch to — or one that just replaced
+    /// the active profile under the same id. That second case needs an
+    /// in-place refresh: <see cref="SelectKeyboard"/> returns early on an
+    /// identical id, which would leave the old geometry on screen. No status
+    /// message, persistence, or HID/bus re-scope — the device the picker
+    /// points at doesn't change.
+    /// </summary>
+    private void ShowProfile(IKeyboardProfile profile)
+    {
+        if (!string.Equals(profile.Id, _profile.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            SelectKeyboard(profile);
+            return;
+        }
+
+        _profile = profile;
+        SelectedKeyboard = profile;
+        BuildKeysFromProfile();
+        _push.SetActiveProfile(profile);
+
+        var km = _keymap.Current;
+        if (km is not null && km.LayerCount > 0 && km.Layers[0].Bindings.Count == profile.KeyCount)
+        {
+            // Same keymap, edited board: repaint so the rebuilt keys carry
+            // their labels again, exactly like the switch path does.
+            RebuildLayers();
+            ApplyActiveLayer(ActiveLayerIndex);
+        }
+    }
+
+    /// <summary>
     /// Registers a saved wizard layout as a user profile (replacing any
     /// existing layout with the same id), selects it through the normal
     /// picker path, and loads the keymap the wizard picked when it found one.
     /// </summary>
     public void ApplyLayoutWizardResult(LayoutWizardResult result)
     {
-        var profile = new UserLayoutProfile(result.Layout);
-        KeyboardProfileRegistry.SetUserProfiles(
-            KeyboardProfileRegistry.All
-                .OfType<UserLayoutProfile>()
-                .Where(p => !string.Equals(p.Source.Id, result.Layout.Id, StringComparison.Ordinal))
-                .Append((IKeyboardProfile)profile));
-        OnPropertyChanged(nameof(AvailableKeyboards));
+        var profile = ReplaceUserProfile(result.Layout);
+        ShowProfile(profile);
 
-        SelectKeyboard(profile);
         if (result.KeymapPathToLoad is not null)
             LoadLayoutFromPath(result.KeymapPathToLoad);
         HasUnmatchedKeymap = false;
@@ -1113,9 +1173,25 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         DiagnosticLog.Info("MainVM", $"Added user layout {profile.Id} ({profile.KeyCount} keys)");
     }
 
+    /// <summary>
+    /// Applies the file the "Edit layout…" window saved: swaps the registry
+    /// entry for the same id and refreshes the board in place, repainting the
+    /// open keymap when it still fits the edited geometry.
+    /// </summary>
+    public void ApplyEditedLayout(UserLayoutFile layout)
+    {
+        ShowProfile(ReplaceUserProfile(layout));
+
+        DiagnosticLog.Info("MainVM", $"Edited user layout user:{layout.Id} ({layout.Keys.Count} keys)");
+    }
+
     /// <summary>Starts the layout wizard via the window callback.</summary>
     [RelayCommand]
     private void AddOwnBoard() => AddOwnBoardRequested?.Invoke();
+
+    /// <summary>Opens the "Edit layout…" window via the window callback.</summary>
+    [RelayCommand]
+    private void EditLayout() => EditLayoutRequested?.Invoke();
 
     /// <summary>
     /// Returns the persisted JSON path for the given profile if one exists and

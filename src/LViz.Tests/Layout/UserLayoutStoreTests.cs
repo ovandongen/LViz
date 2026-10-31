@@ -241,6 +241,59 @@ public sealed class UserLayoutStoreTests : IDisposable
         Assert.Equal(new[] { "neighbour" }, loaded.Select(l => l.Id));
     }
 
+    // --- TryLoadFile ---
+
+    [Fact]
+    public void TryLoadFile_WrittenBySave_ReturnsSameContent()
+    {
+        var saved = new UserLayoutFile(
+            UserLayoutFile.CurrentSchemaVersion,
+            "slabwing",
+            "Slabwing",
+            "Slabwing",
+            [
+                new UserLayoutKey(-1400, -20, 100, 140, -1500, -50, -60, Hand.Left),
+                new UserLayoutKey(1400, 200, 175, 100, 2250, 1500, 900, Hand.Right),
+            ]);
+        UserLayoutStore.Save(saved, _dir);
+
+        var ok = UserLayoutStore.TryLoadFile(
+            Path.Combine(_dir, "slabwing.layout.json"), out var layout, out var reason);
+
+        Assert.True(ok);
+        Assert.NotNull(layout);
+        Assert.Null(reason);
+        Assert.Equal("slabwing", layout!.Id);
+        Assert.Equal("Slabwing", layout.Name);
+        Assert.Equal("Slabwing", layout.HidName);
+        // Record equality compares Keys by reference; compare as a sequence.
+        Assert.Equal(saved.Keys, layout.Keys);
+    }
+
+    [Fact]
+    public void TryLoadFile_FileNameDiffersFromId_FailsWithReason()
+    {
+        Write("other-name.layout.json", FileJson("slabwing", "Slabwing"));
+
+        var ok = UserLayoutStore.TryLoadFile(
+            Path.Combine(_dir, "other-name.layout.json"), out var layout, out var reason);
+
+        Assert.False(ok);
+        Assert.Null(layout);
+        Assert.Contains("does not match", reason);
+    }
+
+    [Fact]
+    public void TryLoadFile_MissingPath_FailsWithoutThrowing()
+    {
+        var ok = UserLayoutStore.TryLoadFile(
+            Path.Combine(_dir, "no-such-folder", "gone.layout.json"), out var layout, out var reason);
+
+        Assert.False(ok);
+        Assert.Null(layout);
+        Assert.NotNull(reason);
+    }
+
     // --- folder layout ---
 
     [Fact]

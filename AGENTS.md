@@ -84,7 +84,10 @@ dotnet run --project src/LViz.App                  # launch the app
   `ICommand` implementations.
 - **Atomic writes for anything persisted.** `Core/Persistence/AtomicFile.cs`
   writes via `.tmp` + `Flush(flushToDisk:true)` + `File.Move`. Use it for
-  settings, exports, any future on-disk state.
+  settings, exports, any future on-disk state. A save that writes several
+  files (a `.layout.json` plus its `.dtsi`, in one or two folders) takes a
+  `FileRollback.Capture` of every target first and calls `Restore()` in the
+  catch, so a failure half-way leaves all files as they were.
 - **Localization via `.resx` + `Loc` singleton.** Both `Strings.resx` (EN
   base) and `Strings.nl.resx` live in `App/Resources/`. Bind UI strings via
   `{Binding [Key_Name], Source={StaticResource Loc}}`. If you add a string,
@@ -143,6 +146,19 @@ dotnet run --project src/LViz.App                  # launch the app
   insists on exactly one physical-layout node. Test fixtures under
   `LViz.Tests/Layout/Fixtures/` are embedded by wildcard: drop a file in and
   read it with `LayoutFixtures.Read("<file>")`.
+- **Layout editor: one geometry home, two-step drafts.** `UserLayoutGeometry`
+  (Core/Layout) owns all `UserLayoutKey` rotation maths (centres, corners,
+  hit-test, move/rotate/hands/normalise); don't re-derive rotations
+  elsewhere. A draft goes `UserLayoutDraft.KeysFrom(ImportedLayout)` (hands
+  from `ImportedLayout.Hands` when the count matches, else the midline) then
+  `Create(keys, …)`, which normalises so the rotated bounds start at (0, 0).
+  `LayoutEditorViewModel` (shared by the wizard's adjust step and the
+  "Edit layout…" window) computes every drag from the snapshot taken on
+  press, and its `Keys` are always hands-applied for the split line.
+  `.dtsi` exports carry `ZmkPhysicalLayoutWriter.GeneratedMarker` on line 1;
+  only a file with that marker is ever overwritten, and the scanner skips an
+  export whose `<id>.layout.json` twin sits next to it. A saved-layout
+  candidate (`ImportedLayout.SavedId`) is saved back under its own id.
 - **Per-key label overrides are scoped `(profileId, layerIndex, keyIndex)`**
   → `KeyLabelOverride` (main label, subscript, top-left badge, FA icon,
   font size, bold). Persisted via `UserSettings.KeyLabelOverrides` through
@@ -207,12 +223,15 @@ Carried over from the upstream Moergo build and still apply verbatim:
   flyout opens and then crashes with "Unable to resolve type vm:...". Use
   `ElementName=...` bindings without the cast instead. See the picker flyout
   in `MainWindow.axaml`.
-- **Compiled bindings make `dotnet build` the XAML check.** Templates and
-  views set `x:DataType`, so a mistyped property name in a `{Binding}`
-  fails the build instead of silently binding to nothing at runtime. Keep
-  `x:DataType` on every new `DataTemplate`; without it this safety net is
-  gone. (It does not catch `ElementName` or `Source={StaticResource Loc}`
-  indexer keys: a missing `.resx` key still only shows up at runtime.)
+- **`dotnet build` does NOT check `{Binding}` paths.** `LViz.App.csproj`
+  doesn't set `AvaloniaUseCompiledBindingsByDefault`, so plain `{Binding}`s
+  are reflection bindings even under `x:DataType`: a mistyped path builds
+  clean and binds to nothing at runtime. The build only catches type and
+  element names and missing `x:Name` fields. Check each new binding path
+  against the view-model by hand, and each new `Loc` key against both
+  `.resx` files. Still keep `x:DataType` on every new `DataTemplate`
+  (needed for the cast-free bindings and for a later switch to compiled
+  bindings).
 - **macOS Carbon hotkey events pump on Avalonia's main run loop** without
   extra wiring — Avalonia 11's AppKit-based loop sources Carbon events
   through `GetApplicationEventTarget`, so a single `InstallEventHandler`
@@ -412,3 +431,31 @@ LViz-specific (extend this list as we hit more):
 - **`ZmkKeymapLoader.Load` wraps every failure, file-read errors included, in
   `ZmkKeymapParseException`.** Catching that one type is complete; don't add
   extra catches for IO errors.
+
+- **Replacing the active profile under the same id must go through
+  `ReplaceUserProfile` + `ShowProfile`** (`MainWindowViewModel`), never
+  `SelectKeyboard` directly: `SelectKeyboard` returns early on an identical
+  id and would leave the old geometry on screen.
+
+- **Never read an `[ObservableProperty]` backing field outside the
+  constructor.** CommunityToolkit emits MVVMTK0034 per read and the build is
+  0-warning. Use the generated property, and `partial void OnXChanged` for
+  derived state. A value that must be clamped *before* it is stored (the
+  wizard's grid steppers) needs a hand-written `SetProperty` setter, because
+  the `On…Changing/Changed` hooks see the value already stored.
+
+- **A command whose CanExecute reads a child view-model** (e.g.
+  `Editor.IsModified`) can't use `[NotifyCanExecuteChangedFor]`; subscribe to
+  the child's `PropertyChanged` and call `XCommand.NotifyCanExecuteChanged()`
+  (see `LayoutEditWindowViewModel`).
+
+- **Avalonia 11.3 custom-drawn controls** (`LayoutEditorCanvas`):
+  `OnSizeChanged` isn't virtual on `Control`, so listen to the `SizeChanged`
+  event to repaint on resize; the `propertyChanged:` argument of
+  `AvaloniaProperty.Register` doesn't compile (use
+  `Prop.Changed.AddClassHandler<T>` in a static ctor); `Matrix.CreateRotation`
+  has no centre overload (use `new RotateTransform(deg, cx, cy).Value`); there
+  is no `Cursors` class (use `new Cursor(StandardCursorType.X)`); text drawn
+  with `FormattedText` needs `new Typeface(FontFamily.Default)`, because a bare
+  `new Typeface()` has no family and throws inside `Render` on every frame,
+  which freezes the window. Tests can't catch any of this; only a real render does.

@@ -1145,6 +1145,10 @@
     <value>failed — {0}</value>
     <comment/>
   </data>
+  <data name="Wizard_Source_UserLayout" xml:space="preserve">
+    <value>Saved LViz layout</value>
+    <comment/>
+  </data>
   <data name="Wizard_Source_PhysicalLayout" xml:space="preserve">
     <value>Physical layout</value>
     <comment/>
@@ -1191,6 +1195,18 @@
     <value>This layout has {0} keys, the keymap has {1}.</value>
     <comment/>
   </data>
+  <data name="Wizard_Warning_MatrixTransformRough" xml:space="preserve">
+    <value>Rough layout, read from the matrix transform text. Drag the keys into place.</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Warning_MatrixTransformGrid" xml:space="preserve">
+    <value>The matrix transform is on one line, so the keys follow the matrix wiring. Drag the keys into place.</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Warning_RotationWithoutPivotFormat" xml:space="preserve">
+    <value>Key {0} is rotated without a pivot point, so it turns around its own centre.</value>
+    <comment/>
+  </data>
   <data name="Wizard_SaveFailedFormat" xml:space="preserve">
     <value>Saving failed: {0}</value>
     <comment/>
@@ -1220,11 +1236,11 @@
     <comment/>
   </data>
   <data name="Wizard_Step2Header" xml:space="preserve">
-    <value>2. Check the layout</value>
+    <value>2. Adjust the layout</value>
     <comment/>
   </data>
   <data name="Wizard_Step2Hint" xml:space="preserve">
-    <value>The labels come from your keymap's base layer. If they sit on the right keys, the order is correct.</value>
+    <value>Drag keys to move them and the round handle to rotate them. Shift-click or drag a box to select several keys, hold Option (Alt) to move without snapping. Keys left of the dashed line belong to the left half.</value>
     <comment/>
   </data>
   <data name="Wizard_Step3Header" xml:space="preserve">
@@ -1259,8 +1275,48 @@
     <value>Save</value>
     <comment/>
   </data>
+  <data name="Wizard_Reset" xml:space="preserve">
+    <value>Reset</value>
+    <comment/>
+  </data>
   <data name="Wizard_Cancel" xml:space="preserve">
     <value>Cancel</value>
+    <comment/>
+  </data>
+  <data name="Wizard_BuildFromQuestions" xml:space="preserve">
+    <value>Build from questions…</value>
+    <comment/>
+  </data>
+  <data name="Wizard_UseBoardFiles" xml:space="preserve">
+    <value>Use board files instead</value>
+    <comment/>
+  </data>
+  <data name="Wizard_GridHeader" xml:space="preserve">
+    <value>Describe your board</value>
+    <comment/>
+  </data>
+  <data name="Wizard_GridSplit" xml:space="preserve">
+    <value>Split keyboard (two halves)</value>
+    <comment/>
+  </data>
+  <data name="Wizard_GridRows" xml:space="preserve">
+    <value>Rows</value>
+    <comment/>
+  </data>
+  <data name="Wizard_GridColumns" xml:space="preserve">
+    <value>Columns (per half when split)</value>
+    <comment/>
+  </data>
+  <data name="Wizard_GridThumbKeys" xml:space="preserve">
+    <value>Thumb keys (per half when split)</value>
+    <comment/>
+  </data>
+  <data name="Wizard_GridKeyCountFormat" xml:space="preserve">
+    <value>{0} keys</value>
+    <comment/>
+  </data>
+  <data name="Wizard_GridHint" xml:space="preserve">
+    <value>Stagger and angles come next, in the editor.</value>
     <comment/>
   </data>
   <data name="Picker_AddOwnBoard" xml:space="preserve">
@@ -1269,6 +1325,14 @@
   </data>
   <data name="Status_CreateLayoutLink" xml:space="preserve">
     <value>Create a layout for this keymap…</value>
+    <comment/>
+  </data>
+  <data name="EditLayout_TitleFormat" xml:space="preserve">
+    <value>Edit layout: {0}</value>
+    <comment/>
+  </data>
+  <data name="Picker_EditLayout" xml:space="preserve">
+    <value>Edit layout…</value>
     <comment/>
   </data>
 </root>

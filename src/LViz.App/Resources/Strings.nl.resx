@@ -1145,6 +1145,10 @@
     <value>mislukt — {0}</value>
     <comment/>
   </data>
+  <data name="Wizard_Source_UserLayout" xml:space="preserve">
+    <value>Opgeslagen LViz-layout</value>
+    <comment/>
+  </data>
   <data name="Wizard_Source_PhysicalLayout" xml:space="preserve">
     <value>Fysieke layout</value>
     <comment/>
@@ -1191,6 +1195,18 @@
     <value>Deze layout heeft {0} toetsen, de keymap {1}.</value>
     <comment/>
   </data>
+  <data name="Wizard_Warning_MatrixTransformRough" xml:space="preserve">
+    <value>Ruwe layout, gelezen uit de tekst van de matrixtransformatie. Sleep de toetsen op hun plek.</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Warning_MatrixTransformGrid" xml:space="preserve">
+    <value>De matrixtransformatie staat op één regel, dus de toetsen volgen de bedrading van de matrix. Sleep de toetsen op hun plek.</value>
+    <comment/>
+  </data>
+  <data name="Wizard_Warning_RotationWithoutPivotFormat" xml:space="preserve">
+    <value>Toets {0} is gedraaid zonder draaipunt en draait dus om zijn eigen middelpunt.</value>
+    <comment/>
+  </data>
   <data name="Wizard_SaveFailedFormat" xml:space="preserve">
     <value>Opslaan mislukt: {0}</value>
     <comment/>
@@ -1220,11 +1236,11 @@
     <comment/>
   </data>
   <data name="Wizard_Step2Header" xml:space="preserve">
-    <value>2. Controleer de layout</value>
+    <value>2. Pas de layout aan</value>
     <comment/>
   </data>
   <data name="Wizard_Step2Hint" xml:space="preserve">
-    <value>De labels komen uit de basislaag van je keymap. Staan ze op de juiste toetsen, dan klopt de volgorde.</value>
+    <value>Sleep toetsen om ze te verplaatsen en het ronde handvat om ze te draaien. Shift-klik of sleep een kader om meerdere toetsen te kiezen, houd Option (Alt) ingedrukt om vrij te verplaatsen. Toetsen links van de stippellijn horen bij de linkerhelft.</value>
     <comment/>
   </data>
   <data name="Wizard_Step3Header" xml:space="preserve">
@@ -1259,8 +1275,48 @@
     <value>Opslaan</value>
     <comment/>
   </data>
+  <data name="Wizard_Reset" xml:space="preserve">
+    <value>Herstellen</value>
+    <comment/>
+  </data>
   <data name="Wizard_Cancel" xml:space="preserve">
     <value>Annuleren</value>
+    <comment/>
+  </data>
+  <data name="Wizard_BuildFromQuestions" xml:space="preserve">
+    <value>Opbouwen met vragen…</value>
+    <comment/>
+  </data>
+  <data name="Wizard_UseBoardFiles" xml:space="preserve">
+    <value>Toch boardbestanden gebruiken</value>
+    <comment/>
+  </data>
+  <data name="Wizard_GridHeader" xml:space="preserve">
+    <value>Beschrijf je toetsenbord</value>
+    <comment/>
+  </data>
+  <data name="Wizard_GridSplit" xml:space="preserve">
+    <value>Gesplitst toetsenbord (twee helften)</value>
+    <comment/>
+  </data>
+  <data name="Wizard_GridRows" xml:space="preserve">
+    <value>Rijen</value>
+    <comment/>
+  </data>
+  <data name="Wizard_GridColumns" xml:space="preserve">
+    <value>Kolommen (per helft als het gesplitst is)</value>
+    <comment/>
+  </data>
+  <data name="Wizard_GridThumbKeys" xml:space="preserve">
+    <value>Duimtoetsen (per helft als het gesplitst is)</value>
+    <comment/>
+  </data>
+  <data name="Wizard_GridKeyCountFormat" xml:space="preserve">
+    <value>{0} toetsen</value>
+    <comment/>
+  </data>
+  <data name="Wizard_GridHint" xml:space="preserve">
+    <value>Verspringing en hoeken stel je hierna in de editor in.</value>
     <comment/>
   </data>
   <data name="Picker_AddOwnBoard" xml:space="preserve">
@@ -1269,6 +1325,14 @@
   </data>
   <data name="Status_CreateLayoutLink" xml:space="preserve">
     <value>Maak een layout voor deze keymap…</value>
+    <comment/>
+  </data>
+  <data name="EditLayout_TitleFormat" xml:space="preserve">
+    <value>Layout bewerken: {0}</value>
+    <comment/>
+  </data>
+  <data name="Picker_EditLayout" xml:space="preserve">
+    <value>Layout bewerken…</value>
     <comment/>
   </data>
 </root>

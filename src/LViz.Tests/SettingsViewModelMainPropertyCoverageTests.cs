@@ -85,6 +85,9 @@ public class SettingsViewModelMainPropertyCoverageTests
         // Transient main-window UI state; drives the status-bar wizard link.
         "HasUnmatchedKeymap",
 
+        // Picker item visibility, main window only ("Edit layout…" flyout item).
+        "CanEditLayout",
+
         // Recents-menu emptiness flag, bound directly in the main window's
         // recents flyout (part 2); settings never renders recents.
         "HasRecentKeymaps",
