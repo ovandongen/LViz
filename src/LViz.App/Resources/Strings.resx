@@ -217,6 +217,34 @@
     <value>File not found</value>
     <comment/>
   </data>
+  <data name="Status_GitHubLoadingFormat" xml:space="preserve">
+    <value>Loading {0} from GitHub…</value>
+    <comment/>
+  </data>
+  <data name="Toast_GitHubOfflineFormat" xml:space="preserve">
+    <value>GitHub not reachable, opened the cached copy of {0}</value>
+    <comment/>
+  </data>
+  <data name="Toast_GitHubSignInNeededFormat" xml:space="preserve">
+    <value>Sign in to GitHub to open {0}</value>
+    <comment/>
+  </data>
+  <data name="Toast_GitHubNotFoundFormat" xml:space="preserve">
+    <value>{0} wasn't found on GitHub, or LViz has no access to the repo</value>
+    <comment/>
+  </data>
+  <data name="Toast_GitHubNetworkFormat" xml:space="preserve">
+    <value>GitHub not reachable and there is no cached copy of {0}</value>
+    <comment/>
+  </data>
+  <data name="Toast_GitHubFailedFormat" xml:space="preserve">
+    <value>Couldn't open {0} from GitHub: {1}</value>
+    <comment/>
+  </data>
+  <data name="Toast_GitHubUpdatedFormat" xml:space="preserve">
+    <value>Loaded the newer {0} from GitHub</value>
+    <comment/>
+  </data>
   <data name="Status_Ready" xml:space="preserve">
     <value>Ready</value>
     <comment/>
@@ -1345,6 +1373,142 @@
   </data>
   <data name="Editor_MirrorUnavailableFormat" xml:space="preserve">
     <value>Mirroring needs the same number of keys on both halves (now {0} left, {1} right).</value>
+    <comment/>
+  </data>
+  <data name="GitHub_SignInAgain" xml:space="preserve">
+    <value>Sign in to GitHub again.</value>
+    <comment/>
+  </data>
+  <data name="GitHub_LoginNotSaved" xml:space="preserve">
+    <value>This computer has no keychain LViz can use, so you'll need to sign in again next time.</value>
+    <comment/>
+  </data>
+  <data name="GitHub_ErrorNetwork" xml:space="preserve">
+    <value>GitHub can't be reached. Check your connection and try again.</value>
+    <comment/>
+  </data>
+  <data name="GitHub_ErrorRateLimited" xml:space="preserve">
+    <value>GitHub is limiting requests right now. Try again in a few minutes.</value>
+    <comment/>
+  </data>
+  <data name="GitHub_ErrorCodeExpired" xml:space="preserve">
+    <value>The code expired. Start again.</value>
+    <comment/>
+  </data>
+  <data name="GitHub_ErrorAccessDenied" xml:space="preserve">
+    <value>Sign-in was cancelled on GitHub.</value>
+    <comment/>
+  </data>
+  <data name="GitHub_ErrorNotFound" xml:space="preserve">
+    <value>Not found on GitHub, or LViz has no access to it.</value>
+    <comment/>
+  </data>
+  <data name="GitHub_ErrorTooLarge" xml:space="preserve">
+    <value>This repository is too large for LViz (over 50 MB).</value>
+    <comment/>
+  </data>
+  <data name="GitHub_ErrorUnexpectedFormat" xml:space="preserve">
+    <value>Something went wrong with GitHub: {0}</value>
+    <comment/>
+  </data>
+  <data name="GitHub_NoKeymapFormat" xml:space="preserve">
+    <value>No .keymap file found in {0} ({1}).</value>
+    <comment/>
+  </data>
+  <data name="GitHub_KeymapBoardFormat" xml:space="preserve">
+    <value>{0} keys · {1}</value>
+    <comment/>
+  </data>
+  <data name="GitHub_KeymapNoLayoutFormat" xml:space="preserve">
+    <value>{0} keys · no layout yet</value>
+    <comment/>
+  </data>
+  <data name="GitHub_KeymapUnreadable" xml:space="preserve">
+    <value>Can't be read</value>
+    <comment/>
+  </data>
+  <data name="RecentKeymaps_OpenFromGitHub" xml:space="preserve">
+    <value>Open from GitHub…</value>
+    <comment/>
+  </data>
+  <data name="GitHub_WindowTitle" xml:space="preserve">
+    <value>Open from GitHub</value>
+    <comment/>
+  </data>
+  <data name="GitHub_SignInIntro" xml:space="preserve">
+    <value>Sign in with your GitHub account to open the keymap from your zmk-config repository. LViz only sees repositories you install the LViz for ZMK app on.</value>
+    <comment/>
+  </data>
+  <data name="GitHub_SignInButton" xml:space="preserve">
+    <value>Sign in with GitHub</value>
+    <comment/>
+  </data>
+  <data name="GitHub_EnterCode" xml:space="preserve">
+    <value>Enter this code on the GitHub page that just opened (it's already on your clipboard):</value>
+    <comment/>
+  </data>
+  <data name="GitHub_CopyCode" xml:space="preserve">
+    <value>Copy code</value>
+    <comment/>
+  </data>
+  <data name="GitHub_OpenPage" xml:space="preserve">
+    <value>Open GitHub page</value>
+    <comment/>
+  </data>
+  <data name="GitHub_Waiting" xml:space="preserve">
+    <value>Waiting for you to approve on GitHub…</value>
+    <comment/>
+  </data>
+  <data name="GitHub_SignedInAs" xml:space="preserve">
+    <value>Signed in as </value>
+    <comment/>
+  </data>
+  <data name="GitHub_SignOut" xml:space="preserve">
+    <value>Sign out</value>
+    <comment/>
+  </data>
+  <data name="GitHub_Repository" xml:space="preserve">
+    <value>Repository</value>
+    <comment/>
+  </data>
+  <data name="GitHub_Branch" xml:space="preserve">
+    <value>Branch</value>
+    <comment/>
+  </data>
+  <data name="GitHub_NoRepos" xml:space="preserve">
+    <value>LViz for ZMK isn't installed on any of your repositories yet. Install it on your zmk-config repository, then reload.</value>
+    <comment/>
+  </data>
+  <data name="GitHub_InstallApp" xml:space="preserve">
+    <value>Install on GitHub…</value>
+    <comment/>
+  </data>
+  <data name="GitHub_ReloadRepos" xml:space="preserve">
+    <value>Reload</value>
+    <comment/>
+  </data>
+  <data name="GitHub_InstallMore" xml:space="preserve">
+    <value>Add more repositories…</value>
+    <comment/>
+  </data>
+  <data name="GitHub_Working" xml:space="preserve">
+    <value>Working…</value>
+    <comment/>
+  </data>
+  <data name="GitHub_PickKeymap" xml:space="preserve">
+    <value>This repository has more than one keymap. Which one do you want to open?</value>
+    <comment/>
+  </data>
+  <data name="GitHub_Back" xml:space="preserve">
+    <value>Back</value>
+    <comment/>
+  </data>
+  <data name="GitHub_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment/>
+  </data>
+  <data name="GitHub_OpenButton" xml:space="preserve">
+    <value>Open</value>
     <comment/>
   </data>
 </root>

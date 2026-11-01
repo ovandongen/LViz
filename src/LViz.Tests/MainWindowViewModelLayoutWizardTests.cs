@@ -1,10 +1,13 @@
 using LViz.App.Services;
+using LViz.App.Services.GitHub;
 using LViz.App.ViewModels;
+using LViz.Core.GitHub;
 using LViz.Core.Keymap;
 using LViz.Core.Keymap.Parser;
 using LViz.Core.Layout;
 using LViz.Core.Models;
 using LViz.Core.Settings;
+using LViz.Tests.GitHub;
 using Xunit;
 
 namespace LViz.Tests;
@@ -15,10 +18,28 @@ namespace LViz.Tests;
 /// context snapshot handed to the wizard window, and applying its result.
 /// Fake setup mirrors <see cref="MainWindowViewModelLoadTests"/>; the profile
 /// registry is process-global static state, so every test restores it in a
-/// <c>finally</c> (the suite runs sequentially).
+/// <c>finally</c> (the suite runs sequentially). The context tests also cover
+/// the GitHub repo cache folder it snapshots for the wizard's start.
 /// </summary>
-public class MainWindowViewModelLayoutWizardTests
+public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
 {
+    // Temp file standing in for the local cache copy of a GitHub keymap.
+    private readonly List<string> _tempFiles = [];
+
+    private string TempKeymapFile()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"lviz-wz-gh-{Guid.NewGuid():N}.keymap");
+        File.WriteAllText(path, "/* cache stand-in */");
+        _tempFiles.Add(path);
+        return path;
+    }
+
+    public void Dispose()
+    {
+        foreach (var path in _tempFiles)
+            try { File.Delete(path); } catch (IOException) { /* best effort */ }
+    }
+
     private sealed class InMemorySettingsService : ISettingsService
     {
         public UserSettings Current { get; set; } = new();
@@ -157,6 +178,59 @@ public class MainWindowViewModelLayoutWizardTests
     }
 
     [Fact]
+    public async Task GetLayoutWizardContext_GitHubKeymapOpen_SnapshotsRepoCacheFolder()
+    {
+        var settings = new InMemorySettingsService();
+        var keymap = new FakeKeymapStateService();
+        var cacheFile = TempKeymapFile();
+        var fake = new FakeGitHubKeymapService
+        {
+            OnOpen = _ => Task.FromResult<GitHubOpenResult>(
+                new GitHubOpenResult.Loaded(cacheFile, FromCacheOffline: false)),
+            OnCacheFolderFor = (owner, repo, branch) => $"cache/{owner}/{repo}/{branch}",
+        };
+        var vm = new MainWindowViewModel(settings, keymapState: keymap, gitHub: fake);
+        keymap.Result = Success(KeymapWith(42), cacheFile);
+        KeyboardProfileRegistry.SetUserProfiles([]);
+        try
+        {
+            await vm.OpenGitHubKeymapAsync(
+                new GitHubKeymapRef("ovandongen", "zmk-config-cosmos82", "main", "config/cosmos82.keymap"));
+
+            var ctx = vm.GetLayoutWizardContext();
+
+            Assert.Equal(
+                fake.OnCacheFolderFor("ovandongen", "zmk-config-cosmos82", "main"),
+                ctx.GitHubFolder);
+        }
+        finally
+        {
+            KeyboardProfileRegistry.SetUserProfiles([]);
+        }
+    }
+
+    [Fact]
+    public void GetLayoutWizardContext_LocalKeymapOpen_GitHubFolderIsNull()
+    {
+        var keymap = new FakeKeymapStateService();
+        // Even with the service wired, a local entry yields no GitHub folder.
+        var vm = new MainWindowViewModel(
+            new InMemorySettingsService(), keymapState: keymap, gitHub: new FakeGitHubKeymapService());
+        keymap.Result = Success(KeymapWith(42), "corne.keymap");
+        KeyboardProfileRegistry.SetUserProfiles([]);
+        try
+        {
+            vm.LoadLayoutFromPath("corne.keymap");
+
+            Assert.Null(vm.GetLayoutWizardContext().GitHubFolder);
+        }
+        finally
+        {
+            KeyboardProfileRegistry.SetUserProfiles([]);
+        }
+    }
+
+    [Fact]
     public void ApplyLayoutWizardResult_RegistersAndSelects_NewProfile_KeepsFittingKeymap()
     {
         var settings = new InMemorySettingsService();
@@ -186,6 +260,43 @@ public class MainWindowViewModelLayoutWizardTests
         finally
         {
             KeyboardProfileRegistry.SetUserProfiles([]);
+        }
+    }
+
+    [Fact]
+    public void ApplyLayoutWizardResult_OpenKeymap_IsRememberedForTheNewBoard()
+    {
+        // The reported bug: open an unmatched keymap on Corne, build a board
+        // for it in the wizard, switch away and back — it must come back.
+        var settings = new InMemorySettingsService();
+        var keymap = new FakeKeymapStateService();
+        var vm = new MainWindowViewModel(settings, keymapState: keymap);
+        KeyboardProfileRegistry.SetUserProfiles([]);
+        var path = Path.Combine(Path.GetTempPath(), $"lviz-wiz-{Guid.NewGuid():N}.keymap");
+        File.WriteAllText(path, "/* stand-in */");
+        try
+        {
+            keymap.Result = Success(KeymapWith(7), "odd.keymap");
+            vm.LoadLayoutFromPath(path);
+            Assert.Equal(path, settings.Current.LayoutJsonPaths["Corne"]);
+
+            vm.ApplyLayoutWizardResult(new LayoutWizardResult(Layout("myboard", 7), KeymapPathToLoad: null));
+
+            Assert.Equal(path, settings.Current.LayoutJsonPaths["user:myboard"]);
+            Assert.False(settings.Current.LayoutJsonPaths.ContainsKey("Corne"));
+            Assert.Equal(path, settings.Current.RecentKeymapPaths["user:myboard"][0]);
+
+            vm.SelectKeyboardCommand.Execute(KeyboardProfileRegistry.All.First(p => p.Id == "Glove80"));
+            Assert.False(vm.HasLayoutLoaded);
+            vm.SelectKeyboardCommand.Execute(vm.AvailableKeyboards.First(p => p.Id == "user:myboard"));
+
+            Assert.True(vm.HasLayoutLoaded);
+            Assert.Equal(path, vm.LoadedLayoutPath);
+        }
+        finally
+        {
+            KeyboardProfileRegistry.SetUserProfiles([]);
+            File.Delete(path);
         }
     }
 

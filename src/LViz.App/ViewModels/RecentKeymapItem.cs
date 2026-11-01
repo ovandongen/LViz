@@ -15,10 +15,14 @@ namespace LViz.App.ViewModels;
 /// shown dimmed under the label.</param>
 /// <param name="Exists">Whether the file was on disk when the list was built.</param>
 /// <param name="IsCurrent">True when <paramref name="Path"/> equals the
-/// currently loaded keymap's path (ordinal).</param>
+/// settings entry of the currently loaded keymap (ordinal).</param>
+/// <param name="IsGitHub">True for a row whose <paramref name="Path"/> is a
+/// GitHub reference instead of a local file path — <see cref="Folder"/> then
+/// shows <c>owner/repo · branch</c> and the row is never greyed out.</param>
 public sealed record RecentKeymapItem(
     string Path,
     string FileName,
     string Folder,
     bool Exists,
-    bool IsCurrent);
+    bool IsCurrent,
+    bool IsGitHub = false);

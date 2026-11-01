@@ -50,11 +50,13 @@ src/
   LViz.App/    → Avalonia 11 UI, MVVM, HID pipeline, native show/hide
                  hotkey (Carbon on macOS, User32 on Windows), tray,
                  custom chrome, EN/NL localization, per-key label
-                 overrides + FontAwesome icon picker.
+                 overrides + FontAwesome icon picker, OS secret stores
+                 (Services/Secrets/), GitHub service (Services/GitHub/).
   LViz.Core/   → pure .NET — dtsi physical-layout parser, keyboard
                  profiles, .keymap parser (Keymap/Parser/) + Moergo
                  .json loader (MoergoJsonKeymapLoader), Raw HID
-                 profile matching, settings, diagnostics. No Avalonia.
+                 profile matching, settings, diagnostics, GitHub client,
+                 login session and repo cache (GitHub/). No Avalonia.
   LViz.Tests/  → xUnit fixtures.
 external/
   zmk-hid-protocol/   → submodule. Raw HID transport + report parser, and
@@ -205,6 +207,26 @@ dotnet run --project src/LViz.App                  # launch the app
   `/template/ ContentPresenter#PART_ContentPresenter`, so state overrides go on
   that part. Palette brushes inside `Application.Styles` need `DynamicResource`:
   `Application.Resources` is parsed after the styles.
+- **GitHub keymaps: one HTTP class, refs in the normal settings lists.**
+  `Core/GitHub/GitHubClient` is the only code that talks HTTP; every call goes
+  through its private `ApiRequest`/`SendAsync`/`SendForJsonAsync`, which own
+  the status → `GitHubErrorKind` mapping. Exception messages are
+  `GitHub {METHOD} {path} returned …` (path only) so a token never reaches
+  the log; `GitHubTokens.ToString()` omits the tokens. `GitHubSession` owns
+  the login (keychain JSON under `GitHubAppInfo.SecretKey`, refresh under 5
+  minutes left, signs out on a rejected refresh); everything else asks it for
+  a token per call. `ISecretStore` implementations never throw for platform
+  failures (warn + "unavailable"), picked per OS by `SecretStoreFactory`.
+  A GitHub keymap is stored as one `github:owner/repo:branch:path` string
+  (`GitHubKeymapRef`) in the same `LayoutJsonPaths`/`RecentKeymapPaths` dicts
+  as local paths; the file actually loaded is the cache copy under
+  `ApplicationData/LViz/github/`, so `MainWindowViewModel` tracks the loaded
+  *entry* in `_loadedEntry` (recents `IsCurrent`, wizard source), never
+  `LoadedLayoutPath`. Startup, board switch and Refresh load the cache copy
+  and then run a silent background check that reloads a newer commit or
+  fetches a cold cache. A GitHub entry without a cache copy is kept, never
+  pruned like a missing file (sign-out deletes the whole cache). The wizard
+  books the already-open keymap for the board it saves.
 
 ## Before writing code
 
@@ -478,3 +500,34 @@ LViz-specific (extend this list as we hit more):
   with `FormattedText` needs `new Typeface(FontFamily.Default)`, because a bare
   `new Typeface()` has no family and throws inside `Render` on every frame,
   which freezes the window. Tests can't catch any of this; only a real render does.
+
+- **A test that calls a `[SupportedOSPlatform]` App type trips CA1416** (the
+  early `if (OperatingSystem.IsMacOS()) return;` doesn't count as a guard).
+  Wrap the test class in `#pragma warning disable/restore CA1416` with a
+  why-comment, as `MacKeychainSecretStoreTests` does.
+
+- **`Tmds.DBus.Protocol` 0.21.3 is not the API on GitHub's main branch.**
+  There `MessageWriter` is a ref struct; in 0.21.3 it isn't, and `Variant` is
+  obsolete (use `VariantValue`, `Dict<,>.AsVariantValue()`). Check members
+  against the NuGet assembly, not main-branch samples. Idiom: see
+  `LinuxSecretServiceStore`.
+
+- **.NET 10 `TarEntry` is abstract.** Build test archives with
+  `new GnuTarEntry(TarEntryType.RegularFile, name) { DataStream = … }`.
+
+- **`FakeHttpHandler.Respond` is a synchronous func**: blocking in it blocks
+  the test thread. A test that must hold a response open needs its own
+  async handler (see `GatingHttpHandler` in `GitHubSessionTests`).
+
+- **`MainWindowViewModel.InitializeAsync` starts the HID stack when
+  `LiveKeyHighlighting` is true** (the default). Startup tests set it false.
+
+- **A horizontal `StackPanel` measures its children unbounded, so
+  `TextTrimming` inside it never trims.** Put an icon + trimmed text in a
+  `DockPanel` instead (recents row in `MainWindow.axaml`). Avalonia's
+  `SelectableTextBlock` centres with `TextAlignment`, not WPF's
+  `HorizontalTextAlignment`.
+
+- **FontAwesome icon names:** `icons.json` is embedded in the Projektanker
+  FontAwesome assembly (`FontAwesomeCatalog` reads it); brand icons need the
+  `fa-brands` prefix (`fa-brands fa-github`).

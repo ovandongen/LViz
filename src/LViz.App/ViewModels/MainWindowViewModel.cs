@@ -6,8 +6,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LViz.App.Localization;
 using LViz.App.Services;
+using LViz.App.Services.GitHub;
 using LViz.App.Services.MouseIdle;
 using LViz.Core.Diagnostics;
+using LViz.Core.GitHub;
 using LViz.Core.Input;
 using LViz.Core.Keymap;
 using LViz.Core.Layout;
@@ -72,10 +74,21 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     // (callers treat that as "every binding is Transparent").
     private readonly IKeymapStateService _keymap;
 
+    // GitHub keymap opener (sign-in, repo refresh, open). Null in tests that
+    // don't wire it — GitHub entries then only ever load from nothing and a
+    // click on one toasts "GitHub is not available".
+    private readonly IGitHubKeymapService? _gitHub;
+
     private IKeyboardProfile _profile;
     // Last successful load's status text. Null when the current StatusMessage
     // is something else (error, transient, etc).
     private string? _loadStatusBase;
+
+    // Settings entry (a local path, or a GitHubKeymapRef string) of the keymap
+    // currently loaded. Not LoadedLayoutPath: a GitHub keymap loads through
+    // its local cache file, so the loaded path and the stored entry differ.
+    // Drives RecentKeymapItem.IsCurrent; card 11 reads this field by name.
+    private string? _loadedEntry;
 
     private readonly IHidPipeline _hid;
     private readonly ILayerPushCoordinator _push;
@@ -504,6 +517,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public Action? AddOwnBoardRequested { get; set; }
     /// <summary>Set by <c>App.axaml.cs</c>: opens the "Edit layout…" window.</summary>
     public Action? EditLayoutRequested { get; set; }
+    /// <summary>Set by <c>App.axaml.cs</c> (card 12+): opens the GitHub keymap picker window.</summary>
+    public Action? OpenFromGitHubRequested { get; set; }
 
     /// <summary>Path of the layout JSON the user currently has loaded, or null if none.</summary>
     public string? LoadedLayoutPath => _keymap.LoadedPath;
@@ -529,25 +544,45 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     internal Func<string, bool> FileExists { get; set; } = File.Exists;
 
     /// <summary>
-    /// <see cref="RecentKeymaps"/> in flyout-ready shape: one item per path
-    /// in the same order, each stamped at read time with whether the file is
-    /// still on disk and whether it is the loaded keymap. Snapshot, like the
-    /// raw list — rebuilt on every read.
+    /// <see cref="RecentKeymaps"/> in flyout-ready shape: one item per entry
+    /// in the same order. A <see cref="GitHubKeymapRef"/> entry renders as a
+    /// GitHub row — repo · branch as the folder line, never greyed out.
+    /// Local entries are stamped at read time with whether the file is still
+    /// on disk. Each row's IsCurrent compares the entry with the loaded
+    /// keymap's settings entry (a GitHub keymap's <em>file</em> lives in the
+    /// cache, so <see cref="LoadedLayoutPath"/> can't answer that).
+    /// Snapshot, like the raw list — rebuilt on every read.
     /// </summary>
     public IReadOnlyList<RecentKeymapItem> RecentKeymapItems
     {
         get
         {
-            var current = LoadedLayoutPath;
-            var paths = RecentKeymaps;
-            var items = new List<RecentKeymapItem>(paths.Count);
-            foreach (var path in paths)
+            var current = _loadedEntry;
+            var entries = RecentKeymaps;
+            var items = new List<RecentKeymapItem>(entries.Count);
+            foreach (var entry in entries)
+            {
+                if (GitHubKeymapRef.TryParse(entry, out var keymap))
+                {
+                    // A GitHub row is never greyed out: "missing" has no
+                    // meaning for a repo path, and the cache may be cold.
+                    items.Add(new RecentKeymapItem(
+                        entry,
+                        keymap.FileName,
+                        $"{keymap.RepoFullName} · {keymap.Branch}",
+                        Exists: true,
+                        IsCurrent: entry == current,
+                        IsGitHub: true));
+                    continue;
+                }
+
                 items.Add(new RecentKeymapItem(
-                    path,
-                    Path.GetFileName(path),
-                    Path.GetDirectoryName(path) ?? "",
-                    FileExists(path),
-                    string.Equals(path, current, StringComparison.Ordinal)));
+                    entry,
+                    Path.GetFileName(entry),
+                    Path.GetDirectoryName(entry) ?? "",
+                    FileExists(entry),
+                    string.Equals(entry, current, StringComparison.Ordinal)));
+            }
             return items;
         }
     }
@@ -596,10 +631,12 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         IMouseIdleMonitor? mouseIdleMonitor = null,
         IKeymapStateService? keymapState = null,
         ICapabilityControl? capabilityControl = null,
-        IHostActionExecutor? hostActionExecutor = null)
+        IHostActionExecutor? hostActionExecutor = null,
+        IGitHubKeymapService? gitHub = null)
     {
         _settingsService = settingsService;
         _keymap = keymapState ?? new KeymapStateService();
+        _gitHub = gitHub;
         var s = settingsService.Load();
         _profile = KeyboardProfileRegistry.TryResolve(s.Keyboard, out var p) ? p : new CorneProfile();
         _selectedKeyboard = _profile;
@@ -706,9 +743,17 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         });
         RefreshCommand = new RelayCommand(() =>
         {
-            var paths = _settingsService.Load().LayoutJsonPaths;
-            if (paths.TryGetValue(_profile.Id, out var path) && !string.IsNullOrEmpty(path))
-                LoadLayoutFromPath(path);
+            // Re-read the stored entry and resolve it (GitHub entries load
+            // from the cache, then check GitHub in the background, which also
+            // fetches a cold cache). A local entry that resolves to nothing
+            // does nothing, as an empty path did before.
+            var entries = _settingsService.Load().LayoutJsonPaths;
+            if (entries.TryGetValue(_profile.Id, out var entry) && !string.IsNullOrEmpty(entry))
+            {
+                if (TryResolveEntry(entry, out var path))
+                    LoadLayoutFromPath(path, entry);
+                PendingGitHubCheck = CheckGitHubForUpdateAsync(entry);
+            }
         });
         TogglePinCommand = new RelayCommand(() =>
         {
@@ -753,22 +798,33 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public void InitializeAsync()
     {
         var s = _settingsService.Load();
-        if (TryGetStoredPathForProfile(s, _profile.Id, out var storedPath))
+        if (TryGetStoredPathForProfile(s, _profile.Id, out var storedPath, out var storedEntry))
         {
-            LoadLayoutFromPath(storedPath);
+            LoadLayoutFromPath(storedPath, storedEntry);
         }
         else
         {
             SetLoadStatusBase(null);
             StatusMessage = Loc.Instance["Status_NoLayoutLoaded"];
         }
+        PendingGitHubCheck = CheckGitHubForUpdateAsync(storedEntry);
 
         if (IsLiveHighlightingEnabled)
             StartKeyEventTracking();
     }
 
-    public void LoadLayoutFromPath(string path)
+    /// <summary>
+    /// Loads the keymap file at <paramref name="path"/> and books
+    /// <paramref name="entry"/> (defaulting to the path) as its settings
+    /// identity — for a GitHub keymap the path is the local cache file while
+    /// the entry stays the <see cref="GitHubKeymapRef"/> string, so recents
+    /// and the per-profile last-used slot keep storing the reference, not a
+    /// cache path the cache layer may move or wipe.
+    /// </summary>
+    public void LoadLayoutFromPath(string path, string? entry = null)
     {
+        entry ??= path;
+
         // Parse + commit happens first and is the only fallible step. On failure
         // nothing else runs, so the profile / settings are never half-mutated.
         var result = _keymap.Load(path, _profile.Id);
@@ -779,9 +835,10 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             StatusMessage = Loc.Instance.Format("Status_LoadErrorFormat", error.Message);
             DiagnosticLog.Error("MainVM", $"Load failed: {error}");
             Toast.Show(Loc.Instance.Format("Toast_LoadFailedFormat", Path.GetFileName(path), error.Message));
-            // A keymap file that no longer loads shouldn't linger in "recent".
-            // Skip the write entirely when the path isn't listed.
-            if (RecentKeymaps.Contains(path, StringComparer.Ordinal))
+            // A keymap that no longer loads shouldn't linger in "recent" —
+            // the *entry* is what recents store, so that's what gets pruned.
+            // Skip the write entirely when the entry isn't listed.
+            if (RecentKeymaps.Contains(entry, StringComparer.Ordinal))
             {
                 PersistSetting(s =>
                 {
@@ -789,7 +846,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                         return s;
                     var recentPaths = new Dictionary<string, List<string>>(s.RecentKeymapPaths)
                     {
-                        [_profile.Id] = RecentKeymapHistory.Remove(recents, path),
+                        [_profile.Id] = RecentKeymapHistory.Remove(recents, entry),
                     };
                     return s with { RecentKeymapPaths = recentPaths };
                 });
@@ -831,23 +888,11 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         BuildCombosForConfig();
         HasLayoutLoaded = true;
 
-        // One write for both dicts: the single last-used path and the
-        // per-profile recents list, always for the profile the keymap ended
-        // up on (_profile is already the auto-switch target when one ran).
-        PersistSetting(s =>
-        {
-            var paths = new Dictionary<string, string>(s.LayoutJsonPaths) { [_profile.Id] = path };
-            var recentPaths = new Dictionary<string, List<string>>(s.RecentKeymapPaths)
-            {
-                [_profile.Id] = RecentKeymapHistory.Push(
-                    s.RecentKeymapPaths.TryGetValue(_profile.Id, out var recents)
-                        ? recents
-                        : Array.Empty<string>(),
-                    path),
-            };
-            return s with { LayoutJsonPaths = paths, RecentKeymapPaths = recentPaths };
-        });
-        RaiseRecentKeymapsChanged();
+        // Booked for the profile the keymap ended up on (_profile is already
+        // the auto-switch target when one ran). The *entry*, not the loaded
+        // path — see the method doc.
+        _loadedEntry = entry;
+        BookEntryForProfile(entry);
 
         var baseMsg = Loc.Instance.Format("Status_Loaded",
             Path.GetFileName(path), loaded.LayerCount);
@@ -877,15 +922,25 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     }
 
     /// <summary>
-    /// Recents flyout row click: load a still-present keymap through the
-    /// normal path, or — when its file has gone missing — prune it from the
-    /// active profile's list instead. The disk is re-checked at click time
-    /// because the row's <see cref="RecentKeymapItem.Exists"/> is only a
-    /// snapshot from when the flyout built its list.
+    /// Recents flyout row click: a GitHub row re-opens through the network
+    /// (cache fallback offline); a local row loads a still-present keymap
+    /// through the normal path, or — when its file has gone missing — prunes
+    /// it from the active profile's list instead. The disk is re-checked at
+    /// click time because the row's <see cref="RecentKeymapItem.Exists"/> is
+    /// only a snapshot from when the flyout built its list.
     /// </summary>
     private void OpenRecentKeymap(RecentKeymapItem? item)
     {
         if (item is null) return;
+
+        if (GitHubKeymapRef.TryParse(item.Path, out var keymap))
+        {
+            // Fire-and-forget: the row's click completes; status/toasts report
+            // the outcome. Unlike a stale local row, a failing GitHub entry is
+            // NOT pruned — the repo may be temporarily unreachable.
+            _ = OpenGitHubKeymapAsync(keymap);
+            return;
+        }
 
         if (FileExists(item.Path))
         {
@@ -913,6 +968,144 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         RaiseRecentKeymapsChanged();
         SetLoadStatusBase(null);
         StatusMessage = Loc.Instance.Format("Status_RecentKeymapRemovedFormat", item.FileName);
+    }
+
+    /// <summary>
+    /// Opens a GitHub keymap: refreshes its repo through
+    /// <see cref="IGitHubKeymapService"/> and loads the resulting local file
+    /// under the reference as its settings entry (offline cache copies load
+    /// too, with a toast). Failures only toast — the entry stays in recents
+    /// because the repo may just be temporarily unreachable. An
+    /// <see cref="GitHubErrorKind.Unauthorized"/> additionally raises
+    /// <see cref="OpenFromGitHubRequested"/> so the sign-in window can open.
+    /// </summary>
+    public async Task OpenGitHubKeymapAsync(GitHubKeymapRef keymap)
+    {
+        if (_gitHub is null)
+        {
+            Toast.Show(Loc.Instance.Format("Toast_GitHubFailedFormat", keymap.FileName, "GitHub is not available"));
+            return;
+        }
+
+        // Keep what the bar said before "Loading…" so a failure can put it
+        // back instead of leaving a stale progress message behind.
+        var statusBefore = StatusMessage;
+        SetLoadStatusBase(null);
+        StatusMessage = Loc.Instance.Format("Status_GitHubLoadingFormat", keymap.FileName);
+        DiagnosticLog.Info("MainVM", $"Opening '{keymap}' from GitHub");
+
+        var result = await _gitHub.OpenAsync(keymap);
+        switch (result)
+        {
+            case GitHubOpenResult.Loaded loaded:
+                DiagnosticLog.Info("MainVM",
+                    $"Opened '{keymap}' from GitHub ({(loaded.FromCacheOffline ? "offline cache" : "fresh")})");
+                LoadLayoutFromPath(loaded.LocalPath, keymap.ToString());
+                if (loaded.FromCacheOffline)
+                    Toast.Show(Loc.Instance.Format("Toast_GitHubOfflineFormat", keymap.FileName));
+                break;
+
+            case GitHubOpenResult.Failed failed:
+                DiagnosticLog.Warn("MainVM", $"Opening '{keymap}' from GitHub failed ({failed.Kind}): {failed.Message}");
+                StatusMessage = statusBefore;
+                switch (failed.Kind)
+                {
+                    case GitHubErrorKind.Unauthorized:
+                        Toast.Show(Loc.Instance.Format("Toast_GitHubSignInNeededFormat", keymap.FileName));
+                        OpenFromGitHubRequested?.Invoke();
+                        break;
+                    case GitHubErrorKind.NotFound:
+                        Toast.Show(Loc.Instance.Format("Toast_GitHubNotFoundFormat", keymap.FileName));
+                        break;
+                    case GitHubErrorKind.Network:
+                        Toast.Show(Loc.Instance.Format("Toast_GitHubNetworkFormat", keymap.FileName));
+                        break;
+                    default:
+                        Toast.Show(Loc.Instance.Format("Toast_GitHubFailedFormat", keymap.FileName, failed.Message));
+                        break;
+                }
+                break;
+        }
+    }
+
+    /// <summary>
+    /// One write for both dicts: <paramref name="entry"/> becomes the active
+    /// profile's last-used keymap and moves to the front of its recents.
+    /// <paramref name="takeFromProfileId"/>, when given, loses its last-used
+    /// slot if that slot held the same entry (the keymap didn't fit there).
+    /// </summary>
+    private void BookEntryForProfile(string entry, string? takeFromProfileId = null)
+    {
+        PersistSetting(s =>
+        {
+            var paths = new Dictionary<string, string>(s.LayoutJsonPaths) { [_profile.Id] = entry };
+            if (takeFromProfileId is not null
+                && !string.Equals(takeFromProfileId, _profile.Id, StringComparison.OrdinalIgnoreCase)
+                && paths.TryGetValue(takeFromProfileId, out var old)
+                && string.Equals(old, entry, StringComparison.Ordinal))
+                paths.Remove(takeFromProfileId);
+            var recentPaths = new Dictionary<string, List<string>>(s.RecentKeymapPaths)
+            {
+                [_profile.Id] = RecentKeymapHistory.Push(
+                    s.RecentKeymapPaths.TryGetValue(_profile.Id, out var recents)
+                        ? recents
+                        : Array.Empty<string>(),
+                    entry),
+            };
+            return s with { LayoutJsonPaths = paths, RecentKeymapPaths = recentPaths };
+        });
+        RaiseRecentKeymapsChanged();
+    }
+
+    /// <summary>The last background GitHub check started at startup or Refresh; tests await it.</summary>
+    internal Task? PendingGitHubCheck { get; private set; }
+
+    /// <summary>
+    /// After a profile's stored GitHub entry was restored (startup, board
+    /// switch, Refresh): ask GitHub in the background whether the branch
+    /// moved, and if a newer copy came down, reload it and say so. When the
+    /// cache was cold (nothing loaded yet) the fetched copy simply loads.
+    /// Silent when signed out or offline — a startup shouldn't pop up errors
+    /// or the sign-in window. A no-op for local entries.
+    /// </summary>
+    private async Task CheckGitHubForUpdateAsync(string entry)
+    {
+        if (_gitHub is null || !GitHubKeymapRef.TryParse(entry, out var keymap))
+            return;
+
+        var profileId = _profile.Id;
+        try
+        {
+            await _gitHub.EnsureRestoredAsync();
+            if (!_gitHub.IsSignedIn)
+                return;
+
+            var result = await _gitHub.FetchRepoAsync(keymap.Owner, keymap.Repo, keymap.Branch);
+
+            // The user switched board or opened something else meanwhile.
+            var wasLoaded = _loadedEntry == entry;
+            if (_profile.Id != profileId || !(wasLoaded || _loadedEntry is null))
+                return;
+            if (wasLoaded && !result.Downloaded)
+                return;
+
+            if (_gitHub.LocalPathFor(keymap) is not string path)
+            {
+                DiagnosticLog.Warn("MainVM", $"'{keymap}' is gone from the newest GitHub copy; keeping the loaded one");
+                return;
+            }
+
+            DiagnosticLog.Info("MainVM", wasLoaded
+                ? $"'{keymap}' changed on GitHub, reloading"
+                : $"'{keymap}' fetched from GitHub (no cached copy)");
+            LoadLayoutFromPath(path, entry);
+            if (wasLoaded)
+                Toast.Show(Loc.Instance.Format("Toast_GitHubUpdatedFormat", keymap.FileName));
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLog.Info("MainVM", $"Background GitHub check for '{keymap}' skipped: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -1023,6 +1216,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         if (km is not null && !layoutFits)
         {
             _keymap.Clear();
+            _loadedEntry = null;
             Layers.Clear();
             ActiveLayerIndex = 0;
             HasLayoutLoaded = false;
@@ -1063,12 +1257,14 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         _deviceBus.SetKeyboardMatcher(_hid.KeyboardMatcher);
         _ = _router.RescanAsync();
 
-        // Auto-load whichever JSON the user last associated with this keyboard.
+        // Auto-load whichever entry the user last associated with this
+        // keyboard (local path or GitHub reference — resolved via cache).
         // If the previously-loaded layout already fits, leave it alone.
-        if (!HasLayoutLoaded
-            && TryGetStoredPathForProfile(_settingsService.Load(), profile.Id, out var storedPath))
+        if (!HasLayoutLoaded)
         {
-            LoadLayoutFromPath(storedPath);
+            if (TryGetStoredPathForProfile(_settingsService.Load(), profile.Id, out var storedPath, out var storedEntry))
+                LoadLayoutFromPath(storedPath, storedEntry);
+            PendingGitHubCheck = CheckGitHubForUpdateAsync(storedEntry);
         }
     }
 
@@ -1077,8 +1273,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// <summary>
     /// Everything the wizard window can't discover itself, read from live VM
     /// state: the open keymap, the user-layout ids already taken (without the
-    /// <c>user:</c> prefix), the connected devices no profile claims, and the
-    /// folder user layouts live in.
+    /// <c>user:</c> prefix), the connected devices no profile claims, the
+    /// folder user layouts live in, and the cache folder of the open GitHub
+    /// repo + branch (null when the open keymap is local).
     /// </summary>
     public LayoutWizardContext GetLayoutWizardContext()
     {
@@ -1094,7 +1291,14 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             .Where(name => !profiles.Any(p => p.NameMatches(name)))
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToList();
-        return new LayoutWizardContext(_keymap.Current, existingIds, deviceNames, UserLayoutStore.DefaultDirectory);
+        // A GitHub entry has no local folder the user could browse to; the
+        // wizard starts on the repo's cache instead.
+        string? gitHubFolder =
+            _gitHub is { } gitHub && GitHubKeymapRef.TryParse(_loadedEntry, out var keymap)
+                ? gitHub.CacheFolderFor(keymap.Owner, keymap.Repo, keymap.Branch)
+                : null;
+        return new LayoutWizardContext(
+            _keymap.Current, existingIds, deviceNames, UserLayoutStore.DefaultDirectory, gitHubFolder);
     }
 
     /// <summary>
@@ -1163,11 +1367,17 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// </summary>
     public void ApplyLayoutWizardResult(LayoutWizardResult result)
     {
+        var previousProfileId = _profile.Id;
         var profile = ReplaceUserProfile(result.Layout);
         ShowProfile(profile);
 
         if (result.KeymapPathToLoad is not null)
             LoadLayoutFromPath(result.KeymapPathToLoad);
+        else if (_loadedEntry is string openEntry)
+            // The wizard built this board around the keymap already open (it
+            // fits, so the switch kept it loaded): remember it for the new
+            // board, and drop it from the board it was opened on unmatched.
+            BookEntryForProfile(openEntry, takeFromProfileId: previousProfileId);
         HasUnmatchedKeymap = false;
 
         DiagnosticLog.Info("MainVM", $"Added user layout {profile.Id} ({profile.KeyCount} keys)");
@@ -1193,21 +1403,52 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     [RelayCommand]
     private void EditLayout() => EditLayoutRequested?.Invoke();
 
+    /// <summary>Opens the GitHub keymap picker window via the window callback.</summary>
+    [RelayCommand]
+    private void OpenFromGitHub() => OpenFromGitHubRequested?.Invoke();
+
     /// <summary>
-    /// Returns the persisted JSON path for the given profile if one exists and
-    /// the file is still on disk. If the entry points at a file that has gone
-    /// missing, logs a warning and removes the stale entry from settings so
+    /// Turns a stored settings entry into a file to load. A GitHub reference
+    /// resolves through the service's local cache only — never the network
+    /// (a cold cache simply doesn't resolve); a local path resolves when the
+    /// file is on disk.
+    /// </summary>
+    private bool TryResolveEntry(string entry, out string path)
+    {
+        if (GitHubKeymapRef.TryParse(entry, out var keymap))
+        {
+            var cached = _gitHub?.LocalPathFor(keymap);
+            path = cached ?? "";
+            return cached is not null;
+        }
+
+        path = entry;
+        return File.Exists(entry);
+    }
+
+    /// <summary>
+    /// Returns the persisted entry for the given profile plus the file it
+    /// resolves to (see <see cref="TryResolveEntry"/>). If the entry points
+    /// at a file that has gone missing — or a GitHub keymap whose cache copy
+    /// is gone — logs a warning and removes the stale entry from settings so
     /// startup doesn't keep complaining about it.
     /// </summary>
-    private bool TryGetStoredPathForProfile(UserSettings s, string profileId, out string path)
+    private bool TryGetStoredPathForProfile(UserSettings s, string profileId, out string path, out string entry)
     {
         path = "";
+        entry = "";
         if (!s.LayoutJsonPaths.TryGetValue(profileId, out var stored) || string.IsNullOrWhiteSpace(stored))
             return false;
-        if (File.Exists(stored))
-        {
-            path = stored;
+        entry = stored;
+        if (TryResolveEntry(stored, out path))
             return true;
+
+        // A GitHub reference without a cache copy (signed out, cache wiped)
+        // is still valid: keep it, the background check fetches it.
+        if (GitHubKeymapRef.IsGitHubEntry(stored))
+        {
+            DiagnosticLog.Info("MainVM", $"Stored layout for {profileId} has no cached copy yet: {stored}");
+            return false;
         }
 
         DiagnosticLog.Warn("MainVM", $"Stored layout for {profileId} is missing on disk: {stored}");

@@ -15,14 +15,16 @@ namespace LViz.App.ViewModels;
 /// Everything the wizard needs that it can't discover itself: the keymap LViz
 /// already has open (used for ranking and labelling when present), the ids the
 /// user layouts already occupy (for id de-duplication), the connected ZMK
-/// devices no profile matches yet (device-name prefill candidates) and the
-/// folder user layouts live in.
+/// devices no profile matches yet (device-name prefill candidates), the
+/// folder user layouts live in, and — when a GitHub keymap is open — the
+/// cache folder of its repo + branch to start scanning from.
 /// </summary>
 public sealed record LayoutWizardContext(
     LoadedKeymap? LoadedKeymap,
     IReadOnlyList<string> ExistingUserLayoutIds,
     IReadOnlyList<string> ConnectedDeviceNames,
-    string LayoutsDirectory);
+    string LayoutsDirectory,
+    string? GitHubFolder = null);
 
 /// <summary>
 /// What the wizard hands back when the user saves: the finished layout file
@@ -551,6 +553,18 @@ public partial class LayoutWizardViewModel : ObservableObject
         ZmkConfigScan Scan, LoadedKeymap? OwnKeymap, string? OwnKeymapPath, string? KeymapError);
 
     /// <summary>
+    /// Open-time kick from the window wiring: with a GitHub keymap open there
+    /// is no local zmk-config folder to browse to, so scan that repo's cache
+    /// folder straight away. A no-op when no GitHub keymap is open or the
+    /// cache vanished; the constructor deliberately doesn't call it, so tests
+    /// stay synchronous.
+    /// </summary>
+    public Task StartAsync() =>
+        _context.GitHubFolder is string folder && Directory.Exists(folder)
+            ? LoadSourceAsync(folder, isFolder: true)
+            : Task.CompletedTask;
+
+    /// <summary>
     /// Scan <paramref name="path"/> (folder or single board file) and rebuild
     /// everything the source step and the prefills show: candidates ranked
     /// against the keymap's key count, the info lines, and name / device name /
@@ -643,8 +657,27 @@ public partial class LayoutWizardViewModel : ObservableObject
             ? saved.Name
             : UserLayoutDraft.SuggestName(scan.KeyboardName, scan.ShieldName, FolderName(scan.Root));
         HidName = SuggestDeviceName(scan);
-        CanSaveToConfig = Directory.Exists(Path.Combine(scan.Root, "config"));
+        CanSaveToConfig = !IsGitHubSource(scan.Root) && Directory.Exists(Path.Combine(scan.Root, "config"));
         AlsoSaveToConfig = false;
+    }
+
+    /// <summary>
+    /// True when the scanned root is the open GitHub repo's cache folder:
+    /// writing a config folder back into the cache would be lost on the next
+    /// download (and pushing to GitHub comes with the editor batch), so the
+    /// "also save to config" option is not offered there.
+    /// </summary>
+    private bool IsGitHubSource(string root)
+    {
+        if (_context.GitHubFolder is not string folder)
+            return false;
+        var comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        return string.Equals(
+            Path.GetFullPath(folder).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+            Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+            comparison);
     }
 
     /// <summary>
