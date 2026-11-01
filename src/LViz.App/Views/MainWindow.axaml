@@ -5,6 +5,7 @@
         xmlns:sys="using:System"
         xmlns:conv="using:LViz.App.Converters"
         xmlns:avconv="using:Avalonia.Data.Converters"
+        xmlns:i="https://github.com/projektanker/icons.avalonia"
         x:Class="LViz.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         x:Name="MainWin"
@@ -196,6 +197,19 @@
                                                 <TextBlock Text="{Binding [RecentKeymaps_Browse], Source={StaticResource Loc}}"
                                                            VerticalAlignment="Center" />
                                             </Button>
+                                            <Button Command="{Binding OpenFromGitHubCommand}"
+                                                    Click="OnKeymapMenuItemClick"
+                                                    Padding="10,6"
+                                                    HorizontalAlignment="Stretch"
+                                                    HorizontalContentAlignment="Left"
+                                                    Background="Transparent">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <i:Icon Value="fa-brands fa-github" FontSize="12"
+                                                            VerticalAlignment="Center" />
+                                                    <TextBlock Text="{Binding [RecentKeymaps_OpenFromGitHub], Source={StaticResource Loc}}"
+                                                               VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
 
                                             <Separator Margin="4,2" />
 
@@ -229,8 +243,17 @@
                                                                            VerticalAlignment="Center"
                                                                            FontWeight="Bold" />
                                                                 <StackPanel Grid.Column="1" Spacing="1">
-                                                                    <TextBlock Text="{Binding FileName}"
-                                                                               TextTrimming="CharacterEllipsis" />
+                                                                    <!-- DockPanel, not a horizontal StackPanel: the
+                                                                         latter measures unbounded, so the name never trims. -->
+                                                                    <DockPanel>
+                                                                        <i:Icon DockPanel.Dock="Left"
+                                                                                Value="fa-brands fa-github" FontSize="11"
+                                                                                Margin="0,0,4,0"
+                                                                                VerticalAlignment="Center"
+                                                                                IsVisible="{Binding IsGitHub}" />
+                                                                        <TextBlock Text="{Binding FileName}"
+                                                                                   TextTrimming="CharacterEllipsis" />
+                                                                    </DockPanel>
                                                                     <TextBlock Text="{Binding Folder}"
                                                                                Foreground="{StaticResource TextStatusBar}"
                                                                                TextTrimming="CharacterEllipsis"

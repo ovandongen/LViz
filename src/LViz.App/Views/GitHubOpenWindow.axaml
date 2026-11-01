@@ -1,0 +1,180 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LViz.App.ViewModels"
+        xmlns:gh="using:LViz.Core.GitHub"
+        xmlns:i="https://github.com/projektanker/icons.avalonia"
+        x:Class="LViz.App.Views.GitHubOpenWindow"
+        x:DataType="vm:GitHubOpenViewModel"
+        x:Name="GitHubWin"
+        Title="{Binding [GitHub_WindowTitle], Source={StaticResource Loc}}"
+        Width="520"
+        SizeToContent="Height"
+        MinHeight="300"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BgBase}">
+
+    <DockPanel Margin="16">
+
+        <!-- Bottom bar: shared error line left, right-aligned Back / Cancel /
+             Open. Back shows on step 2, the accent Open on step 1, Cancel is
+             always there — the error sits above the buttons on every step. -->
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,12,0,0">
+            <TextBlock Grid.Column="0"
+                       Text="{Binding ErrorText}"
+                       Foreground="{StaticResource AccentRed}"
+                       FontSize="12" TextWrapping="Wrap"
+                       VerticalAlignment="Center"
+                       IsVisible="{Binding HasError}" />
+            <Button Grid.Column="1"
+                    Content="{Binding [GitHub_Back], Source={StaticResource Loc}}"
+                    Command="{Binding BackCommand}"
+                    Margin="8,0,0,0"
+                    IsVisible="{Binding IsKeymapStep}" />
+            <Button Grid.Column="2"
+                    Content="{Binding [GitHub_Cancel], Source={StaticResource Loc}}"
+                    Command="{Binding CancelCommand}"
+                    Margin="8,0,0,0" />
+            <Button Grid.Column="3"
+                    Content="{Binding [GitHub_OpenButton], Source={StaticResource Loc}}"
+                    Command="{Binding OpenCommand}"
+                    Classes="accent"
+                    IsDefault="True"
+                    Margin="8,0,0,0"
+                    IsVisible="{Binding IsRepoStep}" />
+        </Grid>
+
+        <!-- Step 0 — sign in: the device flow, first the button, then the
+             code with clipboard/browser shortcuts while the wait runs. -->
+        <StackPanel IsVisible="{Binding IsSignInStep}" Spacing="10">
+            <TextBlock Text="{Binding [GitHub_SignInIntro], Source={StaticResource Loc}}"
+                       FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource Text}" />
+            <Button Classes="accent"
+                    Content="{Binding [GitHub_SignInButton], Source={StaticResource Loc}}"
+                    Command="{Binding SignInCommand}"
+                    HorizontalAlignment="Left"
+                    IsVisible="{Binding !IsWaitingForSignIn}" />
+            <StackPanel Spacing="8" IsVisible="{Binding IsWaitingForSignIn}">
+                <TextBlock Text="{Binding [GitHub_EnterCode], Source={StaticResource Loc}}"
+                           FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource Text}" />
+                <SelectableTextBlock Text="{Binding UserCode}"
+                                     FontSize="28"
+                                     FontFamily="Menlo, Consolas, monospace"
+                                     HorizontalAlignment="Center"
+                                     TextAlignment="Center" />
+                <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+                    <Button Classes="link"
+                            Content="{Binding [GitHub_CopyCode], Source={StaticResource Loc}}"
+                            Command="{Binding CopyCodeCommand}" />
+                    <Button Classes="link"
+                            Content="{Binding [GitHub_OpenPage], Source={StaticResource Loc}}"
+                            Command="{Binding OpenVerificationPageCommand}" />
+                </StackPanel>
+                <TextBlock Text="{Binding [GitHub_Waiting], Source={StaticResource Loc}}"
+                           FontSize="12" Foreground="{StaticResource TextSubtle}"
+                           HorizontalAlignment="Center" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Step 1 — who you are, which repo, which branch. An empty list
+             offers the app-install link instead, and the "working" line
+             covers both busy flags (two TextBlocks, no multi-binding). -->
+        <StackPanel IsVisible="{Binding IsRepoStep}" Spacing="8">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                           Foreground="{StaticResource Text}">
+                    <Run Text="{Binding [GitHub_SignedInAs], Source={StaticResource Loc}, Mode=OneWay}" /><Run Text="{Binding Login, Mode=OneWay}" FontWeight="Bold" />
+                </TextBlock>
+                <Button Grid.Column="1" Classes="link"
+                        Content="{Binding [GitHub_SignOut], Source={StaticResource Loc}}"
+                        Command="{Binding SignOutCommand}" />
+            </Grid>
+            <TextBlock Text="{Binding LoginNotice}"
+                       FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource TextStatusBar}"
+                       IsVisible="{Binding LoginNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+            <StackPanel Spacing="4">
+                <TextBlock Text="{Binding [GitHub_Repository], Source={StaticResource Loc}}"
+                           FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                <ComboBox ItemsSource="{Binding Repos}"
+                          SelectedItem="{Binding SelectedRepo}"
+                          HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Left">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="gh:GitHubRepo">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="{Binding FullName}" VerticalAlignment="Center" />
+                                <i:Icon Value="fa-solid fa-lock" FontSize="10"
+                                        VerticalAlignment="Center"
+                                        IsVisible="{Binding IsPrivate}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+
+            <StackPanel Spacing="4">
+                <TextBlock Text="{Binding [GitHub_Branch], Source={StaticResource Loc}}"
+                           FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                <ComboBox ItemsSource="{Binding Branches}"
+                          SelectedItem="{Binding SelectedBranch}"
+                          HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Left" />
+            </StackPanel>
+
+            <!-- Zero repos is an app-installation problem, so offer its fix. -->
+            <StackPanel Spacing="6" IsVisible="{Binding HasNoRepos}">
+                <TextBlock Text="{Binding [GitHub_NoRepos], Source={StaticResource Loc}}"
+                           FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource Text}" />
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button Classes="link"
+                            Content="{Binding [GitHub_InstallApp], Source={StaticResource Loc}}"
+                            Command="{Binding InstallOnReposCommand}" />
+                    <Button Classes="link"
+                            Content="{Binding [GitHub_ReloadRepos], Source={StaticResource Loc}}"
+                            Command="{Binding ReloadReposCommand}" />
+                </StackPanel>
+            </StackPanel>
+            <Button Classes="link"
+                    Content="{Binding [GitHub_InstallMore], Source={StaticResource Loc}}"
+                    Command="{Binding InstallOnReposCommand}"
+                    FontSize="11"
+                    HorizontalAlignment="Left"
+                    IsVisible="{Binding !HasNoRepos}" />
+
+            <TextBlock Text="{Binding [GitHub_Working], Source={StaticResource Loc}}"
+                       FontSize="12" Foreground="{StaticResource TextSubtle}"
+                       IsVisible="{Binding IsBusy}" />
+            <TextBlock Text="{Binding [GitHub_Working], Source={StaticResource Loc}}"
+                       FontSize="12" Foreground="{StaticResource TextSubtle}"
+                       IsVisible="{Binding IsFetching}" />
+        </StackPanel>
+
+        <!-- Step 2 — the repo's keymaps, recents-row style. The command
+             lives on the window's DataContext, reached through ElementName
+             (type casts break inside deferred template content). -->
+        <StackPanel IsVisible="{Binding IsKeymapStep}" Spacing="8">
+            <TextBlock Text="{Binding [GitHub_PickKeymap], Source={StaticResource Loc}}"
+                       FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource Text}" />
+            <ItemsControl ItemsSource="{Binding Keymaps}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:GitHubKeymapItem">
+                        <Button Command="{Binding DataContext.PickKeymapCommand, ElementName=GitHubWin}"
+                                CommandParameter="{Binding}"
+                                Padding="10,6"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Left"
+                                Background="Transparent">
+                            <StackPanel Spacing="1">
+                                <TextBlock Text="{Binding RelativePath}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding Detail}"
+                                           Foreground="{StaticResource TextStatusBar}" FontSize="11"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </DockPanel>
+</Window>

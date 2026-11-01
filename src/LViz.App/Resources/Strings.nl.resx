@@ -217,6 +217,34 @@
     <value>Bestand niet gevonden</value>
     <comment/>
   </data>
+  <data name="Status_GitHubLoadingFormat" xml:space="preserve">
+    <value>{0} laden van GitHub…</value>
+    <comment/>
+  </data>
+  <data name="Toast_GitHubOfflineFormat" xml:space="preserve">
+    <value>GitHub niet bereikbaar, de opgeslagen kopie van {0} geopend</value>
+    <comment/>
+  </data>
+  <data name="Toast_GitHubSignInNeededFormat" xml:space="preserve">
+    <value>Log in bij GitHub om {0} te openen</value>
+    <comment/>
+  </data>
+  <data name="Toast_GitHubNotFoundFormat" xml:space="preserve">
+    <value>{0} is niet gevonden op GitHub, of LViz heeft geen toegang tot de repo</value>
+    <comment/>
+  </data>
+  <data name="Toast_GitHubNetworkFormat" xml:space="preserve">
+    <value>GitHub niet bereikbaar en er is geen opgeslagen kopie van {0}</value>
+    <comment/>
+  </data>
+  <data name="Toast_GitHubFailedFormat" xml:space="preserve">
+    <value>Kon {0} niet openen vanaf GitHub: {1}</value>
+    <comment/>
+  </data>
+  <data name="Toast_GitHubUpdatedFormat" xml:space="preserve">
+    <value>Nieuwere versie van {0} geladen vanaf GitHub</value>
+    <comment/>
+  </data>
   <data name="Status_Ready" xml:space="preserve">
     <value>Klaar</value>
     <comment/>
@@ -1345,6 +1373,142 @@
   </data>
   <data name="Editor_MirrorUnavailableFormat" xml:space="preserve">
     <value>Spiegelen kan alleen als beide helften evenveel toetsen hebben (nu {0} links, {1} rechts).</value>
+    <comment/>
+  </data>
+  <data name="GitHub_SignInAgain" xml:space="preserve">
+    <value>Log opnieuw in bij GitHub.</value>
+    <comment/>
+  </data>
+  <data name="GitHub_LoginNotSaved" xml:space="preserve">
+    <value>Deze computer heeft geen sleutelhanger die LViz kan gebruiken, dus je moet de volgende keer opnieuw inloggen.</value>
+    <comment/>
+  </data>
+  <data name="GitHub_ErrorNetwork" xml:space="preserve">
+    <value>GitHub is niet bereikbaar. Controleer je verbinding en probeer het opnieuw.</value>
+    <comment/>
+  </data>
+  <data name="GitHub_ErrorRateLimited" xml:space="preserve">
+    <value>GitHub beperkt het aantal verzoeken. Probeer het over een paar minuten opnieuw.</value>
+    <comment/>
+  </data>
+  <data name="GitHub_ErrorCodeExpired" xml:space="preserve">
+    <value>De code is verlopen. Begin opnieuw.</value>
+    <comment/>
+  </data>
+  <data name="GitHub_ErrorAccessDenied" xml:space="preserve">
+    <value>Inloggen is geannuleerd op GitHub.</value>
+    <comment/>
+  </data>
+  <data name="GitHub_ErrorNotFound" xml:space="preserve">
+    <value>Niet gevonden op GitHub, of LViz heeft er geen toegang toe.</value>
+    <comment/>
+  </data>
+  <data name="GitHub_ErrorTooLarge" xml:space="preserve">
+    <value>Deze repository is te groot voor LViz (meer dan 50 MB).</value>
+    <comment/>
+  </data>
+  <data name="GitHub_ErrorUnexpectedFormat" xml:space="preserve">
+    <value>Er ging iets mis met GitHub: {0}</value>
+    <comment/>
+  </data>
+  <data name="GitHub_NoKeymapFormat" xml:space="preserve">
+    <value>Geen .keymap-bestand gevonden in {0} ({1}).</value>
+    <comment/>
+  </data>
+  <data name="GitHub_KeymapBoardFormat" xml:space="preserve">
+    <value>{0} toetsen · {1}</value>
+    <comment/>
+  </data>
+  <data name="GitHub_KeymapNoLayoutFormat" xml:space="preserve">
+    <value>{0} toetsen · nog geen layout</value>
+    <comment/>
+  </data>
+  <data name="GitHub_KeymapUnreadable" xml:space="preserve">
+    <value>Kan niet worden gelezen</value>
+    <comment/>
+  </data>
+  <data name="RecentKeymaps_OpenFromGitHub" xml:space="preserve">
+    <value>Openen vanaf GitHub…</value>
+    <comment/>
+  </data>
+  <data name="GitHub_WindowTitle" xml:space="preserve">
+    <value>Openen vanaf GitHub</value>
+    <comment/>
+  </data>
+  <data name="GitHub_SignInIntro" xml:space="preserve">
+    <value>Log in met je GitHub-account om de keymap uit je zmk-config-repository te openen. LViz ziet alleen repositories waarop je de app LViz for ZMK installeert.</value>
+    <comment/>
+  </data>
+  <data name="GitHub_SignInButton" xml:space="preserve">
+    <value>Inloggen met GitHub</value>
+    <comment/>
+  </data>
+  <data name="GitHub_EnterCode" xml:space="preserve">
+    <value>Vul deze code in op de GitHub-pagina die net is geopend (hij staat al op je klembord):</value>
+    <comment/>
+  </data>
+  <data name="GitHub_CopyCode" xml:space="preserve">
+    <value>Code kopiëren</value>
+    <comment/>
+  </data>
+  <data name="GitHub_OpenPage" xml:space="preserve">
+    <value>GitHub-pagina openen</value>
+    <comment/>
+  </data>
+  <data name="GitHub_Waiting" xml:space="preserve">
+    <value>Wachten tot je goedkeurt op GitHub…</value>
+    <comment/>
+  </data>
+  <data name="GitHub_SignedInAs" xml:space="preserve">
+    <value>Ingelogd als </value>
+    <comment/>
+  </data>
+  <data name="GitHub_SignOut" xml:space="preserve">
+    <value>Uitloggen</value>
+    <comment/>
+  </data>
+  <data name="GitHub_Repository" xml:space="preserve">
+    <value>Repository</value>
+    <comment/>
+  </data>
+  <data name="GitHub_Branch" xml:space="preserve">
+    <value>Branch</value>
+    <comment/>
+  </data>
+  <data name="GitHub_NoRepos" xml:space="preserve">
+    <value>LViz for ZMK is nog op geen enkele repository geïnstalleerd. Installeer de app op je zmk-config-repository en laad daarna opnieuw.</value>
+    <comment/>
+  </data>
+  <data name="GitHub_InstallApp" xml:space="preserve">
+    <value>Installeren op GitHub…</value>
+    <comment/>
+  </data>
+  <data name="GitHub_ReloadRepos" xml:space="preserve">
+    <value>Opnieuw laden</value>
+    <comment/>
+  </data>
+  <data name="GitHub_InstallMore" xml:space="preserve">
+    <value>Meer repositories toevoegen…</value>
+    <comment/>
+  </data>
+  <data name="GitHub_Working" xml:space="preserve">
+    <value>Bezig…</value>
+    <comment/>
+  </data>
+  <data name="GitHub_PickKeymap" xml:space="preserve">
+    <value>Deze repository heeft meer dan één keymap. Welke wil je openen?</value>
+    <comment/>
+  </data>
+  <data name="GitHub_Back" xml:space="preserve">
+    <value>Terug</value>
+    <comment/>
+  </data>
+  <data name="GitHub_Cancel" xml:space="preserve">
+    <value>Annuleren</value>
+    <comment/>
+  </data>
+  <data name="GitHub_OpenButton" xml:space="preserve">
+    <value>Openen</value>
     <comment/>
   </data>
 </root>

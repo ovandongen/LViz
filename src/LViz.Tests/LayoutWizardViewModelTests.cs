@@ -5,6 +5,7 @@ using LViz.Core.Keymap.Parser;
 using LViz.Core.Layout;
 using LViz.Core.Layout.Dtsi;
 using LViz.Core.Layout.Import;
+using LViz.Tests.Keymap;
 using LViz.Tests.Layout;
 using Xunit;
 
@@ -18,7 +19,8 @@ namespace LViz.Tests;
 /// "build from questions" grid source (answers, clamping, generated editor,
 /// save), the adjust step (editor build/keep/rebuild, labels, warnings) and
 /// saving (edited normalised keys, layout files, <c>.dtsi</c> export, error
-/// handling, close result).
+/// handling, close result). <c>StartAsync</c> covers the open-time scan of a
+/// GitHub repo's cache folder and its "also save to config" block.
 /// </summary>
 public sealed class LayoutWizardViewModelTests : IDisposable
 {
@@ -192,6 +194,56 @@ public sealed class LayoutWizardViewModelTests : IDisposable
 
         vm.UseDeviceNameCommand.Execute("Ploopy Bean");
         Assert.Equal("Ploopy Bean", vm.HidName);
+    }
+
+    // --- start on the GitHub repo's cache ---
+
+    [Fact]
+    public async Task StartAsync_GitHubFolder_ScansItAndBlocksSaveToConfig()
+    {
+        var folder = CreateGitHubCacheTree();
+        var vm = CreateVm(gitHubFolder: folder);
+
+        await vm.StartAsync();
+
+        Assert.Equal(folder, vm.SourcePath);
+        Assert.NotEmpty(vm.Candidates);
+        // config/ exists, but writing it back would be lost on the next download.
+        Assert.True(Directory.Exists(Path.Combine(folder, "config")));
+        Assert.False(vm.CanSaveToConfig);
+        Assert.False(vm.AlsoSaveToConfig);
+    }
+
+    [Fact]
+    public async Task LoadSource_SameFolder_NotAGitHubContext_CanSaveToConfig()
+    {
+        var folder = CreateGitHubCacheTree();
+        var vm = CreateVm();
+
+        await vm.LoadSourceAsync(folder, isFolder: true);
+
+        Assert.True(vm.CanSaveToConfig);
+    }
+
+    [Fact]
+    public async Task StartAsync_MissingGitHubFolder_CompletesWithoutScanning()
+    {
+        var vm = CreateVm(gitHubFolder: Path.Combine(Path.GetTempPath(), $"lviz-gone-{Guid.NewGuid():N}"));
+
+        await vm.StartAsync();
+
+        Assert.Null(vm.SourcePath);
+    }
+
+    [Fact]
+    public async Task StartAsync_NoGitHubFolder_CompletesWithoutScanning()
+    {
+        var vm = CreateVm();
+
+        await vm.StartAsync();
+
+        Assert.Null(vm.SourcePath);
+        Assert.Empty(vm.Candidates);
     }
 
     // --- navigation ---
@@ -1025,12 +1077,14 @@ public sealed class LayoutWizardViewModelTests : IDisposable
         LoadedKeymap? loadedKeymap = null,
         IReadOnlyList<string>? connected = null,
         IReadOnlyList<string>? existingIds = null,
-        string? layoutsDirectory = null) =>
+        string? layoutsDirectory = null,
+        string? gitHubFolder = null) =>
         new(new LayoutWizardContext(
             loadedKeymap,
             existingIds ?? Array.Empty<string>(),
             connected ?? Array.Empty<string>(),
-            layoutsDirectory ?? Path.Combine(Path.GetTempPath(), "lviz-wizard-layouts")));
+            layoutsDirectory ?? Path.Combine(Path.GetTempPath(), "lviz-wizard-layouts"),
+            gitHubFolder));
 
     private LoadedKeymap KeymapWithBindings(int count)
     {
@@ -1069,6 +1123,15 @@ public sealed class LayoutWizardViewModelTests : IDisposable
             """);
         WriteFile(root, "config/info.json", LayoutFixtures.Read("slabwing.info.json"));
         WriteFile(root, "config/slabwing.keymap", KeymapText(keymapBindings));
+        return root;
+    }
+
+    /// <summary>A zmk-config tree like a GitHub repo cache unpacks: a config keymap plus a board dtsi.</summary>
+    private string CreateGitHubCacheTree()
+    {
+        var root = CreateTempRoot();
+        WriteFile(root, "config/test.keymap", KeymapFixtures.Read("corne.keymap"));
+        WriteFile(root, "boards/cosmos82.dtsi", LayoutFixtures.Read("cosmos82.dtsi"));
         return root;
     }
 

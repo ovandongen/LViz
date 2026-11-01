@@ -1,10 +1,14 @@
 using Microsoft.Extensions.DependencyInjection;
 using LViz.App.Localization;
 using LViz.App.Services;
+using LViz.App.Services.GitHub;
 using LViz.App.Services.Hotkeys;
 using LViz.App.Services.MouseIdle;
+using LViz.App.Services.Secrets;
 using LViz.App.ViewModels;
 using LViz.Core.Diagnostics;
+using LViz.Core.GitHub;
+using LViz.Core.Persistence;
 using LViz.Core.Settings;
 using ZmkHidProtocol.ActiveWindow;
 
@@ -84,6 +88,25 @@ internal static class AppServices
         services.AddSingleton<IKeyLabelOverrideService>(KeyLabelOverrides.Service);
         services.AddSingleton<IComboLabelOverrideService>(ComboLabelOverrides.Service);
 
+        // GitHub zmk-config: device-flow sign-in, repo browsing and the local
+        // repo cache, tied into the one service the windows talk to. The
+        // secret store is the platform credential store, falling back to
+        // in-memory where none exists.
+        services.AddSingleton<ISecretStore>(_ => SecretStoreFactory.Create());
+        services.AddSingleton(_ => new HttpClient());
+        services.AddSingleton(sp => new GitHubClient(
+            sp.GetRequiredService<HttpClient>(),
+            GitHubAppInfo.ClientId,
+            $"LViz/{typeof(GitHubKeymapService).Assembly.GetName().Version}"));
+        services.AddSingleton(sp => new GitHubSession(
+            sp.GetRequiredService<GitHubClient>(),
+            sp.GetRequiredService<ISecretStore>()));
+        services.AddSingleton(_ => new GitHubRepoCache(GitHubRepoCache.DefaultRoot));
+        services.AddSingleton<IGitHubKeymapService>(sp => new GitHubKeymapService(
+            sp.GetRequiredService<GitHubClient>(),
+            sp.GetRequiredService<GitHubSession>(),
+            sp.GetRequiredService<GitHubRepoCache>()));
+
         services.AddSingleton<MainWindowViewModel>(sp =>
             new MainWindowViewModel(
                 sp.GetRequiredService<ISettingsService>(),
@@ -91,7 +114,8 @@ internal static class AppServices
                 sp.GetService<IMouseIdleMonitor>(),
                 keymapState: null,
                 capabilityControl: sp.GetRequiredService<ICapabilityControl>(),
-                hostActionExecutor: sp.GetRequiredService<IHostActionExecutor>()));
+                hostActionExecutor: sp.GetRequiredService<IHostActionExecutor>(),
+                gitHub: sp.GetRequiredService<IGitHubKeymapService>()));
 
         services.AddTransient<SettingsViewModel>(sp =>
             new SettingsViewModel(

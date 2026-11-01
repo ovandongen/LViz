@@ -10,6 +10,7 @@ using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using LViz.App.Localization;
 using LViz.App.Services;
+using LViz.App.Services.GitHub;
 using LViz.App.Services.Hotkeys;
 using LViz.App.ViewModels;
 using LViz.App.Views;
@@ -302,6 +303,8 @@ public partial class App : Application
             {
                 var ctx = viewModel.GetLayoutWizardContext();
                 var dlgVm = new LayoutWizardViewModel(ctx);
+                // A GitHub keymap's repo is scanned straight away.
+                _ = dlgVm.StartAsync();
                 var dlg = new LayoutWizardWindow
                 {
                     DataContext = dlgVm,
@@ -312,6 +315,28 @@ public partial class App : Application
                     var result = await dlg.ShowDialog<LayoutWizardResult?>(mainWindow);
                     if (result is not null)
                         viewModel.ApplyLayoutWizardResult(result);
+                });
+            };
+
+            // "Open from GitHub…": modal sign-in / repo / keymap picker. The
+            // chosen keymap arrives as a cached file plus its github: entry,
+            // loaded through the shared LoadLayoutFromPath path.
+            viewModel.OpenFromGitHubRequested = () =>
+            {
+                var ghVm = new GitHubOpenViewModel(services.GetRequiredService<IGitHubKeymapService>())
+                {
+                    OpenUrl = url => services.GetRequiredService<IHostActionExecutor>().Launch(url),
+                };
+                var dlg = new GitHubOpenWindow
+                {
+                    DataContext = ghVm,
+                    Topmost = mainWindow.Topmost,
+                };
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    var result = await dlg.ShowDialog<GitHubOpenSelection?>(mainWindow);
+                    if (result is not null)
+                        viewModel.LoadLayoutFromPath(result.LocalPath, result.Keymap.ToString());
                 });
             };
 
