@@ -1,0 +1,3035 @@
+{
+ "source": "ZMK app/include/dt-bindings/zmk/keys.h",
+ "license": "MIT, Copyright (c) 2020 The ZMK Contributors",
+ "generatedBy": "docs/tasks/gen_keycodes.py (LViz, local)",
+ "keycodes": [
+  {
+   "names": [
+    "SYSTEM_POWER",
+    "SYS_PWR"
+   ],
+   "description": "System Power Down",
+   "category": "system"
+  },
+  {
+   "names": [
+    "SYSTEM_SLEEP",
+    "SYS_SLEEP"
+   ],
+   "description": "System Sleep",
+   "category": "system"
+  },
+  {
+   "names": [
+    "SYSTEM_WAKE_UP",
+    "SYS_WAKE"
+   ],
+   "description": "System Wake Up",
+   "category": "system"
+  },
+  {
+   "names": [
+    "A"
+   ],
+   "description": "Keyboard a and A",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "B"
+   ],
+   "description": "Keyboard b and B",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "C"
+   ],
+   "description": "Keyboard c and C",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "D"
+   ],
+   "description": "Keyboard d and D",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "E"
+   ],
+   "description": "Keyboard e and E",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "F"
+   ],
+   "description": "Keyboard f and F",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "G"
+   ],
+   "description": "Keyboard g and G",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "H"
+   ],
+   "description": "Keyboard h and H",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "I"
+   ],
+   "description": "Keyboard i and I",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "J"
+   ],
+   "description": "Keyboard j and J",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "K"
+   ],
+   "description": "Keyboard k and K",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "L"
+   ],
+   "description": "Keyboard l and L",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "M"
+   ],
+   "description": "Keyboard m and M",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "N"
+   ],
+   "description": "Keyboard n and N",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "O"
+   ],
+   "description": "Keyboard o and O",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "P"
+   ],
+   "description": "Keyboard p and P",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "Q"
+   ],
+   "description": "Keyboard q and Q",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "R"
+   ],
+   "description": "Keyboard r and R",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "S"
+   ],
+   "description": "Keyboard s and S",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "T"
+   ],
+   "description": "Keyboard t and T",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "U"
+   ],
+   "description": "Keyboard u and U",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "V"
+   ],
+   "description": "Keyboard v and V",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "W"
+   ],
+   "description": "Keyboard w and W",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "X"
+   ],
+   "description": "Keyboard x and X",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "Y"
+   ],
+   "description": "Keyboard y and Y",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "Z"
+   ],
+   "description": "Keyboard z and Z",
+   "category": "letters"
+  },
+  {
+   "names": [
+    "NUMBER_1",
+    "N1"
+   ],
+   "description": "Keyboard 1 and ! (Exclamation)",
+   "category": "digits",
+   "deprecated": [
+    "NUM_1"
+   ]
+  },
+  {
+   "names": [
+    "EXCLAMATION",
+    "EXCL"
+   ],
+   "description": "Keyboard ! (Exclamation)",
+   "category": "symbols",
+   "deprecated": [
+    "BANG"
+   ],
+   "shiftOf": "NUMBER_1"
+  },
+  {
+   "names": [
+    "NUMBER_2",
+    "N2"
+   ],
+   "description": "Keyboard 2 and @ (At sign)",
+   "category": "digits",
+   "deprecated": [
+    "NUM_2"
+   ]
+  },
+  {
+   "names": [
+    "AT_SIGN",
+    "AT"
+   ],
+   "description": "Keyboard @ (At sign)",
+   "category": "symbols",
+   "deprecated": [
+    "ATSN"
+   ],
+   "shiftOf": "NUMBER_2"
+  },
+  {
+   "names": [
+    "NUMBER_3",
+    "N3"
+   ],
+   "description": "Keyboard 3 and # (Hash/Number)",
+   "category": "digits",
+   "deprecated": [
+    "NUM_3"
+   ]
+  },
+  {
+   "names": [
+    "HASH",
+    "POUND"
+   ],
+   "description": "Keyboard # (Hash/Number)",
+   "category": "symbols",
+   "shiftOf": "NUMBER_3"
+  },
+  {
+   "names": [
+    "NUMBER_4",
+    "N4"
+   ],
+   "description": "Keyboard 4 and $ (Dollar)",
+   "category": "digits",
+   "deprecated": [
+    "NUM_4"
+   ]
+  },
+  {
+   "names": [
+    "DOLLAR",
+    "DLLR"
+   ],
+   "description": "Keyboard $ (Dollar)",
+   "category": "symbols",
+   "shiftOf": "NUMBER_4"
+  },
+  {
+   "names": [
+    "NUMBER_5",
+    "N5"
+   ],
+   "description": "Keyboard 5 and % (Percent)",
+   "category": "digits",
+   "deprecated": [
+    "NUM_5"
+   ]
+  },
+  {
+   "names": [
+    "PERCENT",
+    "PRCNT"
+   ],
+   "description": "Keyboard % (Percent)",
+   "category": "symbols",
+   "deprecated": [
+    "PRCT"
+   ],
+   "shiftOf": "NUMBER_5"
+  },
+  {
+   "names": [
+    "NUMBER_6",
+    "N6"
+   ],
+   "description": "Keyboard 6 and ^ (Caret)",
+   "category": "digits",
+   "deprecated": [
+    "NUM_6"
+   ]
+  },
+  {
+   "names": [
+    "CARET"
+   ],
+   "description": "Keyboard ^ (Caret)",
+   "category": "symbols",
+   "deprecated": [
+    "CRRT"
+   ],
+   "shiftOf": "NUMBER_6"
+  },
+  {
+   "names": [
+    "NUMBER_7",
+    "N7"
+   ],
+   "description": "Keyboard 7 and & (Ampersand)",
+   "category": "digits",
+   "deprecated": [
+    "NUM_7"
+   ]
+  },
+  {
+   "names": [
+    "AMPERSAND",
+    "AMPS"
+   ],
+   "description": "Keyboard & (Ampersand)",
+   "category": "symbols",
+   "shiftOf": "NUMBER_7"
+  },
+  {
+   "names": [
+    "NUMBER_8",
+    "N8"
+   ],
+   "description": "Keyboard 8 and * (Asterisk)",
+   "category": "digits",
+   "deprecated": [
+    "NUM_8"
+   ]
+  },
+  {
+   "names": [
+    "ASTERISK",
+    "ASTRK",
+    "STAR"
+   ],
+   "description": "Keyboard * (Asterisk)",
+   "category": "symbols",
+   "shiftOf": "NUMBER_8"
+  },
+  {
+   "names": [
+    "NUMBER_9",
+    "N9"
+   ],
+   "description": "Keyboard 9 and ( (Left Parenthesis)",
+   "category": "digits",
+   "deprecated": [
+    "NUM_9"
+   ]
+  },
+  {
+   "names": [
+    "LEFT_PARENTHESIS",
+    "LPAR"
+   ],
+   "description": "Keyboard ( (Left Parenthesis)",
+   "category": "symbols",
+   "deprecated": [
+    "LPRN"
+   ],
+   "shiftOf": "NUMBER_9"
+  },
+  {
+   "names": [
+    "NUMBER_0",
+    "N0"
+   ],
+   "description": "Keyboard 0 and ) (Right Parenthesis)",
+   "category": "digits",
+   "deprecated": [
+    "NUM_0"
+   ]
+  },
+  {
+   "names": [
+    "RIGHT_PARENTHESIS",
+    "RPAR"
+   ],
+   "description": "Keyboard ) (Right Parenthesis)",
+   "category": "symbols",
+   "deprecated": [
+    "RPRN"
+   ],
+   "shiftOf": "NUMBER_0"
+  },
+  {
+   "names": [
+    "RETURN",
+    "ENTER",
+    "RET"
+   ],
+   "description": "Keyboard Return (Enter)",
+   "category": "editing"
+  },
+  {
+   "names": [
+    "ESCAPE",
+    "ESC"
+   ],
+   "description": "Keyboard Escape",
+   "category": "editing"
+  },
+  {
+   "names": [
+    "BACKSPACE",
+    "BSPC"
+   ],
+   "description": "Keyboard Backspace",
+   "category": "editing",
+   "deprecated": [
+    "BKSP"
+   ]
+  },
+  {
+   "names": [
+    "TAB"
+   ],
+   "description": "Keyboard Tab",
+   "category": "editing"
+  },
+  {
+   "names": [
+    "SPACE"
+   ],
+   "description": "Keyboard Space",
+   "category": "editing",
+   "deprecated": [
+    "SPC"
+   ]
+  },
+  {
+   "names": [
+    "MINUS"
+   ],
+   "description": "Keyboard - and _ (Minus and Underscore)",
+   "category": "punctuation"
+  },
+  {
+   "names": [
+    "UNDERSCORE",
+    "UNDER"
+   ],
+   "description": "Keyboard _ (Underscore)",
+   "category": "symbols",
+   "shiftOf": "MINUS"
+  },
+  {
+   "names": [
+    "EQUAL"
+   ],
+   "description": "Keyboard = and + (Equal and Plus)",
+   "category": "punctuation",
+   "deprecated": [
+    "EQL"
+   ]
+  },
+  {
+   "names": [
+    "PLUS"
+   ],
+   "description": "Keyboard + (Plus)",
+   "category": "symbols",
+   "shiftOf": "EQUAL"
+  },
+  {
+   "names": [
+    "LEFT_BRACKET",
+    "LBKT"
+   ],
+   "description": "Keyboard [ and { (Left Bracket and Left Brace)",
+   "category": "punctuation"
+  },
+  {
+   "names": [
+    "LEFT_BRACE",
+    "LBRC"
+   ],
+   "description": "Keyboard { (Left Brace)",
+   "category": "symbols",
+   "deprecated": [
+    "LCUR"
+   ],
+   "shiftOf": "LEFT_BRACKET"
+  },
+  {
+   "names": [
+    "RIGHT_BRACKET",
+    "RBKT"
+   ],
+   "description": "Keyboard ] and } (Right Bracket and Right Brace)",
+   "category": "punctuation"
+  },
+  {
+   "names": [
+    "RIGHT_BRACE",
+    "RBRC"
+   ],
+   "description": "Keyboard } (Right Brace)",
+   "category": "symbols",
+   "deprecated": [
+    "RCUR"
+   ],
+   "shiftOf": "RIGHT_BRACKET"
+  },
+  {
+   "names": [
+    "BACKSLASH",
+    "BSLH"
+   ],
+   "description": "Keyboard \\ and | (Backslash and Pipe)",
+   "category": "punctuation"
+  },
+  {
+   "names": [
+    "PIPE"
+   ],
+   "description": "Keyboard | (Pipe)",
+   "category": "symbols",
+   "shiftOf": "BACKSLASH"
+  },
+  {
+   "names": [
+    "NON_US_HASH",
+    "NUHS"
+   ],
+   "description": "Keyboard Non-US # and ~ (Non-US Hash/Number and Tilde)",
+   "category": "punctuation"
+  },
+  {
+   "names": [
+    "TILDE2"
+   ],
+   "description": "Keyboard ~ (Tilde)",
+   "category": "symbols",
+   "shiftOf": "NON_US_HASH"
+  },
+  {
+   "names": [
+    "SEMICOLON",
+    "SEMI"
+   ],
+   "description": "Keyboard ; and : (Semicolon and Colon)",
+   "category": "punctuation",
+   "deprecated": [
+    "SCLN"
+   ]
+  },
+  {
+   "names": [
+    "COLON"
+   ],
+   "description": "Keyboard : (Colon)",
+   "category": "symbols",
+   "deprecated": [
+    "COLN"
+   ],
+   "shiftOf": "SEMICOLON"
+  },
+  {
+   "names": [
+    "SINGLE_QUOTE",
+    "SQT",
+    "APOSTROPHE",
+    "APOS"
+   ],
+   "description": "Keyboard ' and \" (Apostrophe and Quote)",
+   "category": "punctuation",
+   "deprecated": [
+    "QUOT"
+   ]
+  },
+  {
+   "names": [
+    "DOUBLE_QUOTES",
+    "DQT"
+   ],
+   "description": "Keyboard \" (Quote)",
+   "category": "symbols",
+   "shiftOf": "SINGLE_QUOTE"
+  },
+  {
+   "names": [
+    "GRAVE"
+   ],
+   "description": "Keyboard ` and ~ (Grave Accent and Tilde)",
+   "category": "punctuation",
+   "deprecated": [
+    "GRAV"
+   ]
+  },
+  {
+   "names": [
+    "TILDE"
+   ],
+   "description": "Keyboard ~ (Tilde)",
+   "category": "symbols",
+   "deprecated": [
+    "TILD"
+   ],
+   "shiftOf": "GRAVE"
+  },
+  {
+   "names": [
+    "COMMA"
+   ],
+   "description": "Keyboard , and < (Comma and Less Than)",
+   "category": "punctuation",
+   "deprecated": [
+    "CMMA"
+   ]
+  },
+  {
+   "names": [
+    "LESS_THAN",
+    "LT"
+   ],
+   "description": "Keyboard < (Less Than)",
+   "category": "symbols",
+   "deprecated": [
+    "LABT"
+   ],
+   "shiftOf": "COMMA"
+  },
+  {
+   "names": [
+    "PERIOD",
+    "DOT"
+   ],
+   "description": "Keyboard . and > (Period and Greater Than)",
+   "category": "punctuation"
+  },
+  {
+   "names": [
+    "GREATER_THAN",
+    "GT"
+   ],
+   "description": "Keyboard > (Greater Than)",
+   "category": "symbols",
+   "deprecated": [
+    "RABT"
+   ],
+   "shiftOf": "PERIOD"
+  },
+  {
+   "names": [
+    "SLASH",
+    "FSLH"
+   ],
+   "description": "Keyboard / and ? (Forward Slash and Question)",
+   "category": "punctuation"
+  },
+  {
+   "names": [
+    "QUESTION",
+    "QMARK"
+   ],
+   "description": "Keyboard ? (Question)",
+   "category": "symbols",
+   "shiftOf": "SLASH"
+  },
+  {
+   "names": [
+    "CAPSLOCK",
+    "CAPS",
+    "CLCK"
+   ],
+   "description": "Keyboard Caps Lock",
+   "category": "locks"
+  },
+  {
+   "names": [
+    "F1"
+   ],
+   "description": "Keyboard F1",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F2"
+   ],
+   "description": "Keyboard F2",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F3"
+   ],
+   "description": "Keyboard F3",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F4"
+   ],
+   "description": "Keyboard F4",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F5"
+   ],
+   "description": "Keyboard F5",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F6"
+   ],
+   "description": "Keyboard F6",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F7"
+   ],
+   "description": "Keyboard F7",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F8"
+   ],
+   "description": "Keyboard F8",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F9"
+   ],
+   "description": "Keyboard F9",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F10"
+   ],
+   "description": "Keyboard F10",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F11"
+   ],
+   "description": "Keyboard F11",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F12"
+   ],
+   "description": "Keyboard F12",
+   "category": "function"
+  },
+  {
+   "names": [
+    "PRINTSCREEN",
+    "PSCRN"
+   ],
+   "description": "Keyboard Print Screen",
+   "category": "editing",
+   "deprecated": [
+    "PRSC"
+   ]
+  },
+  {
+   "names": [
+    "SCROLLLOCK",
+    "SLCK"
+   ],
+   "description": "Keyboard Scroll Lock",
+   "category": "locks",
+   "deprecated": [
+    "SCLK"
+   ]
+  },
+  {
+   "names": [
+    "PAUSE_BREAK"
+   ],
+   "description": "Keyboard Pause/Break",
+   "category": "editing",
+   "deprecated": [
+    "PAUS"
+   ]
+  },
+  {
+   "names": [
+    "INSERT",
+    "INS"
+   ],
+   "description": "Keyboard Insert",
+   "category": "editing"
+  },
+  {
+   "names": [
+    "HOME"
+   ],
+   "description": "Keyboard Home",
+   "category": "navigation"
+  },
+  {
+   "names": [
+    "PAGE_UP",
+    "PG_UP"
+   ],
+   "description": "Keyboard Page Up",
+   "category": "navigation",
+   "deprecated": [
+    "PGUP"
+   ]
+  },
+  {
+   "names": [
+    "DELETE",
+    "DEL"
+   ],
+   "description": "Keyboard Delete",
+   "category": "editing"
+  },
+  {
+   "names": [
+    "END"
+   ],
+   "description": "Keyboard End",
+   "category": "navigation"
+  },
+  {
+   "names": [
+    "PAGE_DOWN",
+    "PG_DN"
+   ],
+   "description": "Keyboard Page Down",
+   "category": "navigation",
+   "deprecated": [
+    "PGDN"
+   ]
+  },
+  {
+   "names": [
+    "RIGHT_ARROW",
+    "RIGHT"
+   ],
+   "description": "Keyboard Right Arrow",
+   "category": "navigation",
+   "deprecated": [
+    "RARW"
+   ]
+  },
+  {
+   "names": [
+    "LEFT_ARROW",
+    "LEFT"
+   ],
+   "description": "Keyboard Left Arrow",
+   "category": "navigation",
+   "deprecated": [
+    "LARW"
+   ]
+  },
+  {
+   "names": [
+    "DOWN_ARROW",
+    "DOWN"
+   ],
+   "description": "Keyboard Down Arrow",
+   "category": "navigation",
+   "deprecated": [
+    "DARW"
+   ]
+  },
+  {
+   "names": [
+    "UP_ARROW",
+    "UP"
+   ],
+   "description": "Keyboard Up Arrow",
+   "category": "navigation",
+   "deprecated": [
+    "UARW"
+   ]
+  },
+  {
+   "names": [
+    "KP_NUMLOCK",
+    "KP_NUM",
+    "KP_NLCK"
+   ],
+   "description": "Keypad Numlock and Clear",
+   "category": "keypad"
+  },
+  {
+   "names": [
+    "CLEAR2"
+   ],
+   "description": "Keypad Clear",
+   "category": "symbols",
+   "shiftOf": "KP_NUMLOCK"
+  },
+  {
+   "names": [
+    "KP_DIVIDE",
+    "KP_SLASH"
+   ],
+   "description": "Keypad / (Slash/Divide)",
+   "category": "keypad",
+   "deprecated": [
+    "KDIV"
+   ]
+  },
+  {
+   "names": [
+    "KP_MULTIPLY",
+    "KP_ASTERISK"
+   ],
+   "description": "Keypad * (Multiply)",
+   "category": "keypad",
+   "deprecated": [
+    "KMLT"
+   ]
+  },
+  {
+   "names": [
+    "KP_MINUS",
+    "KP_SUBTRACT"
+   ],
+   "description": "Keypad - (Minus)",
+   "category": "keypad",
+   "deprecated": [
+    "KMIN"
+   ]
+  },
+  {
+   "names": [
+    "KP_PLUS"
+   ],
+   "description": "Keypad + (Plus)",
+   "category": "keypad",
+   "deprecated": [
+    "KPLS"
+   ]
+  },
+  {
+   "names": [
+    "KP_ENTER"
+   ],
+   "description": "Keypad Enter",
+   "category": "keypad"
+  },
+  {
+   "names": [
+    "KP_NUMBER_1",
+    "KP_N1"
+   ],
+   "description": "Keypad 1",
+   "category": "keypad"
+  },
+  {
+   "names": [
+    "KP_NUMBER_2",
+    "KP_N2"
+   ],
+   "description": "Keypad 2",
+   "category": "keypad"
+  },
+  {
+   "names": [
+    "KP_NUMBER_3",
+    "KP_N3"
+   ],
+   "description": "Keypad 3",
+   "category": "keypad"
+  },
+  {
+   "names": [
+    "KP_NUMBER_4",
+    "KP_N4"
+   ],
+   "description": "Keypad 4",
+   "category": "keypad"
+  },
+  {
+   "names": [
+    "KP_NUMBER_5",
+    "KP_N5"
+   ],
+   "description": "Keypad 5",
+   "category": "keypad"
+  },
+  {
+   "names": [
+    "KP_NUMBER_6",
+    "KP_N6"
+   ],
+   "description": "Keypad 6",
+   "category": "keypad"
+  },
+  {
+   "names": [
+    "KP_NUMBER_7",
+    "KP_N7"
+   ],
+   "description": "Keypad 7",
+   "category": "keypad"
+  },
+  {
+   "names": [
+    "KP_NUMBER_8",
+    "KP_N8"
+   ],
+   "description": "Keypad 8",
+   "category": "keypad"
+  },
+  {
+   "names": [
+    "KP_NUMBER_9",
+    "KP_N9"
+   ],
+   "description": "Keypad 9",
+   "category": "keypad"
+  },
+  {
+   "names": [
+    "KP_NUMBER_0",
+    "KP_N0"
+   ],
+   "description": "Keypad 0",
+   "category": "keypad"
+  },
+  {
+   "names": [
+    "KP_DOT"
+   ],
+   "description": "Keypad . (Dot)",
+   "category": "keypad"
+  },
+  {
+   "names": [
+    "NON_US_BACKSLASH",
+    "NON_US_BSLH",
+    "NUBS"
+   ],
+   "description": "Keyboard Non-US \\ and | (Non-us Backslash and Pipe)",
+   "category": "punctuation"
+  },
+  {
+   "names": [
+    "PIPE2"
+   ],
+   "description": "Keyboard Pipe",
+   "category": "symbols",
+   "shiftOf": "NON_US_BACKSLASH"
+  },
+  {
+   "names": [
+    "K_APPLICATION",
+    "K_APP",
+    "K_CONTEXT_MENU",
+    "K_CMENU"
+   ],
+   "description": "Keyboard Application (Context Menu)",
+   "category": "editing",
+   "deprecated": [
+    "GUI"
+   ]
+  },
+  {
+   "names": [
+    "K_POWER",
+    "K_PWR"
+   ],
+   "description": "Keyboard Power",
+   "category": "other"
+  },
+  {
+   "names": [
+    "KP_EQUAL"
+   ],
+   "description": "Keypad = (Equal)",
+   "category": "keypad"
+  },
+  {
+   "names": [
+    "F13"
+   ],
+   "description": "Keyboard F13",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F14"
+   ],
+   "description": "Keyboard F14",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F15"
+   ],
+   "description": "Keyboard F15",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F16"
+   ],
+   "description": "Keyboard F16",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F17"
+   ],
+   "description": "Keyboard F17",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F18"
+   ],
+   "description": "Keyboard F18",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F19"
+   ],
+   "description": "Keyboard F19",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F20"
+   ],
+   "description": "Keyboard F20",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F21"
+   ],
+   "description": "Keyboard F21",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F22"
+   ],
+   "description": "Keyboard F22",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F23"
+   ],
+   "description": "Keyboard F23",
+   "category": "function"
+  },
+  {
+   "names": [
+    "F24"
+   ],
+   "description": "Keyboard F24",
+   "category": "function"
+  },
+  {
+   "names": [
+    "K_EXECUTE",
+    "K_EXEC"
+   ],
+   "description": "Keyboard Execute",
+   "category": "editing"
+  },
+  {
+   "names": [
+    "K_HELP"
+   ],
+   "description": "Keyboard Help",
+   "category": "editing"
+  },
+  {
+   "names": [
+    "K_MENU"
+   ],
+   "description": "Keyboard Menu",
+   "category": "editing"
+  },
+  {
+   "names": [
+    "K_SELECT"
+   ],
+   "description": "Keyboard Select",
+   "category": "editing"
+  },
+  {
+   "names": [
+    "K_STOP"
+   ],
+   "description": "Keyboard Stop",
+   "category": "editing"
+  },
+  {
+   "names": [
+    "K_AGAIN",
+    "K_REDO"
+   ],
+   "description": "Keyboard Again",
+   "category": "editing"
+  },
+  {
+   "names": [
+    "K_UNDO"
+   ],
+   "description": "Keyboard Undo",
+   "category": "editing",
+   "deprecated": [
+    "UNDO"
+   ]
+  },
+  {
+   "names": [
+    "K_CUT"
+   ],
+   "description": "Keyboard Cut",
+   "category": "editing",
+   "deprecated": [
+    "CUT"
+   ]
+  },
+  {
+   "names": [
+    "K_COPY"
+   ],
+   "description": "Keyboard Copy",
+   "category": "editing",
+   "deprecated": [
+    "COPY"
+   ]
+  },
+  {
+   "names": [
+    "K_PASTE"
+   ],
+   "description": "Keyboard Paste",
+   "category": "editing",
+   "deprecated": [
+    "PSTE"
+   ]
+  },
+  {
+   "names": [
+    "K_FIND"
+   ],
+   "description": "Keyboard Find",
+   "category": "editing"
+  },
+  {
+   "names": [
+    "K_MUTE"
+   ],
+   "description": "Keyboard Mute",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_VOLUME_UP",
+    "K_VOL_UP"
+   ],
+   "description": "Keyboard Volume Up",
+   "category": "other",
+   "deprecated": [
+    "VOLU"
+   ]
+  },
+  {
+   "names": [
+    "K_VOLUME_DOWN",
+    "K_VOL_DN"
+   ],
+   "description": "Keyboard Volume Down",
+   "category": "other",
+   "deprecated": [
+    "VOLD"
+   ]
+  },
+  {
+   "names": [
+    "LOCKING_CAPS",
+    "LCAPS"
+   ],
+   "description": "Keyboard Locking Caps Lock",
+   "category": "locks"
+  },
+  {
+   "names": [
+    "LOCKING_NUM",
+    "LNLCK"
+   ],
+   "description": "Keyboard Locking Num Lock",
+   "category": "locks"
+  },
+  {
+   "names": [
+    "LOCKING_SCROLL",
+    "LSLCK"
+   ],
+   "description": "Keyboard Locking Scroll Lock",
+   "category": "locks"
+  },
+  {
+   "names": [
+    "KP_COMMA"
+   ],
+   "description": "Keypad , (Comma)",
+   "category": "keypad"
+  },
+  {
+   "names": [
+    "KP_EQUAL_AS400"
+   ],
+   "description": "Keypad = (Equal) AS/400",
+   "category": "keypad"
+  },
+  {
+   "names": [
+    "INTERNATIONAL_1",
+    "INT1",
+    "INT_RO"
+   ],
+   "description": "Keyboard International 1",
+   "category": "international"
+  },
+  {
+   "names": [
+    "INTERNATIONAL_2",
+    "INT2",
+    "INT_KATAKANAHIRAGANA",
+    "INT_KANA"
+   ],
+   "description": "Keyboard International 2",
+   "category": "international"
+  },
+  {
+   "names": [
+    "INTERNATIONAL_3",
+    "INT3",
+    "INT_YEN"
+   ],
+   "description": "Keyboard International 3",
+   "category": "international"
+  },
+  {
+   "names": [
+    "INTERNATIONAL_4",
+    "INT4",
+    "INT_HENKAN"
+   ],
+   "description": "Keyboard International 4",
+   "category": "international"
+  },
+  {
+   "names": [
+    "INTERNATIONAL_5",
+    "INT5",
+    "INT_MUHENKAN"
+   ],
+   "description": "Keyboard International 5",
+   "category": "international"
+  },
+  {
+   "names": [
+    "INTERNATIONAL_6",
+    "INT6",
+    "INT_KPJPCOMMA"
+   ],
+   "description": "Keyboard International 6",
+   "category": "international"
+  },
+  {
+   "names": [
+    "INTERNATIONAL_7",
+    "INT7"
+   ],
+   "description": "Keyboard International 7",
+   "category": "international"
+  },
+  {
+   "names": [
+    "INTERNATIONAL_8",
+    "INT8"
+   ],
+   "description": "Keyboard International 8",
+   "category": "international"
+  },
+  {
+   "names": [
+    "INTERNATIONAL_9",
+    "INT9"
+   ],
+   "description": "Keyboard International 9",
+   "category": "international"
+  },
+  {
+   "names": [
+    "LANGUAGE_1",
+    "LANG1",
+    "LANG_HANGEUL"
+   ],
+   "description": "Keyboard Language 1",
+   "category": "international"
+  },
+  {
+   "names": [
+    "LANGUAGE_2",
+    "LANG2",
+    "LANG_HANJA"
+   ],
+   "description": "Keyboard Language 2",
+   "category": "international"
+  },
+  {
+   "names": [
+    "LANGUAGE_3",
+    "LANG3",
+    "LANG_KATAKANA"
+   ],
+   "description": "Keyboard Language 3",
+   "category": "international"
+  },
+  {
+   "names": [
+    "LANGUAGE_4",
+    "LANG4",
+    "LANG_HIRAGANA"
+   ],
+   "description": "Keyboard Language 4",
+   "category": "international"
+  },
+  {
+   "names": [
+    "LANGUAGE_5",
+    "LANG5",
+    "LANG_ZENKAKUHANKAKU"
+   ],
+   "description": "Keyboard Language 5",
+   "category": "international"
+  },
+  {
+   "names": [
+    "LANGUAGE_6",
+    "LANG6"
+   ],
+   "description": "Keyboard Language 6",
+   "category": "international"
+  },
+  {
+   "names": [
+    "LANGUAGE_7",
+    "LANG7"
+   ],
+   "description": "Keyboard Language 7",
+   "category": "international"
+  },
+  {
+   "names": [
+    "LANGUAGE_8",
+    "LANG8"
+   ],
+   "description": "Keyboard Language 8",
+   "category": "international"
+  },
+  {
+   "names": [
+    "LANGUAGE_9",
+    "LANG9"
+   ],
+   "description": "Keyboard Language 9",
+   "category": "international"
+  },
+  {
+   "names": [
+    "ALT_ERASE"
+   ],
+   "description": "Keyboard Alternate Erase",
+   "category": "other"
+  },
+  {
+   "names": [
+    "SYSREQ",
+    "ATTENTION"
+   ],
+   "description": "Keyboard SysReq/Attention",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_CANCEL"
+   ],
+   "description": "Keyboard Cancel",
+   "category": "editing"
+  },
+  {
+   "names": [
+    "CLEAR"
+   ],
+   "description": "Keyboard Clear",
+   "category": "other"
+  },
+  {
+   "names": [
+    "PRIOR"
+   ],
+   "description": "Keyboard Prior",
+   "category": "other"
+  },
+  {
+   "names": [
+    "RETURN2",
+    "RET2"
+   ],
+   "description": "Keyboard Return",
+   "category": "editing"
+  },
+  {
+   "names": [
+    "SEPARATOR"
+   ],
+   "description": "Keyboard Separator",
+   "category": "other"
+  },
+  {
+   "names": [
+    "OUT"
+   ],
+   "description": "Keyboard Out",
+   "category": "other"
+  },
+  {
+   "names": [
+    "OPER"
+   ],
+   "description": "Keyboard Oper",
+   "category": "other"
+  },
+  {
+   "names": [
+    "CLEAR_AGAIN"
+   ],
+   "description": "Keyboard Clear/Again",
+   "category": "other"
+  },
+  {
+   "names": [
+    "CRSEL"
+   ],
+   "description": "Keyboard CrSel/Props",
+   "category": "other"
+  },
+  {
+   "names": [
+    "EXSEL"
+   ],
+   "description": "Keyboard ExSel",
+   "category": "other"
+  },
+  {
+   "names": [
+    "CURU"
+   ],
+   "description": "Keyboard Currency Unit",
+   "category": "other"
+  },
+  {
+   "names": [
+    "KP_LEFT_PARENTHESIS",
+    "KP_LPAR"
+   ],
+   "description": "Keypad ( (Left Parenthesis)",
+   "category": "keypad"
+  },
+  {
+   "names": [
+    "KP_RIGHT_PARENTHESIS",
+    "KP_RPAR"
+   ],
+   "description": "Keypad ) (Right Parenthesis)",
+   "category": "keypad"
+  },
+  {
+   "names": [
+    "KSPC"
+   ],
+   "description": "Keypad Space",
+   "category": "other"
+  },
+  {
+   "names": [
+    "KP_CLEAR"
+   ],
+   "description": "Keypad Clear",
+   "category": "keypad"
+  },
+  {
+   "names": [
+    "LEFT_CONTROL",
+    "LCTRL"
+   ],
+   "description": "Keyboard Left Control",
+   "category": "modifiers",
+   "deprecated": [
+    "LCTL"
+   ]
+  },
+  {
+   "names": [
+    "LEFT_SHIFT",
+    "LSHIFT",
+    "LSHFT"
+   ],
+   "description": "Keyboard Left Shift",
+   "category": "modifiers",
+   "deprecated": [
+    "LSFT"
+   ]
+  },
+  {
+   "names": [
+    "LEFT_ALT",
+    "LALT"
+   ],
+   "description": "Keyboard Left Alt",
+   "category": "modifiers"
+  },
+  {
+   "names": [
+    "LEFT_GUI",
+    "LGUI",
+    "LEFT_WIN",
+    "LWIN",
+    "LEFT_COMMAND",
+    "LCMD",
+    "LEFT_META",
+    "LMETA"
+   ],
+   "description": "Keyboard Left GUI (Windows / Command / Meta)",
+   "category": "modifiers"
+  },
+  {
+   "names": [
+    "RIGHT_CONTROL",
+    "RCTRL"
+   ],
+   "description": "Keyboard Right Control",
+   "category": "modifiers",
+   "deprecated": [
+    "RCTL"
+   ]
+  },
+  {
+   "names": [
+    "RIGHT_SHIFT",
+    "RSHIFT",
+    "RSHFT"
+   ],
+   "description": "Keyboard Right Shift",
+   "category": "modifiers",
+   "deprecated": [
+    "RSFT"
+   ]
+  },
+  {
+   "names": [
+    "RIGHT_ALT",
+    "RALT"
+   ],
+   "description": "Keyboard Right Alt",
+   "category": "modifiers"
+  },
+  {
+   "names": [
+    "RIGHT_GUI",
+    "RGUI",
+    "RIGHT_WIN",
+    "RWIN",
+    "RIGHT_COMMAND",
+    "RCMD",
+    "RIGHT_META",
+    "RMETA"
+   ],
+   "description": "Keyboard Right GUI (Windows / Command / Meta)",
+   "category": "modifiers"
+  },
+  {
+   "names": [
+    "K_PLAY_PAUSE",
+    "K_PP"
+   ],
+   "description": "Keyboard Play/Pause",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_STOP2"
+   ],
+   "description": "Keyboard Stop",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_PREVIOUS",
+    "K_PREV"
+   ],
+   "description": "Keyboard Previous",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_NEXT"
+   ],
+   "description": "Keyboard Next",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_EJECT"
+   ],
+   "description": "Keyboard Eject",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_VOLUME_UP2",
+    "K_VOL_UP2"
+   ],
+   "description": "Keyboard Volume Up",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_VOLUME_DOWN2",
+    "K_VOL_DN2"
+   ],
+   "description": "Keyboard Volume Down",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_MUTE2"
+   ],
+   "description": "Keyboard Mute",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_WWW"
+   ],
+   "description": "Keyboard WWW",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_BACK"
+   ],
+   "description": "Keyboard Back",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_FORWARD"
+   ],
+   "description": "Keyboard Forward",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_STOP3"
+   ],
+   "description": "Keyboard Stop",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_FIND2"
+   ],
+   "description": "Keyboard Find",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_SCROLL_UP"
+   ],
+   "description": "Keyboard Scroll Up",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_SCROLL_DOWN"
+   ],
+   "description": "Keyboard Scroll Down",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_EDIT"
+   ],
+   "description": "Keyboard Edit",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_SLEEP"
+   ],
+   "description": "Keyboard Sleep",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_LOCK",
+    "K_SCREENSAVER",
+    "K_COFFEE"
+   ],
+   "description": "Keyboard Lock",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_REFRESH"
+   ],
+   "description": "Keyboard Refresh",
+   "category": "other"
+  },
+  {
+   "names": [
+    "K_CALCULATOR",
+    "K_CALC"
+   ],
+   "description": "Keyboard Calculator",
+   "category": "other"
+  },
+  {
+   "names": [
+    "C_POWER",
+    "C_PWR"
+   ],
+   "description": "Consumer Power",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_RESET"
+   ],
+   "description": "Consumer Reset",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_SLEEP"
+   ],
+   "description": "Consumer Sleep",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_SLEEP_MODE"
+   ],
+   "description": "Consumer Sleep Mode",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MENU"
+   ],
+   "description": "Consumer Menu",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MENU_PICK",
+    "C_MENU_SELECT"
+   ],
+   "description": "Consumer Menu Pick",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MENU_UP"
+   ],
+   "description": "Consumer Menu Up",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MENU_DOWN"
+   ],
+   "description": "Consumer Menu Down",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MENU_LEFT"
+   ],
+   "description": "Consumer Menu Left",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MENU_RIGHT"
+   ],
+   "description": "Consumer Menu Right",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MENU_ESCAPE",
+    "C_MENU_ESC"
+   ],
+   "description": "Consumer Menu Escape",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MENU_INCREASE",
+    "C_MENU_INC"
+   ],
+   "description": "Consumer Menu Value Increase",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MENU_DECREASE",
+    "C_MENU_DEC"
+   ],
+   "description": "Consumer Menu Value Decrease",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_DATA_ON_SCREEN"
+   ],
+   "description": "Consumer Data On Screen",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_CAPTIONS",
+    "C_SUBTITLES"
+   ],
+   "description": "Consumer Closed Caption",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_SNAPSHOT"
+   ],
+   "description": "Consumer Snapshot",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_PIP"
+   ],
+   "description": "Consumer Picture-in-Picture Toggle",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_RED_BUTTON",
+    "C_RED"
+   ],
+   "description": "Consumer Red Menu Button",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_GREEN_BUTTON",
+    "C_GREEN"
+   ],
+   "description": "Consumer Green Menu Button",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_BLUE_BUTTON",
+    "C_BLUE"
+   ],
+   "description": "Consumer Blue Menu Button",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_YELLOW_BUTTON",
+    "C_YELLOW"
+   ],
+   "description": "Consumer Yellow Menu Button",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_ASPECT"
+   ],
+   "description": "Consumer Aspect",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_BRIGHTNESS_INC",
+    "C_BRI_INC",
+    "C_BRI_UP"
+   ],
+   "description": "Consumer Display Brightness Increment",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_BRIGHTNESS_DEC",
+    "C_BRI_DEC",
+    "C_BRI_DN"
+   ],
+   "description": "Consumer Display Brightness Decrement",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_BACKLIGHT_TOGGLE",
+    "C_BKLT_TOG"
+   ],
+   "description": "Consumer Display Backlight Toggle",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_BRIGHTNESS_MINIMUM",
+    "C_BRI_MIN"
+   ],
+   "description": "Consumer Display Set Brightness to Minimum",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_BRIGHTNESS_MAXIMUM",
+    "C_BRI_MAX"
+   ],
+   "description": "Consumer Display Set Brightness to Maximum",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_BRIGHTNESS_AUTO",
+    "C_BRI_AUTO"
+   ],
+   "description": "Consumer Display Set Auto Brightness",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MEDIA_STEP",
+    "C_MODE_STEP"
+   ],
+   "description": "Consumer Mode Step",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_RECALL_LAST",
+    "C_CHAN_LAST"
+   ],
+   "description": "Consumer Recall Last",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MEDIA_COMPUTER"
+   ],
+   "description": "Consumer Media Select Computer",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MEDIA_TV"
+   ],
+   "description": "Consumer Media Select TV",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MEDIA_WWW"
+   ],
+   "description": "Consumer Media Select WWW",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MEDIA_DVD"
+   ],
+   "description": "Consumer Media Select DVD",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MEDIA_PHONE"
+   ],
+   "description": "Consumer Media Select Telephone",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MEDIA_GUIDE"
+   ],
+   "description": "Consumer Media Select Program Guide",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MEDIA_VIDEOPHONE"
+   ],
+   "description": "Consumer Media Select Video Phone",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MEDIA_GAMES"
+   ],
+   "description": "Consumer Media Select Games",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MEDIA_MESSAGES"
+   ],
+   "description": "Consumer Media Select Messages",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MEDIA_CD"
+   ],
+   "description": "Consumer Media Select CD",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MEDIA_VCR"
+   ],
+   "description": "Consumer Media Select VCR",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MEDIA_TUNER"
+   ],
+   "description": "Consumer Media Select Tuner",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_QUIT"
+   ],
+   "description": "Consumer Quit",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_HELP"
+   ],
+   "description": "Consumer Help",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MEDIA_TAPE"
+   ],
+   "description": "Consumer Media Select Tape",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MEDIA_CABLE"
+   ],
+   "description": "Consumer Media Select Cable",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MEDIA_SATELLITE"
+   ],
+   "description": "Consumer Media Select Satellite",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MEDIA_HOME"
+   ],
+   "description": "Consumer Media Select Home",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_CHANNEL_INC",
+    "C_CHAN_INC"
+   ],
+   "description": "Consumer Channel Increment",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_CHANNEL_DEC",
+    "C_CHAN_DEC"
+   ],
+   "description": "Consumer Channel Decrement",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MEDIA_VCR_PLUS"
+   ],
+   "description": "Consumer VCR Plus",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_PLAY"
+   ],
+   "description": "Consumer Play",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_PAUSE"
+   ],
+   "description": "Consumer Pause",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_RECORD",
+    "C_REC"
+   ],
+   "description": "Consumer Record",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_FAST_FORWARD",
+    "C_FF"
+   ],
+   "description": "Consumer Fast Forward",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_REWIND",
+    "C_RW"
+   ],
+   "description": "Consumer Rewind",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_NEXT"
+   ],
+   "description": "Consumer Scan Next Track",
+   "category": "consumer",
+   "deprecated": [
+    "M_NEXT"
+   ]
+  },
+  {
+   "names": [
+    "C_PREVIOUS",
+    "C_PREV"
+   ],
+   "description": "Consumer Scan Previous Track",
+   "category": "consumer",
+   "deprecated": [
+    "M_PREV"
+   ]
+  },
+  {
+   "names": [
+    "C_STOP"
+   ],
+   "description": "Consumer Stop",
+   "category": "consumer",
+   "deprecated": [
+    "M_STOP"
+   ]
+  },
+  {
+   "names": [
+    "C_EJECT"
+   ],
+   "description": "Consumer Eject",
+   "category": "consumer",
+   "deprecated": [
+    "M_EJCT"
+   ]
+  },
+  {
+   "names": [
+    "C_RANDOM_PLAY",
+    "C_SHUFFLE"
+   ],
+   "description": "Consumer Random Play",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_REPEAT"
+   ],
+   "description": "Consumer Repeat",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_SLOW_TRACKING",
+    "C_SLOW2"
+   ],
+   "description": "Consumer Slow Tracking",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_STOP_EJECT"
+   ],
+   "description": "Consumer Stop/Eject",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_PLAY_PAUSE",
+    "C_PP"
+   ],
+   "description": "Consumer Play/Pause",
+   "category": "consumer",
+   "deprecated": [
+    "M_PLAY"
+   ]
+  },
+  {
+   "names": [
+    "C_VOICE_COMMAND"
+   ],
+   "description": "Consumer Voice Command",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_MUTE"
+   ],
+   "description": "Consumer Mute",
+   "category": "consumer",
+   "deprecated": [
+    "M_MUTE"
+   ]
+  },
+  {
+   "names": [
+    "C_BASS_BOOST"
+   ],
+   "description": "Consumer Bass Boost",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_VOLUME_UP",
+    "C_VOL_UP"
+   ],
+   "description": "Consumer Volume Increment",
+   "category": "consumer",
+   "deprecated": [
+    "M_VOLU"
+   ]
+  },
+  {
+   "names": [
+    "C_VOLUME_DOWN",
+    "C_VOL_DN"
+   ],
+   "description": "Consumer Volume Decrement",
+   "category": "consumer",
+   "deprecated": [
+    "M_VOLD"
+   ]
+  },
+  {
+   "names": [
+    "C_SLOW"
+   ],
+   "description": "Consumer Slow",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_ALTERNATE_AUDIO_INCREMENT",
+    "C_ALT_AUDIO_INC"
+   ],
+   "description": "Consumer Alternate Audio Increment",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_CCC"
+   ],
+   "description": "Consumer AL Consumer Control Configuration",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_WORD"
+   ],
+   "description": "Consumer AL Word Processor",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_TEXT_EDITOR"
+   ],
+   "description": "Consumer AL Text Editor",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_SPREADSHEET",
+    "C_AL_SHEET"
+   ],
+   "description": "Consumer AL Spreadsheet",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_GRAPHICS_EDITOR"
+   ],
+   "description": "Consumer AL Graphics Editor",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_PRESENTATION"
+   ],
+   "description": "Consumer AL Presentation App",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_DATABASE",
+    "C_AL_DB"
+   ],
+   "description": "Consumer AL Database App",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_EMAIL",
+    "C_AL_MAIL"
+   ],
+   "description": "Consumer AL Email Reader",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_NEWS"
+   ],
+   "description": "Consumer AL Newsreader",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_VOICEMAIL"
+   ],
+   "description": "Consumer AL Voicemail",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_CONTACTS",
+    "C_AL_ADDRESS_BOOK"
+   ],
+   "description": "Consumer AL Contacts/Address Book",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_CALENDAR",
+    "C_AL_CAL"
+   ],
+   "description": "Consumer AL Calendar/Schedule",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_TASK_MANAGER"
+   ],
+   "description": "Consumer AL Task/Project Manager",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_JOURNAL"
+   ],
+   "description": "Consumer AL Log/Journal/Timecard",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_FINANCE"
+   ],
+   "description": "Consumer AL Checkbook/Finance",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_CALCULATOR",
+    "C_AL_CALC"
+   ],
+   "description": "Consumer AL Calculator",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_AV_CAPTURE_PLAYBACK"
+   ],
+   "description": "Consumer AL A/V Capture/Playback",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_MY_COMPUTER"
+   ],
+   "description": "Consumer AL Local Machine Browser",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_WWW"
+   ],
+   "description": "Consumer AL Internet Browser",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_NETWORK_CHAT",
+    "C_AL_CHAT"
+   ],
+   "description": "Consumer AL Network Chat",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_LOGOFF"
+   ],
+   "description": "Consumer AL Logoff",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_LOCK",
+    "C_AL_SCREENSAVER",
+    "C_AL_COFFEE"
+   ],
+   "description": "Consumer AL Terminal Lock/Screensaver",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_CONTROL_PANEL"
+   ],
+   "description": "Consumer AL Control Panel",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_SELECT_TASK"
+   ],
+   "description": "Consumer AL Select Task/Application",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_NEXT_TASK"
+   ],
+   "description": "Consumer AL Next Task/Application",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_PREVIOUS_TASK",
+    "C_AL_PREV_TASK"
+   ],
+   "description": "Consumer AL Previous Task/Application",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_HELP"
+   ],
+   "description": "Consumer AL Integrated Help Center",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_DOCUMENTS",
+    "C_AL_DOCS"
+   ],
+   "description": "Consumer AL Documents",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_SPELLCHECK",
+    "C_AL_SPELL"
+   ],
+   "description": "Consumer AL Spell Check",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_KEYBOARD_LAYOUT"
+   ],
+   "description": "Consumer AL Keyboard Layout",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_SCREEN_SAVER"
+   ],
+   "description": "Consumer AL Screen Saver",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_FILE_BROWSER",
+    "C_AL_FILES"
+   ],
+   "description": "Consumer AL File Browser",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_IMAGE_BROWSER",
+    "C_AL_IMAGES"
+   ],
+   "description": "Consumer AL Image Browser",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_AUDIO_BROWSER",
+    "C_AL_AUDIO",
+    "C_AL_MUSIC"
+   ],
+   "description": "Consumer AL Audio Browser",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_MOVIE_BROWSER",
+    "C_AL_MOVIES"
+   ],
+   "description": "Consumer AL Movie Browser",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_INSTANT_MESSAGING",
+    "C_AL_IM"
+   ],
+   "description": "Consumer AL Instant Messaging",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AL_OEM_FEATURES",
+    "C_AL_TIPS",
+    "C_AL_TUTORIAL"
+   ],
+   "description": "Consumer AL OEM Features/Tips/Tutorial Browser",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_NEW"
+   ],
+   "description": "Consumer AC New",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_OPEN"
+   ],
+   "description": "Consumer AC Open",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_CLOSE"
+   ],
+   "description": "Consumer AC Close",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_EXIT"
+   ],
+   "description": "Consumer AC Exit",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_SAVE"
+   ],
+   "description": "Consumer AC Save",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_PRINT"
+   ],
+   "description": "Consumer AC Print",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_PROPERTIES",
+    "C_AC_PROPS"
+   ],
+   "description": "Consumer AC Properties",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_UNDO"
+   ],
+   "description": "Consumer AC Undo",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_COPY"
+   ],
+   "description": "Consumer AC Copy",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_CUT"
+   ],
+   "description": "Consumer AC Cut",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_PASTE"
+   ],
+   "description": "Consumer AC Paste",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_FIND"
+   ],
+   "description": "Consumer AC Find",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_SEARCH"
+   ],
+   "description": "Consumer AC Search",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_GOTO"
+   ],
+   "description": "Consumer AC Go To",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_HOME"
+   ],
+   "description": "Consumer AC Home",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_BACK"
+   ],
+   "description": "Consumer AC Back",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_FORWARD"
+   ],
+   "description": "Consumer AC Forward",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_STOP"
+   ],
+   "description": "Consumer AC Stop",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_REFRESH"
+   ],
+   "description": "Consumer AC Refresh",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_BOOKMARKS",
+    "C_AC_FAVORITES",
+    "C_AC_FAVOURITES"
+   ],
+   "description": "Consumer AC Bookmarks",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_ZOOM_IN"
+   ],
+   "description": "Consumer AC Zoom In",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_ZOOM_OUT"
+   ],
+   "description": "Consumer AC Zoom Out",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_ZOOM"
+   ],
+   "description": "Consumer AC Zoom",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_VIEW_TOGGLE"
+   ],
+   "description": "Consumer AC View Toggle",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_SCROLL_UP"
+   ],
+   "description": "Consumer AC Scroll Up",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_SCROLL_DOWN"
+   ],
+   "description": "Consumer AC Scroll Down",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_EDIT"
+   ],
+   "description": "Consumer AC Edit",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_CANCEL"
+   ],
+   "description": "Consumer AC Cancel",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_INSERT",
+    "C_AC_INS"
+   ],
+   "description": "Consumer AC Insert Mode",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_DEL"
+   ],
+   "description": "Consumer AC Delete",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_REDO"
+   ],
+   "description": "Consumer AC Redo/Repeat",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_REPLY"
+   ],
+   "description": "Consumer AC Reply",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_FORWARD_MAIL"
+   ],
+   "description": "Consumer AC Forward Msg",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_SEND"
+   ],
+   "description": "Consumer AC Send",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_DESKTOP_SHOW_ALL_WINDOWS"
+   ],
+   "description": "Consumer AC Desktop Show All Windows",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_DESKTOP_SHOW_ALL_APPLICATIONS"
+   ],
+   "description": "Consumer AC Desktop Show All Applications",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_KEYBOARD_INPUT_ASSIST_PREVIOUS",
+    "C_KBIA_PREV"
+   ],
+   "description": "Consumer Keyboard Input Assist Previous",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_KEYBOARD_INPUT_ASSIST_NEXT",
+    "C_KBIA_NEXT"
+   ],
+   "description": "Consumer Keyboard Input Assist Next",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_KEYBOARD_INPUT_ASSIST_PREVIOUS_GROUP",
+    "C_KBIA_PREV_GRP"
+   ],
+   "description": "Consumer Keyboard Input Assist Previous Group",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_KEYBOARD_INPUT_ASSIST_NEXT_GROUP",
+    "C_KBIA_NEXT_GRP"
+   ],
+   "description": "Consumer Keyboard Input Assist Next Group",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_KEYBOARD_INPUT_ASSIST_ACCEPT",
+    "C_KBIA_ACCEPT"
+   ],
+   "description": "Consumer Keyboard Input Assist Accept",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_KEYBOARD_INPUT_ASSIST_CANCEL",
+    "C_KBIA_CANCEL"
+   ],
+   "description": "Consumer Keyboard Input Assist Cancel",
+   "category": "consumer"
+  },
+  {
+   "names": [
+    "C_AC_NEXT_KEYBOARD_LAYOUT_SELECT",
+    "GLOBE"
+   ],
+   "description": "Apple Globe key",
+   "category": "consumer"
+  }
+ ]
+}

@@ -23,6 +23,7 @@
     <EmbeddedResource Include="Resources\sofle.dtsi" />
     <EmbeddedResource Include="Resources\go60.dtsi" />
     <EmbeddedResource Include="Resources\glove80.dtsi" />
+    <EmbeddedResource Include="Resources\zmk-keycodes.json" />
   </ItemGroup>
 
 </Project>

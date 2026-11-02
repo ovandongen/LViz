@@ -1,0 +1,118 @@
+/*
+ * Copyright (c) 2026 OD
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Laid out in PHYSICAL order, matching the map in cosmos82.dtsi: left to
+ * right, top to bottom, as you look down at the board.
+ *
+ * Per half: 7/7/7/7 on finger rows 0-3, 6 on row 4, 2 on row 5, then a 5-key
+ * thumb cluster (3 upper, 2 lower). 41 keys per half, 82 total.
+ *
+ * SYS is a tri-layer: hold both thumb layer keys (NAV + SYM) to reach it.
+ */
+
+#include <behaviors.dtsi>
+#include <dt-bindings/zmk/bt.h>
+#include <dt-bindings/zmk/keys.h>
+#include <dt-bindings/zmk/outputs.h>
+#include <dt-bindings/zmk/pointing.h>
+
+/ {
+    keymap {
+        compatible = "zmk,keymap";
+
+        base_layer {
+            display-name = "Base";
+            bindings = <
+&kp ESC    &kp F1  &kp F2          &kp F3     &kp F4     &kp F5       &kp F6          &kp F7           &kp F8     &kp F9         &kp F10       &kp F11         &kp F12   &kp DEL
+&kp EQUAL  &kp N1  &kp N2          &kp N3     &kp N4     &kp N5       &kp LC(V)       &kp PRINTSCREEN  &kp N6     &kp N7         &kp N8        &kp N9          &kp N0    &kp MINUS
+&kp TAB    &kp Q   &kp W           &kp E      &kp R      &kp T        &kp LC(C)       &mkp MCLK        &kp Y      &kp U          &kp I         &kp O           &kp P     &kp BSLH
+&kp CAPS   &kp A   &kp S           &kp D      &lt 6 F    &kp G        &kp LC(X)       &mkp RCLK        &kp H      &lt 3 J        &lt 4 K       &lt 5 L         &kp SEMI  &kp PAGE_UP
+&kp LSHFT  &kp Z   &kp X           &kp C      &kp V      &kp B                                         &kp N      &kp M          &kp COMMA     &kp DOT         &kp FSLH  &kp PAGE_DOWN
+                   &kp LEFT_ARROW  &kp RIGHT                                                                                     &kp UP_ARROW  &kp DOWN_ARROW
+                                              &kp LCTRL  &lt 2 ENTER  &kp LEFT_SHIFT  &mkp LCLK        &kp SPACE  &kp BACKSPACE
+                                              &kp LALT   &mo 1                                         &kp DEL    &kp TAB
+            >;
+        };
+
+        sys_layer {
+            display-name = "Sys";
+            bindings = <
+&bootloader  &sys_reset    &trans        &trans        &trans        &trans        &trans  &trans        &trans        &trans        &trans  &trans  &sys_reset  &bootloader
+&bt BT_CLR   &bt BT_SEL 0  &bt BT_SEL 1  &bt BT_SEL 2  &bt BT_SEL 3  &bt BT_SEL 4  &trans  &out OUT_USB  &out OUT_BLE  &out OUT_TOG  &trans  &trans  &trans      &trans
+&trans       &trans        &trans        &trans        &trans        &trans        &trans  &trans        &trans        &trans        &trans  &trans  &trans      &trans
+&trans       &trans        &trans        &trans        &trans        &trans        &trans  &trans        &trans        &trans        &trans  &trans  &trans      &trans
+&trans       &trans        &trans        &trans        &trans        &trans                              &trans        &trans        &trans  &trans  &trans      &trans
+                           &trans        &trans                                                                                      &trans  &trans
+                                                       &trans        &trans        &trans  &trans        &trans        &trans
+                                                       &trans        &trans                              &trans        &trans
+            >;
+        };
+
+        symbol {
+            bindings = <
+&trans  &trans         &trans        &trans        &trans        &trans         &trans  &trans  &trans       &trans        &trans         &trans        &trans         &trans
+&trans  &kp AMPERSAND  &kp LBKT      &kp LS(PIPE)  &kp RBKT      &kp LS(EXCL)   &trans  &trans  &kp DOT      &kp LS(LBRC)  &kp LS(PRCNT)  &kp LS(RBRC)  &kp LS(STAR)   &trans
+&trans  &kp LS(POUND)  &kp LS(LBRC)  &kp LS(PLUS)  &kp LS(RBRC)  &kp LS(QMARK)  &trans  &trans  &kp GRAVE    &kp LBKT      &kp LS(COLON)  &kp RBKT      &kp LS(POUND)  &trans
+&trans  &kp LS(AT)     &kp LS(LPAR)  &kp EQUAL     &kp LS(RPAR)  &kp LS(STAR)   &trans  &trans  &kp LS(DQT)  &kp LS(LT)    &kp LS(AT)     &kp LS(GT)    &kp LS(CARET)  &trans
+&trans  &kp LS(DLLR)   &kp LS(LT)    &kp MINUS     &kp LS(GT)    &kp FSLH                       &kp SQT      &kp LS(LPAR)  &kp LS(UNDER)  &kp LS(RPAR)  &kp LS(DLLR)   &trans
+                       &trans        &trans                                                                                &trans         &trans
+                                                   &trans        &trans         &trans  &trans  &trans       &trans
+                                                   &trans        &trans                         &trans       &trans
+            >;
+        };
+
+        nav {
+            bindings = <
+&trans  &trans  &trans          &trans          &trans           &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &trans          &trans          &trans           &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &trans          &kp UP_ARROW    &trans           &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &kp LEFT_ARROW  &kp DOWN_ARROW  &kp RIGHT_ARROW  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &trans          &trans          &trans           &trans                  &trans  &trans  &trans  &trans  &trans  &trans
+                &trans          &trans                                                                   &trans  &trans
+                                                &trans           &trans  &trans  &trans  &trans  &trans
+                                                &trans           &trans                  &trans  &trans
+            >;
+        };
+
+        nav-alt {
+            bindings = <
+&trans  &trans  &trans              &trans              &trans               &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &trans              &trans              &trans               &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &trans              &kp LA(UP_ARROW)    &trans               &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &kp LA(LEFT_ARROW)  &kp LA(DOWN_ARROW)  &kp LA(RIGHT_ARROW)  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &trans              &trans              &trans               &trans                  &trans  &trans  &trans  &trans  &trans  &trans
+                &trans              &trans                                                                           &trans  &trans
+                                                        &trans               &trans  &trans  &trans  &trans  &trans
+                                                        &trans               &trans                  &trans  &trans
+            >;
+        };
+
+        nav-alt-shift {
+            bindings = <
+&trans  &trans  &trans                  &trans                  &trans                   &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &trans                  &trans                  &trans                   &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &trans                  &kp LA(LS(UP_ARROW))    &trans                   &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &kp LA(LS(LEFT_ARROW))  &kp LA(LS(DOWN_ARROW))  &kp LA(LS(RIGHT_ARROW))  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &trans                  &trans                  &trans                   &trans                  &trans  &trans  &trans  &trans  &trans  &trans
+                &trans                  &trans                                                                                   &trans  &trans
+                                                                &trans                   &trans  &trans  &trans  &trans  &trans
+                                                                &trans                   &trans                  &trans  &trans
+            >;
+        };
+
+        numbers {
+            bindings = <
+&trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans
+&trans  &trans  &trans  &trans  &trans  &trans  &trans  &trans  &kp N1  &kp N2  &kp N3  &kp N4  &kp N5  &trans
+&trans  &trans  &trans  &trans  &trans  &trans                  &kp N6  &kp N7  &kp N8  &kp N9  &kp N0  &trans
+                &trans  &trans                                                  &trans  &trans
+                                &trans  &trans  &trans  &trans  &trans  &trans
+                                &trans  &trans                  &trans  &trans
+            >;
+        };
+    };
+};
