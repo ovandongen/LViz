@@ -255,7 +255,7 @@ public static class KeymapWriter
 
     // ---- apply + validate --------------------------------------------------------
 
-    private static string ApplyChanges(
+    internal static string ApplyChanges(
         string source,
         List<(int Offset, string Replacement, int ReplacedLength)> changes)
     {
@@ -315,7 +315,7 @@ public static class KeymapWriter
 
     /// <summary>KeyBinding's record equality ignores the contents of
     /// <c>Params</c> — compare behavior plus params explicitly.</summary>
-    private static bool IsSameBinding(KeyBinding a, KeyBinding b) =>
+    internal static bool IsSameBinding(KeyBinding a, KeyBinding b) =>
         string.Equals(a.Behavior, b.Behavior, StringComparison.Ordinal)
         && a.Params.SequenceEqual(b.Params, StringComparer.Ordinal);
 }

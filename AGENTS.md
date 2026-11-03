@@ -135,6 +135,23 @@ dotnet run --project src/LViz.App                  # launch the app
   replays it, so `after` must be derived from `Current`, with `Layer.Index` ==
   position. `PendingStructureEdits` is empty whenever the ids are back to the
   baseline list, even with structural steps still undoable.
+- **Layer add/delete/move: model in `LayerReferenceRemapper`, text in
+  `KeymapLayerWriter`.** The remapper (Core/Keymap/Editing) is the expected
+  result; the writer patches the text in phases (clear refs via `KeymapWriter`
+  for a delete → renumber numbers and layer `#define` values → re-parse and
+  re-scan → cut/insert the block) and validates layers, combos and macros
+  against the remapper. Conditional layers are renumbered in the text but are
+  not in the model, so the guard can't see them: test them by hand. Re-scan
+  after renumbering (`9` → `10` shifts every later offset). A block moves with
+  its separator (a non-last block takes the one after it, the last block the
+  one before), which makes there-and-back byte-identical; keep `CutSpan`,
+  `SeparatorOf` and `InsertionPoint` in agreement. `KeymapLayerText` counts a
+  `#define` as a layer define only for the *first* definition of a name, with
+  an in-range value, used as a layer reference or named `LAYER_<sanitised
+  layer name>`; a MoErgo `#ifndef` fallback is never touched. A name defined
+  twice makes the guard refuse the edit, by decision. `CheckDelete` returns
+  exactly the set `Apply` refuses. `ZmkKeymapInterpreter` counts every child
+  of the keymap node as a layer.
 - **Two keymap loaders, one output.** `MoergoJsonKeymapLoader` parses the
   Moergo Layout Editor `.json` export (glove80.com / go60) into the *same*
   `KeyboardConfig` — recursive modifier params flatten depth-first to match
