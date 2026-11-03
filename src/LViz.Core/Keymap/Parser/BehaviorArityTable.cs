@@ -13,6 +13,7 @@ public static class BehaviorArityTable
     private static readonly Dictionary<string, int> _known = new(StringComparer.Ordinal)
     {
         ["&kp"] = 1,
+        ["&sk"] = 1,
         ["&trans"] = 0,
         ["&none"] = 0,
 
