@@ -30,6 +30,9 @@ public enum GitHubErrorKind
 
     /// <summary>Anything unexpected: other status codes, bad or incomplete JSON.</summary>
     Unexpected,
+
+    /// <summary>HTTP 409: the file changed on GitHub since it was read.</summary>
+    Conflict,
 }
 
 /// <summary>

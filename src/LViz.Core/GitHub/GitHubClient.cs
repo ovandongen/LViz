@@ -1,5 +1,7 @@
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace LViz.Core.GitHub;
 
@@ -7,8 +9,9 @@ namespace LViz.Core.GitHub;
 /// The only class in LViz that talks HTTP to GitHub. This part is the sign-in:
 /// the GitHub App's OAuth device flow, refreshing the resulting tokens, and
 /// reading the logged-in user's handle. Repository reads — installed repos,
-/// branches, a branch's head commit and the tarball download — live in the
-/// same class on top of the shared helpers here
+/// branches, a branch's head commit and the tarball download — and the
+/// Contents writes (committing one file, reading a file's blob SHA) live in
+/// the same class on top of the shared helpers here
 /// (<see cref="ApiRequest"/>, <see cref="SendAsync"/>,
 /// <see cref="SendForJsonAsync"/>, <see cref="GetString"/>,
 /// <see cref="GetInt64"/>).
@@ -363,7 +366,7 @@ public sealed class GitHubClient
         string branch,
         CancellationToken ct = default)
     {
-        var path = $"{RepoPath(owner, repo)}/commits/{EscapeBranch(branch)}";
+        var path = $"{RepoPath(owner, repo)}/commits/{EscapePathSegments(branch)}";
         using var request = ApiRequest(path, accessToken, ShaAccept);
 
         using var response = await SendAsync(request, ct);
@@ -436,20 +439,140 @@ public sealed class GitHubClient
         }
     }
 
-    // ---- shared request plumbing (repository calls build on these) ----
+    /// <summary>
+    /// Commits one file straight to a branch:
+    /// <c>PUT /repos/{owner}/{repo}/contents/{path}</c> with the content
+    /// base64-encoded and <paramref name="baseBlobSha"/> — the blob SHA of the
+    /// file as it was loaded (see <see cref="GitBlobSha.Compute"/>) — as the
+    /// <c>sha</c> being replaced. The branch goes in the JSON body, the path is
+    /// escaped segment by segment.
+    ///
+    /// <para>
+    /// When the file on the branch no longer matches <paramref name="baseBlobSha"/>
+    /// GitHub answers 409, which arrives as
+    /// <see cref="GitHubErrorKind.Conflict"/> — nothing was written. A missing
+    /// <c>commit.sha</c> or <c>content.sha</c> in a 200 is
+    /// <see cref="GitHubErrorKind.Unexpected"/>. Returned SHAs are lower-case.
+    /// </para>
+    /// </summary>
+    /// <param name="message">Commit message; must not be blank.</param>
+    /// <param name="path">File path in the repo, e.g. <c>config/glove80.keymap</c>.</param>
+    public async Task<GitHubCommitResult> PutFileAsync(
+        string accessToken,
+        string owner,
+        string repo,
+        string branch,
+        string path,
+        byte[] content,
+        string baseBlobSha,
+        string message,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            throw new ArgumentException("Commit message is required", nameof(message));
+        }
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            throw new ArgumentException("File path is required", nameof(path));
+        }
+
+        if (string.IsNullOrWhiteSpace(baseBlobSha))
+        {
+            throw new ArgumentException("Base blob SHA is required", nameof(baseBlobSha));
+        }
+
+        var body = new JsonObject
+        {
+            ["message"] = message,
+            ["content"] = Convert.ToBase64String(content),
+            ["sha"] = baseBlobSha,
+            ["branch"] = branch,
+        };
+
+        var requestPath = $"{RepoPath(owner, repo)}/contents/{EscapePathSegments(path)}";
+        using var request = ApiRequest(
+            requestPath, accessToken, method: HttpMethod.Put, content: JsonContent.Create(body));
+
+        var json = await SendForJsonAsync(request, ct);
+
+        var commit = GetObject(json, "commit");
+        var commitSha = GetString(commit, "sha");
+        var blobSha = GetString(GetObject(json, "content"), "sha");
+        if (commitSha is null || blobSha is null)
+        {
+            throw UnexpectedError($"GitHub {Describe(request)} returned an incomplete commit");
+        }
+
+        // The first parent when there is one; a brand-new branch has none.
+        var parentSha = GetString(GetArray(commit, "parents").FirstOrDefault(), "sha");
+
+        return new GitHubCommitResult(
+            commitSha.ToLowerInvariant(),
+            blobSha.ToLowerInvariant(),
+            parentSha?.ToLowerInvariant());
+    }
 
     /// <summary>
-    /// A GET to <c>https://api.github.com</c> plus <paramref name="pathAndQuery"/>
-    /// with the API headers: User-Agent, <c>Accept</c>,
-    /// <c>X-GitHub-Api-Version</c> and the bearer token. The caller owns (and
-    /// must dispose) the message.
+    /// The current blob SHA of a file:
+    /// <c>GET /repos/{owner}/{repo}/contents/{path}?ref={branch}</c> — the
+    /// value a later "overwrite anyway" commits with. The path is escaped
+    /// segment by segment, the whole branch name url-escaped into the query.
+    /// A 404 is <see cref="GitHubErrorKind.NotFound"/>; an answer that is not
+    /// an object, reports a <c>type</c> other than <c>file</c>, or has no
+    /// <c>sha</c> is <see cref="GitHubErrorKind.Unexpected"/>. Returned
+    /// lower-case.
+    /// </summary>
+    public async Task<string> GetFileShaAsync(
+        string accessToken,
+        string owner,
+        string repo,
+        string branch,
+        string path,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            throw new ArgumentException("File path is required", nameof(path));
+        }
+
+        var requestPath =
+            $"{RepoPath(owner, repo)}/contents/{EscapePathSegments(path)}?ref={Uri.EscapeDataString(branch)}";
+        using var request = ApiRequest(requestPath, accessToken);
+
+        var json = await SendForJsonAsync(request, ct);
+
+        var sha = json.ValueKind == JsonValueKind.Object
+            && GetString(json, "type") == "file"
+            ? GetString(json, "sha")
+            : null;
+
+        return sha?.ToLowerInvariant()
+            ?? throw UnexpectedError($"GitHub {Describe(request)} returned no file sha");
+    }
+
+    // ---- shared request plumbing (every call builds on these) ----
+
+    /// <summary>
+    /// A request to <c>https://api.github.com</c> plus
+    /// <paramref name="pathAndQuery"/> with the API headers: User-Agent,
+    /// <c>Accept</c>, <c>X-GitHub-Api-Version</c> and the bearer token.
+    /// Defaults to GET without a body; a writer passes its method and content
+    /// (the request then owns the content and disposes it). The caller owns
+    /// (and must dispose) the message.
     /// </summary>
     private HttpRequestMessage ApiRequest(
         string pathAndQuery,
         string accessToken,
-        string accept = ApiAccept)
+        string accept = ApiAccept,
+        HttpMethod? method = null,
+        HttpContent? content = null)
     {
-        var request = new HttpRequestMessage(HttpMethod.Get, ApiHost + pathAndQuery);
+        var request = new HttpRequestMessage(method ?? HttpMethod.Get, ApiHost + pathAndQuery)
+        {
+            Content = content,
+        };
         AddCommonHeaders(request, accept);
         request.Headers.TryAddWithoutValidation("X-GitHub-Api-Version", ApiVersion);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
@@ -482,7 +605,7 @@ public sealed class GitHubClient
     /// Sends and returns a successful response; the caller owns it. Everything
     /// else is disposed here and reported as a <see cref="GitHubApiException"/>:
     /// transport errors and timeouts are
-    /// <see cref="GitHubErrorKind.Network"/>, 401/404 map to their kinds, 403
+    /// <see cref="GitHubErrorKind.Network"/>, 401/404/409 map to their kinds, 403
     /// and 429 that say "rate limited" (an exhausted
     /// <c>x-ratelimit-remaining</c> or a <c>retry-after</c>) map to
     /// <see cref="GitHubErrorKind.RateLimited"/>, anything else is
@@ -536,6 +659,12 @@ public sealed class GitHubClient
         if (status == 404)
         {
             throw new GitHubApiException(GitHubErrorKind.NotFound,
+                $"GitHub {described} returned {status}", status);
+        }
+
+        if (status == 409)
+        {
+            throw new GitHubApiException(GitHubErrorKind.Conflict,
                 $"GitHub {described} returned {status}", status);
         }
 
@@ -635,12 +764,13 @@ public sealed class GitHubClient
         $"/repos/{Uri.EscapeDataString(owner)}/{Uri.EscapeDataString(repo)}";
 
     /// <summary>
-    /// A branch name escaped for a URL path: GitHub allows <c>/</c> in a branch,
-    /// so each <c>/</c>-separated segment is escaped and the separators stay
-    /// literal (<c>feature/x y</c> becomes <c>feature/x%20y</c>).
+    /// A path escaped for a URL: GitHub allows <c>/</c> in branch names and in
+    /// file paths, so each <c>/</c>-separated segment is escaped and the
+    /// separators stay literal (<c>config/my board.keymap</c> becomes
+    /// <c>config/my%20board.keymap</c>).
     /// </summary>
-    private static string EscapeBranch(string branch) =>
-        string.Join('/', branch.Split('/').Select(Uri.EscapeDataString));
+    private static string EscapePathSegments(string value) =>
+        string.Join('/', value.Split('/').Select(Uri.EscapeDataString));
 
     /// <summary>
     /// Method and URL path only — never the query, which is where a caller

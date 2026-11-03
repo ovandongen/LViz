@@ -40,6 +40,8 @@ public sealed class FakeGitHubKeymapService : IGitHubKeymapService
         (_, _, _) => throw new NotSupportedException();
     public Func<GitHubKeymapRef, Task<GitHubOpenResult>> OnOpen { get; set; } =
         _ => throw new NotSupportedException();
+    public Func<GitHubKeymapRef, byte[], string, string, bool, Task<GitHubSaveResult>> OnSave { get; set; } =
+        (_, _, _, _, _) => throw new NotSupportedException();
     public Func<GitHubKeymapRef, string?> OnLocalPathFor { get; set; } = _ => null;
     public Func<string, string, string, string> OnCacheFolderFor { get; set; } =
         (owner, repo, branch) =>
@@ -93,6 +95,18 @@ public sealed class FakeGitHubKeymapService : IGitHubKeymapService
     {
         Calls.Add(nameof(OpenAsync));
         return OnOpen(keymap);
+    }
+
+    public Task<GitHubSaveResult> SaveAsync(
+        GitHubKeymapRef keymap,
+        byte[] content,
+        string baseBlobSha,
+        string message,
+        bool overwrite,
+        CancellationToken ct = default)
+    {
+        Calls.Add(nameof(SaveAsync));
+        return OnSave(keymap, content, baseBlobSha, message, overwrite);
     }
 
     public string? LocalPathFor(GitHubKeymapRef keymap)
