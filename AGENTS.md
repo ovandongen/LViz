@@ -124,6 +124,17 @@ dotnet run --project src/LViz.App                  # launch the app
   differ). A layer number is written as a define name only when the file
   already uses that define as a layer reference (`&mo NAME`, `&lt NAME …`):
   MoErgo exports define `KB_TYPE_GLOVE_80 1` ahead of `LAYER_Symbol 1`.
+- **`Core/Keymap/Editing/KeymapEditSession` tracks layers by id, not
+  position.** Baseline layer `i` is id `i`; an add takes a fresh id that is
+  never reused. Each id has an origin (its baseline name and bindings, or what
+  it was added with), and `IsKeyChanged`/`IsLayerRenamed`/`ChangeCount` compare
+  `Current` with those origins, never with the undo stack. Keys that a
+  structural edit only renumbered (`&mo 2` → `&mo 3`) deliberately count as
+  changed. Steps are private nested records so they reach the id list
+  directly. `ApplyStructure` stores the caller's `after` verbatim and redo
+  replays it, so `after` must be derived from `Current`, with `Layer.Index` ==
+  position. `PendingStructureEdits` is empty whenever the ids are back to the
+  baseline list, even with structural steps still undoable.
 - **Two keymap loaders, one output.** `MoergoJsonKeymapLoader` parses the
   Moergo Layout Editor `.json` export (glove80.com / go60) into the *same*
   `KeyboardConfig` — recursive modifier params flatten depth-first to match
@@ -451,6 +462,13 @@ LViz-specific (extend this list as we hit more):
 - **`KeyBinding` record equality does not compare `Params` contents** (it
   compares the list reference). Compare `Behavior` plus
   `Params.SequenceEqual`, in code and in tests.
+
+- **A C# local named `from` can't be the receiver of a `with` expression**
+  (`from with { … }` parses as a LINQ query, even in parentheses). Rename the
+  local or use the constructor.
+
+- **xUnit analyzer warnings break the 0-warning build**: `Assert.Equal(1,
+  x.Count)` must be `Assert.Single(x)` (xUnit2013).
 
 - **Don't close an Avalonia flyout synchronously from a button inside it.**
   The button resolves and runs its `Command` *after* its `Click` handler; hiding
