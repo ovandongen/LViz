@@ -136,6 +136,15 @@ dotnet run --project src/LViz.App                  # launch the app
   `KeyboardConfigValidator` for the layer-count consistency check. Unmapped on
   purpose: `decoration.color`, `inputListeners`, `custom_devicetree`. This is
   the import format the fork originally dropped, re-added scoped to Moergo.
+- **Picking catalogs live in `Core/Keymap/Catalog/`, codes and kinds only.**
+  `ZmkKeycodeCatalog` is the pickable keycode list from the embedded
+  `Resources/zmk-keycodes.json`, generated from ZMK's MIT `keys.h` by the
+  local-only `docs/tasks/gen_keycodes.py`. Regenerate it, never hand-edit it;
+  a regeneration that changes counts must update `ZmkKeycodeCatalogTests`.
+  `ZmkKeycodeLabel`/`ZmkKeycodeMapper` stay the display-glyph path.
+  `ZmkBehaviorCatalog` (behaviors + parameter kinds) and `ZmkModifierWrap`
+  (flat `["LC","LS","A"]` form ↔ flags) carry no display strings: friendly
+  names and explanations are resx UI text.
 - **Three layout importers, one result.** `Core/Layout/Import/` turns board
   files into `ImportedLayout`s (keys as `DtsiKeyPhysical` in ZMK units, in
   keymap binding order, plus warnings): `PhysicalLayoutImporter`
@@ -505,6 +514,9 @@ LViz-specific (extend this list as we hit more):
   early `if (OperatingSystem.IsMacOS()) return;` doesn't count as a guard).
   Wrap the test class in `#pragma warning disable/restore CA1416` with a
   why-comment, as `MacKeychainSecretStoreTests` does.
+
+- **xUnit `[InlineData]` can't take an implicitly typed array** (`new[] { "x" }`
+  → CS0182). Use `new string[] { … }` or a `[Fact]`.
 
 - **`Tmds.DBus.Protocol` 0.21.3 is not the API on GitHub's main branch.**
   There `MessageWriter` is a ref struct; in 0.21.3 it isn't, and `Variant` is
