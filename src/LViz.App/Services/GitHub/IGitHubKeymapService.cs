@@ -6,13 +6,17 @@ namespace LViz.App.Services.GitHub;
 /// The single thing the main window and the GitHub window talk to for
 /// GitHub-hosted keymaps: signing in through the OAuth device flow, browsing
 /// the repositories installed on the LViz App and their branches, refreshing
-/// the local cache copy of a repository, and opening a keymap from it.
+/// the local cache copy of a repository, opening a keymap from it, and
+/// committing one back.
 ///
 /// <para>
 /// Failure contract: everything throws <see cref="GitHubApiException"/> for a
 /// GitHub failure and propagates a cancelled token, except
 /// <see cref="OpenAsync"/> (which reports through <see cref="GitHubOpenResult"/>
-/// so offline fallback can ride along) and <see cref="LocalPathFor"/> /
+/// so offline fallback can ride along) and
+/// <see cref="SaveAsync"/> (which reports through
+/// <see cref="GitHubSaveResult"/> so a conflict is a result the editor can act
+/// on), plus <see cref="LocalPathFor"/> /
 /// <see cref="CacheFolderFor"/> (no I/O beyond a file check).
 /// </para>
 /// </summary>
@@ -65,6 +69,30 @@ public interface IGitHubKeymapService
     /// </summary>
     Task<GitHubOpenResult> OpenAsync(GitHubKeymapRef keymap, CancellationToken ct = default);
 
+    /// <summary>
+    /// Commits <paramref name="content"/> to the keymap's path on its branch
+    /// with <paramref name="message"/>, reports the outcome through
+    /// <see cref="GitHubSaveResult"/>, and — after a commit — brings the local
+    /// cache copy of the branch in step with what was saved.
+    /// </summary>
+    /// <param name="baseBlobSha">
+    /// The <see cref="GitBlobSha"/> of the bytes the editor loaded. GitHub
+    /// refuses the commit when the file on the branch no longer matches it,
+    /// which arrives as <see cref="GitHubSaveResult.Conflict"/>.
+    /// </param>
+    /// <param name="overwrite">
+    /// True after the user chose to replace GitHub's version anyway: the
+    /// file's <i>current</i> blob SHA is fetched from GitHub and committed
+    /// against, so <paramref name="baseBlobSha"/> is ignored.
+    /// </param>
+    Task<GitHubSaveResult> SaveAsync(
+        GitHubKeymapRef keymap,
+        byte[] content,
+        string baseBlobSha,
+        string message,
+        bool overwrite,
+        CancellationToken ct = default);
+
     /// <summary>The locally cached copy of this keymap, or null when it is not on disk.</summary>
     string? LocalPathFor(GitHubKeymapRef keymap);
 
@@ -91,4 +119,28 @@ public abstract record GitHubOpenResult
 
     /// <summary>The keymap could not be opened.</summary>
     public sealed record Failed(GitHubErrorKind Kind, string Message) : GitHubOpenResult;
+}
+
+/// <summary>
+/// The outcome of <see cref="IGitHubKeymapService.SaveAsync"/>: the commit
+/// GitHub accepted, the file having changed under us, or the kind and message
+/// of what went wrong.
+/// </summary>
+public abstract record GitHubSaveResult
+{
+    /// <summary>
+    /// GitHub committed the file as <see cref="CommitSha"/>; the local cache
+    /// copy was brought in step with it.
+    /// </summary>
+    public sealed record Saved(string CommitSha) : GitHubSaveResult;
+
+    /// <summary>
+    /// The file on the branch no longer matches the blob SHA the save was
+    /// attempted against — nothing was committed. Saving again with
+    /// <c>overwrite</c> replaces GitHub's version.
+    /// </summary>
+    public sealed record Conflict : GitHubSaveResult;
+
+    /// <summary>The keymap could not be saved.</summary>
+    public sealed record Failed(GitHubErrorKind Kind, string Message) : GitHubSaveResult;
 }

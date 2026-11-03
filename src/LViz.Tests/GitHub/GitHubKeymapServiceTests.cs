@@ -2,6 +2,7 @@ using System.Formats.Tar;
 using System.IO.Compression;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using LViz.App;
 using LViz.App.Services.GitHub;
 using LViz.Core.GitHub;
@@ -14,7 +15,8 @@ namespace LViz.Tests.GitHub;
 /// <summary>
 /// <see cref="GitHubKeymapService"/> — tying client, session and cache
 /// together: restore-once, sign-in completion, sign-out wiping the cache,
-/// and the open flow with its offline fallback. Runs on a real
+/// the open flow with its offline fallback, and the save flow (commit,
+/// conflict, overwrite, keeping the cache copy in step). Runs on a real
 /// <see cref="GitHubClient"/> over <see cref="FakeHttpHandler"/>, an
 /// <see cref="InMemorySecretStore"/>, a temp cache root and tarballs built
 /// in-test with <see cref="TarWriter"/>, so nothing touches the network.
@@ -30,6 +32,20 @@ public sealed class GitHubKeymapServiceTests : IDisposable
     private const string RefreshToken = "ghr_testrefresh";
 
     private const string Sha1 = "1111111111111111111111111111111111111111";
+
+    /// <summary>Where the service commits <see cref="Keymap"/> to / reads its
+    /// current blob SHA from.</summary>
+    private const string ContentsPath = "/repos/o/r/contents/config/cosmos82.keymap";
+
+    /// <summary>What <see cref="NewContent"/> was loaded as, per the editor.</summary>
+    private const string LoadedBlobSha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    /// <summary>The blob SHA currently on GitHub — what "overwrite" commits with.</summary>
+    private const string RemoteBlobSha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+    private const string CommitSha = "cccccccccccccccccccccccccccccccccccccccc";
+
+    private static readonly byte[] NewContent = "layers { edited }\n"u8.ToArray();
 
     private static readonly GitHubKeymapRef Keymap =
         new("o", "r", "main", "config/cosmos82.keymap");
@@ -168,6 +184,114 @@ public sealed class GitHubKeymapServiceTests : IDisposable
         Assert.Equal(GitHubErrorKind.NotFound, failed.Kind);
     }
 
+    // ---- SaveAsync ----
+
+    [Fact]
+    public async Task Save_SignedIn_CommitsWithLoadedBlobSha_AndUpdatesCacheCopy()
+    {
+        await CachedCopyAsync();
+        Route(ContentsPath, () => FakeHttpHandler.Json(CommitJson(CommitSha, RemoteBlobSha, parentSha: Sha1)));
+
+        var result = await _service.SaveAsync(
+            Keymap, NewContent, LoadedBlobSha, "LViz: save cosmos82", overwrite: false);
+
+        var saved = Assert.IsType<GitHubSaveResult.Saved>(result);
+        Assert.Equal(CommitSha, saved.CommitSha);
+
+        var (request, body) = Assert.Single(_handler.Requests);
+        Assert.Equal(HttpMethod.Put, request.Method);
+        Assert.Equal(ContentsPath, request.RequestUri!.PathAndQuery);
+
+        using var document = JsonDocument.Parse(body!);
+        var root = document.RootElement;
+        Assert.Equal(LoadedBlobSha, root.GetProperty("sha").GetString());
+        Assert.Equal("LViz: save cosmos82", root.GetProperty("message").GetString());
+        Assert.Equal("main", root.GetProperty("branch").GetString());
+        Assert.Equal(NewContent, Convert.FromBase64String(root.GetProperty("content").GetString()!));
+
+        // The cached copy now holds what was committed, and counts as current
+        // at the commit (its parent was the commit it was downloaded at).
+        Assert.Equal(NewContent, File.ReadAllBytes(_service.LocalPathFor(Keymap)!));
+        Assert.Equal(CommitSha, CachedSha());
+    }
+
+    [Fact]
+    public async Task Save_StaleBaseSha_ReportsConflictAndLeavesCacheCopy()
+    {
+        await CachedCopyAsync();
+        Route(ContentsPath, () => FakeHttpHandler.Json(
+            """{"message":"A commit has been made but not reflected in the response"}""", (HttpStatusCode)409));
+
+        var result = await _service.SaveAsync(
+            Keymap, NewContent, LoadedBlobSha, "LViz: save cosmos82", overwrite: false);
+
+        Assert.IsType<GitHubSaveResult.Conflict>(result);
+        Assert.Equal("keymap body", File.ReadAllText(_service.LocalPathFor(Keymap)!));
+        Assert.Equal(Sha1, CachedSha());
+    }
+
+    [Fact]
+    public async Task Save_Overwrite_ReadsCurrentBlobShaThenCommitsWithIt()
+    {
+        await CachedCopyAsync();
+        Route(ContentsPath + "?ref=main", () => FakeHttpHandler.Json($$"""{"type":"file","sha":"{{RemoteBlobSha}}"}"""));
+        Route(ContentsPath, () => FakeHttpHandler.Json(CommitJson(CommitSha, RemoteBlobSha, parentSha: Sha1)));
+
+        var result = await _service.SaveAsync(
+            Keymap, NewContent, LoadedBlobSha, "LViz: save cosmos82", overwrite: true);
+
+        Assert.IsType<GitHubSaveResult.Saved>(result);
+        Assert.Equal(new[] { ContentsPath + "?ref=main", ContentsPath }, SentPaths());
+        Assert.Equal(HttpMethod.Get, _handler.Requests[0].Request.Method);
+
+        // The commit replaces GitHub's current version, not the loaded baseline.
+        using var document = JsonDocument.Parse(_handler.Requests[1].Body!);
+        Assert.Equal(RemoteBlobSha, document.RootElement.GetProperty("sha").GetString());
+    }
+
+    [Fact]
+    public async Task Save_SignedOut_FailsUnauthorized_WithoutHttpRequest()
+    {
+        var result = await _service.SaveAsync(
+            Keymap, NewContent, LoadedBlobSha, "LViz: save cosmos82", overwrite: false);
+
+        var failed = Assert.IsType<GitHubSaveResult.Failed>(result);
+        Assert.Equal(GitHubErrorKind.Unauthorized, failed.Kind);
+        Assert.Equal("Not signed in", failed.Message);
+        Assert.Empty(_handler.Requests);
+    }
+
+    [Fact]
+    public async Task Save_PutReturns404_FailsNotFound_AndLeavesCacheCopy()
+    {
+        await CachedCopyAsync();
+        Route(ContentsPath, () => new HttpResponseMessage(HttpStatusCode.NotFound));
+
+        var result = await _service.SaveAsync(
+            Keymap, NewContent, LoadedBlobSha, "LViz: save cosmos82", overwrite: false);
+
+        var failed = Assert.IsType<GitHubSaveResult.Failed>(result);
+        Assert.Equal(GitHubErrorKind.NotFound, failed.Kind);
+        Assert.Contains(ContentsPath, failed.Message);
+        Assert.DoesNotContain(AccessToken, failed.Message);
+        Assert.Equal("keymap body", File.ReadAllText(_service.LocalPathFor(Keymap)!));
+    }
+
+    [Fact]
+    public async Task Save_CancelledToken_PropagatesCancellation_WithoutHttpRequest()
+    {
+        await CachedCopyAsync();
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => _service.SaveAsync(
+                Keymap, NewContent, LoadedBlobSha, "LViz: save cosmos82", overwrite: false, cancelled.Token));
+
+        Assert.Empty(_handler.Requests);
+        Assert.Equal("keymap body", File.ReadAllText(_service.LocalPathFor(Keymap)!));
+    }
+
     // ---- sign out ----
 
     [Fact]
@@ -258,6 +382,39 @@ public sealed class GitHubKeymapServiceTests : IDisposable
         Route(
             "/repos/o/r/tarball/" + sha,
             () => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(payload) });
+
+    /// <summary>
+    /// Signed in with the keymap's branch already downloaded at commit
+    /// <see cref="Sha1"/> — the state the editor saves from. The request log is
+    /// cleared afterwards, so a save test only sees its own traffic.
+    /// </summary>
+    private async Task CachedCopyAsync()
+    {
+        await StoreSignedInAsync();
+        RouteHead(Sha1);
+        RouteTarball(Sha1, TarGz(FileEntry("o-r-1111/config/cosmos82.keymap", "keymap body")));
+        Assert.IsType<GitHubOpenResult.Loaded>(await _service.OpenAsync(Keymap));
+        _handler.Requests.Clear();
+    }
+
+    /// <summary>The commit the cached copy of <c>o/r</c> at <c>main</c> matches.</summary>
+    private string? CachedSha() => new GitHubRepoCache(_root).CachedSha("o", "r", "main");
+
+    /// <summary>The paths every request went to, in order.</summary>
+    private string[] SentPaths() =>
+        _handler.Requests.Select(entry => entry.Request.RequestUri!.PathAndQuery).ToArray();
+
+    /// <summary>
+    /// A successful commit answer; a null parent leaves <c>parents</c> out of
+    /// the commit object entirely.
+    /// </summary>
+    private static string CommitJson(string commitSha, string blobSha, string? parentSha)
+    {
+        var commit = parentSha is null
+            ? $$"""{"sha":"{{commitSha}}"}"""
+            : $$"""{"sha":"{{commitSha}}","parents":[{"sha":"{{parentSha}}"}]}""";
+        return $$"""{"content":{"sha":"{{blobSha}}"},"commit":{{commit}}}""";
+    }
 
     private static string DeviceCodeJson() =>
         "{\"device_code\":\"dc-1\",\"user_code\":\"ABCD-1234\","

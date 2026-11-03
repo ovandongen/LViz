@@ -264,6 +264,20 @@ dotnet run --project src/LViz.App                  # launch the app
   fetches a cold cache. A GitHub entry without a cache copy is kept, never
   pruned like a missing file (sign-out deletes the whole cache). The wizard
   books the already-open keymap for the board it saves.
+- **Saving keymaps: conflict-checked on both sides.** A GitHub save
+  (`IGitHubKeymapService.SaveAsync`) commits straight to the branch against
+  the `GitBlobSha` of the bytes the editor loaded; GitHub's 409 becomes
+  `GitHubErrorKind.Conflict` → `GitHubSaveResult.Conflict`, and "overwrite"
+  re-reads the current blob SHA (`GetFileShaAsync`). After a commit
+  `GitHubRepoCache.ApplyCommittedFile` writes the file into the cache and moves
+  the cached SHA only when the commit's parent is the cached SHA (otherwise the
+  next background check re-downloads). The cache info file is written only via
+  `GitHubRepoCache.InfoJson`. A local save goes through
+  `KeymapFileSaver.SaveAsync`: refuses with `ChangedOnDisk` when the file no
+  longer equals the loaded text (Ordinal), else snapshots it into
+  `KeymapBackupStore` (`ApplicationData/LViz/keymap-backups/<16-hex sha256 of
+  the full path>/`, `source.txt` names the file, newest 20 kept) and writes
+  atomically. Use one `KeymapBackupStore` root: another root starts a new history.
 
 ## Before writing code
 
@@ -565,6 +579,11 @@ LViz-specific (extend this list as we hit more):
 - **`FakeHttpHandler.Respond` is a synchronous func**: blocking in it blocks
   the test thread. A test that must hold a response open needs its own
   async handler (see `GatingHttpHandler` in `GitHubSessionTests`).
+
+- **A new `GitHubErrorKind` member trips
+  `GitHubOpenViewModelTests.MessageFor_EveryKind_GetsDistinctResolvedText`**:
+  every kind needs its own `MessageFor` text (both `.resx` files). `Conflict`
+  is excluded there until the save UI adds its text; drop the exclusion then.
 
 - **`MainWindowViewModel.InitializeAsync` starts the HID stack when
   `LiveKeyHighlighting` is true** (the default). Startup tests set it false.

@@ -1,7 +1,9 @@
 using System.Formats.Tar;
+using System.Globalization;
 using System.IO.Compression;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using LViz.Core.GitHub;
 using Xunit;
 
@@ -9,7 +11,8 @@ namespace LViz.Tests.GitHub;
 
 /// <summary>
 /// The local repo cache — folder layout, tar unpacking, head-commit freshness,
-/// atomic swap and cleanup — over a temp root per test. HTTP goes through
+/// atomic swap, absorbing a file LViz committed, and cleanup — over a temp
+/// root per test. HTTP goes through
 /// <see cref="FakeHttpHandler"/> routed by <c>PathAndQuery</c>, and tarballs
 /// are built in-test with <see cref="TarWriter"/> over a <see cref="GZipStream"/>,
 /// so nothing touches the network.
@@ -22,6 +25,10 @@ public sealed class GitHubRepoCacheTests : IDisposable
 
     private const string Sha1 = "1111111111111111111111111111111111111111";
     private const string Sha2 = "2222222222222222222222222222222222222222";
+    private const string Sha3 = "3333333333333333333333333333333333333333";
+
+    private static readonly GitHubKeymapRef Keymap =
+        new("o", "r", "main", "config/cosmos82.keymap");
 
     private readonly string _root = Path.Combine(
         Path.GetTempPath(), $"lviz-repo-cache-tests-{Guid.NewGuid():N}");
@@ -232,6 +239,111 @@ public sealed class GitHubRepoCacheTests : IDisposable
         AssertNoLeftovers();
     }
 
+    // ---- ApplyCommittedFile ----
+
+    [Fact]
+    public async Task ApplyCommittedFile_ParentMatchesCached_ReplacesFileAndRecordsCommit()
+    {
+        var cache = await CachedAtSha1Async();
+        var folder = cache.FolderFor("o", "r", "main");
+        var infoBefore = InfoText(folder);
+
+        cache.ApplyCommittedFile(Keymap, Content("saved body"), new GitHubCommitResult(Sha2, Sha3, ParentSha: Sha1));
+
+        Assert.Equal("saved body", File.ReadAllText(Path.Combine(folder, "config", "cosmos82.keymap")));
+        Assert.Equal(Sha2, cache.CachedSha("o", "r", "main"));
+
+        // Rewritten, and in the shape RefreshAsync writes: camelCase sha plus
+        // a fresh round-trip timestamp.
+        Assert.NotEqual(infoBefore, InfoText(folder));
+        using var document = JsonDocument.Parse(InfoText(folder));
+        var info = document.RootElement;
+        Assert.Equal(Sha2, info.GetProperty("sha").GetString());
+        Assert.True(DateTimeOffset.TryParse(
+            info.GetProperty("downloadedAt").GetString(),
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.RoundtripKind,
+            out _));
+
+        // Only the keymap's file and the info file were touched.
+        Assert.Equal(
+            new[] { GitHubRepoCache.InfoFileName, "build.yaml", Path.Combine("config", "cosmos82.keymap") },
+            ListedFiles(folder));
+    }
+
+    [Fact]
+    public async Task ApplyCommittedFile_ParentIsAnotherCommit_ReplacesFileAndKeepsCachedSha()
+    {
+        var cache = await CachedAtSha1Async();
+        var folder = cache.FolderFor("o", "r", "main");
+        var infoBefore = InfoText(folder);
+
+        cache.ApplyCommittedFile(Keymap, Content("saved body"), new GitHubCommitResult(Sha2, Sha3, ParentSha: Sha3));
+
+        // Someone else committed in between: the editor sees its own save, and
+        // the untouched SHA makes the next refresh re-download the branch.
+        Assert.Equal("saved body", File.ReadAllText(Path.Combine(folder, "config", "cosmos82.keymap")));
+        Assert.Equal(Sha1, cache.CachedSha("o", "r", "main"));
+        Assert.Equal(infoBefore, InfoText(folder));
+    }
+
+    [Fact]
+    public void ApplyCommittedFile_BranchNeverDownloaded_CreatesNothing()
+    {
+        var cache = new GitHubRepoCache(_root);
+
+        cache.ApplyCommittedFile(Keymap, Content("saved body"), new GitHubCommitResult(Sha2, Sha3, ParentSha: Sha1));
+
+        Assert.False(Directory.Exists(_root));
+        Assert.False(Directory.Exists(cache.FolderFor("o", "r", "main")));
+        Assert.Null(cache.LocalPathFor(Keymap));
+    }
+
+    [Fact]
+    public void ApplyCommittedFile_FolderWithoutInfoFile_WritesFileWithoutRecording()
+    {
+        var cache = new GitHubRepoCache(_root);
+        var folder = cache.FolderFor("o", "r", "main");
+        Directory.CreateDirectory(folder);
+
+        // A commit with no parent (a branch's first commit) must not be read as
+        // "matches a folder that never recorded a commit".
+        cache.ApplyCommittedFile(Keymap, Content("saved body"), new GitHubCommitResult(Sha2, Sha3, ParentSha: null));
+
+        Assert.Equal("saved body", File.ReadAllText(Path.Combine(folder, "config", "cosmos82.keymap")));
+        Assert.False(File.Exists(Path.Combine(folder, GitHubRepoCache.InfoFileName)));
+        Assert.Null(cache.CachedSha("o", "r", "main"));
+    }
+
+    [Fact]
+    public async Task ApplyCommittedFile_UnwritableTarget_KeepsCacheAndDoesNotThrow()
+    {
+        var cache = await CachedAtSha1Async();
+        var target = Path.Combine(cache.FolderFor("o", "r", "main"), "config", "cosmos82.keymap");
+        File.Delete(target);
+        // A directory can never take the file's place, so the write must fail.
+        Directory.CreateDirectory(target);
+
+        cache.ApplyCommittedFile(Keymap, Content("saved body"), new GitHubCommitResult(Sha2, Sha3, ParentSha: Sha1));
+
+        Assert.True(Directory.Exists(target));
+        Assert.Equal(Sha1, cache.CachedSha("o", "r", "main"));
+    }
+
+    [Fact]
+    public async Task ApplyCommittedFile_PathInNewSubFolder_CreatesTheFolders()
+    {
+        var cache = await CachedAtSha1Async();
+        var keymap = new GitHubKeymapRef("o", "r", "main", "config/new/x.keymap");
+
+        cache.ApplyCommittedFile(keymap, Content("fresh"), new GitHubCommitResult(Sha2, Sha3, ParentSha: Sha1));
+
+        var local = cache.LocalPathFor(keymap);
+        Assert.NotNull(local);
+        Assert.Equal(Path.Combine(_root, "o", "r", "main", "config", "new", "x.keymap"), local);
+        Assert.Equal("fresh", File.ReadAllText(local!));
+    }
+
     // ---- DeleteAll ----
 
     [Fact]
@@ -259,6 +371,28 @@ public sealed class GitHubRepoCacheTests : IDisposable
         Route(
             "/repos/o/r/tarball/" + sha,
             () => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(payload) });
+
+    /// <summary>
+    /// A cache holding <c>o/r</c> at <c>main</c> downloaded at commit
+    /// <see cref="Sha1"/>: one keymap plus a second file, so a replaced folder
+    /// is visible.
+    /// </summary>
+    private async Task<GitHubRepoCache> CachedAtSha1Async()
+    {
+        var cache = new GitHubRepoCache(_root);
+        RouteHead(Sha1);
+        RouteTarball(Sha1, TarGz(
+            FileEntry("o-r-1111/config/cosmos82.keymap", "downloaded body"),
+            FileEntry("o-r-1111/build.yaml", "shield: zmk")));
+        await cache.RefreshAsync(_client, AccessToken, "o", "r", "main");
+        return cache;
+    }
+
+    /// <summary>The raw body of a folder's info file.</summary>
+    private static string InfoText(string folder) =>
+        File.ReadAllText(Path.Combine(folder, GitHubRepoCache.InfoFileName));
+
+    private static byte[] Content(string text) => Encoding.UTF8.GetBytes(text);
 
     /// <summary>The paths every request went to, in order.</summary>
     private string[] SentPaths() =>

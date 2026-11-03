@@ -340,7 +340,13 @@ public sealed class GitHubOpenViewModelTests : IDisposable
     [Fact]
     public void MessageFor_EveryKind_GetsDistinctResolvedText()
     {
-        var kinds = Enum.GetValues<GitHubErrorKind>();
+        // Conflict (HTTP 409) cannot reach the UI yet — no call returns it
+        // until keymap saving lands — and its translated text arrives with
+        // the save UI (saving chain, later card), which must drop this
+        // exclusion when it adds the mapping and the Loc keys.
+        var kinds = Enum.GetValues<GitHubErrorKind>()
+            .Where(kind => kind != GitHubErrorKind.Conflict)
+            .ToArray();
         var texts = kinds
             .Select(kind => GitHubOpenViewModel.MessageFor(new GitHubApiException(kind, "detail")))
             .ToList();

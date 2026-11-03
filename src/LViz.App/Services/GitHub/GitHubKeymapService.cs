@@ -9,8 +9,9 @@ namespace LViz.App.Services.GitHub;
 /// owns HTTP, <see cref="GitHubRepoCache"/> owns the local copies — this class
 /// only ties them together and enforces the house rules: restore at most once,
 /// fetch the access token right before every refresh (never hold it), wipe the
-/// repo cache on sign-out, and fall back to the cached copy of a keymap when
-/// GitHub is unreachable.
+/// repo cache on sign-out, fall back to the cached copy of a keymap when
+/// GitHub is unreachable, and hand a committed file to the cache so it does
+/// not need re-downloading.
 ///
 /// <para>
 /// The access-token lifetime is why <see cref="EnsureRestoredAsync"/> caches
@@ -152,6 +153,61 @@ public sealed class GitHubKeymapService(
         {
             DiagnosticLog.Warn("GitHub", $"Open {keymap}: {ex.Message}");
             return new GitHubOpenResult.Failed(GitHubErrorKind.Unexpected, ex.Message);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<GitHubSaveResult> SaveAsync(
+        GitHubKeymapRef keymap,
+        byte[] content,
+        string baseBlobSha,
+        string message,
+        bool overwrite,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            await EnsureRestoredAsync(ct);
+            if (!IsSignedIn)
+            {
+                return new GitHubSaveResult.Failed(GitHubErrorKind.Unauthorized, "Not signed in");
+            }
+
+            // Fetched here and never held, like every other call.
+            var accessToken = await session.GetAccessTokenAsync(ct);
+
+            // "Overwrite" is the user choosing to replace GitHub's version, so
+            // the commit goes against the file's current blob SHA and the
+            // baseline the editor loaded is dropped.
+            var baseSha = overwrite
+                ? await client.GetFileShaAsync(
+                    accessToken, keymap.Owner, keymap.Repo, keymap.Branch, keymap.Path, ct)
+                : baseBlobSha;
+
+            var commit = await client.PutFileAsync(
+                accessToken, keymap.Owner, keymap.Repo, keymap.Branch, keymap.Path,
+                content, baseSha, message, ct);
+
+            cache.ApplyCommittedFile(keymap, content, commit);
+            return new GitHubSaveResult.Saved(commit.CommitSha);
+        }
+        catch (GitHubApiException ex) when (ex.Kind == GitHubErrorKind.Conflict)
+        {
+            // Nothing was written; the editor asks whether to overwrite.
+            return new GitHubSaveResult.Conflict();
+        }
+        catch (GitHubApiException ex)
+        {
+            return new GitHubSaveResult.Failed(ex.Kind, ex.Message);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLog.Warn("GitHub", $"Save {keymap}: {ex.Message}");
+            return new GitHubSaveResult.Failed(GitHubErrorKind.Unexpected, ex.Message);
         }
     }
 
