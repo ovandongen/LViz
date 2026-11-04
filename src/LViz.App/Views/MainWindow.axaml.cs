@@ -32,6 +32,10 @@ public partial class MainWindow : Window
             SystemDecorations = SystemDecorations.Full;
 
         MinimizeButton.Click += (_, _) => WindowState = WindowState.Minimized;
+
+        // Edit-mode shortcuts ride the Tunnel route so they win over whatever
+        // control happens to hold focus (see OnEditKeyDown).
+        AddHandler(KeyDownEvent, OnEditKeyDown, RoutingStrategies.Tunnel);
     }
 
     /// <summary>
@@ -119,20 +123,67 @@ public partial class MainWindow : Window
         if (shouldBeBottom)
         {
             // Bottom edge: combo legend nearest the keyboard (row 0),
-            // tabs middle (row 1), status bar at the outer edge (row 2).
+            // tabs (row 1), edit banner (row 2), status bar at the outer
+            // edge (row 3).
             Grid.SetRow(ComboLegend, 0);
             Grid.SetRow(LayerTabs, 1);
-            Grid.SetRow(StatusBar, 2);
+            Grid.SetRow(EditBanner, 2);
+            Grid.SetRow(StatusBar, 3);
             StatusBar.CornerRadius = new CornerRadius(0, 0, 8, 8);
         }
         else
         {
-            // Top edge: status bar at the outer edge (row 0), tabs middle
-            // (row 1), combo legend nearest the keyboard (row 2).
+            // Top edge: status bar at the outer edge (row 0), edit banner
+            // right below it (row 1), tabs (row 2), combo legend nearest
+            // the keyboard (row 3).
             Grid.SetRow(StatusBar, 0);
-            Grid.SetRow(LayerTabs, 1);
-            Grid.SetRow(ComboLegend, 2);
+            Grid.SetRow(EditBanner, 1);
+            Grid.SetRow(LayerTabs, 2);
+            Grid.SetRow(ComboLegend, 3);
             StatusBar.CornerRadius = new CornerRadius(8, 8, 0, 0);
+        }
+    }
+
+    /// <summary>
+    /// Edit-mode shortcuts. Tunnel routing so the window sees the press before
+    /// the focused control does; text boxes keep their keys, and outside edit
+    /// mode every press falls through untouched. The gesture table lives in
+    /// <see cref="EditShortcuts"/>.
+    /// </summary>
+    private void OnEditKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel { IsEditing: true } vm) return;
+        if (e.Source is TextBox) return;
+
+        var shortcut = EditShortcuts.Resolve(
+            e.Key,
+            e.KeyModifiers,
+            PlatformSettings?.HotkeyConfiguration.CommandModifiers ?? KeyModifiers.Control);
+
+        switch (shortcut)
+        {
+            case EditShortcut.Undo:
+                if (vm.Edit!.UndoCommand.CanExecute(null))
+                    vm.Edit.UndoCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case EditShortcut.Redo:
+                if (vm.Edit!.RedoCommand.CanExecute(null))
+                    vm.Edit.RedoCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case EditShortcut.ClearToTransparent:
+                vm.EditClearSelectedKey(false);
+                e.Handled = true;
+                break;
+            case EditShortcut.ClearToNone:
+                vm.EditClearSelectedKey(true);
+                e.Handled = true;
+                break;
+            case EditShortcut.ClearSelection:
+                vm.EditClearSelection();
+                e.Handled = true;
+                break;
         }
     }
 
@@ -152,13 +203,15 @@ public partial class MainWindow : Window
         var edge = GetResizeEdge(pos);
         if (edge.HasValue) { BeginResizeDrag(edge.Value, e); return; }
 
-        // Only drag from the bars background, not from interactive controls
-        var source = e.Source as Visual;
-        while (source != null && source != this)
-        {
-            if (source is Button) return;
-            source = source.GetVisualParent();
-        }
+        // Only drag from the bars background, not from interactive controls.
+        // A disabled button is left out of hit testing (GetVisualsAt too), so
+        // its press arrives with the bar as the source; check the button
+        // bounds by geometry instead, or a click on a greyed-out button starts
+        // a window drag (macOS then logs "Window move completed without
+        // beginning").
+        if (BarsPanel.GetVisualDescendants().OfType<Button>().Any(b =>
+                b.IsEffectivelyVisible && new Rect(b.Bounds.Size).Contains(e.GetPosition(b))))
+            return;
 
         var barsHeight = BarsPanel.Bounds.Height;
         bool inBars = _barsOnBottom == true

@@ -12,8 +12,11 @@ using LViz.Core.Diagnostics;
 using LViz.Core.GitHub;
 using LViz.Core.Input;
 using LViz.Core.Keymap;
+using LViz.Core.Keymap.Editing;
+using LViz.Core.Keymap.Parser;
 using LViz.Core.Layout;
 using LViz.Core.Models;
+using LViz.Core.Persistence;
 using LViz.Core.Settings;
 using ZmkHidProtocol.ActiveWindow;
 using ZmkHidProtocol.Protocol;
@@ -32,20 +35,23 @@ namespace LViz.App.ViewModels;
 public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 {
     /// <summary>
-    /// Always null on the main VM — the main window's BoardView is read-only.
-    /// The picker VM (<see cref="ExitKeyPickerViewModel"/>) provides a real
-    /// handler so taps register selections.
+    /// Null on the main VM outside keymap edit mode — the main window's
+    /// BoardView is read-only there. While editing it selects the tapped key
+    /// (<see cref="OnEditKeyTapped"/>). The picker VM
+    /// (<see cref="ExitKeyPickerViewModel"/>) provides a real handler so taps
+    /// register selections.
     /// </summary>
-    public Action<int>? OnKeyTapped => null;
+    public Action<int>? OnKeyTapped => IsEditing ? OnEditKeyTapped : null;
 
     /// <summary>
-    /// Right-click on a key opens the per-key label-override editor. Wired
+    /// Right-click on a key opens the per-key label-override editor — inert
+    /// while editing a keymap, where the label dialog doesn't apply. Wired
     /// up so the View can stay binding-only; the actual dialog launch is a
     /// callback into <c>App.axaml.cs</c> (see <see cref="EditKeyLabelRequested"/>)
     /// because the View can't construct a window directly without leaking
     /// Avalonia.Controls into the VM.
     /// </summary>
-    public Action<int>? OnKeyRightTapped => OnKeyRightTappedInternal;
+    public Action<int>? OnKeyRightTapped => IsEditing ? null : OnKeyRightTappedInternal;
 
     private void OnKeyRightTappedInternal(int keyIndex) =>
         EditKeyLabelRequested?.Invoke(keyIndex, ActiveLayerIndex);
@@ -78,6 +84,11 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     // don't wire it — GitHub entries then only ever load from nothing and a
     // click on one toasts "GitHub is not available".
     private readonly IGitHubKeymapService? _gitHub;
+
+    // Backup store the keymap editor's local save snapshots into. App injects
+    // the shared one; tests point it at a temp folder. Only ever written by a
+    // part-6 save, never by entering or leaving edit mode.
+    private readonly KeymapBackupStore _keymapBackups;
 
     private IKeyboardProfile _profile;
     // Last successful load's status text. Null when the current StatusMessage
@@ -182,6 +193,16 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     [ObservableProperty] private bool _isLiveHighlightingEnabled;
     [ObservableProperty] private bool _isAutoLayerSwitchEnabled;
     [ObservableProperty] private bool _hasLayoutLoaded;
+
+    // The edit button's enabled state and tooltip follow the loaded file, so
+    // every flip of "a layout is loaded" re-raises them (a successful load
+    // raises again explicitly — the file can change while this stays true).
+    partial void OnHasLayoutLoadedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanStartEdit));
+        OnPropertyChanged(nameof(EditButtonTooltip));
+        StartEditCommand.NotifyCanExecuteChanged();
+    }
 
     /// <summary>
     /// True when a keymap loaded successfully but its binding count matches
@@ -632,11 +653,13 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         IKeymapStateService? keymapState = null,
         ICapabilityControl? capabilityControl = null,
         IHostActionExecutor? hostActionExecutor = null,
-        IGitHubKeymapService? gitHub = null)
+        IGitHubKeymapService? gitHub = null,
+        KeymapBackupStore? keymapBackups = null)
     {
         _settingsService = settingsService;
         _keymap = keymapState ?? new KeymapStateService();
         _gitHub = gitHub;
+        _keymapBackups = keymapBackups ?? new KeymapBackupStore(KeymapBackupStore.DefaultRoot);
         var s = settingsService.Load();
         _profile = KeyboardProfileRegistry.TryResolve(s.Keyboard, out var p) ? p : new CorneProfile();
         _selectedKeyboard = _profile;
@@ -743,6 +766,11 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         });
         RefreshCommand = new RelayCommand(() =>
         {
+            if (IsEditing)
+            {
+                DiagnosticLog.Info("MainVM", "RefreshCommand ignored while editing");
+                return;
+            }
             // Re-read the stored entry and resolve it (GitHub entries load
             // from the cache, then check GitHub in the background, which also
             // fetches a cold cache). A local entry that resolves to nothing
@@ -823,6 +851,12 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// </summary>
     public void LoadLayoutFromPath(string path, string? entry = null)
     {
+        if (IsEditing)
+        {
+            DiagnosticLog.Info("MainVM", "LoadLayoutFromPath ignored while editing");
+            return;
+        }
+
         entry ??= path;
 
         // Parse + commit happens first and is the only fallible step. On failure
@@ -909,6 +943,13 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         SetLoadStatusBase(baseMsg);
         StatusMessage = baseMsg;
         DiagnosticLog.Info("MainVM", $"Loaded '{path}'");
+
+        // The edit button tracks the loaded file: enabled for a fresh .keymap,
+        // tooltip wording per extension. HasLayoutLoaded may not have flipped,
+        // so raise explicitly on every successful load.
+        OnPropertyChanged(nameof(CanStartEdit));
+        OnPropertyChanged(nameof(EditButtonTooltip));
+        StartEditCommand.NotifyCanExecuteChanged();
     }
 
     // The recents flyout binds RecentKeymaps + the two derived members;
@@ -981,6 +1022,12 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// </summary>
     public async Task OpenGitHubKeymapAsync(GitHubKeymapRef keymap)
     {
+        if (IsEditing)
+        {
+            DiagnosticLog.Info("MainVM", "OpenGitHubKeymapAsync ignored while editing");
+            return;
+        }
+
         if (_gitHub is null)
         {
             Toast.Show(Loc.Instance.Format("Toast_GitHubFailedFormat", keymap.FileName, "GitHub is not available"));
@@ -1095,6 +1142,15 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                 return;
             }
 
+            // An open edit holds the bytes the cache copy was parsed from;
+            // reloading underneath it is what the explicit load lock refuses —
+            // and no "changed on GitHub" toast may claim otherwise.
+            if (IsEditing)
+            {
+                DiagnosticLog.Info("MainVM", "CheckGitHubForUpdateAsync ignored while editing");
+                return;
+            }
+
             DiagnosticLog.Info("MainVM", wasLoaded
                 ? $"'{keymap}' changed on GitHub, reloading"
                 : $"'{keymap}' fetched from GitHub (no cached copy)");
@@ -1178,6 +1234,294 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         _hid.Dispose();
     }
 
+    // --- Keymap edit mode (start/discard/save here; the UI is part 7) ---
+
+    /// <summary>
+    /// The open keymap edit, or null. Setting it (from <see cref="StartEdit"/>
+    /// and <see cref="LeaveEdit"/>) drives everything the view changes while
+    /// editing — <see cref="IsEditing"/>, <see cref="UnsavedEditCount"/>,
+    /// <see cref="CanStartEdit"/> and the Start command's enable state.
+    /// </summary>
+    [ObservableProperty]
+    private KeymapEditViewModel? _edit;
+
+    /// <summary>True while a keymap edit is open — locks keymap/board switching
+    /// and routes key taps into the editor.</summary>
+    public bool IsEditing => Edit is not null;
+
+    /// <summary>Changes still differing from the baseline; 0 when not editing.</summary>
+    public int UnsavedEditCount => Edit?.ChangeCount ?? 0;
+
+    /// <summary>Only a loaded <c>.keymap</c> file can be edited (the Moergo
+    /// <c>.json</c> export stays import-only), and only one edit at a time.</summary>
+    public bool CanStartEdit =>
+        !IsEditing
+        && HasLayoutLoaded
+        && LoadedLayoutPath is string path
+        && path.EndsWith(".keymap", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Tooltip for the edit button; over a <c>.json</c> keymap it says
+    /// that format cannot be edited.</summary>
+    public string EditButtonTooltip =>
+        LoadedLayoutPath is string path && path.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
+            ? Loc.Instance["Tooltip_EditKeymapJson"]
+            : Loc.Instance["Tooltip_EditKeymap"];
+
+    partial void OnEditChanged(KeymapEditViewModel? value)
+    {
+        OnPropertyChanged(nameof(IsEditing));
+        OnPropertyChanged(nameof(UnsavedEditCount));
+        OnPropertyChanged(nameof(CanStartEdit));
+        StartEditCommand.NotifyCanExecuteChanged();
+        NotifyEditCommandState();
+    }
+
+    /// <summary>
+    /// Re-query the commands whose enable state hangs off <see cref="Edit"/> and
+    /// <see cref="IsSavingEdit"/>. Every site that can move that state calls this
+    /// so one of them can't be forgotten.
+    /// </summary>
+    private void NotifyEditCommandState()
+    {
+        SaveEditCommand.NotifyCanExecuteChanged();
+        DiscardEditCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Open an edit on the loaded keymap: re-read the file, parse it, and show
+    /// the edit view — every layer tab visible (hidden ones included, in memory
+    /// only). A read or parse failure leaves the view unedited and toasts why.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanStartEdit))]
+    private void StartEdit()
+    {
+        KeymapEditViewModel edit;
+        try
+        {
+            edit = KeymapEditViewModel.Start(
+                LoadedLayoutPath!, _loadedEntry ?? LoadedLayoutPath!, _gitHub, _keymapBackups);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ZmkKeymapParseException)
+        {
+            Toast.Show(Loc.Instance.Format(
+                "Edit_StartFailedFormat", Path.GetFileName(LoadedLayoutPath!), ex.Message));
+            DiagnosticLog.Warn("MainVM", $"Starting the keymap edit failed: {ex}");
+            return;
+        }
+
+        Edit = edit;
+        edit.Changed += OnEditChanged;
+
+        // Every layer tab shows while editing, hidden ones included — purely
+        // in memory; LeaveEdit rebuilds the tabs from the persisted setting.
+        foreach (var layer in Layers)
+            layer.IsShown = true;
+
+        ApplyActiveLayer(ActiveLayerIndex);
+    }
+
+    /// <summary>One edit change: repaint the board off the edited keymap and
+    /// refresh the banner count and the save/discard enable state.</summary>
+    private void OnEditChanged(object? sender, EventArgs e)
+    {
+        ApplyActiveLayer(ActiveLayerIndex);
+        OnPropertyChanged(nameof(UnsavedEditCount));
+        NotifyEditCommandState();
+    }
+
+    /// <summary>
+    /// Close the open edit without saving: unsubscribe, rebuild the tabs from
+    /// settings (hidden layers hide again), and repaint from the loaded keymap.
+    /// The save path reuses this once the bytes are on disk, and always before
+    /// reloading anything — the edit-mode locks refuse every load path.
+    /// </summary>
+    private void LeaveEdit()
+    {
+        if (Edit is { } edit)
+            edit.Changed -= OnEditChanged;
+        Edit = null;
+        RebuildLayers();
+        ApplyActiveLayer(ActiveLayerIndex);
+    }
+
+    /// <summary>Drop the edit and its changes — the editor's Discard/Esc in part 7.</summary>
+    [RelayCommand(CanExecute = nameof(CanDiscardEdit))]
+    private void DiscardEdit()
+    {
+        if (IsEditing) LeaveEdit();
+    }
+
+    /// <summary>Left-click on a key while editing selects it for the BoardView.</summary>
+    private void OnEditKeyTapped(int keyIndex)
+    {
+        Edit!.SelectKey(keyIndex);
+        RefreshEditSelectionFlags();
+    }
+
+    /// <summary>Mark the editor's current selection on every key.</summary>
+    private void RefreshEditSelectionFlags()
+    {
+        if (Edit is not { } edit) return;
+        for (var i = 0; i < Keys.Count; i++)
+            Keys[i].IsEditSelected = edit.SelectedKeyIndex == i;
+    }
+
+    /// <summary>
+    /// Clear the selected key on the visible layer to <c>&amp;none</c>
+    /// (<paramref name="toNone"/>) or <c>&amp;trans</c> — Delete / Shift+Delete
+    /// in part 7. Does nothing while not editing or when nothing is selected;
+    /// the session's Changed event repaints the board and the flags.
+    /// </summary>
+    public void EditClearSelectedKey(bool toNone)
+    {
+        if (Edit is not { } edit) return;
+        if (edit.SelectedKeyIndex is not int selected) return;
+        edit.ClearKey(ActiveLayerIndex, selected, toNone);
+    }
+
+    /// <summary>Drop the key selection — Esc in part 7. Does nothing while not editing.</summary>
+    public void EditClearSelection()
+    {
+        if (Edit is not { } edit) return;
+        edit.ClearSelection();
+        RefreshEditSelectionFlags();
+    }
+
+    // ---- saving the edit ----
+
+    /// <summary>
+    /// Invoked between building the save plan and writing it: the callback (set
+    /// by <c>App.axaml.cs</c>, part 8) owns the review dialog's lifecycle and
+    /// answers <see langword="false"/> to abandon the save. Null means approved —
+    /// until part 8 wires a dialog, and in tests, saving goes straight through.
+    /// </summary>
+    public Func<KeymapReviewRequest, Task<bool>>? ReviewChangesRequested { get; set; }
+
+    /// <summary>
+    /// Invoked when the target changed underneath the edit: the callback (set by
+    /// <c>App.axaml.cs</c>, part 9) owns the conflict dialog and answers reload /
+    /// overwrite / cancel. Null means <see cref="KeymapSaveConflictChoice.Cancel"/>
+    /// — nothing is ever written over a changed target silently.
+    /// </summary>
+    public Func<KeymapConflictRequest, Task<KeymapSaveConflictChoice>>? SaveConflictRequested { get; set; }
+
+    /// <summary>True while a save is in flight; gates Save and Discard so
+    /// neither can run against an edit that is being written.</summary>
+    [ObservableProperty]
+    private bool _isSavingEdit;
+
+    partial void OnIsSavingEditChanged(bool value) => NotifyEditCommandState();
+
+    /// <summary>Only an edit with something to write can be saved, and only
+    /// while no save is already running.</summary>
+    private bool CanSaveEdit => Edit is { HasChanges: true } && !IsSavingEdit;
+
+    private bool CanDiscardEdit => IsEditing && !IsSavingEdit;
+
+    /// <summary>
+    /// Write the open edit where it came from: freeze it into a
+    /// <see cref="KeymapSavePlan"/> (a writer refusal toasts and keeps the user
+    /// in edit mode), pass it by the review callback, then save it through
+    /// <see cref="KeymapEditViewModel.SaveAsync"/>.
+    /// <list type="bullet">
+    /// <item><description>saved — leave edit mode, reload what was written, stay
+    /// on the layer the editor was on, and report it in the status bar (toasts
+    /// are for errors only);</description></item>
+    /// <item><description>conflict — ask: reload loses the changes and shows the
+    /// target as it stands, overwrite writes anyway, cancel keeps editing;
+    /// </description></item>
+    /// <item><description>failed — toast the translated reason and keep editing
+    /// with the changes intact.</description></item>
+    /// </list>
+    /// Every reload happens <em>after</em> <see cref="LeaveEdit"/>: the edit-mode
+    /// locks refuse <see cref="LoadLayoutFromPath"/> and
+    /// <see cref="OpenGitHubKeymapAsync"/> while an edit is open.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanSaveEdit))]
+    private async Task SaveEditAsync()
+    {
+        var edit = Edit;
+        if (edit is null) return;
+
+        KeymapSavePlan plan;
+        try
+        {
+            plan = edit.BuildSavePlan();
+        }
+        catch (Exception ex) when (ex is ZmkKeymapParseException or ArgumentException)
+        {
+            // The text was never written; the edit and its undo history are
+            // untouched, so the user stays put and can keep working.
+            Toast.Show(Loc.Instance.Format("Edit_SaveRefusedFormat", ex.Message));
+            DiagnosticLog.Warn("MainVM", $"Building the keymap save plan failed: {ex}");
+            return;
+        }
+
+        if (ReviewChangesRequested is { } review)
+        {
+            var approved = await review(new KeymapReviewRequest(
+                plan,
+                edit.Source.TargetName,
+                edit.Source.IsGitHub ? edit.CommitMessageFor(plan) : null));
+            if (!approved) return;
+        }
+
+        IsSavingEdit = true;
+        try
+        {
+            var overwrite = false;
+
+            while (true)
+            {
+                var outcome = await edit.SaveAsync(plan, overwrite);
+
+                if (outcome is KeymapEditSaveOutcome.Saved saved)
+                {
+                    // A reload always lands on layer 0; a save must not move the
+                    // user off the layer they were editing.
+                    var layer = ActiveLayerIndex;
+                    LeaveEdit();
+                    LoadLayoutFromPath(saved.ReloadPath, edit.Source.Entry);
+                    ApplyActiveLayer(layer);
+                    SetLoadStatusBase(null);
+                    StatusMessage = Loc.Instance.Format(
+                        "Status_EditSavedFormat", Path.GetFileName(saved.ReloadPath));
+                    return;
+                }
+
+                if (outcome is KeymapEditSaveOutcome.Failed failed)
+                {
+                    Toast.Show(failed.Message);
+                    return;
+                }
+
+                // Conflict: the target moved since the edit opened.
+                var choice = SaveConflictRequested is { } askConflict
+                    ? await askConflict(new KeymapConflictRequest(
+                        edit.Source.IsGitHub, edit.Source.TargetName))
+                    : KeymapSaveConflictChoice.Cancel;
+
+                if (choice == KeymapSaveConflictChoice.Cancel) return;
+
+                if (choice == KeymapSaveConflictChoice.Reload)
+                {
+                    LeaveEdit();
+                    if (edit.Source.GitHub is { } gitHubRef)
+                        await OpenGitHubKeymapAsync(gitHubRef);
+                    else
+                        LoadLayoutFromPath(edit.Source.LocalPath, edit.Source.Entry);
+                    return;
+                }
+
+                overwrite = true;
+            }
+        }
+        finally
+        {
+            IsSavingEdit = false;
+        }
+    }
+
     // --- Internals ---
 
     private void BuildKeysFromProfile()
@@ -1200,6 +1544,12 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     private void SelectKeyboard(IKeyboardProfile? profile)
     {
+        if (IsEditing)
+        {
+            DiagnosticLog.Info("MainVM", "SelectKeyboard ignored while editing");
+            return;
+        }
+
         if (profile is null) return;
         if (string.Equals(profile.Id, _profile.Id, StringComparison.OrdinalIgnoreCase)) return;
 
@@ -1367,6 +1717,12 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// </summary>
     public void ApplyLayoutWizardResult(LayoutWizardResult result)
     {
+        if (IsEditing)
+        {
+            DiagnosticLog.Info("MainVM", "ApplyLayoutWizardResult ignored while editing");
+            return;
+        }
+
         var previousProfileId = _profile.Id;
         var profile = ReplaceUserProfile(result.Layout);
         ShowProfile(profile);
@@ -1390,6 +1746,12 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// </summary>
     public void ApplyEditedLayout(UserLayoutFile layout)
     {
+        if (IsEditing)
+        {
+            DiagnosticLog.Info("MainVM", "ApplyEditedLayout ignored while editing");
+            return;
+        }
+
         ShowProfile(ReplaceUserProfile(layout));
 
         DiagnosticLog.Info("MainVM", $"Edited user layout user:{layout.Id} ({layout.Keys.Count} keys)");
@@ -1397,11 +1759,27 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     /// <summary>Starts the layout wizard via the window callback.</summary>
     [RelayCommand]
-    private void AddOwnBoard() => AddOwnBoardRequested?.Invoke();
+    private void AddOwnBoard()
+    {
+        if (IsEditing)
+        {
+            DiagnosticLog.Info("MainVM", "AddOwnBoard ignored while editing");
+            return;
+        }
+        AddOwnBoardRequested?.Invoke();
+    }
 
     /// <summary>Opens the "Edit layout…" window via the window callback.</summary>
     [RelayCommand]
-    private void EditLayout() => EditLayoutRequested?.Invoke();
+    private void EditLayout()
+    {
+        if (IsEditing)
+        {
+            DiagnosticLog.Info("MainVM", "EditLayout ignored while editing");
+            return;
+        }
+        EditLayoutRequested?.Invoke();
+    }
 
     /// <summary>Opens the GitHub keymap picker window via the window callback.</summary>
     [RelayCommand]
@@ -1521,7 +1899,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     private void ApplyActiveLayer(int index)
     {
-        var km = _keymap.Current;
+        // While editing, the edited config paints instead of the loaded one.
+        var edit = Edit;
+        var km = edit?.Keymap ?? _keymap.Current;
         if (km is null) return;
         if (index < 0 || index >= km.LayerCount) return;
 
@@ -1529,17 +1909,54 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
         for (int i = 0; i < Keys.Count; i++)
         {
-            // Resolution (including &trans fall-through) lives on LoadedKeymap;
-            // here we just paint the resolved binding onto the key VM.
-            var r = km.Resolve(index, i);
-            Keys[i].ApplyBinding(
-                r.Binding,
-                activeLayerIndex: index,
-                targetLayer: r.TargetLayer,
-                targetLayerName: r.TargetLayerName,
-                profileId: _profile.Id,
-                holdTap: r.HoldTap,
-                macros: km.MacrosByName);
+            if (edit is null)
+            {
+                // Resolution (including &trans fall-through) lives on LoadedKeymap;
+                // here we just paint the resolved binding onto the key VM.
+                var r = km.Resolve(index, i);
+                Keys[i].ApplyBinding(
+                    r.Binding,
+                    activeLayerIndex: index,
+                    targetLayer: r.TargetLayer,
+                    targetLayerName: r.TargetLayerName,
+                    profileId: _profile.Id,
+                    holdTap: r.HoldTap,
+                    macros: km.MacrosByName);
+                Keys[i].IsEditChanged = false;
+                Keys[i].IsEditSelected = false;
+                continue;
+            }
+
+            // Edit mode shows the layer's OWN binding — &trans paints ▽ and
+            // &none empty, no fall-through — and ignores per-key label
+            // overrides, so the user sees exactly what a save will write.
+            var bindings = km.Layers[index].Bindings;
+            var literal = i < bindings.Count ? bindings[i] : KeyBinding.Transparent;
+            if (literal.Behavior is "&trans" or "&none")
+            {
+                Keys[i].ApplyBinding(
+                    literal,
+                    activeLayerIndex: index,
+                    targetLayer: null,
+                    targetLayerName: null,
+                    profileId: _profile.Id,
+                    ignoreLabelOverride: true);
+            }
+            else
+            {
+                var r = km.Resolve(index, i);
+                Keys[i].ApplyBinding(
+                    r.Binding,
+                    activeLayerIndex: index,
+                    targetLayer: r.TargetLayer,
+                    targetLayerName: r.TargetLayerName,
+                    profileId: _profile.Id,
+                    holdTap: r.HoldTap,
+                    macros: km.MacrosByName,
+                    ignoreLabelOverride: true);
+            }
+            Keys[i].IsEditChanged = edit.IsKeyChanged(index, i);
+            Keys[i].IsEditSelected = edit.SelectedKeyIndex == i;
         }
 
         for (int i = 0; i < Layers.Count; i++)
@@ -1686,6 +2103,13 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     private void OnActiveLayerChanged(int layer)
     {
+        // The view keeps showing the layer the editor is on while editing;
+        // the board's own switches must not repaint underneath it.
+        if (IsEditing)
+        {
+            DiagnosticLog.Info("MainVM", "OnActiveLayerChanged ignored while editing");
+            return;
+        }
         if (!IsAutoLayerSwitchEnabled) return;
         Avalonia.Threading.Dispatcher.UIThread.Post(() => ApplyActiveLayer(layer));
     }

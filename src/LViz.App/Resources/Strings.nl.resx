@@ -293,6 +293,10 @@
     <value>{0} verwijderd uit recente keymaps (bestand niet gevonden)</value>
     <comment/>
   </data>
+  <data name="Status_EditSavedFormat" xml:space="preserve">
+    <value>{0} opgeslagen</value>
+    <comment/>
+  </data>
   <data name="Toast_LoadFailedFormat" xml:space="preserve">
     <value>Kon {0} niet laden: {1}</value>
     <comment/>
@@ -1407,6 +1411,10 @@
     <value>Deze repository is te groot voor LViz (meer dan 50 MB).</value>
     <comment/>
   </data>
+  <data name="GitHub_ErrorConflict" xml:space="preserve">
+    <value>Het bestand is op GitHub gewijzigd nadat je het opende.</value>
+    <comment/>
+  </data>
   <data name="GitHub_ErrorUnexpectedFormat" xml:space="preserve">
     <value>Er ging iets mis met GitHub: {0}</value>
     <comment/>
@@ -1509,6 +1517,130 @@
   </data>
   <data name="GitHub_OpenButton" xml:space="preserve">
     <value>Openen</value>
+    <comment/>
+  </data>
+  <data name="Edit_BannerNone" xml:space="preserve">
+    <value>Bewerken: geen wijzigingen</value>
+    <comment/>
+  </data>
+  <data name="Edit_BannerOne" xml:space="preserve">
+    <value>Bewerken: 1 wijziging</value>
+    <comment/>
+  </data>
+  <data name="Edit_BannerFormat" xml:space="preserve">
+    <value>Bewerken: {0} wijzigingen</value>
+    <comment/>
+  </data>
+  <data name="Edit_SaveFailedFormat" xml:space="preserve">
+    <value>Opslaan mislukt: {0}</value>
+    <comment/>
+  </data>
+  <data name="Edit_SaveGitHubUnavailable" xml:space="preserve">
+    <value>GitHub is niet beschikbaar.</value>
+    <comment/>
+  </data>
+  <data name="Edit_StartFailedFormat" xml:space="preserve">
+    <value>Kan {0} niet bewerken: {1}</value>
+    <comment/>
+  </data>
+  <data name="Edit_SaveRefusedFormat" xml:space="preserve">
+    <value>Kan niet opslaan: {0}</value>
+    <comment/>
+  </data>
+  <data name="Tooltip_EditKeymap" xml:space="preserve">
+    <value>Keymap bewerken</value>
+    <comment/>
+  </data>
+  <data name="Tooltip_EditKeymapJson" xml:space="preserve">
+    <value>MoErgo-.json-keymaps kun je niet bewerken. Open het .keymap-bestand.</value>
+    <comment/>
+  </data>
+  <data name="Tooltip_EditUndo" xml:space="preserve">
+    <value>Ongedaan maken</value>
+    <comment/>
+  </data>
+  <data name="Tooltip_EditRedo" xml:space="preserve">
+    <value>Opnieuw</value>
+    <comment/>
+  </data>
+  <data name="Edit_Discard" xml:space="preserve">
+    <value>Verwerpen</value>
+    <comment/>
+  </data>
+  <data name="Edit_Save" xml:space="preserve">
+    <value>Opslaan</value>
+    <comment/>
+  </data>
+  <data name="Edit_Saving" xml:space="preserve">
+    <value>Opslaan…</value>
+    <comment/>
+  </data>
+  <data name="Edit_Cancel" xml:space="preserve">
+    <value>Annuleren</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewTitle" xml:space="preserve">
+    <value>Wijzigingen controleren</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewHeaderFormat" xml:space="preserve">
+    <value>Deze wijzigingen worden opgeslagen in {0}:</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewAddFormat" xml:space="preserve">
+    <value>Nieuwe laag "{0}" op positie {1}</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewDeleteFormat" xml:space="preserve">
+    <value>Laag {0} verwijderd</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewMoveFormat" xml:space="preserve">
+    <value>Laag {0} verplaatst naar positie {1}</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewRenameFormat" xml:space="preserve">
+    <value>Laag {0}: "{1}" → "{2}"</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewKeyFormat" xml:space="preserve">
+    <value>{0} · toets {1}: {2} → {3}</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewCommitMessage" xml:space="preserve">
+    <value>Commitbericht</value>
+    <comment/>
+  </data>
+  <data name="Edit_ConflictTitle" xml:space="preserve">
+    <value>Bestand gewijzigd</value>
+    <comment/>
+  </data>
+  <data name="Edit_ConflictLocalFormat" xml:space="preserve">
+    <value>{0} is op schijf gewijzigd nadat je begon met bewerken. Opnieuw laden en je wijzigingen kwijtraken, of overschrijven met jouw versie?</value>
+    <comment/>
+  </data>
+  <data name="Edit_ConflictGitHubFormat" xml:space="preserve">
+    <value>De keymap in {0} is op GitHub gewijzigd nadat je hem opende. Opnieuw laden en je wijzigingen kwijtraken, of overschrijven met jouw versie?</value>
+    <comment/>
+  </data>
+  <data name="Edit_ConflictReload" xml:space="preserve">
+    <value>Opnieuw laden</value>
+    <comment/>
+  </data>
+  <data name="Edit_ConflictOverwrite" xml:space="preserve">
+    <value>Overschrijven</value>
+    <comment/>
+  </data>
+  <data name="Edit_QuitTitle" xml:space="preserve">
+    <value>Niet-opgeslagen wijzigingen</value>
+    <comment/>
+  </data>
+  <data name="Edit_QuitMessageFormat" xml:space="preserve">
+    <value>De keymap heeft niet-opgeslagen wijzigingen ({0}). Afsluiten en ze kwijtraken?</value>
+    <comment/>
+  </data>
+  <data name="Edit_QuitConfirm" xml:space="preserve">
+    <value>Afsluiten</value>
     <comment/>
   </data>
 </root>

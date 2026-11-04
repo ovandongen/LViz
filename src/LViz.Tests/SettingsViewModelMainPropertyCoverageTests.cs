@@ -91,6 +91,14 @@ public class SettingsViewModelMainPropertyCoverageTests
         // Recents-menu emptiness flag, bound directly in the main window's
         // recents flyout (part 2); settings never renders recents.
         "HasRecentKeymaps",
+
+        // Keymap edit mode: main-window-only state.
+        "Edit",
+        "IsEditing",
+        "UnsavedEditCount",
+        "CanStartEdit",
+        "EditButtonTooltip",
+        "IsSavingEdit",
     };
 
     [Fact]

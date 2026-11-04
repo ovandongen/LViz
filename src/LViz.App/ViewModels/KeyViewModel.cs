@@ -61,6 +61,14 @@ public partial class KeyViewModel : ObservableObject
     [ObservableProperty] private bool _isInCombo;
     [ObservableProperty] private string _tooltip = "";
 
+    /// <summary>True while keymap edit mode is on and this key differs from
+    /// the baseline text — drives the changed-key marker on the board.</summary>
+    [ObservableProperty] private bool _isEditChanged;
+
+    /// <summary>True while keymap edit mode is on and this is the selected
+    /// key — drives the selection marker on the board.</summary>
+    [ObservableProperty] private bool _isEditSelected;
+
     /// <summary>
     /// True when a combo this key participates in is currently being hovered
     /// (from either the on-key pill or the legend tile). Re-uses the
@@ -191,7 +199,10 @@ public partial class KeyViewModel : ObservableObject
     private string _baseTooltip = "";
     private string _comboTooltipSections = "";
 
-    public void ApplyBinding(KeyBinding binding, int activeLayerIndex, int? targetLayer, string? targetLayerName, string profileId, HoldTap? holdTap = null, IReadOnlyDictionary<string, ZmkMacro>? macros = null)
+    /// <param name="ignoreLabelOverride">Edit mode passes true: the per-key
+    /// label override is skipped exactly as when none is stored, so the key
+    /// shows what will actually be written to the file.</param>
+    public void ApplyBinding(KeyBinding binding, int activeLayerIndex, int? targetLayer, string? targetLayerName, string profileId, HoldTap? holdTap = null, IReadOnlyDictionary<string, ZmkMacro>? macros = null, bool ignoreLabelOverride = false)
     {
         Behavior = binding.Behavior;
         KeyFillColor = ResolveFillColor(binding, targetLayer, profileId);
@@ -206,7 +217,9 @@ public partial class KeyViewModel : ObservableObject
 
         // User-authored override wins over the formatter — same precedence as
         // decoration.label in KeyLabelFormatter.FormatBinding.
-        var ov = KeyLabelOverrides.Get(profileId, activeLayerIndex, Position.Index);
+        var ov = ignoreLabelOverride
+            ? null
+            : KeyLabelOverrides.Get(profileId, activeLayerIndex, Position.Index);
         if (ov is not null)
         {
             Label = ov.MainLabel;

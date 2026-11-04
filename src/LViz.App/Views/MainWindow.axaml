@@ -62,10 +62,10 @@
     <Grid RowDefinitions="Auto,*,Auto">
 
         <!-- Bars panel: Row 0 (top) or Row 2 (bottom), switched automatically.
-             Inner Grid swaps StatusBar/LayerTabs/ComboLegend so the status
-             bar is always at the outer edge and the combo legend always
+             Inner Grid swaps StatusBar/EditBanner/LayerTabs/ComboLegend so the
+             status bar is always at the outer edge and the combo legend always
              sits closest to the keyboard. -->
-        <Grid x:Name="BarsPanel" Grid.Row="0" RowDefinitions="Auto,Auto,Auto">
+        <Grid x:Name="BarsPanel" Grid.Row="0" RowDefinitions="Auto,Auto,Auto,Auto">
 
             <!-- Status bar (solid, also serves as drag handle) -->
             <Border x:Name="StatusBar" Grid.Row="0" Background="{StaticResource BgBase}" Padding="12,8"
@@ -90,7 +90,8 @@
                                   Data="M20 14H4v-2h16v2z" />
                     </Button>
 
-                    <!-- Primary controls: keyboard picker, load JSON, info hover. Sit just after the chrome buttons. -->
+                    <!-- Primary controls: keyboard picker, load JSON, info hover, keymap edit.
+                         Sit just after the chrome buttons. -->
                     <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="4"
                                 VerticalAlignment="Center" Margin="0,0,8,0">
                         <StackPanel.Styles>
@@ -102,6 +103,7 @@
                         <!-- Keyboard profile picker — switches the physical layout (GO60 / Glove80). -->
                         <Button x:Name="KeyboardPickerButton"
                                 Padding="8,4"
+                                IsEnabled="{Binding !IsEditing}"
                                 ToolTip.Tip="{Binding [Tooltip_Keyboard], Source={StaticResource Loc}}">
                             <StackPanel Orientation="Horizontal" Spacing="4">
                                 <PathIcon Width="14" Height="14"
@@ -176,6 +178,7 @@
                         <!-- Load layout JSON — opens a flyout: Browse… + recent keymaps. -->
                         <Button x:Name="LoadLayoutButton"
                                 Padding="8,4"
+                                IsEnabled="{Binding !IsEditing}"
                                 ToolTip.Tip="{Binding [Tooltip_LoadLayout], Source={StaticResource Loc}}">
                             <PathIcon Width="14" Height="14"
                                       Data="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
@@ -299,6 +302,16 @@
                             <PathIcon Width="14" Height="14"
                                       Data="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
                         </Button>
+
+                        <!-- Keymap edit — opens edit mode (banner + key picking).
+                             Disabled states explain themselves via the tooltip. -->
+                        <Button x:Name="EditKeymapButton" Padding="8,4"
+                                Command="{Binding StartEditCommand}"
+                                ToolTip.Tip="{Binding EditButtonTooltip}"
+                                ToolTip.ShowOnDisabled="True">
+                            <PathIcon Width="14" Height="14"
+                                      Data="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                        </Button>
                     </StackPanel>
 
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
@@ -357,6 +370,7 @@
                         <!-- Refresh loaded JSON from disk -->
                         <Button x:Name="RefreshButton" Command="{Binding RefreshCommand}"
                                 Padding="8,4"
+                                IsEnabled="{Binding !IsEditing}"
                                 IsVisible="{Binding HasLayoutLoaded}"
                                 ToolTip.Tip="{Binding [Tooltip_Refresh], Source={StaticResource Loc}}">
                             <PathIcon Width="16" Height="16"
@@ -411,6 +425,7 @@
                          otherwise, so the status text is unaffected. -->
                     <Button DockPanel.Dock="Right"
                             Command="{Binding AddOwnBoardCommand}"
+                            IsEnabled="{Binding !IsEditing}"
                             IsVisible="{Binding HasUnmatchedKeymap}"
                             Classes="link"
                             Padding="6,2"
@@ -429,12 +444,57 @@
                 </DockPanel>
             </Border>
 
+            <!-- Edit banner: shown while editing. Its own row next to the
+                 status bar, so it travels with the bars when they swap. -->
+            <Border x:Name="EditBanner" Grid.Row="1"
+                    IsVisible="{Binding IsEditing}"
+                    Background="{StaticResource AccentBlue}"
+                    Padding="12,4">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+                        <Button Command="{Binding Edit.UndoCommand}"
+                                Focusable="False"
+                                Padding="8,4"
+                                ToolTip.Tip="{Binding [Tooltip_EditUndo], Source={StaticResource Loc}}">
+                            <PathIcon Width="14" Height="14"
+                                      Data="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z" />
+                        </Button>
+                        <Button Command="{Binding Edit.RedoCommand}"
+                                Focusable="False"
+                                Padding="8,4"
+                                ToolTip.Tip="{Binding [Tooltip_EditRedo], Source={StaticResource Loc}}">
+                            <PathIcon Width="14" Height="14"
+                                      Data="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z" />
+                        </Button>
+                        <Button Command="{Binding DiscardEditCommand}"
+                                Focusable="False"
+                                Padding="8,4"
+                                Content="{Binding [Edit_Discard], Source={StaticResource Loc}}" />
+                        <Button Classes="accent"
+                                Focusable="False"
+                                Padding="8,4"
+                                Command="{Binding SaveEditCommand}">
+                            <StackPanel>
+                                <TextBlock Text="{Binding [Edit_Save], Source={StaticResource Loc}}"
+                                           IsVisible="{Binding !IsSavingEdit}" />
+                                <TextBlock Text="{Binding [Edit_Saving], Source={StaticResource Loc}}"
+                                           IsVisible="{Binding IsSavingEdit}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <TextBlock Text="{Binding Edit.BannerText}"
+                               Foreground="{StaticResource BgBase}"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center" />
+                </DockPanel>
+            </Border>
+
             <!-- Combo legend: WrapPanel of numbered tiles, one per
                  active-layer combo. Docked alongside the tabs — same
                  edge as the bars panel, always closest to the keyboard.
                  IsVisible gated on the overlay toggle, so the row
                  collapses cleanly when off. -->
-            <Border x:Name="ComboLegend" Grid.Row="2"
+            <Border x:Name="ComboLegend" Grid.Row="3"
                     IsVisible="{Binding IsComboOverlayVisible}"
                     Background="{Binding TabBackground, Converter={StaticResource HexToBrush}}"
                     Padding="8,4">
@@ -538,7 +598,7 @@
             </Border>
 
             <!-- Layer tabs -->
-            <Border x:Name="LayerTabs" Grid.Row="1"
+            <Border x:Name="LayerTabs" Grid.Row="2"
                     Background="{Binding TabBackground, Converter={StaticResource HexToBrush}}"
                     Padding="8,2">
                 <ItemsControl ItemsSource="{Binding Layers}">
