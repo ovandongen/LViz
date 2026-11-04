@@ -1,0 +1,37 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LViz.App.ViewModels"
+        x:Class="LViz.App.Views.RenameLayerDialog"
+        x:DataType="vm:RenameLayerDialogViewModel"
+        Title="{Binding Title}"
+        Width="380" Height="170"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BgBase}">
+
+    <DockPanel Margin="16">
+
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto,Auto" Margin="0,12,0,0">
+            <Button Grid.Column="1"
+                    Content="{Binding [Edit_Cancel], Source={StaticResource Loc}}"
+                    Click="OnCancelClick" />
+            <Button Grid.Column="2"
+                    Content="{Binding [Edit_RenameLayerConfirm], Source={StaticResource Loc}}"
+                    Margin="8,0,0,0"
+                    Classes="accent"
+                    IsDefault="True"
+                    IsEnabled="{Binding CanConfirm}"
+                    Click="OnRenameClick" />
+        </Grid>
+
+        <StackPanel Spacing="6">
+            <TextBlock FontSize="12" Foreground="{StaticResource Text}" TextWrapping="Wrap"
+                       Text="{Binding Prompt}" />
+            <TextBox x:Name="NameBox" Text="{Binding Name, Mode=TwoWay}" />
+        </StackPanel>
+
+    </DockPanel>
+
+</Window>

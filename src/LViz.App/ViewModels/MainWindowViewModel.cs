@@ -14,6 +14,7 @@ using LViz.Core.Input;
 using LViz.Core.Keymap;
 using LViz.Core.Keymap.Editing;
 using LViz.Core.Keymap.Parser;
+using LViz.Core.Keymap.Writer;
 using LViz.Core.Layout;
 using LViz.Core.Models;
 using LViz.Core.Persistence;
@@ -226,7 +227,26 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     private int _activeLayerIndex;
 
     /// <summary>Palette color for the active layer — used as the press-highlight pulse fill.</summary>
-    public string ActiveLayerTintColor => LayerColorPalette.GetColor(_profile.Id, ActiveLayerIndex);
+    public string ActiveLayerTintColor => LayerColorFor(ActiveLayerIndex);
+
+    /// <summary>
+    /// Tab color for the layer at <paramref name="index"/>. While a keymap edit
+    /// is open the color follows the <em>layer</em> rather than the position: a
+    /// layer that came from the baseline keeps the color its baseline index
+    /// owns (surviving a move), and a layer the edit added gets the palette
+    /// default for its position. Outside an edit this is the plain
+    /// per-profile palette lookup.
+    /// </summary>
+    private string LayerColorFor(int index)
+    {
+        if (Edit is { } edit)
+        {
+            return edit.Session.BaselineIndexOf(index) is int baseline
+                ? LayerColorPalette.GetColor(_profile.Id, baseline)
+                : LayerColorPalette.GetDefaultColor(index);
+        }
+        return LayerColorPalette.GetColor(_profile.Id, index);
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(BoardBackground))]
@@ -304,7 +324,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
         // Repaint tab swatches in place (re-creating Layers would steal selection focus).
         foreach (var layer in Layers)
-            layer.TabColor = LayerColorPalette.GetColor(profileId, layer.Index);
+            layer.TabColor = LayerColorFor(layer.Index);
         // Re-resolve every key's fill — &lt / &mo keys reference arbitrary
         // layer colors, so changing layer 2's tint repaints layer 0's view too.
         if (_keymap.HasLayout)
@@ -1292,6 +1312,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     {
         SaveEditCommand.NotifyCanExecuteChanged();
         DiscardEditCommand.NotifyCanExecuteChanged();
+        NotifyLayerCommandState();
     }
 
     /// <summary>
@@ -1319,21 +1340,58 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         Edit = edit;
         edit.Changed += OnEditChanged;
 
-        // Every layer tab shows while editing, hidden ones included — purely
-        // in memory; LeaveEdit rebuilds the tabs from the persisted setting.
-        foreach (var layer in Layers)
-            layer.IsShown = true;
+        // The tabs rebuild off the edit: every layer shows (hidden ones
+        // included, purely in memory) and each tab carries the per-layer
+        // actions; LeaveEdit rebuilds them from the loaded keymap and the
+        // persisted setting.
+        RebuildLayers();
 
         ApplyActiveLayer(ActiveLayerIndex);
     }
 
     /// <summary>One edit change: repaint the board off the edited keymap and
-    /// refresh the banner count and the save/discard enable state.</summary>
+    /// refresh the banner count and the save/discard enable state. The board
+    /// follows the shown <em>layer</em>, not its position, so an undo or redo of
+    /// a move shows that layer where it went. When the shown layer is gone (an
+    /// undone add) the position is kept, or the last layer when that position
+    /// no longer exists. Structural changes (add/delete/move/rename) also
+    /// rebuild the tab strip — a plain key edit leaves the tabs alone, since
+    /// rebuilding replaces the tab buttons.</summary>
     private void OnEditChanged(object? sender, EventArgs e)
     {
-        ApplyActiveLayer(ActiveLayerIndex);
+        var index = ActiveLayerIndex;
+        if (Edit is { } edit)
+        {
+            if (_shownLayerId is int id && edit.Session.IndexOfLayerId(id) is int followed)
+                index = followed;
+            var count = edit.Session.Current.Layers.Count;
+            if (count > 0 && (index < 0 || index >= count)) index = count - 1;
+        }
+        if (!TabsMatchEdit()) RebuildLayers();
+        ApplyActiveLayer(index);
         OnPropertyChanged(nameof(UnsavedEditCount));
+        // A tab color can move to another position while the shown index (and
+        // with it the NotifyPropertyChangedFor above) stays put.
+        OnPropertyChanged(nameof(ActiveLayerTintColor));
         NotifyEditCommandState();
+    }
+
+    /// <summary>True while <see cref="Layers"/> still mirrors the open edit —
+    /// same count, and every tab's caption and color equal what a rebuild from
+    /// the edit would produce at its position. False (rebuild) only after a
+    /// structural change; a plain key edit never moves either.</summary>
+    private bool TabsMatchEdit()
+    {
+        if (Edit is not { } edit) return true;
+        var layers = edit.Keymap.Layers;
+        if (Layers.Count != layers.Count) return false;
+        for (var i = 0; i < layers.Count; i++)
+        {
+            var tab = Layers[i];
+            if (tab.DisplayName != $"{i} : {layers[i].Name}") return false;
+            if (tab.TabColor != LayerColorFor(i)) return false;
+        }
+        return true;
     }
 
     /// <summary>
@@ -1471,15 +1529,199 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         }
     }
 
+    // ---- layer operations --------------------------------------------------------
+
+    /// <summary>
+    /// Invoked when the user asks to rename a layer: the callback (set by
+    /// <c>App.axaml.cs</c>, part 7) owns the rename dialog's lifecycle and
+    /// answers the new name, or <see langword="null"/> when it was cancelled.
+    /// Null means the dialog isn't wired up — renaming does nothing.
+    /// </summary>
+    public Func<RenameLayerRequest, Task<string?>>? RenameLayerRequested { get; set; }
+
+    /// <summary>
+    /// Invoked when a delete is refused: the callback (set by
+    /// <c>App.axaml.cs</c>, part 7) owns the dialog listing the blockers. Null
+    /// means the dialog isn't wired up — the refused delete passes silently.
+    /// </summary>
+    public Func<LayerDeleteBlockedRequest, Task>? LayerDeleteBlockedRequested { get; set; }
+
+    /// <summary>True while a callback from <see cref="RenameLayerAsync"/> or
+    /// <see cref="DeleteLayerAsync"/> is still open; a second request is
+    /// ignored until it closes.</summary>
+    private bool _layerDialogOpen;
+
+    /// <summary>Layer actions need an open edit and no save in flight.</summary>
+    private bool CanEditLayers => IsEditing && !IsSavingEdit;
+
+    /// <summary>
+    /// Append a new layer to the edit and show it. Does nothing when not
+    /// editing or while saving; a keymap with no layers yields no new layer
+    /// (and so no shown-layer change).
+    /// </summary>
+    public void AddLayer()
+    {
+        if (!CanEditLayers) return;
+        if (Edit!.AddLayer() is int added) ApplyActiveLayer(added);
+    }
+
+    /// <summary>
+    /// Copy the layer at <paramref name="layerIndex"/> right after itself and
+    /// show the copy. Does nothing when not editing, while saving, or when the
+    /// index falls outside the edited layers.
+    /// </summary>
+    public void DuplicateLayer(int layerIndex)
+    {
+        if (!CanEditLayers) return;
+        if (Edit!.DuplicateLayer(layerIndex) is int copy) ApplyActiveLayer(copy);
+    }
+
+    /// <summary>
+    /// Move the layer at <paramref name="layerIndex"/> by
+    /// <paramref name="delta"/> places and keep showing it (the board follows
+    /// the layer, not the position). Does nothing when not editing, while
+    /// saving, or when the move is refused.
+    /// </summary>
+    public void MoveLayer(int layerIndex, int delta)
+    {
+        if (!CanEditLayers) return;
+        var to = layerIndex + delta;
+        if (Edit!.MoveLayer(layerIndex, to)) ApplyActiveLayer(to);
+    }
+
+    /// <summary>
+    /// Rename the layer at <paramref name="layerIndex"/> through the rename
+    /// dialog. Does nothing when not editing, while saving, when the index
+    /// falls outside the edited layers, when no callback is wired up, or while
+    /// an earlier layer dialog is still open. A cancelled dialog (null) changes
+    /// nothing; so does an answer once the edit it was opened on has been
+    /// replaced underneath the await.
+    /// </summary>
+    public async Task RenameLayerAsync(int layerIndex)
+    {
+        if (!CanEditLayers) return;
+        var edit = Edit!;
+        var layers = edit.Session.Current.Layers;
+        if (layerIndex < 0 || layerIndex >= layers.Count) return;
+
+        if (RenameLayerRequested is not { } callback) return;
+        if (_layerDialogOpen) return;
+
+        _layerDialogOpen = true;
+        try
+        {
+            var answer = await callback(new RenameLayerRequest(layerIndex, layers[layerIndex].Name));
+
+            if (answer is not null && ReferenceEquals(Edit, edit))
+                edit.RenameLayer(layerIndex, answer);
+        }
+        finally
+        {
+            _layerDialogOpen = false;
+        }
+    }
+
+    /// <summary>
+    /// Delete the layer at <paramref name="layerIndex"/>, no confirmation:
+    /// when the check allows it, delete it, show the layer before it (layer 0
+    /// when layer 0 went), and report it in the status bar — with the cleared
+    /// key count when keys pointed at the layer. When it is refused, show the
+    /// blockers through <see cref="LayerDeleteBlockedRequested"/> and change
+    /// nothing. Does nothing when not editing, while saving, when the index
+    /// falls outside the edited layers, or while an earlier layer dialog is
+    /// still open. A writer refusal toasts why and changes nothing.
+    /// </summary>
+    public async Task DeleteLayerAsync(int layerIndex)
+    {
+        if (!CanEditLayers) return;
+        var edit = Edit!;
+        var layers = edit.Session.Current.Layers;
+        if (layerIndex < 0 || layerIndex >= layers.Count) return;
+        var name = layers[layerIndex].Name;
+
+        try
+        {
+            if (edit.CheckDeleteLayer(layerIndex) is not { } check) return;
+
+            if (!check.CanDelete)
+            {
+                if (LayerDeleteBlockedRequested is { } blocked && !_layerDialogOpen)
+                {
+                    _layerDialogOpen = true;
+                    try
+                    {
+                        await blocked(new LayerDeleteBlockedRequest(name, check.Blockers));
+                    }
+                    finally
+                    {
+                        _layerDialogOpen = false;
+                    }
+                }
+                return;
+            }
+
+            if (edit.DeleteLayer(layerIndex))
+            {
+                ApplyActiveLayer(Math.Max(layerIndex - 1, 0));
+                StatusMessage = check.ClearedBindings > 0
+                    ? Loc.Instance.Format("Edit_LayerDeletedFormat", name, check.ClearedBindings)
+                    : Loc.Instance.Format("Edit_LayerDeletedNoRefsFormat", name);
+            }
+        }
+        catch (ZmkKeymapParseException ex)
+        {
+            // The text refused the change; the edit and its undo history are
+            // untouched, so the user stays put.
+            Toast.Show(Loc.Instance.Format("Edit_LayerActionFailedFormat", ex.Message));
+            DiagnosticLog.Warn("MainVM", $"The layer action on '{name}' failed: {ex}");
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanEditLayers))]
+    private void NewLayer() => AddLayer();
+
+    [RelayCommand(CanExecute = nameof(CanEditLayers))]
+    private void DuplicateShownLayer() => DuplicateLayer(ActiveLayerIndex);
+
+    private bool CanMoveShownLayerLeft => CanEditLayers && ActiveLayerIndex > 0;
+
+    [RelayCommand(CanExecute = nameof(CanMoveShownLayerLeft))]
+    private void MoveShownLayerLeft() => MoveLayer(ActiveLayerIndex, -1);
+
+    private bool CanMoveShownLayerRight =>
+        CanEditLayers && Edit is { } edit && ActiveLayerIndex < edit.Session.Current.Layers.Count - 1;
+
+    [RelayCommand(CanExecute = nameof(CanMoveShownLayerRight))]
+    private void MoveShownLayerRight() => MoveLayer(ActiveLayerIndex, +1);
+
+    [RelayCommand(CanExecute = nameof(CanEditLayers))]
+    private Task RenameShownLayerAsync() => RenameLayerAsync(ActiveLayerIndex);
+
+    [RelayCommand(CanExecute = nameof(CanEditLayers))]
+    private Task DeleteShownLayerAsync() => DeleteLayerAsync(ActiveLayerIndex);
+
+    /// <summary>Re-query the six layer commands — the "⋮" menu items and the
+    /// shortcuts ride their enable state.</summary>
+    private void NotifyLayerCommandState()
+    {
+        NewLayerCommand.NotifyCanExecuteChanged();
+        DuplicateShownLayerCommand.NotifyCanExecuteChanged();
+        MoveShownLayerLeftCommand.NotifyCanExecuteChanged();
+        MoveShownLayerRightCommand.NotifyCanExecuteChanged();
+        RenameShownLayerCommand.NotifyCanExecuteChanged();
+        DeleteShownLayerCommand.NotifyCanExecuteChanged();
+    }
+
     // ---- saving the edit ----
 
     /// <summary>
     /// Invoked between building the save plan and writing it: the callback (set
-    /// by <c>App.axaml.cs</c>, part 8) owns the review dialog's lifecycle and
-    /// answers <see langword="false"/> to abandon the save. Null means approved —
-    /// until part 8 wires a dialog, and in tests, saving goes straight through.
+    /// by <c>App.axaml.cs</c>) owns the review dialog's lifecycle and answers
+    /// <see langword="null"/> to abandon the save, else the commit message the
+    /// user approved. No callback means approved with the generated message —
+    /// in tests, saving goes straight through.
     /// </summary>
-    public Func<KeymapReviewRequest, Task<bool>>? ReviewChangesRequested { get; set; }
+    public Func<KeymapReviewRequest, Task<KeymapReviewAnswer?>>? ReviewChangesRequested { get; set; }
 
     /// <summary>
     /// Invoked when the target changed underneath the edit: the callback (set by
@@ -1488,6 +1730,15 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// — nothing is ever written over a changed target silently.
     /// </summary>
     public Func<KeymapConflictRequest, Task<KeymapSaveConflictChoice>>? SaveConflictRequested { get; set; }
+
+    /// <summary>
+    /// Invoked after a save that added, deleted or moved layers and with them
+    /// the per-layer settings, when something broke on the way: one translated
+    /// line per notice, in notice order. The callback (set by
+    /// <c>App.axaml.cs</c>, part 7) owns the dialog's lifecycle. Null — as in
+    /// tests — means nothing is shown.
+    /// </summary>
+    public Func<IReadOnlyList<string>, Task>? LayerSettingsNoticeRequested { get; set; }
 
     /// <summary>True while a save is in flight; gates Save and Discard so
     /// neither can run against an edit that is being written.</summary>
@@ -1541,13 +1792,15 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             return;
         }
 
+        string? commitMessage = null;
         if (ReviewChangesRequested is { } review)
         {
-            var approved = await review(new KeymapReviewRequest(
+            var answer = await review(new KeymapReviewRequest(
                 plan,
                 edit.Source.TargetName,
                 edit.Source.IsGitHub ? edit.CommitMessageFor(plan) : null));
-            if (!approved) return;
+            if (answer is null) return;
+            commitMessage = answer.CommitMessage;
         }
 
         IsSavingEdit = true;
@@ -1557,7 +1810,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
             while (true)
             {
-                var outcome = await edit.SaveAsync(plan, overwrite);
+                var outcome = await edit.SaveAsync(plan, overwrite, commitMessage);
 
                 if (outcome is KeymapEditSaveOutcome.Saved saved)
                 {
@@ -1565,11 +1818,23 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                     // user off the layer they were editing — unless that layer's
                     // tab is hidden, then the nearest shown one takes over.
                     var layer = ActiveLayerIndex;
+
+                    // The layers just moved on disk for good — renumber this
+                    // keyboard's per-layer settings with them and collect what
+                    // the move could not carry over.
+                    var notices = edit.Session.PendingStructureEdits.Count > 0
+                        ? MoveLayerSettings(edit.Session.BaselineLayerMap())
+                        : Array.Empty<LayerSettingsNotice>();
+
                     LeaveEdit();
                     LoadLayoutFromPath(saved.ReloadPath, edit.Source.Entry);
                     ApplyActiveLayer(NearestShownLayer(layer));
                     StatusMessage = Loc.Instance.Format(
                         "Status_EditSavedFormat", Path.GetFileName(saved.ReloadPath));
+
+                    if (notices.Count > 0 && LayerSettingsNoticeRequested is { } notify)
+                        await notify(notices.Select(NoticeLine).ToList());
+
                     return;
                 }
 
@@ -1605,6 +1870,50 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             IsSavingEdit = false;
         }
     }
+
+    /// <summary>
+    /// Carries this keyboard's persisted per-layer settings across a save that
+    /// added, deleted or moved layers: <paramref name="map"/> is the just-closed
+    /// edit's <see cref="KeymapEditSession.BaselineLayerMap"/>, applied to the
+    /// settings as they stand at that moment. Every in-memory copy is refreshed
+    /// from the rewritten settings so the UI reads the new numbers — palette and
+    /// key labels wholesale, the auto-switch rules and the mouse layer through
+    /// their engines (which persist their own slice). Returns what the remap
+    /// dropped or cannot fix; see <see cref="LayerSettingsRemap"/>.
+    /// </summary>
+    private IReadOnlyList<LayerSettingsNotice> MoveLayerSettings(IReadOnlyList<int?> map)
+    {
+        LayerSettingsRemapResult? remapped = null;
+        PersistSetting(s =>
+        {
+            remapped = LayerSettingsRemap.Apply(s, _profile.Id, map);
+            return remapped.Settings;
+        });
+        if (remapped is null) return Array.Empty<LayerSettingsNotice>();
+
+        var settings = remapped.Settings;
+        LayerColorPalette.SetOverrides(settings.LayerColors);
+        KeyLabelOverrides.SetOverrides(settings.KeyLabelOverrides);
+        AutoSwitch.ApplyAppLayerRules(settings.AppLayerRules.TryGetValue(_profile.Id, out var rules)
+            ? rules
+            : Array.Empty<AppLayerRule>());
+        if (settings.MouseLayer.TryGetValue(_profile.Id, out var mouse))
+            MouseLayer?.ApplySettings(mouse);
+
+        return remapped.Notices;
+    }
+
+    /// <summary>One remap notice as its translated report line.</summary>
+    private static string NoticeLine(LayerSettingsNotice notice) => notice.Kind switch
+    {
+        LayerSettingsNoticeKind.AppRuleRemoved => Loc.Instance.Format(
+            "Edit_NoticeAppRuleRemovedFormat", notice.Name, notice.OldLayerIndex),
+        LayerSettingsNoticeKind.MouseLayerCleared => Loc.Instance.Format(
+            "Edit_NoticeMouseLayerClearedFormat", notice.OldLayerIndex),
+        // PipelineStepCheck — pipelines are global, nothing was rewritten.
+        _ => Loc.Instance.Format(
+            "Edit_NoticePipelineCheckFormat", notice.Name, notice.OldLayerIndex),
+    };
 
     // --- Internals ---
 
@@ -1926,17 +2235,29 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     private void RebuildLayers()
     {
         Layers.Clear();
-        var km = _keymap.Current;
+        // While editing, the tabs show the edited keymap, hidden layers
+        // included, and carry the per-layer actions; outside an edit they
+        // show the loaded keymap with the persisted hidden flags.
+        var edit = Edit;
+        var km = edit?.Keymap ?? _keymap.Current;
         if (km is null) return;
-        var hiddenLayers = _settingsService.Load().HiddenLayers;
+        var editing = edit is not null;
+        var layerCount = km.Layers.Count;
+        var hiddenLayers = editing ? null : _settingsService.Load().HiddenLayers;
         foreach (var layer in km.Layers)
         {
             var layerVm = new LayerViewModel(
                 layer.Index,
                 $"{layer.Index} : {layer.Name}",
-                LayerColorPalette.GetColor(_profile.Id, layer.Index),
-                SelectLayer);
-            layerVm.IsShown = !HiddenLayers.IsHidden(hiddenLayers, _profile.Id, layer.Index);
+                LayerColorFor(layer.Index),
+                SelectLayer,
+                editing
+                    ? new LayerTabActions(
+                        i => _ = RenameLayerAsync(i), DuplicateLayer, MoveLayer,
+                        i => _ = DeleteLayerAsync(i), layerCount)
+                    : null);
+            if (hiddenLayers is { } hidden)
+                layerVm.IsShown = !HiddenLayers.IsHidden(hidden, _profile.Id, layer.Index);
             Layers.Add(layerVm);
         }
     }
@@ -1981,6 +2302,11 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public Task<string?> QueryConfigIdAsync(TimeSpan timeout, CancellationToken ct) =>
         _hid.QueryConfigIdAsync(timeout, ct);
 
+    /// <summary>The edit session's id of the shown layer (see
+    /// <see cref="KeymapEditSession.LayerIdAt"/>), so <see cref="OnEditChanged"/>
+    /// can follow the layer through undo and redo; null outside an edit.</summary>
+    private int? _shownLayerId;
+
     private void ApplyActiveLayer(int index)
     {
         // While editing, the edited config paints instead of the loaded one.
@@ -1990,6 +2316,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         if (index < 0 || index >= km.LayerCount) return;
 
         ActiveLayerIndex = index;
+        _shownLayerId = edit?.Session.LayerIdAt(index);
 
         for (int i = 0; i < Keys.Count; i++)
         {
@@ -2045,6 +2372,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
         for (int i = 0; i < Layers.Count; i++)
             Layers[i].IsSelected = Layers[i].Index == index;
+
+        // The shown layer decides whether the layer moves are possible.
+        NotifyLayerCommandState();
     }
 
     /// <summary>

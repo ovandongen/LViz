@@ -154,8 +154,13 @@ dotnet run --project src/LViz.App                  # launch the app
   changed. Steps are private nested records so they reach the id list
   directly. `ApplyStructure` stores the caller's `after` verbatim and redo
   replays it, so `after` must be derived from `Current`, with `Layer.Index` ==
-  position. `PendingStructureEdits` is empty whenever the ids are back to the
-  baseline list, even with structural steps still undoable.
+  position. `PendingStructureEdits` is the *net* edit list derived from the
+  ids, never the undo history: deletes from the highest baseline index down,
+  then moves that leave the longest in-order run in place, then adds at their
+  final position (current name, origin bindings; key edits on them come from
+  the diff). It is empty whenever the ids are back to the baseline list. The
+  review dialog, the delete check and the save all replay it. A shown layer is
+  followed through undo/redo by id (`LayerIdAt`/`IndexOfLayerId`).
 - **Layer add/delete/move: model in `LayerReferenceRemapper`, text in
   `KeymapLayerWriter`.** The remapper (Core/Keymap/Editing) is the expected
   result; the writer patches the text in phases (clear refs via `KeymapWriter`
@@ -269,8 +274,12 @@ dotnet run --project src/LViz.App                  # launch the app
   reached with `/template/` selectors. Tune sizing *there*, not per-control —
   and a local property value still overrides these (Avalonia precedence), so a
   control that needs a different size just sets it inline.
-  `Button.accent` (primary dialog button) and `Button.link` (text link) are
-  defined there too. Fluent paints hover/pressed on
+  `Button.accent` (primary dialog button), `Button.link` (text link) and
+  `Button.onAccent` (+ `primary`; a button on an `AccentBlue` surface such as
+  the edit banner) are defined there too. Text on a light accent fill is
+  `BgBase`, never Fluent's default white. A `PathIcon` in a button doesn't
+  follow the button's `Foreground`; give it its own style
+  (`Button.onAccent PathIcon`). Fluent paints hover/pressed on
   `/template/ ContentPresenter#PART_ContentPresenter`, so state overrides go on
   that part. Palette brushes inside `Application.Styles` need `DynamicResource`:
   `Application.Resources` is parsed after the styles.
@@ -512,10 +521,11 @@ LViz-specific (extend this list as we hit more):
   shipped firmware; revisit the guard + its test if a board emits it otherwise.
   See `docs/lviz-dotnet-inbound-validation.md`.
 
-- **Every new public property on `MainWindowViewModel` trips
+- **Every new public value property on `MainWindowViewModel` trips
   `SettingsViewModelMainPropertyCoverageTests`.** The test enforces that the
-  Settings window doesn't silently miss main-VM changes: a new public property
-  needs either an entry in `SettingsViewModel._mainPropagators` or its name in
+  Settings window doesn't silently miss main-VM changes. Commands, delegate
+  callbacks and collections are skipped; any other new public property needs
+  either an entry in `SettingsViewModel._mainPropagators` or its name in
   `IgnoredMainProperties` in that test, with a one-line reason. Main-window-only state (e.g.
   `HasRecentKeymaps`) belongs on the ignore list. Plan for this edit when a
   change adds a VM property; it is the one expected change to an existing test.
@@ -536,6 +546,12 @@ LViz-specific (extend this list as we hit more):
 - **A C# local named `from` can't be the receiver of a `with` expression**
   (`from with { … }` parses as a LINQ query, even in parentheses). Rename the
   local or use the constructor.
+
+- **A closed Avalonia `ContextMenu` doesn't inherit its owner's DataContext**
+  (it isn't in the owner's visual tree until it opens), so an `Opening` handler
+  that reads it sees null. The layer tabs pin it from the button
+  (`MainWindow.OnLayerTabLoaded`). `ContextMenu.Opening` is a plain
+  `CancelEventHandler`, set from XAML like any event.
 
 - **An Avalonia `ListBox` whose `ItemsSource` is replaced drops its
   selection**, and a TwoWay `SelectedItem`/`SelectedIndex` binding doesn't put

@@ -32,7 +32,7 @@ public sealed record KeymapLayerRenameChange(int LayerIndex, string OldName, str
 /// </summary>
 /// <param name="NewSource">The text to write to the file.</param>
 /// <param name="StructureEdits">The layer adds/deletes/moves replayed into the
-/// text, oldest first — the session's <see cref="KeymapEditSession.PendingStructureEdits"/>.</param>
+/// text, in replay order: the session's net <see cref="KeymapEditSession.PendingStructureEdits"/>.</param>
 /// <param name="BindingChanges">The keys the save rewrites, ordered by layer then key.</param>
 /// <param name="Renames">The layers the save renames, ordered by layer.</param>
 public sealed record KeymapSavePlan(

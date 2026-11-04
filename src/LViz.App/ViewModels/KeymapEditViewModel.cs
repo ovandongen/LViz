@@ -9,6 +9,7 @@ using LViz.Core.GitHub;
 using LViz.Core.Keymap;
 using LViz.Core.Keymap.Editing;
 using LViz.Core.Keymap.Parser;
+using LViz.Core.Keymap.Writer;
 using LViz.Core.Models;
 using LViz.Core.Persistence;
 
@@ -228,6 +229,158 @@ public sealed partial class KeymapEditViewModel : ObservableObject
     public bool IsKeyChanged(int layerIndex, int keyIndex) => Session.IsKeyChanged(layerIndex, keyIndex);
 
     /// <summary>
+    /// Append a new layer at the end of the layer list — every key
+    /// <c>&amp;trans</c>, named "Layer N" for its index (made unique against the
+    /// names in use) — as a single undo step.
+    /// </summary>
+    /// <returns>
+    /// The index the new layer sits at, or <see langword="null"/> when the
+    /// keymap has no layers at all, so the key count of a new layer is unknown.
+    /// </returns>
+    public int? AddLayer()
+    {
+        var layers = Session.Current.Layers;
+        if (layers.Count == 0) return null;
+
+        var index = layers.Count;
+        var edit = new LayerStructureEdit.Add(
+            index,
+            LayerNames.Unique($"Layer {index}", layers.Select(l => l.Name)),
+            [.. Enumerable.Repeat(KeyBinding.Transparent, layers[0].Bindings.Count)]);
+
+        Session.ApplyStructure(edit, LayerReferenceRemapper.Apply(Session.Current, edit));
+        return index;
+    }
+
+    /// <summary>
+    /// Insert a copy of the layer at <paramref name="layerIndex"/> right after
+    /// it — same bindings, named "&lt;name&gt; copy" (made unique against the
+    /// names in use) — as a single undo step. Layer references in the copy point
+    /// where the original's pointed, renumbered for the insertion.
+    /// </summary>
+    /// <returns>
+    /// The index the copy sits at (<paramref name="layerIndex"/> + 1), or
+    /// <see langword="null"/> when <paramref name="layerIndex"/> falls outside
+    /// <see cref="KeymapEditSession.Current"/>.
+    /// </returns>
+    public int? DuplicateLayer(int layerIndex)
+    {
+        var layers = Session.Current.Layers;
+        if (layerIndex < 0 || layerIndex >= layers.Count) return null;
+
+        var source = layers[layerIndex];
+        var index = layerIndex + 1;
+        var edit = new LayerStructureEdit.Add(
+            index,
+            LayerNames.Unique($"{source.Name} copy", layers.Select(l => l.Name)),
+            [.. source.Bindings]);
+
+        Session.ApplyStructure(edit, LayerReferenceRemapper.Apply(Session.Current, edit));
+        return index;
+    }
+
+    /// <summary>
+    /// Move the layer at <paramref name="layerIndex"/> to
+    /// <paramref name="toIndex"/> (remove, then insert there in the shortened
+    /// list) as a single undo step, renumbering every layer reference.
+    /// </summary>
+    /// <returns>
+    /// <see langword="false"/> — without touching anything — when either index
+    /// falls outside <see cref="KeymapEditSession.Current"/> or they are equal.
+    /// </returns>
+    public bool MoveLayer(int layerIndex, int toIndex)
+    {
+        var count = Session.Current.Layers.Count;
+        if (layerIndex < 0 || layerIndex >= count) return false;
+        if (toIndex < 0 || toIndex >= count) return false;
+        if (layerIndex == toIndex) return false;
+
+        var edit = new LayerStructureEdit.Move(layerIndex, toIndex);
+        return Session.ApplyStructure(edit, LayerReferenceRemapper.Apply(Session.Current, edit));
+    }
+
+    /// <summary>
+    /// Give the layer at <paramref name="layerIndex"/> a new
+    /// <c>display-name</c> (<paramref name="name"/> trimmed) as a single undo
+    /// step.
+    /// </summary>
+    /// <returns>
+    /// <see langword="false"/> — without touching anything, never throwing —
+    /// when <paramref name="layerIndex"/> falls outside
+    /// <see cref="KeymapEditSession.Current"/>, the trimmed name is empty or
+    /// holds a control character (a quoted devicetree string cannot), or the
+    /// layer already has that name.
+    /// </returns>
+    public bool RenameLayer(int layerIndex, string name)
+    {
+        var layers = Session.Current.Layers;
+        if (layerIndex < 0 || layerIndex >= layers.Count) return false;
+
+        var trimmed = (name ?? string.Empty).Trim();
+        if (trimmed.Length == 0 || trimmed.Any(char.IsControl)) return false;
+        if (string.Equals(trimmed, layers[layerIndex].Name, StringComparison.Ordinal)) return false;
+
+        return Session.RenameLayer(layerIndex, trimmed);
+    }
+
+    /// <summary>
+    /// What deleting the layer at <paramref name="layerIndex"/> would do,
+    /// without changing anything: the blockers the <c>.keymap</c> text still
+    /// holds, and how many keys would lose their layer target.
+    /// </summary>
+    /// <remarks>
+    /// The blockers come from the baseline text with the pending structural
+    /// edits replayed onto it, so the writer's layer indices line up with
+    /// <see cref="KeymapEditSession.Current"/>; the cleared-binding count comes
+    /// from <see cref="Current"/> itself, because key edits are never in that
+    /// text.
+    /// </remarks>
+    /// <remarks>
+    /// <see cref="ZmkKeymapParseException"/> (the pending edits would not write)
+    /// propagates — the caller shows it.
+    /// </remarks>
+    /// <returns>
+    /// The check, or <see langword="null"/> when <paramref name="layerIndex"/>
+    /// falls outside <see cref="KeymapEditSession.Current"/>.
+    /// </returns>
+    public LayerDeleteCheck? CheckDeleteLayer(int layerIndex)
+    {
+        var layers = Session.Current.Layers;
+        if (layerIndex < 0 || layerIndex >= layers.Count) return null;
+
+        var text = KeymapLayerWriter.ApplyAll(Source.BaselineText, Session.PendingStructureEdits);
+        var check = KeymapLayerWriter.CheckDelete(text, layerIndex);
+        return check with
+        {
+            ClearedBindings = LayerReferenceRemapper.CountClearedBindings(Session.Current, layerIndex),
+        };
+    }
+
+    /// <summary>
+    /// Delete the layer at <paramref name="layerIndex"/> as a single undo step,
+    /// clearing the layer bindings that targeted it — only when
+    /// <see cref="CheckDeleteLayer"/> finds no blocker (combos, conditional
+    /// layers, define usages refuse the delete).
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ZmkKeymapParseException"/> propagates through the check.
+    /// </remarks>
+    /// <returns>
+    /// <see langword="false"/> — without touching anything — when the index
+    /// falls outside <see cref="KeymapEditSession.Current"/> or the delete has
+    /// blockers.
+    /// </returns>
+    public bool DeleteLayer(int layerIndex)
+    {
+        var check = CheckDeleteLayer(layerIndex);
+        if (check is null || !check.CanDelete) return false;
+
+        var edit = new LayerStructureEdit.Delete(layerIndex);
+        Session.ApplyStructure(edit, LayerReferenceRemapper.Apply(Session.Current, edit));
+        return true;
+    }
+
+    /// <summary>
     /// Freeze the current edit into the text and the change lists a save writes,
     /// against the baseline text this editor opened.
     /// </summary>
@@ -246,7 +399,9 @@ public sealed partial class KeymapEditViewModel : ObservableObject
     /// file through <see cref="KeymapFileSaver"/> (the content on disk is
     /// backed up first), or GitHub as a commit on the keymap's branch against
     /// <see cref="KeymapEditSource.BaseBlobSha"/> with
-    /// <see cref="CommitMessageFor"/>. A target that changed since the edit
+    /// <paramref name="commitMessage"/> (the message the user edited in the
+    /// review dialog), or <see cref="CommitMessageFor"/> when it is null. A
+    /// local save ignores the message. A target that changed since the edit
     /// started reports <see cref="KeymapEditSaveOutcome.Conflict"/>;
     /// <paramref name="overwrite"/> replaces it anyway.
     /// </summary>
@@ -262,6 +417,7 @@ public sealed partial class KeymapEditViewModel : ObservableObject
     public async Task<KeymapEditSaveOutcome> SaveAsync(
         KeymapSavePlan plan,
         bool overwrite,
+        string? commitMessage = null,
         CancellationToken ct = default)
     {
         if (!Source.IsGitHub)
@@ -290,7 +446,7 @@ public sealed partial class KeymapEditViewModel : ObservableObject
             Source.GitHub!,
             new UTF8Encoding(false).GetBytes(plan.NewSource),
             Source.BaseBlobSha,
-            CommitMessageFor(plan),
+            commitMessage ?? CommitMessageFor(plan),
             overwrite,
             ct);
 

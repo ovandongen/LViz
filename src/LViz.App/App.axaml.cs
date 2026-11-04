@@ -325,11 +325,12 @@ public partial class App : Application
             };
 
             // Review-before-save: modal, awaited by the save command, so the
-            // save only continues when the user approved the listed changes.
+            // save only continues when the user approved the listed changes,
+            // with the commit message as the user left it.
             viewModel.ReviewChangesRequested = async request =>
             {
                 var dlg = new KeymapReviewDialog { DataContext = new KeymapReviewDialogViewModel(request) };
-                return await dlg.ShowDialog<bool>(mainWindow);
+                return await dlg.ShowDialog<KeymapReviewAnswer?>(mainWindow);
             };
 
             // Key dialog: modal, awaited by the open-key command, which
@@ -348,6 +349,32 @@ public partial class App : Application
             {
                 var dlg = new ChoiceDialog { DataContext = ChoiceDialogViewModel.Conflict(request) };
                 return ChoiceDialogViewModel.ToConflictChoice(await dlg.ShowDialog<string?>(mainWindow));
+            };
+
+            // Rename layer: modal, awaited by the rename command, which
+            // applies the answered name. A null answer (Esc, Cancel, close)
+            // keeps the current name.
+            viewModel.RenameLayerRequested = async request =>
+            {
+                var dlg = new RenameLayerDialog { DataContext = new RenameLayerDialogViewModel(request) };
+                return await dlg.ShowDialog<string?>(mainWindow);
+            };
+
+            // Blocked layer delete: modal notice listing every reason the
+            // delete was refused; the user just acknowledges it.
+            viewModel.LayerDeleteBlockedRequested = async request =>
+            {
+                var dlg = new ChoiceDialog { DataContext = ChoiceDialogViewModel.LayerDeleteBlocked(request) };
+                await dlg.ShowDialog<string?>(mainWindow);
+            };
+
+            // After-save report about layer settings the structural save
+            // moved or dropped; the lines are already translated, the user
+            // just acknowledges them.
+            viewModel.LayerSettingsNoticeRequested = async lines =>
+            {
+                var dlg = new ChoiceDialog { DataContext = ChoiceDialogViewModel.LayerSettingsNotice(lines) };
+                await dlg.ShowDialog<string?>(mainWindow);
             };
 
             // Layout wizard: modal, closes with null (cancel) or the saved

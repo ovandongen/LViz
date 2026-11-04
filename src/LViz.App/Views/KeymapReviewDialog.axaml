@@ -25,6 +25,7 @@
             <Button Content="{Binding [Edit_Save], Source={StaticResource Loc}}"
                     Classes="accent"
                     IsDefault="True"
+                    IsEnabled="{Binding CanSave}"
                     Click="OnSaveClick" />
         </StackPanel>
 
@@ -32,8 +33,7 @@
                     IsVisible="{Binding HasCommitMessage}">
             <TextBlock Text="{Binding [Edit_ReviewCommitMessage], Source={StaticResource Loc}}"
                        FontSize="11" Foreground="{StaticResource TextSubtle}" />
-            <TextBox Text="{Binding CommitMessage, Mode=OneWay}"
-                     IsReadOnly="True"
+            <TextBox Text="{Binding CommitMessage, Mode=TwoWay}"
                      TextWrapping="Wrap"
                      AcceptsReturn="True"
                      Height="110"
