@@ -4,6 +4,7 @@ using LViz.App.Services;
 using LViz.App.ViewModels;
 using LViz.Core.Keymap;
 using LViz.Core.Keymap.Parser;
+using LViz.Core.Layout;
 using LViz.Core.Models;
 using LViz.Core.Persistence;
 using LViz.Core.Settings;
@@ -89,6 +90,41 @@ public class MainWindowViewModelEditTests : IDisposable
             """;
     }
 
+    /// <summary>
+    /// Three layers ("Base", "Lower", "Raise") with 42 bindings each — the
+    /// fixture for the visible-layer-fallback tests. Bindings are
+    /// <see cref="KeymapText"/>'s: Base key 0 <c>&amp;kp Q</c>, key 1
+    /// <c>&amp;kp W</c>, the rest <c>&amp;kp A</c>; Lower and Raise are
+    /// entirely <c>&amp;trans</c>.
+    /// </summary>
+    private static string KeymapText3()
+    {
+        var baseBindings = new List<string> { "&kp Q", "&kp W" };
+        baseBindings.AddRange(Enumerable.Repeat("&kp A", 40));
+        return $$"""
+            / {
+                keymap {
+                    compatible = "zmk,keymap";
+
+                    base {
+                        display-name = "Base";
+                        bindings = <{{string.Join(" ", baseBindings)}}>;
+                    };
+
+                    lower {
+                        display-name = "Lower";
+                        bindings = <{{string.Join(" ", Enumerable.Repeat("&trans", 42))}}>;
+                    };
+
+                    raise {
+                        display-name = "Raise";
+                        bindings = <{{string.Join(" ", Enumerable.Repeat("&trans", 42))}}>;
+                    };
+                };
+            };
+            """;
+    }
+
     /// <summary>The load tests' tiny 3-key keymap — only its layer name text
     /// matters to the fake service, which reports its own binding count.</summary>
     private static LoadedKeymap SampleKeymap() =>
@@ -108,6 +144,12 @@ public class MainWindowViewModelEditTests : IDisposable
 
     private static InMemorySettingsService NewSettings(UserSettings? seed = null) =>
         new() { Current = (seed ?? new UserSettings()) with { LiveKeyHighlighting = false } };
+
+    /// <summary>A settings seed hiding the given Corne layer tabs.</summary>
+    private static UserSettings HiddenCorneLayers(params int[] layers) => new()
+    {
+        HiddenLayers = new Dictionary<string, List<int>> { ["Corne"] = layers.ToList() },
+    };
 
     private MainWindowViewModel NewVm(InMemorySettingsService settings, IKeymapStateService? keymapState = null) =>
         new(settings, keymapState: keymapState, keymapBackups: new KeymapBackupStore(_backupsRoot));
@@ -277,6 +319,58 @@ public class MainWindowViewModelEditTests : IDisposable
         Assert.Equal(new[] { 1 }, settings.Current.HiddenLayers["Corne"]);
     }
 
+    // ---- visible layer after leaving edit mode ------------------------------------
+
+    /// <summary>Loads the 3-layer fixture with the seeded hidden tabs and
+    /// enters edit mode.</summary>
+    private MainWindowViewModel StartEditing3(InMemorySettingsService settings)
+    {
+        var vm = NewVm(settings);
+        vm.LoadLayoutFromPath(WriteTempKeymap(text: KeymapText3()));
+        Assert.Equal(3, vm.Layers.Count);
+        vm.StartEditCommand.Execute(null);
+        Assert.True(vm.IsEditing);
+        return vm;
+    }
+
+    [Fact]
+    public void Discard_OnHiddenLayer_FallsBackToNearestShown_LowerIndexWinsTie()
+    {
+        var vm = StartEditing3(NewSettings(HiddenCorneLayers(1)));
+        vm.Layers[1].SelectCommand.Execute(null);
+        Assert.Equal(1, vm.ActiveLayerIndex);
+
+        vm.DiscardEditCommand.Execute(null);
+
+        // 0 and 2 are both one step away and shown; the tie goes to the lower.
+        Assert.Equal(0, vm.ActiveLayerIndex);
+    }
+
+    [Fact]
+    public void Discard_WithAllHigherLayersHidden_FallsBackToBase()
+    {
+        var vm = StartEditing3(NewSettings(HiddenCorneLayers(1, 2)));
+        vm.Layers[2].SelectCommand.Execute(null);
+        Assert.Equal(2, vm.ActiveLayerIndex);
+
+        vm.DiscardEditCommand.Execute(null);
+
+        Assert.Equal(0, vm.ActiveLayerIndex);
+    }
+
+    [Fact]
+    public void Discard_WhileOnShownLayer_StaysOnThatLayer()
+    {
+        var vm = StartEditing3(NewSettings(HiddenCorneLayers(2)));
+        vm.Layers[1].SelectCommand.Execute(null);
+        Assert.Equal(1, vm.ActiveLayerIndex);
+
+        vm.DiscardEditCommand.Execute(null);
+
+        // Its tab survived the rebuild — no reason to move.
+        Assert.Equal(1, vm.ActiveLayerIndex);
+    }
+
     // ---- locks -----------------------------------------------------------------------
 
     [Fact]
@@ -398,6 +492,43 @@ public class MainWindowViewModelEditTests : IDisposable
     }
 
     [Fact]
+    public async Task SaveEdit_OnHiddenLayer_FallsBackToNearestShown()
+    {
+        var vm = StartEditing3(NewSettings(HiddenCorneLayers(1)));
+        vm.Layers[1].SelectCommand.Execute(null);
+        // Lower is all &trans — clearing key 0 to &none is the one change.
+        Tap(vm, 0);
+        vm.EditClearSelectedKey(toNone: true);
+        Assert.Equal(1, vm.UnsavedEditCount);
+
+        await vm.SaveEditCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsEditing);
+        // Same rule as on discard: layer 1's tab is hidden again after the
+        // reload, and the tie between 0 and 2 goes to the lower index.
+        Assert.Equal(0, vm.ActiveLayerIndex);
+    }
+
+    [Fact]
+    public async Task SaveEdit_KeepsTheLoadedInfoTooltip()
+    {
+        var vm = StartEditing(out var path);
+        ClearKeyZero(vm);
+
+        await vm.SaveEditCommand.ExecuteAsync(null);
+
+        // The reload's "Loaded … (2 layers)" base stays up — a save must not
+        // reset the tooltip to "No layout loaded"; only the status bar changes.
+        Assert.StartsWith(
+            Loc.Instance.Format("Status_Loaded", Path.GetFileName(path), 2),
+            vm.LoadInfoTooltip);
+        Assert.DoesNotContain(Loc.Instance["Status_NoLayoutLoaded"], vm.LoadInfoTooltip);
+        Assert.Equal(
+            Loc.Instance.Format("Status_EditSavedFormat", Path.GetFileName(path)),
+            vm.StatusMessage);
+    }
+
+    [Fact]
     public async Task SaveEdit_ReviewDeclined_StaysInEditMode_WritesNothing()
     {
         var vm = StartEditing(out var path);
@@ -514,5 +645,204 @@ public class MainWindowViewModelEditTests : IDisposable
         vm.IsSavingEdit = true;
         Assert.False(vm.DiscardEditCommand.CanExecute(null));
         Assert.False(vm.SaveEditCommand.CanExecute(null));
+    }
+
+    // ---- the key dialog --------------------------------------------------------------
+
+    private static KeyBinding Kp(string keycode) => new("&kp", new[] { keycode });
+
+    [Fact]
+    public async Task KeyDialog_CallbackReturnsBinding_RequestNamesShownKey_ChangeAppliesAsOneStep()
+    {
+        var vm = StartEditing(out _);
+        Tap(vm, 1);
+        var configAtOpen = vm.Edit!.Session.Current;
+
+        KeyDialogRequest? captured = null;
+        vm.KeyDialogRequested = request =>
+        {
+            captured = request;
+            return Task.FromResult<KeyBinding?>(Kp("B"));
+        };
+
+        await vm.EditSelectedKeyAsync();
+
+        Assert.NotNull(captured);
+        Assert.Equal(vm.ActiveLayerIndex, captured!.LayerIndex);
+        Assert.Equal(1, captured.KeyIndex);
+        // The dialog reads exactly the config the session held when it opened —
+        // records are replaced, never mutated, so it still shows the old binding.
+        Assert.Same(configAtOpen, captured.Config);
+        var opened = captured.Config.Layers[captured.LayerIndex].Bindings[captured.KeyIndex];
+        Assert.Equal("&kp", opened.Behavior);
+        Assert.Equal("W", opened.Params[0]);
+
+        // What it answers lands as one unsaved change, and the board repaints.
+        var now = vm.Edit!.Session.Current.Layers[0].Bindings[1];
+        Assert.Equal("&kp", now.Behavior);
+        Assert.Equal("B", now.Params[0]);
+        Assert.Equal(1, vm.UnsavedEditCount);
+        Assert.Equal("B", vm.Keys[1].Label);
+    }
+
+    [Fact]
+    public async Task KeyDialog_CallbackReturnsNull_ChangesNothing()
+    {
+        var vm = StartEditing(out _);
+        Tap(vm, 1);
+        vm.KeyDialogRequested = _ => Task.FromResult<KeyBinding?>(null);
+
+        await vm.EditSelectedKeyAsync();
+
+        Assert.Equal(0, vm.UnsavedEditCount);
+        Assert.False(vm.Edit!.CanUndo);
+        Assert.Equal("W", vm.Keys[1].Label);
+    }
+
+    [Fact]
+    public async Task KeyDialog_NoSelection_CallbackNotCalled()
+    {
+        var vm = StartEditing(out _);
+        var calls = 0;
+        vm.KeyDialogRequested = _ =>
+        {
+            calls++;
+            return Task.FromResult<KeyBinding?>(Kp("B"));
+        };
+
+        await vm.EditSelectedKeyAsync();
+
+        Assert.Equal(0, calls);
+        Assert.Equal(0, vm.UnsavedEditCount);
+    }
+
+    [Fact]
+    public async Task KeyDialog_NoCallback_DoesNothing()
+    {
+        var vm = StartEditing(out _);
+        Tap(vm, 1);
+
+        await vm.EditSelectedKeyAsync();
+
+        Assert.Equal(0, vm.UnsavedEditCount);
+        Assert.False(vm.Edit!.CanUndo);
+    }
+
+    [Fact]
+    public async Task KeyDialog_ActiveLowerLayer_RequestNamesLayerOne_ChangeLandsThere()
+    {
+        var vm = StartEditing(out _);
+        vm.Layers[1].SelectCommand.Execute(null);
+        Tap(vm, 3);
+
+        KeyDialogRequest? captured = null;
+        vm.KeyDialogRequested = request =>
+        {
+            captured = request;
+            return Task.FromResult<KeyBinding?>(Kp("B"));
+        };
+
+        await vm.EditSelectedKeyAsync();
+
+        Assert.Equal(1, captured!.LayerIndex);
+        Assert.Equal(1, vm.ActiveLayerIndex);
+        var now = vm.Edit!.Session.Current.Layers[1].Bindings[3];
+        Assert.Equal("&kp", now.Behavior);
+        Assert.Equal("B", now.Params[0]);
+        // The same key on Base is untouched.
+        Assert.Equal("A", vm.Edit.Session.Current.Layers[0].Bindings[3].Params[0]);
+    }
+
+    [Fact]
+    public async Task KeyDialog_SecondCallWhileDialogOpen_IgnoredUntilFirstCloses()
+    {
+        var vm = StartEditing(out _);
+        Tap(vm, 1);
+
+        var gate = new TaskCompletionSource<KeyBinding?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        vm.KeyDialogRequested = _ =>
+        {
+            calls++;
+            return gate.Task;
+        };
+
+        var first = vm.EditSelectedKeyAsync();
+        Assert.Equal(1, calls);
+
+        await vm.EditSelectedKeyAsync();
+        Assert.Equal(1, calls);
+
+        gate.SetResult(Kp("B"));
+        await first;
+
+        Assert.Equal(1, calls);
+        Assert.Equal(1, vm.UnsavedEditCount);
+        Assert.Equal("B", vm.Edit!.Session.Current.Layers[0].Bindings[1].Params[0]);
+    }
+
+    [Fact]
+    public void KeyDialog_DoubleTapSelectsTheKeyAndOpensTheDialog_NullWhenNotEditing()
+    {
+        var vm = NewVm(NewSettings());
+        Assert.Null(vm.OnKeyDoubleTapped);
+
+        vm.LoadLayoutFromPath(WriteTempKeymap());
+        vm.StartEditCommand.Execute(null);
+
+        KeyDialogRequest? captured = null;
+        vm.KeyDialogRequested = request =>
+        {
+            captured = request;
+            return Task.FromResult<KeyBinding?>(null);
+        };
+
+        vm.OnKeyDoubleTapped!.Invoke(1);
+
+        Assert.Equal(1, vm.Edit!.SelectedKeyIndex);
+        Assert.True(vm.Keys[1].IsEditSelected);
+        Assert.NotNull(captured);
+        Assert.Equal(1, captured!.KeyIndex);
+    }
+
+    // ---- the Settings keyboard picker lock ------------------------------------------
+
+    [Fact]
+    public void SettingsVM_Editing_CanPickKeyboardFalse_RaisesAndTurnsTrueOnDiscard()
+    {
+        var settings = NewSettings();
+        var vm = NewVm(settings);
+        vm.LoadLayoutFromPath(WriteTempKeymap());
+        vm.StartEditCommand.Execute(null);
+        var settingsVm = new SettingsViewModel(settings, vm, new UpdateService(settings));
+
+        Assert.False(settingsVm.CanPickKeyboard);
+        var raised = new List<string?>();
+        settingsVm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.DiscardEditCommand.Execute(null);
+
+        // The main VM's IsEditing change propagates through _mainPropagators.
+        Assert.Contains(nameof(SettingsViewModel.CanPickKeyboard), raised);
+        Assert.True(settingsVm.CanPickKeyboard);
+    }
+
+    [Fact]
+    public void SettingsVM_Editing_AssigningProfile_LeavesMainVmOnItsBoard()
+    {
+        var settings = NewSettings();
+        var vm = NewVm(settings);
+        vm.LoadLayoutFromPath(WriteTempKeymap());
+        vm.StartEditCommand.Execute(null);
+        var settingsVm = new SettingsViewModel(settings, vm, new UpdateService(settings));
+
+        var active = vm.SelectedKeyboard!;
+        var other = KeyboardProfileRegistry.All.First(p => p.Id != active.Id);
+
+        settingsVm.SelectedKeyboardProfile = other;
+
+        // The switch is refused and the combo is re-raised so it snaps back.
+        Assert.Same(active, vm.SelectedKeyboard);
+        Assert.Equal(active, settingsVm.SelectedKeyboardProfile);
     }
 }

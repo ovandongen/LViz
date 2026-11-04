@@ -97,6 +97,37 @@ public static class ZmkModifierWrap
     }
 
     /// <summary>
+    /// Groups flat params into logical params with exactly the rule
+    /// <c>ZmkBindingFormatter.ReNestModifiers</c> re-nests by: walking
+    /// right-to-left, a modifier function token that has a token after it
+    /// joins that token's group; any other token — and a trailing modifier
+    /// function — ends its own group.
+    /// <c>["LS","LC","A"]</c> → <c>[["LS","LC","A"]]</c>;
+    /// <c>["LSHFT","LS","A"]</c> → <c>[["LSHFT"],["LS","A"]]</c>;
+    /// <c>["A","LS"]</c> → <c>[["A"],["LS"]]</c>. Empty input → empty list.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="flatParams"/> is null.
+    /// </exception>
+    public static IReadOnlyList<IReadOnlyList<string>> SplitLogical(IReadOnlyList<string> flatParams)
+    {
+        ArgumentNullException.ThrowIfNull(flatParams);
+
+        // Built right-to-left: the last entry is the leftmost group once
+        // reversed, mirroring the formatter's stack walk.
+        var groups = new List<List<string>>();
+        for (int i = flatParams.Count - 1; i >= 0; i--)
+        {
+            if (groups.Count > 0 && FlagByFunction.ContainsKey(flatParams[i]))
+                groups[^1].Insert(0, flatParams[i]);
+            else
+                groups.Add(new List<string> { flatParams[i] });
+        }
+        groups.Reverse();
+        return groups;
+    }
+
+    /// <summary>
     /// The wrapper function name for one modifier flag: LeftCtrl → "LC",
     /// …, RightGui → "RG".
     /// </summary>

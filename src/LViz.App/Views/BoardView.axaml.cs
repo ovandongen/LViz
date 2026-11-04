@@ -42,8 +42,10 @@ public partial class BoardView : UserControl
     /// <summary>
     /// Routes a cap pointer event to the hosting <see cref="IBoardSurface"/>:
     /// left-clicks fire <c>OnKeyTapped</c> (selection in the exit-key picker;
-    /// inert in the main window), right-clicks fire <c>OnKeyRightTapped</c>
-    /// (per-key label-override editor in the main window; inert in the picker).
+    /// inert in the main window), the second press of a double-click fires
+    /// <c>OnKeyDoubleTapped</c> (key dialog on the cap while editing), and
+    /// right-clicks fire <c>OnKeyRightTapped</c> (per-key label-override editor
+    /// in the main window; inert in the picker).
     /// </summary>
     private void OnKeyPointerPressed(object? sender, PointerPressedEventArgs e)
     {
@@ -62,6 +64,13 @@ public partial class BoardView : UserControl
         }
         if (point.Properties.IsLeftButtonPressed)
         {
+            if (e.ClickCount >= 2 && surface.OnKeyDoubleTapped is { } doubleHandler)
+            {
+                doubleHandler(keyVm.Position.Index);
+                e.Handled = true;
+                return;
+            }
+
             var handler = surface.OnKeyTapped;
             if (handler is null) return;
             handler(keyVm.Position.Index);

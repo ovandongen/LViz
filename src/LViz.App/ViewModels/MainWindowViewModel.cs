@@ -44,6 +44,13 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public Action<int>? OnKeyTapped => IsEditing ? OnEditKeyTapped : null;
 
     /// <summary>
+    /// Double-click on a cap while editing selects it and opens the key dialog
+    /// on it (see <see cref="EditSelectedKeyAsync"/>). Null outside edit mode,
+    /// where the board has no dialog to open.
+    /// </summary>
+    public Action<int>? OnKeyDoubleTapped => IsEditing ? OnEditKeyDoubleTapped : null;
+
+    /// <summary>
     /// Right-click on a key opens the per-key label-override editor — inert
     /// while editing a keymap, where the label dialog doesn't apply. Wired
     /// up so the View can stay binding-only; the actual dialog launch is a
@@ -1341,7 +1348,25 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             edit.Changed -= OnEditChanged;
         Edit = null;
         RebuildLayers();
-        ApplyActiveLayer(ActiveLayerIndex);
+        ApplyActiveLayer(NearestShownLayer(ActiveLayerIndex));
+    }
+
+    /// <summary>
+    /// Maps a layer index to the closest layer whose tab is shown, so leaving
+    /// edit mode never displays a layer the user hid: the index itself while
+    /// its tab is in <see cref="Layers"/> and shown, otherwise the nearest
+    /// shown layer (a tie goes to the lower index). With no layers, or none
+    /// shown, there is nothing to map to and the index is returned unchanged.
+    /// </summary>
+    private int NearestShownLayer(int index)
+    {
+        if (Layers.Any(l => l.Index == index && l.IsShown)) return index;
+        var shown = Layers.Where(l => l.IsShown).ToList();
+        if (shown.Count == 0) return index;
+        return shown
+            .OrderBy(l => Math.Abs(l.Index - index))
+            .ThenBy(l => l.Index)
+            .First().Index;
     }
 
     /// <summary>Drop the edit and its changes — the editor's Discard/Esc in part 7.</summary>
@@ -1356,6 +1381,14 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     {
         Edit!.SelectKey(keyIndex);
         RefreshEditSelectionFlags();
+    }
+
+    /// <summary>Double-click on a key while editing selects it and opens the
+    /// key dialog on it — fire and forget, the dialog owns its own errors.</summary>
+    private void OnEditKeyDoubleTapped(int keyIndex)
+    {
+        OnEditKeyTapped(keyIndex);
+        _ = EditSelectedKeyAsync();
     }
 
     /// <summary>Mark the editor's current selection on every key.</summary>
@@ -1385,6 +1418,57 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         if (Edit is not { } edit) return;
         edit.ClearSelection();
         RefreshEditSelectionFlags();
+    }
+
+    // ---- the key dialog ------------------------------------------------------------
+
+    /// <summary>
+    /// Invoked when the user asks to rebind a key (double-click or Enter while
+    /// editing): the callback (set by <c>App.axaml.cs</c>, part 9) owns the key
+    /// dialog's lifecycle and answers the new binding, or
+    /// <see langword="null"/> when the dialog was cancelled. Null means the
+    /// dialog isn't wired up — opening it does nothing.
+    /// </summary>
+    public Func<KeyDialogRequest, Task<KeyBinding?>>? KeyDialogRequested { get; set; }
+
+    /// <summary>True while a callback from an earlier <see cref="EditSelectedKeyAsync"/>
+    /// is still open; a second Enter/double-click is ignored until it closes.</summary>
+    private bool _keyDialogOpen;
+
+    /// <summary>
+    /// Open the key dialog on the selected key of the shown layer and apply
+    /// what it answers as one undo step. Does nothing when not editing, when
+    /// nothing is selected, when the selection sits outside the active layer,
+    /// when no callback is wired up, or while an earlier dialog is still open.
+    /// A cancelled dialog (null) changes nothing; so does a result once the
+    /// edit it was opened on has been replaced underneath the await.
+    /// </summary>
+    public async Task EditSelectedKeyAsync()
+    {
+        if (Edit is not { } edit) return;
+        if (edit.SelectedKeyIndex is not int key) return;
+
+        var layer = ActiveLayerIndex;
+        var layers = edit.Session.Current.Layers;
+        if (layer < 0 || layer >= layers.Count) return;
+        if (key < 0 || key >= layers[layer].Bindings.Count) return;
+
+        if (KeyDialogRequested is not { } callback) return;
+        if (_keyDialogOpen) return;
+
+        _keyDialogOpen = true;
+        try
+        {
+            var result = await callback(
+                new KeyDialogRequest(edit.Session.Current, edit.Defines, layer, key));
+
+            if (result is not null && ReferenceEquals(Edit, edit))
+                edit.SetKey(layer, key, result);
+        }
+        finally
+        {
+            _keyDialogOpen = false;
+        }
     }
 
     // ---- saving the edit ----
@@ -1478,12 +1562,12 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                 if (outcome is KeymapEditSaveOutcome.Saved saved)
                 {
                     // A reload always lands on layer 0; a save must not move the
-                    // user off the layer they were editing.
+                    // user off the layer they were editing — unless that layer's
+                    // tab is hidden, then the nearest shown one takes over.
                     var layer = ActiveLayerIndex;
                     LeaveEdit();
                     LoadLayoutFromPath(saved.ReloadPath, edit.Source.Entry);
-                    ApplyActiveLayer(layer);
-                    SetLoadStatusBase(null);
+                    ApplyActiveLayer(NearestShownLayer(layer));
                     StatusMessage = Loc.Instance.Format(
                         "Status_EditSavedFormat", Path.GetFileName(saved.ReloadPath));
                     return;
@@ -2105,11 +2189,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     {
         // The view keeps showing the layer the editor is on while editing;
         // the board's own switches must not repaint underneath it.
-        if (IsEditing)
-        {
-            DiagnosticLog.Info("MainVM", "OnActiveLayerChanged ignored while editing");
-            return;
-        }
+        if (IsEditing) return;
         if (!IsAutoLayerSwitchEnabled) return;
         Avalonia.Threading.Dispatcher.UIThread.Post(() => ApplyActiveLayer(layer));
     }

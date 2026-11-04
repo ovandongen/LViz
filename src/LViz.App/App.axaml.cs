@@ -19,6 +19,9 @@ using LViz.Core.Layout;
 using LViz.Core.Settings;
 using Projektanker.Icons.Avalonia;
 using Projektanker.Icons.Avalonia.FontAwesome;
+// App.axaml.cs also imports Avalonia.Input, whose own KeyBinding (gesture)
+// type collides; only the Core binding model is meant here.
+using KeyBinding = LViz.Core.Models.KeyBinding;
 
 namespace LViz.App;
 
@@ -327,6 +330,15 @@ public partial class App : Application
             {
                 var dlg = new KeymapReviewDialog { DataContext = new KeymapReviewDialogViewModel(request) };
                 return await dlg.ShowDialog<bool>(mainWindow);
+            };
+
+            // Key dialog: modal, awaited by the open-key command, which
+            // applies the answered binding as one undo step. A null answer
+            // (Esc, Cancel, close) changes nothing.
+            viewModel.KeyDialogRequested = async request =>
+            {
+                var dlg = new KeyDialog { DataContext = new KeyDialogViewModel(request) };
+                return await dlg.ShowDialog<KeyBinding?>(mainWindow);
             };
 
             // Save conflict: the target changed underneath the edit. Modal,

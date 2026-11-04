@@ -166,7 +166,10 @@ public static class Preprocessor
         return sb.ToString();
     }
 
-    private static readonly Regex DirectiveRegex = new(@"^\s*#\s*(\w+)(.*)$", RegexOptions.Compiled);
+    // The (?![\w-]) keeps devicetree properties that start a line
+    // (#binding-cells, #address-cells) from reading as an unknown directive
+    // and being dropped.
+    private static readonly Regex DirectiveRegex = new(@"^\s*#\s*(\w+)(?![\w-])(.*)$", RegexOptions.Compiled);
 
     private static (string Text, Dictionary<string, string> Defines, List<string> Order)
         ApplyConditionalsAndCollectDefines(string source)

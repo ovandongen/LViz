@@ -25,6 +25,9 @@ public enum EditShortcut
 
     /// <summary>Drop the key selection.</summary>
     ClearSelection,
+
+    /// <summary>Open the key dialog on the selected key.</summary>
+    OpenKeyDialog,
 }
 
 /// <summary>
@@ -60,6 +63,9 @@ public static class EditShortcuts
 
         if (key == Key.Escape && modifiers == KeyModifiers.None)
             return EditShortcut.ClearSelection;
+
+        if (key == Key.Enter && modifiers == KeyModifiers.None)
+            return EditShortcut.OpenKeyDialog;
 
         return EditShortcut.None;
     }

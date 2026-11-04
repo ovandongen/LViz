@@ -169,4 +169,35 @@ public class ZmkKeymapLoaderTests
         Assert.Contains("default_layer", ex.Message);
         Assert.Contains("other_layer", ex.Message);
     }
+
+    // ---- devicetree "#..." properties at line start --------------------------
+
+    [Fact]
+    public void BindingCellsOnItsOwnLine_IsAPropertyNotADirective()
+    {
+        // Real keymaps put "#binding-cells" on its own line; the preprocessor
+        // must not drop it as an unknown directive.
+        const string text = """
+            #define NAV 1
+            / {
+                macros {
+                    m1: m1 {
+                        compatible = "zmk,behavior-macro-one-param";
+                        #binding-cells = <1>;
+                        bindings = <&macro_param_1to1>, <&kp MACRO_PLACEHOLDER>;
+                    };
+                };
+                keymap {
+                    compatible = "zmk,keymap";
+                    base { bindings = <&m1 A &mo NAV>; };
+                };
+            };
+            """;
+
+        var config = ZmkKeymapLoader.LoadFromText(text, "test");
+
+        Assert.Single(config.Macros[0].Params);
+        Assert.Equal(new[] { "A" }, config.Layers[0].Bindings[0].Params);
+        Assert.Equal(new[] { "1" }, config.Layers[0].Bindings[1].Params);
+    }
 }
