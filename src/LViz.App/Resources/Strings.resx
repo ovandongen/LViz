@@ -293,6 +293,10 @@
     <value>Removed {0} from recent keymaps (file not found)</value>
     <comment/>
   </data>
+  <data name="Status_EditSavedFormat" xml:space="preserve">
+    <value>Saved {0}</value>
+    <comment/>
+  </data>
   <data name="Toast_LoadFailedFormat" xml:space="preserve">
     <value>Could not load {0}: {1}</value>
     <comment/>
@@ -1407,6 +1411,10 @@
     <value>This repository is too large for LViz (over 50 MB).</value>
     <comment/>
   </data>
+  <data name="GitHub_ErrorConflict" xml:space="preserve">
+    <value>The file was changed on GitHub after you opened it.</value>
+    <comment/>
+  </data>
   <data name="GitHub_ErrorUnexpectedFormat" xml:space="preserve">
     <value>Something went wrong with GitHub: {0}</value>
     <comment/>
@@ -1509,6 +1517,130 @@
   </data>
   <data name="GitHub_OpenButton" xml:space="preserve">
     <value>Open</value>
+    <comment/>
+  </data>
+  <data name="Edit_BannerNone" xml:space="preserve">
+    <value>Editing: no changes</value>
+    <comment/>
+  </data>
+  <data name="Edit_BannerOne" xml:space="preserve">
+    <value>Editing: 1 change</value>
+    <comment/>
+  </data>
+  <data name="Edit_BannerFormat" xml:space="preserve">
+    <value>Editing: {0} changes</value>
+    <comment/>
+  </data>
+  <data name="Edit_SaveFailedFormat" xml:space="preserve">
+    <value>Saving failed: {0}</value>
+    <comment/>
+  </data>
+  <data name="Edit_SaveGitHubUnavailable" xml:space="preserve">
+    <value>GitHub is not available.</value>
+    <comment/>
+  </data>
+  <data name="Edit_StartFailedFormat" xml:space="preserve">
+    <value>Can't edit {0}: {1}</value>
+    <comment/>
+  </data>
+  <data name="Edit_SaveRefusedFormat" xml:space="preserve">
+    <value>Can't save: {0}</value>
+    <comment/>
+  </data>
+  <data name="Tooltip_EditKeymap" xml:space="preserve">
+    <value>Edit keymap</value>
+    <comment/>
+  </data>
+  <data name="Tooltip_EditKeymapJson" xml:space="preserve">
+    <value>MoErgo .json keymaps can't be edited. Open the .keymap file instead.</value>
+    <comment/>
+  </data>
+  <data name="Tooltip_EditUndo" xml:space="preserve">
+    <value>Undo</value>
+    <comment/>
+  </data>
+  <data name="Tooltip_EditRedo" xml:space="preserve">
+    <value>Redo</value>
+    <comment/>
+  </data>
+  <data name="Edit_Discard" xml:space="preserve">
+    <value>Discard</value>
+    <comment/>
+  </data>
+  <data name="Edit_Save" xml:space="preserve">
+    <value>Save</value>
+    <comment/>
+  </data>
+  <data name="Edit_Saving" xml:space="preserve">
+    <value>Saving…</value>
+    <comment/>
+  </data>
+  <data name="Edit_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewTitle" xml:space="preserve">
+    <value>Review changes</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewHeaderFormat" xml:space="preserve">
+    <value>These changes will be saved to {0}:</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewAddFormat" xml:space="preserve">
+    <value>New layer "{0}" at position {1}</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewDeleteFormat" xml:space="preserve">
+    <value>Layer {0} deleted</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewMoveFormat" xml:space="preserve">
+    <value>Layer {0} moved to position {1}</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewRenameFormat" xml:space="preserve">
+    <value>Layer {0}: "{1}" → "{2}"</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewKeyFormat" xml:space="preserve">
+    <value>{0} · key {1}: {2} → {3}</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewCommitMessage" xml:space="preserve">
+    <value>Commit message</value>
+    <comment/>
+  </data>
+  <data name="Edit_ConflictTitle" xml:space="preserve">
+    <value>File changed</value>
+    <comment/>
+  </data>
+  <data name="Edit_ConflictLocalFormat" xml:space="preserve">
+    <value>{0} was changed on disk after you started editing. Reload it and lose your changes, or overwrite it with your version?</value>
+    <comment/>
+  </data>
+  <data name="Edit_ConflictGitHubFormat" xml:space="preserve">
+    <value>The keymap in {0} was changed on GitHub after you opened it. Reload it and lose your changes, or overwrite it with your version?</value>
+    <comment/>
+  </data>
+  <data name="Edit_ConflictReload" xml:space="preserve">
+    <value>Reload</value>
+    <comment/>
+  </data>
+  <data name="Edit_ConflictOverwrite" xml:space="preserve">
+    <value>Overwrite</value>
+    <comment/>
+  </data>
+  <data name="Edit_QuitTitle" xml:space="preserve">
+    <value>Unsaved changes</value>
+    <comment/>
+  </data>
+  <data name="Edit_QuitMessageFormat" xml:space="preserve">
+    <value>The keymap has unsaved changes ({0}). Quit and lose them?</value>
+    <comment/>
+  </data>
+  <data name="Edit_QuitConfirm" xml:space="preserve">
+    <value>Quit</value>
     <comment/>
   </data>
 </root>

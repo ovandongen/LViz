@@ -38,6 +38,21 @@
                            StrokeThickness="1"
                            Fill="{Binding KeyFillColor, Converter={x:Static convApp:HexColorToBrushConverter.Instance}}" />
 
+                <!-- Edit-mode outlines: orange = changed against the baseline,
+                     blue = the selected key. Stroke-only (Fill defaults to
+                     null) and never hit-tested; both flags are false outside
+                     edit mode, so the exit-key picker is unaffected. -->
+                <Rectangle RadiusX="6" RadiusY="6"
+                           Stroke="{StaticResource AccentYellow}"
+                           StrokeThickness="3"
+                           IsHitTestVisible="False"
+                           IsVisible="{Binding IsEditChanged}" />
+                <Rectangle Margin="3" RadiusX="4" RadiusY="4"
+                           Stroke="{StaticResource AccentBlue}"
+                           StrokeThickness="2"
+                           IsHitTestVisible="False"
+                           IsVisible="{Binding IsEditSelected}" />
+
                 <!-- Press-indicator dot: pulses when the hook sees this
                      key fire. Fill/Stroke walk past the per-item
                      KeyViewModel DataContext via ElementName=Board to

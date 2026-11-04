@@ -93,9 +93,11 @@ dotnet run --project src/LViz.App                  # launch the app
 - **Localization via `.resx` + `Loc` singleton.** Both `Strings.resx` (EN
   base) and `Strings.nl.resx` live in `App/Resources/`. Bind UI strings via
   `{Binding [Key_Name], Source={StaticResource Loc}}`. If you add a string,
-  add it to both `.resx` files. No test compares the two key sets, and `Loc`
-  shows `[Key]` for a missing key instead of failing, so diff the key lists
-  yourself.
+  add it to both `.resx` files. `LocalizationKeyTests` checks that both files
+  have the same keys and that every literal key used in `.axaml` and App `.cs`
+  files exists; `Loc` itself still shows `[Key]` for a missing key instead of
+  failing. A key picked by a ternary (`Format(c ? "A" : "B", …)`) isn't a
+  literal to that scan; only the EN/NL parity test covers it.
 - **Diagnostics log at `ApplicationData/LViz/diagnostic.log`**
   (`~/Library/Application Support/LViz/` on macOS; confirm via
   `DiagnosticLog.GetLogFilePath()`).
@@ -106,7 +108,20 @@ dotnet run --project src/LViz.App                  # launch the app
   `MainWindow.axaml.cs`.** It works. Don't rewrite it without a concrete
   reason — the 3-tier transparency fallback, 8-way edge resize, and
   position-aware bar swap took real iteration to get right in the sister
-  app.
+  app. `BarsPanel` has four rows (status bar, edit banner, layer tabs, combo
+  legend; mirrored when the bars sit at the bottom): a new bar sets its row in
+  both the XAML and `UpdateBarPosition`.
+- **Keymap edit mode lives in `KeymapEditViewModel` on
+  `MainWindowViewModel.Edit`.** `KeymapSavePlan.Build` (Core/Keymap/Editing)
+  is the one save pipeline (structure → re-parse → diff → `KeymapWriter`);
+  catch `ZmkKeymapParseException` + `ArgumentException` once at the Save call
+  site. While `IsEditing`, every keymap/board load path returns early, so a
+  save or a conflict reload calls `LeaveEdit()` first, and a save re-applies
+  `ActiveLayerIndex` afterwards because a load lands on layer 0. The edit
+  commands' enable state is re-queried only through `NotifyEditCommandState()`.
+  Edit-mode key gestures are rules in `EditShortcuts.Resolve` (tested as a
+  table); `MainWindow.OnEditKeyDown` only dispatches. The commit message
+  (`KeymapCommitMessage`) is English by decision, not resx text.
 - **`Core/Keymap/Parser/` is the `.keymap` pipeline.** Preprocess →
   devicetree lex/parse → two-pass interpret produces a `KeyboardConfig`.
   Lean v1 by design — function-like `#define`, `#include` resolution,
@@ -320,8 +335,8 @@ Carried over from the upstream Moergo build and still apply verbatim:
   are reflection bindings even under `x:DataType`: a mistyped path builds
   clean and binds to nothing at runtime. The build only catches type and
   element names and missing `x:Name` fields. Check each new binding path
-  against the view-model by hand, and each new `Loc` key against both
-  `.resx` files. Still keep `x:DataType` on every new `DataTemplate`
+  against the view-model by hand (new `Loc` keys are covered by
+  `LocalizationKeyTests`). Still keep `x:DataType` on every new `DataTemplate`
   (needed for the cast-free bindings and for a later switch to compiled
   bindings).
 - **macOS Carbon hotkey events pump on Avalonia's main run loop** without
@@ -582,8 +597,16 @@ LViz-specific (extend this list as we hit more):
 
 - **A new `GitHubErrorKind` member trips
   `GitHubOpenViewModelTests.MessageFor_EveryKind_GetsDistinctResolvedText`**:
-  every kind needs its own `MessageFor` text (both `.resx` files). `Conflict`
-  is excluded there until the save UI adds its text; drop the exclusion then.
+  every kind needs its own `MessageFor` text (both `.resx` files).
+
+- **A disabled Avalonia control is left out of hit testing**, `GetVisualsAt`
+  included: a press on it reaches the parent with the parent as source. Code
+  that asks "is the pointer over a button?" (the bars drag in
+  `MainWindow.OnPointerPressed`) checks button bounds by geometry, or a click
+  on a greyed-out button starts a window drag.
+
+- **Avalonia 11 `ItemsControl` has no `Spacing`.** Put it on the panel in
+  `ItemsControl.ItemsPanel` (see `ChoiceDialog.axaml`).
 
 - **`MainWindowViewModel.InitializeAsync` starts the HID stack when
   `LiveKeyHighlighting` is true** (the default). Startup tests set it false.

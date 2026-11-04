@@ -120,22 +120,46 @@ public partial class App : Application
             }
 
             var closingHandled = false;
-            mainWindow.Closing += (sender, e) =>
+
+            // Quit guard: unsaved keymap edits are confirmed before anything
+            // shuts down. With no edits both quit paths below run exactly as
+            // before (save window state, shut down, close/exit).
+            async Task<bool> ConfirmDiscardEditsAsync()
+            {
+                if (viewModel.UnsavedEditCount == 0) return true;
+                // The global hotkey can hide the window while the user keeps
+                // editing, and a modal dialog on a hidden owner never shows.
+                mainWindow.Show();
+                mainWindow.Activate();
+                var dlg = new ChoiceDialog
+                {
+                    DataContext = ChoiceDialogViewModel.QuitWithUnsavedEdits(viewModel.UnsavedEditCount),
+                };
+                var result = await dlg.ShowDialog<string?>(mainWindow);
+                return result == "quit";
+            }
+
+            mainWindow.Closing += (_, e) =>
             {
                 if (closingHandled) return;
-                closingHandled = true;
                 e.Cancel = true;
-                SaveWindowState();
-                viewModel.Shutdown();
-                ((Window)sender!).Close();
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    if (!await ConfirmDiscardEditsAsync()) return;
+                    closingHandled = true;
+                    SaveWindowState();
+                    viewModel.Shutdown();
+                    mainWindow.Close();
+                });
             };
 
-            viewModel.QuitRequested = () =>
+            viewModel.QuitRequested = () => Dispatcher.UIThread.Post(async () =>
             {
+                if (!await ConfirmDiscardEditsAsync()) return;
                 SaveWindowState();
                 viewModel.Shutdown();
                 Environment.Exit(0);
-            };
+            });
 
             // Tray icon: localize menu headers + pipe clicks to the VM
             var trayIcons = TrayIcon.GetIcons(this);
@@ -295,6 +319,23 @@ public partial class App : Application
                     if (result.Saved)
                         viewModel.SetComboLabelOverride(keyPositionsKey, result.Value);
                 });
+            };
+
+            // Review-before-save: modal, awaited by the save command, so the
+            // save only continues when the user approved the listed changes.
+            viewModel.ReviewChangesRequested = async request =>
+            {
+                var dlg = new KeymapReviewDialog { DataContext = new KeymapReviewDialogViewModel(request) };
+                return await dlg.ShowDialog<bool>(mainWindow);
+            };
+
+            // Save conflict: the target changed underneath the edit. Modal,
+            // awaited by the save command, which applies the answer (reload /
+            // overwrite / keep editing) directly.
+            viewModel.SaveConflictRequested = async request =>
+            {
+                var dlg = new ChoiceDialog { DataContext = ChoiceDialogViewModel.Conflict(request) };
+                return ChoiceDialogViewModel.ToConflictChoice(await dlg.ShowDialog<string?>(mainWindow));
             };
 
             // Layout wizard: modal, closes with null (cancel) or the saved

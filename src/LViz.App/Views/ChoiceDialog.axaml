@@ -1,0 +1,40 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LViz.App.ViewModels"
+        x:Class="LViz.App.Views.ChoiceDialog"
+        x:DataType="vm:ChoiceDialogViewModel"
+        Title="{Binding Title}"
+        Width="420"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BgBase}">
+
+    <StackPanel Margin="16" Spacing="12">
+
+        <TextBlock FontSize="13"
+                   Foreground="{StaticResource Text}"
+                   TextWrapping="Wrap"
+                   Text="{Binding Message}" />
+
+        <ItemsControl ItemsSource="{Binding Options}" HorizontalAlignment="Right">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="8" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ChoiceDialogOption">
+                    <Button Content="{Binding Label}"
+                            Classes.accent="{Binding IsAccent}"
+                            Tag="{Binding Id}"
+                            Click="OnOptionClick" />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+    </StackPanel>
+
+</Window>

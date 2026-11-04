@@ -468,6 +468,7 @@ public partial class GitHubOpenViewModel : ObservableObject
         GitHubErrorKind.AccessDenied => Loc.Instance["GitHub_ErrorAccessDenied"],
         GitHubErrorKind.NotFound => Loc.Instance["GitHub_ErrorNotFound"],
         GitHubErrorKind.TooLarge => Loc.Instance["GitHub_ErrorTooLarge"],
+        GitHubErrorKind.Conflict => Loc.Instance["GitHub_ErrorConflict"],
         _ => Loc.Instance.Format("GitHub_ErrorUnexpectedFormat", e.Message),
     };
 }

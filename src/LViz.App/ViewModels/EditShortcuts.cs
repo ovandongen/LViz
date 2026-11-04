@@ -1,0 +1,66 @@
+using Avalonia.Input;
+
+namespace LViz.App.ViewModels;
+
+/// <summary>
+/// The edit-mode action a key press stands for, or <see cref="None"/> when the
+/// press is nobody's business and the window keeps handling it normally.
+/// </summary>
+public enum EditShortcut
+{
+    /// <summary>Not an edit shortcut.</summary>
+    None,
+
+    /// <summary>Undo the last edit step.</summary>
+    Undo,
+
+    /// <summary>Redo the last undone step.</summary>
+    Redo,
+
+    /// <summary>Clear the selected key to <c>&amp;trans</c>.</summary>
+    ClearToTransparent,
+
+    /// <summary>Clear the selected key to <c>&amp;none</c>.</summary>
+    ClearToNone,
+
+    /// <summary>Drop the key selection.</summary>
+    ClearSelection,
+}
+
+/// <summary>
+/// Maps a raw key press to the edit-mode shortcut it triggers, without
+/// touching the UI. Pure so the rules are testable without a window;
+/// <see cref="MainWindow"/> just feeds it the event and dispatches the result.
+/// </summary>
+public static class EditShortcuts
+{
+    /// <summary>
+    /// Classify <paramref name="key"/> + <paramref name="modifiers"/> against
+    /// the edit-mode rules. <paramref name="commandModifier"/> is the platform's
+    /// command key (<c>Meta</c> on macOS, <c>Control</c> elsewhere, from
+    /// <c>PlatformSettings.HotkeyConfiguration.CommandModifiers</c>), so
+    /// Cmd+Z on a Mac and Ctrl+Z elsewhere hit the same rule.
+    /// </summary>
+    public static EditShortcut Resolve(Key key, KeyModifiers modifiers, KeyModifiers commandModifier)
+    {
+        // "cmd" means every flag of the platform command modifier is down, so
+        // a Meta+Control setup could not be short-circuited by holding one.
+        var cmd = modifiers.HasFlag(commandModifier);
+        var shift = modifiers.HasFlag(KeyModifiers.Shift);
+        var alt = modifiers.HasFlag(KeyModifiers.Alt);
+
+        if (key == Key.Z && cmd)
+            return shift ? EditShortcut.Redo : EditShortcut.Undo;
+
+        if (key == Key.Y && cmd && !shift)
+            return EditShortcut.Redo;
+
+        if ((key == Key.Delete || key == Key.Back) && !cmd && !alt)
+            return shift ? EditShortcut.ClearToNone : EditShortcut.ClearToTransparent;
+
+        if (key == Key.Escape && modifiers == KeyModifiers.None)
+            return EditShortcut.ClearSelection;
+
+        return EditShortcut.None;
+    }
+}
