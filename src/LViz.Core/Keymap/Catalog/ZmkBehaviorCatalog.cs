@@ -13,6 +13,11 @@ public enum ZmkBehaviorParamKind
     Modifier,
     Layer,
     Raw,
+
+    /// <summary>A named command from <see cref="ZmkCommandCatalog"/>,
+    /// optionally followed by a profile number. One logical parameter that can
+    /// produce 1 or 2 flat binding params (<c>&amp;bt BT_SEL 2</c>).</summary>
+    Command,
 }
 
 /// <summary>
@@ -21,9 +26,15 @@ public enum ZmkBehaviorParamKind
 /// </summary>
 public enum ZmkBehaviorGroup
 {
-    Keys,
-    Layers,
-    Special,
+    Key,
+    HoldTap,
+    Layer,
+    Bluetooth,
+    Output,
+    Lighting,
+    Mouse,
+    System,
+    Clear,
     Keymap,
 }
 
@@ -38,9 +49,9 @@ public sealed record ZmkBehavior(
     IReadOnlyList<ZmkBehaviorParamKind> Params);
 
 /// <summary>
-/// The behaviors the key dialog offers: the fixed v1 set plus the hold-taps
-/// and macros of the currently loaded keymap. Only codes and parameter kinds
-/// — anything else is entered as a raw binding by the UI.
+/// The behaviors the key dialog offers: the fixed built-in set plus the
+/// hold-taps and macros of the currently loaded keymap. Only codes and
+/// parameter kinds — anything else is entered as a raw binding by the UI.
 /// </summary>
 public static class ZmkBehaviorCatalog
 {
@@ -48,19 +59,36 @@ public static class ZmkBehaviorCatalog
     private static readonly HashSet<string> LayerBindings =
         new(StringComparer.Ordinal) { "&mo", "&to", "&tog", "&sl" };
 
-    /// <summary>The ten v1 behaviors, in picker order.</summary>
+    /// <summary>
+    /// The built-in behaviors, in picker order: the ten v1 behaviors, then the
+    /// six command behaviors (their parameter is a named command from
+    /// <see cref="ZmkCommandCatalog"/>), then the parameter-less key and
+    /// system behaviors.
+    /// </summary>
     public static IReadOnlyList<ZmkBehavior> BuiltIn { get; } = new[]
     {
-        new ZmkBehavior("&kp", ZmkBehaviorGroup.Keys, new[] { ZmkBehaviorParamKind.Keycode }),
-        new ZmkBehavior("&mt", ZmkBehaviorGroup.Keys, new[] { ZmkBehaviorParamKind.Modifier, ZmkBehaviorParamKind.Keycode }),
-        new ZmkBehavior("&sk", ZmkBehaviorGroup.Keys, new[] { ZmkBehaviorParamKind.Keycode }),
-        new ZmkBehavior("&lt", ZmkBehaviorGroup.Layers, new[] { ZmkBehaviorParamKind.Layer, ZmkBehaviorParamKind.Keycode }),
-        new ZmkBehavior("&mo", ZmkBehaviorGroup.Layers, new[] { ZmkBehaviorParamKind.Layer }),
-        new ZmkBehavior("&to", ZmkBehaviorGroup.Layers, new[] { ZmkBehaviorParamKind.Layer }),
-        new ZmkBehavior("&tog", ZmkBehaviorGroup.Layers, new[] { ZmkBehaviorParamKind.Layer }),
-        new ZmkBehavior("&sl", ZmkBehaviorGroup.Layers, new[] { ZmkBehaviorParamKind.Layer }),
-        new ZmkBehavior("&trans", ZmkBehaviorGroup.Special, Array.Empty<ZmkBehaviorParamKind>()),
-        new ZmkBehavior("&none", ZmkBehaviorGroup.Special, Array.Empty<ZmkBehaviorParamKind>()),
+        new ZmkBehavior("&kp", ZmkBehaviorGroup.Key, new[] { ZmkBehaviorParamKind.Keycode }),
+        new ZmkBehavior("&mt", ZmkBehaviorGroup.HoldTap, new[] { ZmkBehaviorParamKind.Modifier, ZmkBehaviorParamKind.Keycode }),
+        new ZmkBehavior("&sk", ZmkBehaviorGroup.Key, new[] { ZmkBehaviorParamKind.Keycode }),
+        new ZmkBehavior("&lt", ZmkBehaviorGroup.HoldTap, new[] { ZmkBehaviorParamKind.Layer, ZmkBehaviorParamKind.Keycode }),
+        new ZmkBehavior("&mo", ZmkBehaviorGroup.Layer, new[] { ZmkBehaviorParamKind.Layer }),
+        new ZmkBehavior("&to", ZmkBehaviorGroup.Layer, new[] { ZmkBehaviorParamKind.Layer }),
+        new ZmkBehavior("&tog", ZmkBehaviorGroup.Layer, new[] { ZmkBehaviorParamKind.Layer }),
+        new ZmkBehavior("&sl", ZmkBehaviorGroup.Layer, new[] { ZmkBehaviorParamKind.Layer }),
+        new ZmkBehavior("&trans", ZmkBehaviorGroup.Clear, Array.Empty<ZmkBehaviorParamKind>()),
+        new ZmkBehavior("&none", ZmkBehaviorGroup.Clear, Array.Empty<ZmkBehaviorParamKind>()),
+        new ZmkBehavior("&bt", ZmkBehaviorGroup.Bluetooth, new[] { ZmkBehaviorParamKind.Command }),
+        new ZmkBehavior("&out", ZmkBehaviorGroup.Output, new[] { ZmkBehaviorParamKind.Command }),
+        new ZmkBehavior("&rgb_ug", ZmkBehaviorGroup.Lighting, new[] { ZmkBehaviorParamKind.Command }),
+        new ZmkBehavior("&mkp", ZmkBehaviorGroup.Mouse, new[] { ZmkBehaviorParamKind.Command }),
+        new ZmkBehavior("&msc", ZmkBehaviorGroup.Mouse, new[] { ZmkBehaviorParamKind.Command }),
+        new ZmkBehavior("&mmv", ZmkBehaviorGroup.Mouse, new[] { ZmkBehaviorParamKind.Command }),
+        new ZmkBehavior("&caps_word", ZmkBehaviorGroup.Key, Array.Empty<ZmkBehaviorParamKind>()),
+        new ZmkBehavior("&key_repeat", ZmkBehaviorGroup.Key, Array.Empty<ZmkBehaviorParamKind>()),
+        new ZmkBehavior("&bootloader", ZmkBehaviorGroup.System, Array.Empty<ZmkBehaviorParamKind>()),
+        new ZmkBehavior("&sys_reset", ZmkBehaviorGroup.System, Array.Empty<ZmkBehaviorParamKind>()),
+        new ZmkBehavior("&soft_off", ZmkBehaviorGroup.System, Array.Empty<ZmkBehaviorParamKind>()),
+        new ZmkBehavior("&studio_unlock", ZmkBehaviorGroup.System, Array.Empty<ZmkBehaviorParamKind>()),
     };
 
     /// <summary>

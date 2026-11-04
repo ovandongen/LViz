@@ -81,6 +81,41 @@ public class BehaviorAritySlicerTests
     }
 
     [Fact]
+    public void BtDiscTakesTwoParamsLikeBtSel()
+    {
+        var bindings = SliceLayer("&bt BT_DISC 0 &kp A");
+        Assert.Equal(2, bindings.Count);
+        Assert.Equal("&bt", bindings[0].Behavior);
+        Assert.Equal(new[] { "BT_DISC", "0" }, bindings[0].Params);
+        Assert.Equal("&kp", bindings[1].Behavior);
+        Assert.Equal(new[] { "A" }, bindings[1].Params);
+    }
+
+    [Fact]
+    public void BtCommandsSliceByCommand()
+    {
+        var bindings = SliceLayer("&bt BT_SEL 4 &bt BT_NXT &bt BT_CLR_ALL");
+        Assert.Equal(3, bindings.Count);
+        Assert.Equal(new[] { "BT_SEL", "4" }, bindings[0].Params);
+        Assert.Equal(new[] { "BT_NXT" }, bindings[1].Params);
+        Assert.Equal(new[] { "BT_CLR_ALL" }, bindings[2].Params);
+    }
+
+    [Theory]
+    [InlineData("BT_SEL", 2)]
+    [InlineData("BT_DISC", 2)]
+    [InlineData("BT_CLR", 1)]
+    [InlineData("BT_NXT", 1)]
+    [InlineData("", 1)]
+    [InlineData(null, 1)]
+    public void BtArityFollowsTheTable(string? command, int expected)
+        => Assert.Equal(expected, BehaviorArityTable.BtArity(command));
+
+    [Fact]
+    public void BtHasNoEntryInTheArityTable()
+        => Assert.Equal(BehaviorArityTable.UnknownArity, BehaviorArityTable.Arity("&bt"));
+
+    [Fact]
     public void ModifierWrappedKeycodeSurvivesAsSingleParam()
     {
         // (LC(LSFT)) should be one param, not multiple tokens.

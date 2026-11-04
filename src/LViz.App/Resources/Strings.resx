@@ -1819,6 +1819,102 @@
     <value>The key (usually a modifier) stays pressed for the next key press.</value>
     <comment/>
   </data>
+  <data name="Behavior_Bt_Name" xml:space="preserve">
+    <value>Bluetooth</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Bt_Help" xml:space="preserve">
+    <value>Selects, switches or clears Bluetooth profiles.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Out_Name" xml:space="preserve">
+    <value>Output</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Out_Help" xml:space="preserve">
+    <value>Chooses whether keys go over USB or Bluetooth.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_RgbUg_Name" xml:space="preserve">
+    <value>RGB lighting</value>
+    <comment/>
+  </data>
+  <data name="Behavior_RgbUg_Help" xml:space="preserve">
+    <value>Controls the RGB lighting: on/off, brightness, colour, effect.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Mkp_Name" xml:space="preserve">
+    <value>Mouse button</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Mkp_Help" xml:space="preserve">
+    <value>Clicks a mouse button.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Msc_Name" xml:space="preserve">
+    <value>Mouse scroll</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Msc_Help" xml:space="preserve">
+    <value>Scrolls while the key is held.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Mmv_Name" xml:space="preserve">
+    <value>Mouse move</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Mmv_Help" xml:space="preserve">
+    <value>Moves the pointer while the key is held.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_CapsWord_Name" xml:space="preserve">
+    <value>Caps word</value>
+    <comment/>
+  </data>
+  <data name="Behavior_CapsWord_Help" xml:space="preserve">
+    <value>Types capitals until a key that ends the word, like space.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_KeyRepeat_Name" xml:space="preserve">
+    <value>Key repeat</value>
+    <comment/>
+  </data>
+  <data name="Behavior_KeyRepeat_Help" xml:space="preserve">
+    <value>Sends the last key again.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Bootloader_Name" xml:space="preserve">
+    <value>Bootloader</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Bootloader_Help" xml:space="preserve">
+    <value>Restarts into the bootloader, for flashing firmware.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_SysReset_Name" xml:space="preserve">
+    <value>Restart</value>
+    <comment/>
+  </data>
+  <data name="Behavior_SysReset_Help" xml:space="preserve">
+    <value>Restarts the keyboard.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_SoftOff_Name" xml:space="preserve">
+    <value>Turn off</value>
+    <comment/>
+  </data>
+  <data name="Behavior_SoftOff_Help" xml:space="preserve">
+    <value>Turns the keyboard off until it is woken up.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_StudioUnlock_Name" xml:space="preserve">
+    <value>Studio unlock</value>
+    <comment/>
+  </data>
+  <data name="Behavior_StudioUnlock_Help" xml:space="preserve">
+    <value>Unlocks ZMK Studio so it can change the keymap.</value>
+    <comment/>
+  </data>
   <data name="Behavior_Keymap_Help" xml:space="preserve">
     <value>Defined in this keymap.</value>
     <comment/>
@@ -1829,6 +1925,290 @@
   </data>
   <data name="Behavior_Custom_Help" xml:space="preserve">
     <value>Type any ZMK binding, for example &amp;bt BT_SEL 0.</value>
+    <comment/>
+  </data>
+  <data name="Command_FromKeymap_Help" xml:space="preserve">
+    <value>Used in this keymap.</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_SEL_Name" xml:space="preserve">
+    <value>Select profile</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_SEL_Help" xml:space="preserve">
+    <value>Switches to the chosen Bluetooth profile.</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_NXT_Name" xml:space="preserve">
+    <value>Next profile</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_NXT_Help" xml:space="preserve">
+    <value>Switches to the next Bluetooth profile.</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_PRV_Name" xml:space="preserve">
+    <value>Previous profile</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_PRV_Help" xml:space="preserve">
+    <value>Switches to the previous Bluetooth profile.</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_CLR_Name" xml:space="preserve">
+    <value>Clear profile</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_CLR_Help" xml:space="preserve">
+    <value>Forgets the pairing of the current profile.</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_CLR_ALL_Name" xml:space="preserve">
+    <value>Clear all profiles</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_CLR_ALL_Help" xml:space="preserve">
+    <value>Forgets the pairings of all profiles.</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_DISC_Name" xml:space="preserve">
+    <value>Disconnect profile</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_DISC_Help" xml:space="preserve">
+    <value>Disconnects the chosen profile without forgetting it.</value>
+    <comment/>
+  </data>
+  <data name="Command_OUT_USB_Name" xml:space="preserve">
+    <value>USB</value>
+    <comment/>
+  </data>
+  <data name="Command_OUT_USB_Help" xml:space="preserve">
+    <value>Sends keys over USB.</value>
+    <comment/>
+  </data>
+  <data name="Command_OUT_BLE_Name" xml:space="preserve">
+    <value>Bluetooth</value>
+    <comment/>
+  </data>
+  <data name="Command_OUT_BLE_Help" xml:space="preserve">
+    <value>Sends keys over Bluetooth.</value>
+    <comment/>
+  </data>
+  <data name="Command_OUT_TOG_Name" xml:space="preserve">
+    <value>Toggle</value>
+    <comment/>
+  </data>
+  <data name="Command_OUT_TOG_Help" xml:space="preserve">
+    <value>Switches between USB and Bluetooth.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_TOG_Name" xml:space="preserve">
+    <value>On/off</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_TOG_Help" xml:space="preserve">
+    <value>Turns the lighting on or off.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_ON_Name" xml:space="preserve">
+    <value>On</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_ON_Help" xml:space="preserve">
+    <value>Turns the lighting on.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_OFF_Name" xml:space="preserve">
+    <value>Off</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_OFF_Help" xml:space="preserve">
+    <value>Turns the lighting off.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_BRI_Name" xml:space="preserve">
+    <value>Brighter</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_BRI_Help" xml:space="preserve">
+    <value>Increases the brightness.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_BRD_Name" xml:space="preserve">
+    <value>Dimmer</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_BRD_Help" xml:space="preserve">
+    <value>Decreases the brightness.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_HUI_Name" xml:space="preserve">
+    <value>Hue up</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_HUI_Help" xml:space="preserve">
+    <value>Shifts the colour forward.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_HUD_Name" xml:space="preserve">
+    <value>Hue down</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_HUD_Help" xml:space="preserve">
+    <value>Shifts the colour back.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_SAI_Name" xml:space="preserve">
+    <value>More saturation</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_SAI_Help" xml:space="preserve">
+    <value>Makes the colour more intense.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_SAD_Name" xml:space="preserve">
+    <value>Less saturation</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_SAD_Help" xml:space="preserve">
+    <value>Makes the colour paler.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_SPI_Name" xml:space="preserve">
+    <value>Faster</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_SPI_Help" xml:space="preserve">
+    <value>Speeds up the effect.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_SPD_Name" xml:space="preserve">
+    <value>Slower</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_SPD_Help" xml:space="preserve">
+    <value>Slows down the effect.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_EFF_Name" xml:space="preserve">
+    <value>Next effect</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_EFF_Help" xml:space="preserve">
+    <value>Switches to the next effect.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_EFR_Name" xml:space="preserve">
+    <value>Previous effect</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_EFR_Help" xml:space="preserve">
+    <value>Switches to the previous effect.</value>
+    <comment/>
+  </data>
+  <data name="Command_LCLK_Name" xml:space="preserve">
+    <value>Left click</value>
+    <comment/>
+  </data>
+  <data name="Command_LCLK_Help" xml:space="preserve">
+    <value>Clicks the left mouse button.</value>
+    <comment/>
+  </data>
+  <data name="Command_RCLK_Name" xml:space="preserve">
+    <value>Right click</value>
+    <comment/>
+  </data>
+  <data name="Command_RCLK_Help" xml:space="preserve">
+    <value>Clicks the right mouse button.</value>
+    <comment/>
+  </data>
+  <data name="Command_MCLK_Name" xml:space="preserve">
+    <value>Middle click</value>
+    <comment/>
+  </data>
+  <data name="Command_MCLK_Help" xml:space="preserve">
+    <value>Clicks the middle mouse button.</value>
+    <comment/>
+  </data>
+  <data name="Command_MB4_Name" xml:space="preserve">
+    <value>Button 4</value>
+    <comment/>
+  </data>
+  <data name="Command_MB4_Help" xml:space="preserve">
+    <value>Mouse button 4, usually Back.</value>
+    <comment/>
+  </data>
+  <data name="Command_MB5_Name" xml:space="preserve">
+    <value>Button 5</value>
+    <comment/>
+  </data>
+  <data name="Command_MB5_Help" xml:space="preserve">
+    <value>Mouse button 5, usually Forward.</value>
+    <comment/>
+  </data>
+  <data name="Command_SCRL_UP_Name" xml:space="preserve">
+    <value>Scroll up</value>
+    <comment/>
+  </data>
+  <data name="Command_SCRL_UP_Help" xml:space="preserve">
+    <value>Scrolls up.</value>
+    <comment/>
+  </data>
+  <data name="Command_SCRL_DOWN_Name" xml:space="preserve">
+    <value>Scroll down</value>
+    <comment/>
+  </data>
+  <data name="Command_SCRL_DOWN_Help" xml:space="preserve">
+    <value>Scrolls down.</value>
+    <comment/>
+  </data>
+  <data name="Command_SCRL_LEFT_Name" xml:space="preserve">
+    <value>Scroll left</value>
+    <comment/>
+  </data>
+  <data name="Command_SCRL_LEFT_Help" xml:space="preserve">
+    <value>Scrolls left.</value>
+    <comment/>
+  </data>
+  <data name="Command_SCRL_RIGHT_Name" xml:space="preserve">
+    <value>Scroll right</value>
+    <comment/>
+  </data>
+  <data name="Command_SCRL_RIGHT_Help" xml:space="preserve">
+    <value>Scrolls right.</value>
+    <comment/>
+  </data>
+  <data name="Command_MOVE_UP_Name" xml:space="preserve">
+    <value>Move up</value>
+    <comment/>
+  </data>
+  <data name="Command_MOVE_UP_Help" xml:space="preserve">
+    <value>Moves the pointer up.</value>
+    <comment/>
+  </data>
+  <data name="Command_MOVE_DOWN_Name" xml:space="preserve">
+    <value>Move down</value>
+    <comment/>
+  </data>
+  <data name="Command_MOVE_DOWN_Help" xml:space="preserve">
+    <value>Moves the pointer down.</value>
+    <comment/>
+  </data>
+  <data name="Command_MOVE_LEFT_Name" xml:space="preserve">
+    <value>Move left</value>
+    <comment/>
+  </data>
+  <data name="Command_MOVE_LEFT_Help" xml:space="preserve">
+    <value>Moves the pointer left.</value>
+    <comment/>
+  </data>
+  <data name="Command_MOVE_RIGHT_Name" xml:space="preserve">
+    <value>Move right</value>
+    <comment/>
+  </data>
+  <data name="Command_MOVE_RIGHT_Help" xml:space="preserve">
+    <value>Moves the pointer right.</value>
     <comment/>
   </data>
   <data name="KeyDialog_ParamKey" xml:space="preserve">
@@ -1849,6 +2229,18 @@
   </data>
   <data name="KeyDialog_ParamFormat" xml:space="preserve">
     <value>Parameter {0}</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ParamCommand" xml:space="preserve">
+    <value>Command</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ParamProfile" xml:space="preserve">
+    <value>Profile</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_CommandProfileFormat" xml:space="preserve">
+    <value>{0} {1}</value>
     <comment/>
   </data>
   <data name="KeyDialog_TitleFormat" xml:space="preserve">

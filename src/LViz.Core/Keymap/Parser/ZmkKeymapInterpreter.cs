@@ -123,12 +123,12 @@ public static class ZmkKeymapInterpreter
             var behavior = "&" + refCell.PhandleName;
             int arity = BehaviorArityTable.Arity(behavior, userArities);
 
-            // &bt is special: arity 2 if next token is BT_SEL, else 1.
+            // &bt is special: the command in the next cell decides —
+            // BT_SEL/BT_DISC eat a profile number, the others take none.
             if (behavior == "&bt")
             {
-                arity = (i + 1 < cells.Count
-                         && cells[i + 1] is DtCellIdent ident
-                         && ident.Text == "BT_SEL") ? 2 : 1;
+                arity = BehaviorArityTable.BtArity(
+                    i + 1 < cells.Count && cells[i + 1] is DtCellIdent ident ? ident.Text : null);
             }
 
             i++; // consume the ref

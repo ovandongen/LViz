@@ -150,8 +150,8 @@ public class ZmkKeycodeUsageTests
         // The only binding of layer 1.
         Assert.Equal(1, usage.CountOf(Code("A")));
 
-        // &trans has no params, &bt is no known behavior → the five above
-        // are all the picker may rank, and the top one is the 4-use keycode.
+        // &trans has no params, &bt's command is no keycode param → the five
+        // above are all the picker may rank, and the top one is the 4-use keycode.
         Assert.Equal(5, usage.Ranked.Count);
         Assert.Equal("NUMBER_1", usage.Ranked[0].Keycode.Name);
         Assert.DoesNotContain("BT_SEL", usage.Ranked.Select(u => u.Keycode.Name));

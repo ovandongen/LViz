@@ -15,9 +15,11 @@ namespace LViz.App.ViewModels;
 /// parameter 2, moved with <see cref="NextTab"/>/<see cref="PreviousTab"/>),
 /// and produces the new binding in <see cref="Result"/> — null while
 /// something is missing. Cancel drops everything; a key opened and confirmed
-/// unchanged gives back exactly its old binding. Anything the editors cannot
-/// show (an unknown behavior, a param-count mismatch, a seed the editors
-/// reject) opens as Custom free text.
+/// unchanged gives back exactly its old binding. A named-command behavior
+/// (&amp;bt, &amp;out, …) edits its command on one tab taking the binding's
+/// whole param list (a command name plus an optional profile number).
+/// Anything the editors cannot show (an unknown behavior, a param-count
+/// mismatch, a seed the editors reject) opens as Custom free text.
 /// </summary>
 public sealed partial class KeyDialogViewModel : ObservableObject
 {
@@ -213,6 +215,7 @@ public sealed partial class KeyDialogViewModel : ObservableObject
                 ZmkBehaviorParamKind.Keycode or ZmkBehaviorParamKind.Modifier =>
                     new KeycodeParamViewModel(label, kind, Usage),
                 ZmkBehaviorParamKind.Layer => new LayerParamViewModel(label, _config),
+                ZmkBehaviorParamKind.Command => new CommandParamViewModel(label, behavior.Code, _config),
                 _ => new RawParamViewModel(label),
             };
             editor.Changed += OnEditorChanged;
@@ -390,10 +393,14 @@ public sealed partial class KeyDialogViewModel : ObservableObject
 
     /// <summary>
     /// Opens on the original binding: its behavior by code among Quick +
-    /// AllOther, its logical params seeded into the editors. Anything the
-    /// editors cannot show — an unknown behavior, a param-count mismatch, a
-    /// seed that returns false — opens as Custom text instead. Afterwards
-    /// <see cref="Result"/> equals the original binding.
+    /// AllOther, its logical params seeded into the editors. A behavior
+    /// whose only parameter is a command skips the param-count check — that
+    /// one editor is seeded with all groups (a command name plus an
+    /// optional profile number, see <see cref="CommandParamViewModel.Seed"/>).
+    /// Anything the editors cannot show — an unknown behavior, a
+    /// param-count mismatch, a seed that returns false — opens as Custom
+    /// text instead. Afterwards <see cref="Result"/> equals the original
+    /// binding.
     /// </summary>
     private void Seed(KeyBinding binding)
     {
@@ -408,7 +415,11 @@ public sealed partial class KeyDialogViewModel : ObservableObject
         }
 
         var groups = ZmkModifierWrap.SplitLogical(binding.Params);
-        if (groups.Count != behavior.Params.Count)
+        // A single command parameter covers the whole param list, so the
+        // binding carries the command's groups (1, or 2 with a profile
+        // number) rather than one group per parameter.
+        if (behavior.Params is not [ZmkBehaviorParamKind.Command]
+            && groups.Count != behavior.Params.Count)
         {
             OpenAsCustom(binding);
             return;
@@ -422,12 +433,12 @@ public sealed partial class KeyDialogViewModel : ObservableObject
 
         for (int i = 0; i < Params.Count; i++)
         {
-            var group = groups[i];
             bool seeded = Params[i] switch
             {
-                KeycodeParamViewModel keycode => keycode.Picker.Seed(group),
-                LayerParamViewModel layer => layer.Seed(group),
-                RawParamViewModel raw => SeedRaw(raw, group),
+                KeycodeParamViewModel keycode => keycode.Picker.Seed(groups[i]),
+                LayerParamViewModel layer => layer.Seed(groups[i]),
+                RawParamViewModel raw => SeedRaw(raw, groups[i]),
+                CommandParamViewModel command => command.Seed(groups),
                 _ => false,
             };
 

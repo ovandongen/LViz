@@ -93,8 +93,12 @@ public static class ZmkBindingText
         // 7. Known arity (from the table plus the file's hold-taps/macros).
         if (binding.Behavior == "&bt")
         {
-            // &bt is special: 1 or 2 logical params are both fine.
-            if (logicalCount is not (1 or 2)) return null;
+            // &bt is special: the command in its first param decides —
+            // BT_SEL/BT_DISC need a profile number, the others stand alone.
+            // A bare &bt (zero params) is refused too: BtArity(null) is 1.
+            var btArity = BehaviorArityTable.BtArity(
+                binding.Params.Count > 0 ? binding.Params[0] : null);
+            if (logicalCount != btArity) return null;
         }
         else
         {

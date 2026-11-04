@@ -41,25 +41,47 @@ public static class KeyBehaviorChoices
         ["&tog"] = "Tog",
         ["&sl"] = "Sl",
         ["&sk"] = "Sk",
+        ["&bt"] = "Bt",
+        ["&out"] = "Out",
+        ["&rgb_ug"] = "RgbUg",
+        ["&mkp"] = "Mkp",
+        ["&msc"] = "Msc",
+        ["&mmv"] = "Mmv",
+        ["&caps_word"] = "CapsWord",
+        ["&key_repeat"] = "KeyRepeat",
+        ["&bootloader"] = "Bootloader",
+        ["&sys_reset"] = "SysReset",
+        ["&soft_off"] = "SoftOff",
+        ["&studio_unlock"] = "StudioUnlock",
     };
 
     private static readonly string[] QuickCodes = ["&kp", "&trans", "&none"];
     private static readonly string[] OthersBeforeOwn = ["&mt", "&lt"];
-    private static readonly string[] OthersAfterOwn = ["&to", "&mo", "&tog", "&sl", "&sk"];
+    private static readonly string[] OthersAfterOwn =
+    [
+        "&to", "&mo", "&tog", "&sl", "&sk",
+        "&bt", "&out", "&rgb_ug", "&mkp", "&msc", "&mmv",
+        "&caps_word", "&key_repeat", "&bootloader", "&sys_reset", "&soft_off", "&studio_unlock",
+    ];
 
-    /// <summary>The quick buttons: &amp;kp, &amp;trans, &amp;none.</summary>
+    /// <summary>The quick buttons: &amp;kp, &amp;trans, &amp;none. They head
+    /// <see cref="Others"/> too, so the behavior filter finds them.</summary>
     public static IReadOnlyList<KeyBehaviorChoice> Quick(KeyboardConfig? config) =>
         QuickCodes.Select(BuiltIn).ToArray();
 
     /// <summary>
-    /// Everything but the quick buttons: &amp;mt, &amp;lt, the open keymap's
+    /// The behavior list: the quick behaviors (&amp;kp, &amp;trans,
+    /// &amp;none, also shown as buttons), &amp;mt, &amp;lt, the open keymap's
     /// own hold-taps and macros (code as name, "Defined in this keymap." as
-    /// help), then &amp;to, &amp;mo, &amp;tog, &amp;sl, &amp;sk, and the
-    /// free-text "Custom binding" last.
+    /// help), then &amp;to, &amp;mo, &amp;tog, &amp;sl, &amp;sk, &amp;bt,
+    /// &amp;out, &amp;rgb_ug, &amp;mkp, &amp;msc, &amp;mmv, &amp;caps_word,
+    /// &amp;key_repeat, &amp;bootloader, &amp;sys_reset, &amp;soft_off,
+    /// &amp;studio_unlock, and the free-text "Custom binding" last.
     /// </summary>
     public static IReadOnlyList<KeyBehaviorChoice> Others(KeyboardConfig? config)
     {
-        var choices = new List<KeyBehaviorChoice>(OthersBeforeOwn.Select(BuiltIn));
+        var choices = new List<KeyBehaviorChoice>(
+            QuickCodes.Concat(OthersBeforeOwn).Select(BuiltIn));
 
         foreach (var behavior in ZmkBehaviorCatalog.For(config))
         {
@@ -249,6 +271,143 @@ public sealed partial class RawParamViewModel : KeyParamViewModel
     partial void OnTextChanged(string value) => RaiseChanged();
 }
 
+/// <summary>One entry of a command parameter's list: the catalog
+/// <see cref="Command"/>, its translated <see cref="Name"/> and
+/// <see cref="Help"/>.</summary>
+public sealed record CommandChoice(ZmkCommand Command, string Name, string Help);
+
+/// <summary>One profile-number button: the number written and its caption.</summary>
+public sealed record ProfileChoice(int Number, string Text);
+
+/// <summary>
+/// The command parameter editor: the behavior's named commands
+/// (<see cref="ZmkCommandCatalog.For"/> order, translated; extras from the
+/// open keymap show their ZMK name), and for a command that takes one
+/// (<see cref="ZmkCommand.TakesNumber"/>) a profile number picked from
+/// <see cref="Profiles"/> on the same tab. The flat value is the command
+/// name, plus the number when the command takes one and a profile is picked.
+/// </summary>
+public sealed partial class CommandParamViewModel : KeyParamViewModel
+{
+    public CommandParamViewModel(string label, string behaviorCode, KeyboardConfig? config)
+        : base(label, ZmkBehaviorParamKind.Command)
+    {
+        Commands = ZmkCommandCatalog.For(behaviorCode, config)
+            .Select(command => new CommandChoice(
+                command,
+                command.FromKeymap
+                    ? command.Name
+                    : Loc.Instance[$"Command_{command.Name}_Name"],
+                command.FromKeymap
+                    ? Loc.Instance["Command_FromKeymap_Help"]
+                    : Loc.Instance[$"Command_{command.Name}_Help"]))
+            .ToArray();
+        Profiles = ZmkCommandCatalog.ProfileNumbers
+            .Select(number => Profile(number))
+            .ToArray();
+        ProfileLabel = Loc.Instance["KeyDialog_ParamProfile"];
+    }
+
+    /// <summary>The command list: bundled commands, then the keymap's extras.</summary>
+    public IReadOnlyList<CommandChoice> Commands { get; }
+
+    [ObservableProperty]
+    private CommandChoice? _selectedCommand;
+
+    /// <summary>The profile-number buttons; <see cref="ZmkCommandCatalog.ProfileNumbers"/>,
+    /// plus a higher number <see cref="Seed"/> found in the binding.</summary>
+    public IReadOnlyList<ProfileChoice> Profiles { get; private set; }
+
+    [ObservableProperty]
+    private ProfileChoice? _selectedProfile;
+
+    /// <summary>Whether the picked command is followed by a profile number.</summary>
+    public bool NeedsProfile => SelectedCommand?.Command.TakesNumber == true;
+
+    /// <summary>The caption above the profile buttons.</summary>
+    public string ProfileLabel { get; }
+
+    public override IReadOnlyList<string>? Values
+    {
+        get
+        {
+            if (SelectedCommand is not { } choice) return null;
+            if (!choice.Command.TakesNumber) return [choice.Command.Name];
+            return SelectedProfile is { } profile
+                ? [choice.Command.Name, profile.Number.ToString(CultureInfo.InvariantCulture)]
+                : null;
+        }
+    }
+
+    public override string ValueText
+    {
+        get
+        {
+            if (SelectedCommand is not { } choice) return "";
+            if (choice.Command.TakesNumber && SelectedProfile is { } profile)
+                return Loc.Instance.Format("KeyDialog_CommandProfileFormat", choice.Name, profile.Number);
+            return choice.Name;
+        }
+    }
+
+    partial void OnSelectedCommandChanged(CommandChoice? value)
+    {
+        OnPropertyChanged(nameof(NeedsProfile));
+        RaiseChanged();
+    }
+
+    // The picked profile survives a command change; it only counts while
+    // NeedsProfile is true (see Values).
+    partial void OnSelectedProfileChanged(ProfileChoice? value) => RaiseChanged();
+
+    /// <summary>Opens the editor on one existing logical param: one token
+    /// naming a listed command that takes no number, or a command that takes
+    /// one followed by its profile number (a number beyond the bundled range
+    /// is added to <see cref="Profiles"/>). Returns whether it took.</summary>
+    public bool Seed(IReadOnlyList<IReadOnlyList<string>> groups)
+    {
+        if (groups.Count is not (1 or 2)) return false;
+        if (groups.Any(group => group.Count != 1)) return false;
+
+        var choice = Commands.FirstOrDefault(
+            c => string.Equals(c.Command.Name, groups[0][0], StringComparison.Ordinal));
+        if (choice is null) return false;
+
+        if (groups.Count == 1)
+        {
+            if (choice.Command.TakesNumber) return false;
+            SelectedCommand = choice;
+            return true;
+        }
+
+        if (!choice.Command.TakesNumber) return false;
+        if (!int.TryParse(groups[1][0], NumberStyles.None, CultureInfo.InvariantCulture, out var number)
+            || number < 0)
+        {
+            return false;
+        }
+
+        SelectedCommand = choice;
+        SelectedProfile = ProfileFor(number);
+        return true;
+    }
+
+    /// <summary>The button for a profile number, adding one when the list
+    /// doesn't have it yet (kept sorted).</summary>
+    private ProfileChoice ProfileFor(int number)
+    {
+        var existing = Profiles.FirstOrDefault(profile => profile.Number == number);
+        if (existing is not null) return existing;
+
+        Profiles = [.. Profiles.OrderBy(profile => profile.Number).Append(Profile(number))];
+        OnPropertyChanged(nameof(Profiles));
+        return Profiles.First(profile => profile.Number == number);
+    }
+
+    private static ProfileChoice Profile(int number) =>
+        new(number, number.ToString(CultureInfo.InvariantCulture));
+}
+
 /// <summary>
 /// The translated captions for a behavior's parameters: macro parameters are
 /// numbered, hold-tap-like pairs are Hold/Tap, a single parameter is named
@@ -285,6 +444,7 @@ public static class KeyParamLabels
         ZmkBehaviorParamKind.Keycode or ZmkBehaviorParamKind.Modifier =>
             Loc.Instance["KeyDialog_ParamKey"],
         ZmkBehaviorParamKind.Layer => Loc.Instance["KeyDialog_ParamLayer"],
+        ZmkBehaviorParamKind.Command => Loc.Instance["KeyDialog_ParamCommand"],
         _ => Loc.Instance.Format("KeyDialog_ParamFormat", 1),
     };
 }
