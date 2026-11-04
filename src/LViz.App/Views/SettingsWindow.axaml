@@ -88,6 +88,7 @@
                                    Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
                         <ComboBox MinWidth="200" Margin="0,4,0,0"
                                   HorizontalAlignment="Left"
+                                  IsEnabled="{Binding CanPickKeyboard}"
                                   ItemsSource="{Binding KeyboardChoices}"
                                   SelectedItem="{Binding SelectedKeyboardProfile, Mode=TwoWay}">
                             <ComboBox.ItemTemplate>
@@ -96,6 +97,9 @@
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
+                        <TextBlock Text="{Binding [Settings_KeyboardLockedWhileEditing], Source={StaticResource Loc}}"
+                                   IsVisible="{Binding !CanPickKeyboard}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
                     </StackPanel>
 
                     <Border Height="1" Background="{StaticResource BgSurface0}" />

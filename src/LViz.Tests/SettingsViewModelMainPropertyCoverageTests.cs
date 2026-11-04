@@ -92,9 +92,9 @@ public class SettingsViewModelMainPropertyCoverageTests
         // recents flyout (part 2); settings never renders recents.
         "HasRecentKeymaps",
 
-        // Keymap edit mode: main-window-only state.
+        // Keymap edit mode: main-window-only state. (IsEditing is not here —
+        // it propagates to SettingsViewModel.CanPickKeyboard, the picker lock.)
         "Edit",
-        "IsEditing",
         "UnsavedEditCount",
         "CanStartEdit",
         "EditButtonTooltip",

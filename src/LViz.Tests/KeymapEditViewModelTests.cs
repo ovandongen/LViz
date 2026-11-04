@@ -6,6 +6,7 @@ using LViz.App.ViewModels;
 using LViz.Core.GitHub;
 using LViz.Core.Keymap.Editing;
 using LViz.Core.Keymap.Parser;
+using LViz.Core.Models;
 using LViz.Core.Persistence;
 using LViz.Tests.GitHub;
 using Xunit;
@@ -75,6 +76,29 @@ public class KeymapEditViewModelTests
         Assert.False(vm.CanUndo);
         Assert.Equal(Loc.Instance["Edit_BannerNone"], vm.BannerText);
         Assert.Null(vm.SelectedKeyIndex);
+    }
+
+    [Fact]
+    public void New_Defines_CarryTheBaselineFilesDefines()
+    {
+        const string text = """
+            #define NAV 1
+
+            / {
+                keymap {
+                    compatible = "zmk,keymap";
+                    base { display-name = "Base"; bindings = <&kp A>; };
+                };
+            };
+            """;
+
+        var vm = new KeymapEditViewModel(
+            new KeymapEditSource("d.keymap", "d.keymap", text, "sha", null),
+            ZmkKeymapLoader.LoadFromText(text, "editor"),
+            gitHub: null,
+            new KeymapBackupStore(TempBackupsRoot()));
+
+        Assert.Contains(new KeyValuePair<string, string>("NAV", "1"), vm.Defines);
     }
 
     // ---- clearing keys --------------------------------------------------------------
@@ -152,6 +176,58 @@ public class KeymapEditViewModelTests
         Assert.False(vm.ClearKey(0, 3, toNone: false));
 
         Assert.Equal(0, vm.ChangeCount);
+    }
+
+    // ---- setting keys (the key dialog's Confirm) ------------------------------------
+
+    [Fact]
+    public void SetKey_WritesBinding_AsOneUndoStep()
+    {
+        var vm = NewVm();
+
+        Assert.True(vm.SetKey(0, 0, new KeyBinding("&kp", ["B"])));
+
+        var binding = vm.Keymap.Config.Layers[0].Bindings[0];
+        Assert.Equal("&kp", binding.Behavior);
+        Assert.Equal("B", binding.Params[0]);
+        Assert.Equal(1, vm.ChangeCount);
+
+        vm.UndoCommand.Execute(null);
+
+        Assert.Equal(0, vm.ChangeCount);
+        Assert.Equal("A", vm.Keymap.Config.Layers[0].Bindings[0].Params[0]);
+    }
+
+    [Fact]
+    public void SetKey_SameBinding_ReturnsFalse_AndAddsNoUndoStep()
+    {
+        var vm = NewVm();
+
+        // Layer 0 key 1 already holds &kp B.
+        Assert.False(vm.SetKey(0, 1, new KeyBinding("&kp", ["B"])));
+
+        Assert.False(vm.CanUndo);
+        Assert.Equal(0, vm.ChangeCount);
+    }
+
+    [Fact]
+    public void SetKey_OutOfRange_ReturnsFalse_AndChangesNothing()
+    {
+        var vm = NewVm();
+
+        Assert.False(vm.SetKey(-1, 0, KeyBinding.None));
+        Assert.False(vm.SetKey(2, 0, KeyBinding.None));
+        Assert.False(vm.SetKey(0, 3, KeyBinding.None));
+
+        Assert.Equal(0, vm.ChangeCount);
+    }
+
+    [Fact]
+    public void SetKey_NullBinding_Throws()
+    {
+        var vm = NewVm();
+
+        Assert.Throws<ArgumentNullException>(() => vm.SetKey(0, 0, null!));
     }
 
     // ---- selection --------------------------------------------------------------------

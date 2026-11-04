@@ -252,16 +252,28 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     public IReadOnlyList<Core.Layout.IKeyboardProfile> KeyboardChoices =>
         Core.Layout.KeyboardProfileRegistry.All;
 
+    /// <summary>False while the main VM is editing a keymap — the keyboard
+    /// picker is locked, because a board switch underneath the editor would
+    /// repaint the keys the edit is showing.</summary>
+    public bool CanPickKeyboard => !_mainViewModel.IsEditing;
+
     /// <summary>TwoWay-bound profile selector. Routes user picks through
     /// <see cref="MainWindowViewModel.SelectKeyboardCommand"/> so the full
     /// switch path (rebuild keys, re-scope HID, drop incompatible layout,
     /// persist) runs — direct property assignment would skip all of that.
-    /// The setter ignores no-op selections and null (combo-box clear).</summary>
+    /// The setter ignores no-op selections and null (combo-box clear). While
+    /// editing it refuses every change and re-raises so the combo snaps back
+    /// to the still-active board.</summary>
     public Core.Layout.IKeyboardProfile SelectedKeyboardProfile
     {
         get => _mainViewModel.SelectedKeyboard;
         set
         {
+            if (!CanPickKeyboard)
+            {
+                OnPropertyChanged(nameof(SelectedKeyboardProfile));
+                return;
+            }
             if (value is null) return;
             if (string.Equals(value.Id, _mainViewModel.SelectedKeyboard?.Id, StringComparison.OrdinalIgnoreCase))
                 return;
@@ -567,6 +579,8 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
             s.ReloadMouseLayerSnapshot();
         },
         [nameof(MainWindowViewModel.LayerSourceHint)] = s => s.OnPropertyChanged(nameof(LayerSourceStatus)),
+        // The keyboard picker locks while an edit is open (CanPickKeyboard).
+        [nameof(MainWindowViewModel.IsEditing)] = s => s.OnPropertyChanged(nameof(CanPickKeyboard)),
     };
 
     // Re-raises derived SettingsVM properties off the auto-switch engine's own

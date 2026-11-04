@@ -184,6 +184,10 @@ public partial class MainWindow : Window
                 vm.EditClearSelection();
                 e.Handled = true;
                 break;
+            case EditShortcut.OpenKeyDialog:
+                _ = vm.EditSelectedKeyAsync();
+                e.Handled = true;
+                break;
         }
     }
 

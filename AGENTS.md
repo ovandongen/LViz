@@ -98,6 +98,8 @@ dotnet run --project src/LViz.App                  # launch the app
   files exists; `Loc` itself still shows `[Key]` for a missing key instead of
   failing. A key picked by a ternary (`Format(c ? "A" : "B", …)`) isn't a
   literal to that scan; only the EN/NL parity test covers it.
+  A key built at runtime must be interpolated (`Loc.Instance[$"Prefix_{x}"]`):
+  `Loc.Instance["Prefix_" + x]` matches the scan and fails on the cut-off key.
 - **Diagnostics log at `ApplicationData/LViz/diagnostic.log`**
   (`~/Library/Application Support/LViz/` on macOS; confirm via
   `DiagnosticLog.GetLogFilePath()`).
@@ -129,6 +131,10 @@ dotnet run --project src/LViz.App                  # launch the app
   (see [docs/roadmap.md](docs/roadmap.md) §1). Strict errors throw with
   line/column on malformed input — preserve that loudness; don't try to
   half-render a truncated file.
+  A line starting `#word-…` (`#binding-cells`, `#address-cells`) is a
+  devicetree property, not a preprocessor directive: `DirectiveRegex` must
+  never swallow it, or user behaviors lose their arity and macros their
+  parameter count.
 - **`Core/Keymap/Writer/` patches the original `.keymap` text, never
   regenerates it.** `KeymapSourceMap` maps every parsed binding and
   `display-name` to an exact span in the source and refuses (with a line
@@ -188,6 +194,15 @@ dotnet run --project src/LViz.App                  # launch the app
   `ZmkBehaviorCatalog` (behaviors + parameter kinds) and `ZmkModifierWrap`
   (flat `["LC","LS","A"]` form ↔ flags) carry no display strings: friendly
   names and explanations are resx UI text.
+- **Key dialog: open unchanged, confirm unchanged.** `KeyDialogViewModel`
+  (App/ViewModels) seeds one editor per parameter from the binding
+  (`ZmkModifierWrap.SplitLogical` groups the flat params) and must give back
+  exactly the old binding when nothing changes; anything its editors can't
+  show opens as Custom text. Typed binding text (Custom, `Raw` params) goes
+  through `ZmkBindingText.TryParse`, which runs the real loader and adds the
+  stray/missing-token and arity checks the loader skips. A picked keycode is
+  written as `ZmkKeycodeUsage.NameFor` (the file's most used spelling, else the
+  shortest name); a seeded one keeps its own spelling.
 - **Three layout importers, one result.** `Core/Layout/Import/` turns board
   files into `ImportedLayout`s (keys as `DtsiKeyPhysical` in ZMK units, in
   keymap binding order, plus warnings): `PhysicalLayoutImporter`
@@ -521,6 +536,19 @@ LViz-specific (extend this list as we hit more):
 - **A C# local named `from` can't be the receiver of a `with` expression**
   (`from with { … }` parses as a LINQ query, even in parentheses). Rename the
   local or use the constructor.
+
+- **An Avalonia `ListBox` whose `ItemsSource` is replaced drops its
+  selection**, and a TwoWay `SelectedItem`/`SelectedIndex` binding doesn't put
+  it back while the view-model still holds an equal item; `AlwaysSelected`
+  instead selects row 0 and writes *that* to the view-model. So: keep a tab
+  strip's items stable (update a header property in place), let selection
+  setters ignore null / -1, and re-select from the view (see the selection
+  restore in `KeyDialog.axaml.cs`). Such view behaviour can be checked without
+  the app: a .NET 10 file-based program with
+  `#:project src/LViz.App/LViz.App.csproj` +
+  `#:package Avalonia.Headless@11.3.13`, `AppBuilder.Configure<LViz.App.App>()
+  .UseHeadless(...).SetupWithoutStarting()`, then show the window and drive its
+  controls.
 
 - **xUnit analyzer warnings break the 0-warning build**: `Assert.Equal(1,
   x.Count)` must be `Assert.Single(x)` (xUnit2013).

@@ -25,6 +25,8 @@ public class EditShortcutsTests
     [InlineData(Key.Back, KeyModifiers.Alt, EditShortcut.None)]
     [InlineData(Key.Escape, KeyModifiers.None, EditShortcut.ClearSelection)]
     [InlineData(Key.Escape, KeyModifiers.Shift, EditShortcut.None)]
+    [InlineData(Key.Enter, KeyModifiers.None, EditShortcut.OpenKeyDialog)]
+    [InlineData(Key.Enter, KeyModifiers.Shift, EditShortcut.None)]
     [InlineData(Key.A, KeyModifiers.None, EditShortcut.None)]
     public void Resolve_WithMetaCommandModifier(Key key, KeyModifiers modifiers, EditShortcut expected) =>
         Assert.Equal(expected, EditShortcuts.Resolve(key, modifiers, KeyModifiers.Meta));

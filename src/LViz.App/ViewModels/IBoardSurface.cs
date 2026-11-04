@@ -42,6 +42,14 @@ public interface IBoardSurface
     Action<int>? OnKeyTapped { get; }
 
     /// <summary>
+    /// Optional per-cap double-click handler. When non-null, <c>BoardView</c>
+    /// fires this instead of <see cref="OnKeyTapped"/> on the second press of a
+    /// double-click. The main VM opens the key dialog on the tapped cap while
+    /// editing; the exit-key picker leaves it null.
+    /// </summary>
+    Action<int>? OnKeyDoubleTapped { get; }
+
+    /// <summary>
     /// Optional per-cap right-click handler. Symmetric with
     /// <see cref="OnKeyTapped"/>: the main VM provides a handler that opens
     /// the per-key label-override editor; the exit-key picker leaves it

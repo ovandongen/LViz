@@ -325,6 +325,10 @@
     <value>Welke fysieke layout het bord moet weergeven. Wisselt automatisch bij het laden als het aantal toetsen overeenkomt met een ander profiel.</value>
     <comment/>
   </data>
+  <data name="Settings_KeyboardLockedWhileEditing" xml:space="preserve">
+    <value>Sla de keymapbewerking op of verwerp die om het toetsenbord te wijzigen.</value>
+    <comment/>
+  </data>
   <data name="Settings_BackgroundOpacity" xml:space="preserve">
     <value>Achtergrondopaciteit</value>
     <comment/>
@@ -1641,6 +1645,242 @@
   </data>
   <data name="Edit_QuitConfirm" xml:space="preserve">
     <value>Afsluiten</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_CategoryUsed" xml:space="preserve">
+    <value>Gebruikt in deze keymap</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_CategoryAll" xml:space="preserve">
+    <value>Alle keycodes</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Letters" xml:space="preserve">
+    <value>Letters</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Digits" xml:space="preserve">
+    <value>Cijfers</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Punctuation" xml:space="preserve">
+    <value>Leestekens</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Symbols" xml:space="preserve">
+    <value>Symbolen</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Modifiers" xml:space="preserve">
+    <value>Modificatietoetsen</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Navigation" xml:space="preserve">
+    <value>Navigatie</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Editing" xml:space="preserve">
+    <value>Bewerken</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Function" xml:space="preserve">
+    <value>Functietoetsen</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Keypad" xml:space="preserve">
+    <value>Numeriek toetsenblok</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Locks" xml:space="preserve">
+    <value>Vergrendeltoetsen</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_International" xml:space="preserve">
+    <value>Internationaal</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Consumer" xml:space="preserve">
+    <value>Media en apparaat</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_System" xml:space="preserve">
+    <value>Systeem</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Other" xml:space="preserve">
+    <value>Overig</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_MatchCountFormat" xml:space="preserve">
+    <value>{0} keycodes</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Kp_Name" xml:space="preserve">
+    <value>Toets</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Kp_Help" xml:space="preserve">
+    <value>Stuurt een toets, eventueel met modificatietoetsen.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Trans_Name" xml:space="preserve">
+    <value>Transparant</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Trans_Help" xml:space="preserve">
+    <value>Doet wat deze toets doet op de eerstvolgende actieve laag eronder.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_None_Name" xml:space="preserve">
+    <value>Niets</value>
+    <comment/>
+  </data>
+  <data name="Behavior_None_Help" xml:space="preserve">
+    <value>De toets doet niets; lagere lagen worden niet gebruikt.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Mt_Name" xml:space="preserve">
+    <value>Mod-tap</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Mt_Help" xml:space="preserve">
+    <value>Vasthouden stuurt de eerste toets, tikken de tweede.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Lt_Name" xml:space="preserve">
+    <value>Laag-tap</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Lt_Help" xml:space="preserve">
+    <value>Vasthouden zet de laag aan, tikken stuurt de toets.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Mo_Name" xml:space="preserve">
+    <value>Laag zolang ingedrukt</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Mo_Help" xml:space="preserve">
+    <value>De laag staat aan zolang de toets ingedrukt is.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_To_Name" xml:space="preserve">
+    <value>Naar laag</value>
+    <comment/>
+  </data>
+  <data name="Behavior_To_Help" xml:space="preserve">
+    <value>Zet de laag aan en alle andere lagen behalve de standaardlaag uit.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Tog_Name" xml:space="preserve">
+    <value>Laag aan/uit</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Tog_Help" xml:space="preserve">
+    <value>Zet de laag aan, of uit als die al aan staat.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Sl_Name" xml:space="preserve">
+    <value>Plaklaag</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Sl_Help" xml:space="preserve">
+    <value>De laag blijft aan voor de volgende toetsaanslag.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Sk_Name" xml:space="preserve">
+    <value>Plaktoets</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Sk_Help" xml:space="preserve">
+    <value>De toets (meestal een modificatietoets) blijft ingedrukt voor de volgende toetsaanslag.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Keymap_Help" xml:space="preserve">
+    <value>Gedefinieerd in deze keymap.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Custom_Name" xml:space="preserve">
+    <value>Eigen binding</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Custom_Help" xml:space="preserve">
+    <value>Typ een willekeurige ZMK-binding, bijvoorbeeld &amp;bt BT_SEL 0.</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ParamKey" xml:space="preserve">
+    <value>Toets</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ParamHold" xml:space="preserve">
+    <value>Vasthouden</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ParamTap" xml:space="preserve">
+    <value>Tikken</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ParamLayer" xml:space="preserve">
+    <value>Laag</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ParamFormat" xml:space="preserve">
+    <value>Parameter {0}</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_TitleFormat" xml:space="preserve">
+    <value>Toets {0} op laag {1}</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_TabBehavior" xml:space="preserve">
+    <value>Gedrag</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_TabValueFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_CustomInvalid" xml:space="preserve">
+    <value>Geen geldige binding.</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Ok" xml:space="preserve">
+    <value>OK</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_FilterBehaviors" xml:space="preserve">
+    <value>Gedrag filteren</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_SearchKeycodes" xml:space="preserve">
+    <value>Keycodes zoeken</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Record" xml:space="preserve">
+    <value>Toets opnemen</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Recording" xml:space="preserve">
+    <value>Druk op een toets…</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ModShift" xml:space="preserve">
+    <value>Shift</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ModCtrl" xml:space="preserve">
+    <value>Ctrl</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ModAlt" xml:space="preserve">
+    <value>Alt</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ModGui" xml:space="preserve">
+    <value>GUI (Cmd/Win)</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_UseCountFormat" xml:space="preserve">
+    <value>×{0}</value>
     <comment/>
   </data>
 </root>

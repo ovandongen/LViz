@@ -1,4 +1,5 @@
 using LViz.Core.Keymap.Editing;
+using LViz.Core.Models;
 
 namespace LViz.App.ViewModels;
 
@@ -38,3 +39,18 @@ public enum KeymapSaveConflictChoice
     /// <summary>Write the edit over the changed target.</summary>
     Overwrite,
 }
+
+/// <summary>
+/// What the key dialog edits: the config it reads (layers, hold-taps,
+/// macros), the file's #defines (for formatting and raw text), and the key;
+/// the binding is Config.Layers[LayerIndex].Bindings[KeyIndex].
+/// </summary>
+/// <param name="Config">The loaded keymap the dialog reads from.</param>
+/// <param name="Defines">The file's #defines, for formatting and raw text.</param>
+/// <param name="LayerIndex">Which layer holds the key.</param>
+/// <param name="KeyIndex">Which key on that layer.</param>
+public sealed record KeyDialogRequest(
+    KeyboardConfig Config,
+    IReadOnlyList<KeyValuePair<string, string>> Defines,
+    int LayerIndex,
+    int KeyIndex);

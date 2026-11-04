@@ -1,0 +1,266 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LViz.App.ViewModels"
+        xmlns:views="using:LViz.App.Views"
+        x:Class="LViz.App.Views.KeyDialog"
+        x:DataType="vm:KeyDialogViewModel"
+        Title="{Binding TitleText}"
+        Width="680" Height="560"
+        MinWidth="520" MinHeight="380"
+        CanResize="True"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BgBase}">
+
+    <Window.Styles>
+        <!-- The record button's caption swaps with the recording state. -->
+        <Style Selector="ToggleButton:checked TextBlock.record-idle">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="ToggleButton:not(:checked) TextBlock.record-live">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+    </Window.Styles>
+
+    <DockPanel Margin="16">
+
+        <!-- Tabs: Behavior › param 1 › param 2; selection drives the VM, and
+             the VM (tab switches, behavior changes) drives it back. -->
+        <ListBox DockPanel.Dock="Top"
+                 ItemsSource="{Binding Tabs}"
+                 SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}"
+                 SelectionChanged="OnTabSelectionChanged"
+                 Margin="0,0,0,4" Padding="0"
+                 Background="Transparent" BorderThickness="0"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.Styles>
+                <Style Selector="ListBoxItem">
+                    <Setter Property="Padding" Value="4,2" />
+                </Style>
+                <Style Selector="ListBoxItem:first-child TextBlock.tab-sep">
+                    <Setter Property="IsVisible" Value="False" />
+                </Style>
+            </ListBox.Styles>
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:KeyDialogTab">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Classes="tab-sep" Text="›"
+                                   Foreground="{StaticResource TextSubtle}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding Header}"
+                                   Foreground="{StaticResource Text}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- Bottom: preview cap + binding text, the invalid-text hint, buttons. -->
+        <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
+            <Grid ColumnDefinitions="Auto,*">
+                <Border Width="56" Height="56" CornerRadius="6"
+                        BorderBrush="{StaticResource BgSurface1}" BorderThickness="1"
+                        Background="{StaticResource BgSurface0}">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding PreviewLabel}"
+                                   FontSize="16" FontWeight="SemiBold"
+                                   Foreground="{StaticResource Text}" HorizontalAlignment="Center" />
+                        <TextBlock Text="{Binding PreviewSubscript}" FontSize="9"
+                                   Foreground="{StaticResource TextSubtle}" HorizontalAlignment="Center"
+                                   IsVisible="{Binding PreviewSubscript, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+                </Border>
+                <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"
+                           FontFamily="Menlo, Consolas, monospace"
+                           Foreground="{StaticResource Text}"
+                           Text="{Binding PreviewText}" />
+            </Grid>
+            <TextBlock Text="{Binding ErrorText}" FontSize="12"
+                       Foreground="{StaticResource AccentRed}"
+                       IsVisible="{Binding ErrorText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <Button Content="{Binding [Edit_Cancel], Source={StaticResource Loc}}"
+                        Click="OnCancelClick" />
+                <Button Content="{Binding [KeyDialog_Ok], Source={StaticResource Loc}}"
+                        Classes="accent"
+                        IsEnabled="{Binding CanConfirm}"
+                        Click="OnOkClick" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Centre: the behavior tab (no CurrentParam) and the param editors. -->
+        <Grid>
+            <DockPanel IsVisible="{Binding CurrentParam, Converter={x:Static ObjectConverters.IsNull}}">
+                <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding QuickBehaviors}" Margin="0,0,0,8">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="8" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:KeyBehaviorChoice">
+                            <Button Click="OnQuickBehaviorClick">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="{Binding Name}" Foreground="{StaticResource Text}" />
+                                    <TextBlock Text="{Binding Code}" FontSize="11"
+                                               FontFamily="Menlo, Consolas, monospace"
+                                               Foreground="{StaticResource TextSubtle}" />
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBox DockPanel.Dock="Top" Margin="0,0,0,8"
+                         Text="{Binding BehaviorFilter, Mode=TwoWay}"
+                         Watermark="{Binding [KeyDialog_FilterBehaviors], Source={StaticResource Loc}}" />
+
+                <TextBox DockPanel.Dock="Bottom" Margin="0,8,0,0"
+                         Text="{Binding CustomText, Mode=TwoWay}"
+                         FontFamily="Menlo, Consolas, monospace"
+                         Watermark="&amp;bt BT_SEL 0"
+                         IsVisible="{Binding IsCustom}" />
+
+                <ListBox ItemsSource="{Binding OtherBehaviors}"
+                         SelectedItem="{Binding SelectedOtherBehavior, Mode=TwoWay}"
+                         Tag="behaviors" AttachedToVisualTree="OnSelectionListAttached"
+                         Background="Transparent" BorderThickness="0" Padding="0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:KeyBehaviorChoice">
+                            <StackPanel Spacing="2" Margin="0,3">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                               Foreground="{StaticResource Text}" />
+                                    <TextBlock Text="{Binding Code}" FontSize="11"
+                                               FontFamily="Menlo, Consolas, monospace"
+                                               Foreground="{StaticResource TextSubtle}" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding Help}" TextWrapping="Wrap"
+                                           FontSize="11" Foreground="{StaticResource TextSubtle}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+
+            <ContentControl Content="{Binding CurrentParam}"
+                            IsVisible="{Binding CurrentParam, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <ContentControl.DataTemplates>
+
+                    <DataTemplate DataType="{x:Type vm:KeycodeParamViewModel}" x:DataType="vm:KeycodeParamViewModel">
+                        <DockPanel>
+                            <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,8">
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding Picker.SearchText, Mode=TwoWay}"
+                                         Watermark="{Binding [KeyDialog_SearchKeycodes], Source={StaticResource Loc}}"
+                                         AttachedToVisualTree="OnKeyCodeSearchAttached" />
+                                <ToggleButton Grid.Column="1" Margin="8,0,0,0"
+                                              IsChecked="{Binding Picker.IsRecording, Mode=TwoWay}">
+                                    <Grid>
+                                        <TextBlock Classes="record-idle"
+                                                   Text="{Binding [KeyDialog_Record], Source={StaticResource Loc}}" />
+                                        <TextBlock Classes="record-live"
+                                                   Text="{Binding [KeyDialog_Recording], Source={StaticResource Loc}}" />
+                                    </Grid>
+                                </ToggleButton>
+                                <TextBlock Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center"
+                                           FontSize="11" Foreground="{StaticResource TextSubtle}"
+                                           Text="{Binding Picker.MatchCountText}" />
+                            </Grid>
+
+                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="12"
+                                        Margin="0,0,0,8"
+                                        IsVisible="{Binding Picker.ShowWrapToggles}">
+                                <CheckBox Content="{Binding [KeyDialog_ModShift], Source={StaticResource Loc}}"
+                                          IsChecked="{Binding Picker.IsShift, Mode=TwoWay}" />
+                                <CheckBox Content="{Binding [KeyDialog_ModCtrl], Source={StaticResource Loc}}"
+                                          IsChecked="{Binding Picker.IsCtrl, Mode=TwoWay}" />
+                                <CheckBox Content="{Binding [KeyDialog_ModAlt], Source={StaticResource Loc}}"
+                                          IsChecked="{Binding Picker.IsAlt, Mode=TwoWay}" />
+                                <CheckBox Content="{Binding [KeyDialog_ModGui], Source={StaticResource Loc}}"
+                                          IsChecked="{Binding Picker.IsGui, Mode=TwoWay}" />
+                            </StackPanel>
+
+                            <Grid ColumnDefinitions="170,*">
+                                <ListBox ItemsSource="{Binding Picker.Categories}"
+                                         SelectedItem="{Binding Picker.SelectedCategory, Mode=TwoWay}"
+                                         Tag="categories" AttachedToVisualTree="OnSelectionListAttached"
+                                         Margin="0,0,8,0"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:KeycodeCategoryChoice">
+                                            <TextBlock Text="{Binding Name}" Foreground="{StaticResource Text}" />
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+
+                                <ListBox Grid.Column="1"
+                                         ItemsSource="{Binding Picker.Items}"
+                                         SelectedItem="{Binding Picker.SelectedItem, Mode=TwoWay}"
+                                         Tag="keycodes" AttachedToVisualTree="OnSelectionListAttached"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:KeycodeItem">
+                                            <!-- DockPanel (not a horizontal StackPanel) so the
+                                                 description gets a bounded width and can trim. -->
+                                            <DockPanel Margin="0,2">
+                                                <TextBlock DockPanel.Dock="Left" Text="{Binding Glyph}"
+                                                           Width="32" FontWeight="Bold"
+                                                           Foreground="{StaticResource Text}"
+                                                           VerticalAlignment="Center" />
+                                                <TextBlock DockPanel.Dock="Right"
+                                                           Text="{Binding UseCount, Converter={x:Static views:KeycodeUseCountConverter.Instance}}"
+                                                           FontSize="11" Foreground="{StaticResource TextSubtle}"
+                                                           VerticalAlignment="Center" Margin="8,0,0,0" />
+                                                <TextBlock DockPanel.Dock="Left" Text="{Binding Name}"
+                                                           Margin="0,0,6,0"
+                                                           FontFamily="Menlo, Consolas, monospace"
+                                                           Foreground="{StaticResource Text}"
+                                                           VerticalAlignment="Center" />
+                                                <TextBlock DockPanel.Dock="Left" Text="{Binding ShiftGlyph}"
+                                                           Margin="0,0,6,0"
+                                                           Foreground="{StaticResource TextSubtle}"
+                                                           VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding Description}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Foreground="{StaticResource TextSubtle}"
+                                                           VerticalAlignment="Center" />
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Grid>
+                        </DockPanel>
+                    </DataTemplate>
+
+                    <DataTemplate DataType="{x:Type vm:LayerParamViewModel}" x:DataType="vm:LayerParamViewModel">
+                        <ListBox ItemsSource="{Binding Layers}"
+                                 SelectedItem="{Binding SelectedLayer, Mode=TwoWay}"
+                                 Background="Transparent" BorderThickness="0" Padding="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:LayerChoice">
+                                    <TextBlock Text="{Binding Text}" Foreground="{StaticResource Text}" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DataTemplate>
+
+                    <DataTemplate DataType="{x:Type vm:RawParamViewModel}" x:DataType="vm:RawParamViewModel">
+                        <TextBox Text="{Binding Text, Mode=TwoWay}"
+                                 FontFamily="Menlo, Consolas, monospace"
+                                 VerticalAlignment="Top" />
+                    </DataTemplate>
+
+                </ContentControl.DataTemplates>
+            </ContentControl>
+        </Grid>
+
+    </DockPanel>
+
+</Window>

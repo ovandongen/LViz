@@ -78,6 +78,7 @@ public sealed partial class KeymapEditViewModel : ObservableObject
         Source = source;
         Session = new KeymapEditSession(baseline);
         Keymap = new LoadedKeymap(Session.Current);
+        Defines = Preprocessor.CollectDefines(source.BaselineText);
         Session.Changed += OnSessionChanged;
         _gitHub = gitHub;
         _backups = backups;
@@ -140,6 +141,13 @@ public sealed partial class KeymapEditViewModel : ObservableObject
     /// </summary>
     public LoadedKeymap Keymap { get; private set; }
 
+    /// <summary>
+    /// The file's object-like <c>#define</c>s read off <see cref="Source"/>'s
+    /// baseline text — what the key dialog feeds binding formatting and the
+    /// raw-text parser so a typed <c>&amp;mo NAV</c> resolves like the file does.
+    /// </summary>
+    public IReadOnlyList<KeyValuePair<string, string>> Defines { get; }
+
     /// <summary>The one selected key, or null when nothing is selected.</summary>
     [ObservableProperty]
     private int? _selectedKeyIndex;
@@ -193,6 +201,27 @@ public sealed partial class KeymapEditViewModel : ObservableObject
 
         var target = toNone ? KeyBinding.None : KeyBinding.Transparent;
         return Session.SetBindings([new BindingChange(layerIndex, keyIndex, target)]);
+    }
+
+    /// <summary>
+    /// Write <paramref name="binding"/> onto one key as a single undo step —
+    /// the key dialog's Confirm.
+    /// </summary>
+    /// <returns>
+    /// <see langword="false"/> — without touching anything — when the indices
+    /// fall outside <see cref="KeymapEditSession.Current"/>, or when the key
+    /// already holds that binding (no step, no event).
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="binding"/> is null.</exception>
+    public bool SetKey(int layerIndex, int keyIndex, KeyBinding binding)
+    {
+        ArgumentNullException.ThrowIfNull(binding);
+
+        var layers = Session.Current.Layers;
+        if (layerIndex < 0 || layerIndex >= layers.Count) return false;
+        if (keyIndex < 0 || keyIndex >= layers[layerIndex].Bindings.Count) return false;
+
+        return Session.SetBindings([new BindingChange(layerIndex, keyIndex, binding)]);
     }
 
     /// <summary>True when the key differs from what it was in the baseline.</summary>

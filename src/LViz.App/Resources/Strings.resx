@@ -325,6 +325,10 @@
     <value>Which board's physical layout to render. Auto-switches on load if the keymap's key count matches a different profile.</value>
     <comment/>
   </data>
+  <data name="Settings_KeyboardLockedWhileEditing" xml:space="preserve">
+    <value>Save or discard the keymap edit to change the keyboard.</value>
+    <comment/>
+  </data>
   <data name="Settings_BackgroundOpacity" xml:space="preserve">
     <value>Background opacity</value>
     <comment/>
@@ -1641,6 +1645,242 @@
   </data>
   <data name="Edit_QuitConfirm" xml:space="preserve">
     <value>Quit</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_CategoryUsed" xml:space="preserve">
+    <value>Used in this keymap</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_CategoryAll" xml:space="preserve">
+    <value>All keycodes</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Letters" xml:space="preserve">
+    <value>Letters</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Digits" xml:space="preserve">
+    <value>Digits</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Punctuation" xml:space="preserve">
+    <value>Punctuation</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Symbols" xml:space="preserve">
+    <value>Symbols</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Modifiers" xml:space="preserve">
+    <value>Modifiers</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Navigation" xml:space="preserve">
+    <value>Navigation</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Editing" xml:space="preserve">
+    <value>Editing</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Function" xml:space="preserve">
+    <value>Function keys</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Keypad" xml:space="preserve">
+    <value>Keypad</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Locks" xml:space="preserve">
+    <value>Locks</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_International" xml:space="preserve">
+    <value>International</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Consumer" xml:space="preserve">
+    <value>Media and consumer</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_System" xml:space="preserve">
+    <value>System</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Category_Other" xml:space="preserve">
+    <value>Other</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_MatchCountFormat" xml:space="preserve">
+    <value>{0} keycodes</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Kp_Name" xml:space="preserve">
+    <value>Key press</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Kp_Help" xml:space="preserve">
+    <value>Sends a key, optionally with modifiers.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Trans_Name" xml:space="preserve">
+    <value>Transparent</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Trans_Help" xml:space="preserve">
+    <value>Does what this key does on the next active layer below.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_None_Name" xml:space="preserve">
+    <value>Nothing</value>
+    <comment/>
+  </data>
+  <data name="Behavior_None_Help" xml:space="preserve">
+    <value>The key does nothing; lower layers are not used.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Mt_Name" xml:space="preserve">
+    <value>Mod-tap</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Mt_Help" xml:space="preserve">
+    <value>Hold sends the first key, tap sends the second.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Lt_Name" xml:space="preserve">
+    <value>Layer-tap</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Lt_Help" xml:space="preserve">
+    <value>Hold turns the layer on, tap sends the key.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Mo_Name" xml:space="preserve">
+    <value>Momentary layer</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Mo_Help" xml:space="preserve">
+    <value>The layer is on while the key is held.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_To_Name" xml:space="preserve">
+    <value>To layer</value>
+    <comment/>
+  </data>
+  <data name="Behavior_To_Help" xml:space="preserve">
+    <value>Turns the layer on and all other layers except the default layer off.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Tog_Name" xml:space="preserve">
+    <value>Toggle layer</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Tog_Help" xml:space="preserve">
+    <value>Turns the layer on, or off when it is already on.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Sl_Name" xml:space="preserve">
+    <value>Sticky layer</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Sl_Help" xml:space="preserve">
+    <value>The layer stays on for the next key press.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Sk_Name" xml:space="preserve">
+    <value>Sticky key</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Sk_Help" xml:space="preserve">
+    <value>The key (usually a modifier) stays pressed for the next key press.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Keymap_Help" xml:space="preserve">
+    <value>Defined in this keymap.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Custom_Name" xml:space="preserve">
+    <value>Custom binding</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Custom_Help" xml:space="preserve">
+    <value>Type any ZMK binding, for example &amp;bt BT_SEL 0.</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ParamKey" xml:space="preserve">
+    <value>Key</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ParamHold" xml:space="preserve">
+    <value>Hold</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ParamTap" xml:space="preserve">
+    <value>Tap</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ParamLayer" xml:space="preserve">
+    <value>Layer</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ParamFormat" xml:space="preserve">
+    <value>Parameter {0}</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_TitleFormat" xml:space="preserve">
+    <value>Key {0} on layer {1}</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_TabBehavior" xml:space="preserve">
+    <value>Behavior</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_TabValueFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_CustomInvalid" xml:space="preserve">
+    <value>Not a valid binding.</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Ok" xml:space="preserve">
+    <value>OK</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_FilterBehaviors" xml:space="preserve">
+    <value>Filter behaviors</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_SearchKeycodes" xml:space="preserve">
+    <value>Search keycodes</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Record" xml:space="preserve">
+    <value>Record key</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_Recording" xml:space="preserve">
+    <value>Press a key…</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ModShift" xml:space="preserve">
+    <value>Shift</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ModCtrl" xml:space="preserve">
+    <value>Ctrl</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ModAlt" xml:space="preserve">
+    <value>Alt</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ModGui" xml:space="preserve">
+    <value>GUI (Cmd/Win)</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_UseCountFormat" xml:space="preserve">
+    <value>×{0}</value>
     <comment/>
   </data>
 </root>
