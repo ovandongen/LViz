@@ -6,18 +6,26 @@ using Xunit;
 namespace LViz.Tests.Keymap;
 
 /// <summary>
-/// The pickable behavior list: fixed v1 built-ins in picker order, plus the
+/// The pickable behavior list: fixed built-ins in picker order (the v1 set,
+/// the command behaviors, the parameter-less key/system behaviors), plus the
 /// hold-taps and macros of a loaded keymap mapped to parameter kinds, with
 /// built-in-wins de-duplication.
 /// </summary>
 public class ZmkBehaviorCatalogTests
 {
+    /// <summary>The 22 built-in codes in picker order; shared by the
+    /// For()-append tests.</summary>
+    private static readonly string[] BuiltInCodes =
+    [
+        "&kp", "&mt", "&sk", "&lt", "&mo", "&to", "&tog", "&sl", "&trans", "&none",
+        "&bt", "&out", "&rgb_ug", "&mkp", "&msc", "&mmv",
+        "&caps_word", "&key_repeat", "&bootloader", "&sys_reset", "&soft_off", "&studio_unlock",
+    ];
+
     [Fact]
     public void BuiltIn_CodesInExactOrder()
     {
-        Assert.Equal(
-            new[] { "&kp", "&mt", "&sk", "&lt", "&mo", "&to", "&tog", "&sl", "&trans", "&none" },
-            ZmkBehaviorCatalog.BuiltIn.Select(b => b.Code));
+        Assert.Equal(BuiltInCodes, ZmkBehaviorCatalog.BuiltIn.Select(b => b.Code));
     }
 
     [Fact]
@@ -32,9 +40,69 @@ public class ZmkBehaviorCatalogTests
     [Fact]
     public void BuiltIn_Groups()
     {
-        Assert.Equal(ZmkBehaviorGroup.Keys, ZmkBehaviorCatalog.Find(null, "&kp")!.Group);
-        Assert.Equal(ZmkBehaviorGroup.Layers, ZmkBehaviorCatalog.Find(null, "&mo")!.Group);
-        Assert.Equal(ZmkBehaviorGroup.Special, ZmkBehaviorCatalog.Find(null, "&none")!.Group);
+        Assert.Equal(ZmkBehaviorGroup.Key, ZmkBehaviorCatalog.Find(null, "&kp")!.Group);
+        Assert.Equal(ZmkBehaviorGroup.HoldTap, ZmkBehaviorCatalog.Find(null, "&mt")!.Group);
+        Assert.Equal(ZmkBehaviorGroup.HoldTap, ZmkBehaviorCatalog.Find(null, "&lt")!.Group);
+        Assert.Equal(ZmkBehaviorGroup.Layer, ZmkBehaviorCatalog.Find(null, "&mo")!.Group);
+        Assert.Equal(ZmkBehaviorGroup.Clear, ZmkBehaviorCatalog.Find(null, "&none")!.Group);
+        Assert.Equal(ZmkBehaviorGroup.Bluetooth, ZmkBehaviorCatalog.Find(null, "&bt")!.Group);
+        Assert.Equal(ZmkBehaviorGroup.Output, ZmkBehaviorCatalog.Find(null, "&out")!.Group);
+        Assert.Equal(ZmkBehaviorGroup.Lighting, ZmkBehaviorCatalog.Find(null, "&rgb_ug")!.Group);
+        Assert.Equal(ZmkBehaviorGroup.Mouse, ZmkBehaviorCatalog.Find(null, "&msc")!.Group);
+        Assert.Equal(ZmkBehaviorGroup.System, ZmkBehaviorCatalog.Find(null, "&bootloader")!.Group);
+        Assert.Equal(ZmkBehaviorGroup.Key, ZmkBehaviorCatalog.Find(null, "&caps_word")!.Group);
+    }
+
+    [Fact]
+    public void BuiltIn_CommandParams_AreExactlyTheCommandCatalogCodes()
+    {
+        var commandBehaviors = ZmkBehaviorCatalog.BuiltIn
+            .Where(b => b.Params.Contains(ZmkBehaviorParamKind.Command))
+            .ToArray();
+
+        // A Command param is one logical parameter, nothing else alongside it.
+        foreach (var behavior in commandBehaviors)
+        {
+            Assert.Equal(
+                new[] { ZmkBehaviorParamKind.Command }, behavior.Params);
+        }
+
+        // Same set of codes, ignoring picker order.
+        Assert.Equal(
+            ZmkCommandCatalog.Behaviors.OrderBy(c => c, StringComparer.Ordinal).ToArray(),
+            commandBehaviors.Select(b => b.Code).OrderBy(c => c, StringComparer.Ordinal).ToArray());
+    }
+
+    [Theory]
+    [InlineData("&caps_word")]
+    [InlineData("&key_repeat")]
+    [InlineData("&bootloader")]
+    [InlineData("&sys_reset")]
+    [InlineData("&soft_off")]
+    [InlineData("&studio_unlock")]
+    public void BuiltIn_Parameterless_AgreeWithParserArity(string code)
+    {
+        Assert.Empty(ZmkBehaviorCatalog.Find(null, code)!.Params);
+        Assert.Equal(0, BehaviorArityTable.Arity(code));
+    }
+
+    [Fact]
+    public void For_Glove80Fixture_MagicIsKeymapAfterAllBuiltIns()
+    {
+        var config = ZmkKeymapLoader.LoadFromText(
+            KeymapFixtures.Read("glove80-editor.keymap"), "glove80");
+
+        var all = ZmkBehaviorCatalog.For(config);
+
+        // The 22 built-ins come first, untouched.
+        Assert.Equal(
+            BuiltInCodes, all.Take(BuiltInCodes.Length).Select(b => b.Code));
+
+        var index = all.Select(b => b.Code).ToList().IndexOf("&magic");
+        Assert.True(
+            index >= BuiltInCodes.Length,
+            $"&magic at index {index}, expected after all {BuiltInCodes.Length} built-ins");
+        Assert.Equal(ZmkBehaviorGroup.Keymap, all[index].Group);
     }
 
     [Fact]
@@ -72,13 +140,12 @@ public class ZmkBehaviorCatalogTests
         var all = ZmkBehaviorCatalog.For(config);
 
         Assert.Equal(
-            new[] { "&kp", "&mt", "&sk", "&lt", "&mo", "&to", "&tog", "&sl", "&trans", "&none",
-                    "&hrm", "&two", "&zero" },
+            BuiltInCodes.Concat(new[] { "&hrm", "&two", "&zero" }),
             all.Select(b => b.Code));
 
-        // The user's &lt lost: the built-in entry (Layers group) is what remains.
+        // The user's &lt lost: the built-in entry (HoldTap group) is what remains.
         var lt = ZmkBehaviorCatalog.Find(config, "&lt")!;
-        Assert.Equal(ZmkBehaviorGroup.Layers, lt.Group);
+        Assert.Equal(ZmkBehaviorGroup.HoldTap, lt.Group);
         Assert.Equal(
             new[] { ZmkBehaviorParamKind.Layer, ZmkBehaviorParamKind.Keycode }, lt.Params);
 
@@ -104,8 +171,7 @@ public class ZmkBehaviorCatalogTests
         var all = ZmkBehaviorCatalog.For(config);
 
         Assert.Equal(
-            new[] { "&kp", "&mt", "&sk", "&lt", "&mo", "&to", "&tog", "&sl", "&trans", "&none",
-                    "&dup" },
+            BuiltInCodes.Append("&dup"),
             all.Select(b => b.Code));
         // First occurrence wins → [Layer, Keycode] (hold &mo, tap &kp).
         Assert.Equal(

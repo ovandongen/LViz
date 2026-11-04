@@ -122,7 +122,9 @@ dotnet run --project src/LViz.App                  # launch the app
   `ActiveLayerIndex` afterwards because a load lands on layer 0. The edit
   commands' enable state is re-queried only through `NotifyEditCommandState()`.
   Edit-mode key gestures are rules in `EditShortcuts.Resolve` (tested as a
-  table); `MainWindow.OnEditKeyDown` only dispatches. The commit message
+  table); `MainWindow.OnEditKeyDown` only dispatches. A numpad gesture
+  matches on `PhysicalKey` (`NumPadEnter`): its `Key` value differs per
+  platform. The commit message
   (`KeymapCommitMessage`) is English by decision, not resx text.
 - **`Core/Keymap/Parser/` is the `.keymap` pipeline.** Preprocess →
   devicetree lex/parse → two-pass interpret produces a `KeyboardConfig`.
@@ -208,6 +210,16 @@ dotnet run --project src/LViz.App                  # launch the app
   stray/missing-token and arity checks the loader skips. A picked keycode is
   written as `ZmkKeycodeUsage.NameFor` (the file's most used spelling, else the
   shortest name); a seeded one keeps its own spelling.
+  A `Command` param (`&bt`, `&out`, `&rgb_ug`, `&mkp`, `&msc`, `&mmv`) is one
+  editor seeded with *all* groups: the command, plus a profile number for
+  `BT_SEL`/`BT_DISC`. Commands come from `ZmkCommandCatalog` (bundled, then
+  one-param names the open keymap uses). The `&bt` profile-number rule lives
+  only in `BehaviorArityTable.BtCommandsWithProfile`; the parser,
+  `ZmkBindingText` and the catalog all read it, so never compare `BT_SEL`
+  literally. The behavior list starts with the quick-button behaviors, so the
+  filter finds them. A `KeyDialog` `ListBox` that must keep its selection needs
+  `Tag` + `AttachedToVisualTree="OnSelectionListAttached"` *and* a matching
+  `WantedSelection` case; one without the other loses the selection.
 - **Three layout importers, one result.** `Core/Layout/Import/` turns board
   files into `ImportedLayout`s (keys as `DtsiKeyPhysical` in ZMK units, in
   keymap binding order, plus warnings): `PhysicalLayoutImporter`
@@ -648,6 +660,12 @@ LViz-specific (extend this list as we hit more):
   that asks "is the pointer over a button?" (the bars drag in
   `MainWindow.OnPointerPressed`) checks button bounds by geometry, or a click
   on a greyed-out button starts a window drag.
+
+- **A hidden (`IsVisible=false`) Avalonia control stays attached to the
+  visual tree**, so focusing it from `AttachedToVisualTree` works only once.
+  Focus it each time it is shown instead (the behavior filter in
+  `KeyDialog.axaml.cs`). In a `DockPanel` the *first* `Dock="Bottom"` child
+  sits lowest, so a caption above an input docks as one panel.
 
 - **Avalonia 11 `ItemsControl` has no `Spacing`.** Put it on the panel in
   `ItemsControl.ItemsPanel` (see `ChoiceDialog.axaml`).

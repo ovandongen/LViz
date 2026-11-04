@@ -55,6 +55,22 @@ public class ZmkBindingTextTests
     public void TryParse_BtWithoutBtSelTakesOneParam()
         => AssertBinding("&bt BT_CLR", "&bt", "BT_CLR");
 
+    [Fact]
+    public void TryParse_BtDiscTakesTwoParams()
+        => AssertBinding("&bt BT_DISC 1", "&bt", "BT_DISC", "1");
+
+    [Fact]
+    public void TryParse_BtSelWithoutProfileNumber_IsNull()
+        => Assert.Null(ZmkBindingText.TryParse("&bt BT_SEL", NoDefines, null));
+
+    [Fact]
+    public void TryParse_BtClrWithStrayProfileNumber_IsNull()
+        => Assert.Null(ZmkBindingText.TryParse("&bt BT_CLR 0", NoDefines, null));
+
+    [Fact]
+    public void TryParse_BtNxtTakesOneParam()
+        => AssertBinding("&bt BT_NXT", "&bt", "BT_NXT");
+
     [Theory]
     [InlineData("&out OUT_USB", "&out", "OUT_USB")]
     [InlineData("&rgb_ug RGB_TOG", "&rgb_ug", "RGB_TOG")]
@@ -119,7 +135,7 @@ public class ZmkBindingTextTests
     [Fact]
     public void TryParse_BtAloneWithNoParams_IsNull()
     {
-        // &bt is special-cased to 1 or 2 params (rule 7).
+        // &bt always needs its command; a bare &bt is refused (rule 7).
         Assert.Null(ZmkBindingText.TryParse("&bt", NoDefines, null));
     }
 

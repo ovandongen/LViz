@@ -1819,6 +1819,102 @@
     <value>De toets (meestal een modificatietoets) blijft ingedrukt voor de volgende toetsaanslag.</value>
     <comment/>
   </data>
+  <data name="Behavior_Bt_Name" xml:space="preserve">
+    <value>Bluetooth</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Bt_Help" xml:space="preserve">
+    <value>Kiest, wisselt of wist Bluetooth-profielen.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Out_Name" xml:space="preserve">
+    <value>Uitvoer</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Out_Help" xml:space="preserve">
+    <value>Kiest of toetsen via USB of Bluetooth gaan.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_RgbUg_Name" xml:space="preserve">
+    <value>RGB-verlichting</value>
+    <comment/>
+  </data>
+  <data name="Behavior_RgbUg_Help" xml:space="preserve">
+    <value>Bedient de RGB-verlichting: aan/uit, helderheid, kleur, effect.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Mkp_Name" xml:space="preserve">
+    <value>Muisknop</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Mkp_Help" xml:space="preserve">
+    <value>Klikt met een muisknop.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Msc_Name" xml:space="preserve">
+    <value>Muis scrollen</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Msc_Help" xml:space="preserve">
+    <value>Scrolt zolang de toets ingedrukt is.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Mmv_Name" xml:space="preserve">
+    <value>Muis bewegen</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Mmv_Help" xml:space="preserve">
+    <value>Beweegt de aanwijzer zolang de toets ingedrukt is.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_CapsWord_Name" xml:space="preserve">
+    <value>Hoofdletterwoord</value>
+    <comment/>
+  </data>
+  <data name="Behavior_CapsWord_Help" xml:space="preserve">
+    <value>Typt hoofdletters tot een toets die het woord afsluit, zoals spatie.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_KeyRepeat_Name" xml:space="preserve">
+    <value>Toets herhalen</value>
+    <comment/>
+  </data>
+  <data name="Behavior_KeyRepeat_Help" xml:space="preserve">
+    <value>Stuurt de laatste toets nog een keer.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Bootloader_Name" xml:space="preserve">
+    <value>Bootloader</value>
+    <comment/>
+  </data>
+  <data name="Behavior_Bootloader_Help" xml:space="preserve">
+    <value>Herstart in de bootloader, om firmware te flashen.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_SysReset_Name" xml:space="preserve">
+    <value>Herstarten</value>
+    <comment/>
+  </data>
+  <data name="Behavior_SysReset_Help" xml:space="preserve">
+    <value>Herstart het toetsenbord.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_SoftOff_Name" xml:space="preserve">
+    <value>Uitzetten</value>
+    <comment/>
+  </data>
+  <data name="Behavior_SoftOff_Help" xml:space="preserve">
+    <value>Zet het toetsenbord uit tot het weer gewekt wordt.</value>
+    <comment/>
+  </data>
+  <data name="Behavior_StudioUnlock_Name" xml:space="preserve">
+    <value>Studio ontgrendelen</value>
+    <comment/>
+  </data>
+  <data name="Behavior_StudioUnlock_Help" xml:space="preserve">
+    <value>Ontgrendelt ZMK Studio zodat het de keymap kan wijzigen.</value>
+    <comment/>
+  </data>
   <data name="Behavior_Keymap_Help" xml:space="preserve">
     <value>Gedefinieerd in deze keymap.</value>
     <comment/>
@@ -1829,6 +1925,290 @@
   </data>
   <data name="Behavior_Custom_Help" xml:space="preserve">
     <value>Typ een willekeurige ZMK-binding, bijvoorbeeld &amp;bt BT_SEL 0.</value>
+    <comment/>
+  </data>
+  <data name="Command_FromKeymap_Help" xml:space="preserve">
+    <value>Gebruikt in deze keymap.</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_SEL_Name" xml:space="preserve">
+    <value>Profiel kiezen</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_SEL_Help" xml:space="preserve">
+    <value>Schakelt naar het gekozen Bluetooth-profiel.</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_NXT_Name" xml:space="preserve">
+    <value>Volgend profiel</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_NXT_Help" xml:space="preserve">
+    <value>Schakelt naar het volgende Bluetooth-profiel.</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_PRV_Name" xml:space="preserve">
+    <value>Vorig profiel</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_PRV_Help" xml:space="preserve">
+    <value>Schakelt naar het vorige Bluetooth-profiel.</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_CLR_Name" xml:space="preserve">
+    <value>Profiel wissen</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_CLR_Help" xml:space="preserve">
+    <value>Vergeet de koppeling van het huidige profiel.</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_CLR_ALL_Name" xml:space="preserve">
+    <value>Alle profielen wissen</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_CLR_ALL_Help" xml:space="preserve">
+    <value>Vergeet de koppelingen van alle profielen.</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_DISC_Name" xml:space="preserve">
+    <value>Profiel loskoppelen</value>
+    <comment/>
+  </data>
+  <data name="Command_BT_DISC_Help" xml:space="preserve">
+    <value>Verbreekt het gekozen profiel zonder het te vergeten.</value>
+    <comment/>
+  </data>
+  <data name="Command_OUT_USB_Name" xml:space="preserve">
+    <value>USB</value>
+    <comment/>
+  </data>
+  <data name="Command_OUT_USB_Help" xml:space="preserve">
+    <value>Stuurt toetsen via USB.</value>
+    <comment/>
+  </data>
+  <data name="Command_OUT_BLE_Name" xml:space="preserve">
+    <value>Bluetooth</value>
+    <comment/>
+  </data>
+  <data name="Command_OUT_BLE_Help" xml:space="preserve">
+    <value>Stuurt toetsen via Bluetooth.</value>
+    <comment/>
+  </data>
+  <data name="Command_OUT_TOG_Name" xml:space="preserve">
+    <value>Wisselen</value>
+    <comment/>
+  </data>
+  <data name="Command_OUT_TOG_Help" xml:space="preserve">
+    <value>Wisselt tussen USB en Bluetooth.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_TOG_Name" xml:space="preserve">
+    <value>Aan/uit</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_TOG_Help" xml:space="preserve">
+    <value>Zet de verlichting aan of uit.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_ON_Name" xml:space="preserve">
+    <value>Aan</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_ON_Help" xml:space="preserve">
+    <value>Zet de verlichting aan.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_OFF_Name" xml:space="preserve">
+    <value>Uit</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_OFF_Help" xml:space="preserve">
+    <value>Zet de verlichting uit.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_BRI_Name" xml:space="preserve">
+    <value>Helderder</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_BRI_Help" xml:space="preserve">
+    <value>Verhoogt de helderheid.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_BRD_Name" xml:space="preserve">
+    <value>Donkerder</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_BRD_Help" xml:space="preserve">
+    <value>Verlaagt de helderheid.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_HUI_Name" xml:space="preserve">
+    <value>Tint omhoog</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_HUI_Help" xml:space="preserve">
+    <value>Verschuift de kleur vooruit.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_HUD_Name" xml:space="preserve">
+    <value>Tint omlaag</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_HUD_Help" xml:space="preserve">
+    <value>Verschuift de kleur terug.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_SAI_Name" xml:space="preserve">
+    <value>Meer verzadiging</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_SAI_Help" xml:space="preserve">
+    <value>Maakt de kleur voller.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_SAD_Name" xml:space="preserve">
+    <value>Minder verzadiging</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_SAD_Help" xml:space="preserve">
+    <value>Maakt de kleur bleker.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_SPI_Name" xml:space="preserve">
+    <value>Sneller</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_SPI_Help" xml:space="preserve">
+    <value>Versnelt het effect.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_SPD_Name" xml:space="preserve">
+    <value>Langzamer</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_SPD_Help" xml:space="preserve">
+    <value>Vertraagt het effect.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_EFF_Name" xml:space="preserve">
+    <value>Volgend effect</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_EFF_Help" xml:space="preserve">
+    <value>Schakelt naar het volgende effect.</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_EFR_Name" xml:space="preserve">
+    <value>Vorig effect</value>
+    <comment/>
+  </data>
+  <data name="Command_RGB_EFR_Help" xml:space="preserve">
+    <value>Schakelt naar het vorige effect.</value>
+    <comment/>
+  </data>
+  <data name="Command_LCLK_Name" xml:space="preserve">
+    <value>Linksklik</value>
+    <comment/>
+  </data>
+  <data name="Command_LCLK_Help" xml:space="preserve">
+    <value>Klikt met de linkermuisknop.</value>
+    <comment/>
+  </data>
+  <data name="Command_RCLK_Name" xml:space="preserve">
+    <value>Rechtsklik</value>
+    <comment/>
+  </data>
+  <data name="Command_RCLK_Help" xml:space="preserve">
+    <value>Klikt met de rechtermuisknop.</value>
+    <comment/>
+  </data>
+  <data name="Command_MCLK_Name" xml:space="preserve">
+    <value>Middenklik</value>
+    <comment/>
+  </data>
+  <data name="Command_MCLK_Help" xml:space="preserve">
+    <value>Klikt met de middelste muisknop.</value>
+    <comment/>
+  </data>
+  <data name="Command_MB4_Name" xml:space="preserve">
+    <value>Knop 4</value>
+    <comment/>
+  </data>
+  <data name="Command_MB4_Help" xml:space="preserve">
+    <value>Muisknop 4, meestal Terug.</value>
+    <comment/>
+  </data>
+  <data name="Command_MB5_Name" xml:space="preserve">
+    <value>Knop 5</value>
+    <comment/>
+  </data>
+  <data name="Command_MB5_Help" xml:space="preserve">
+    <value>Muisknop 5, meestal Vooruit.</value>
+    <comment/>
+  </data>
+  <data name="Command_SCRL_UP_Name" xml:space="preserve">
+    <value>Omhoog scrollen</value>
+    <comment/>
+  </data>
+  <data name="Command_SCRL_UP_Help" xml:space="preserve">
+    <value>Scrolt omhoog.</value>
+    <comment/>
+  </data>
+  <data name="Command_SCRL_DOWN_Name" xml:space="preserve">
+    <value>Omlaag scrollen</value>
+    <comment/>
+  </data>
+  <data name="Command_SCRL_DOWN_Help" xml:space="preserve">
+    <value>Scrolt omlaag.</value>
+    <comment/>
+  </data>
+  <data name="Command_SCRL_LEFT_Name" xml:space="preserve">
+    <value>Naar links scrollen</value>
+    <comment/>
+  </data>
+  <data name="Command_SCRL_LEFT_Help" xml:space="preserve">
+    <value>Scrolt naar links.</value>
+    <comment/>
+  </data>
+  <data name="Command_SCRL_RIGHT_Name" xml:space="preserve">
+    <value>Naar rechts scrollen</value>
+    <comment/>
+  </data>
+  <data name="Command_SCRL_RIGHT_Help" xml:space="preserve">
+    <value>Scrolt naar rechts.</value>
+    <comment/>
+  </data>
+  <data name="Command_MOVE_UP_Name" xml:space="preserve">
+    <value>Omhoog bewegen</value>
+    <comment/>
+  </data>
+  <data name="Command_MOVE_UP_Help" xml:space="preserve">
+    <value>Beweegt de aanwijzer omhoog.</value>
+    <comment/>
+  </data>
+  <data name="Command_MOVE_DOWN_Name" xml:space="preserve">
+    <value>Omlaag bewegen</value>
+    <comment/>
+  </data>
+  <data name="Command_MOVE_DOWN_Help" xml:space="preserve">
+    <value>Beweegt de aanwijzer omlaag.</value>
+    <comment/>
+  </data>
+  <data name="Command_MOVE_LEFT_Name" xml:space="preserve">
+    <value>Naar links bewegen</value>
+    <comment/>
+  </data>
+  <data name="Command_MOVE_LEFT_Help" xml:space="preserve">
+    <value>Beweegt de aanwijzer naar links.</value>
+    <comment/>
+  </data>
+  <data name="Command_MOVE_RIGHT_Name" xml:space="preserve">
+    <value>Naar rechts bewegen</value>
+    <comment/>
+  </data>
+  <data name="Command_MOVE_RIGHT_Help" xml:space="preserve">
+    <value>Beweegt de aanwijzer naar rechts.</value>
     <comment/>
   </data>
   <data name="KeyDialog_ParamKey" xml:space="preserve">
@@ -1849,6 +2229,18 @@
   </data>
   <data name="KeyDialog_ParamFormat" xml:space="preserve">
     <value>Parameter {0}</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ParamCommand" xml:space="preserve">
+    <value>Commando</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_ParamProfile" xml:space="preserve">
+    <value>Profiel</value>
+    <comment/>
+  </data>
+  <data name="KeyDialog_CommandProfileFormat" xml:space="preserve">
+    <value>{0} {1}</value>
     <comment/>
   </data>
   <data name="KeyDialog_TitleFormat" xml:space="preserve">

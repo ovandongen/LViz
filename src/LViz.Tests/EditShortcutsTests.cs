@@ -37,6 +37,22 @@ public class EditShortcutsTests
     public void Resolve_WithMetaCommandModifier(Key key, KeyModifiers modifiers, EditShortcut expected) =>
         Assert.Equal(expected, EditShortcuts.Resolve(key, modifiers, KeyModifiers.Meta));
 
+    /// <summary>
+    /// The numpad Enter reports a different <see cref="Key"/> per platform, so
+    /// its rule reads the physical position. Other rows pass the physical key
+    /// they arrive with and must keep behaving as the table above says.
+    /// </summary>
+    [Theory]
+    [InlineData(Key.Enter, KeyModifiers.None, PhysicalKey.NumPadEnter, EditShortcut.OpenKeyDialog)]
+    [InlineData(Key.None, KeyModifiers.None, PhysicalKey.NumPadEnter, EditShortcut.OpenKeyDialog)]
+    [InlineData(Key.A, KeyModifiers.None, PhysicalKey.NumPadEnter, EditShortcut.OpenKeyDialog)]
+    [InlineData(Key.None, KeyModifiers.Shift, PhysicalKey.NumPadEnter, EditShortcut.None)]
+    [InlineData(Key.None, KeyModifiers.None, PhysicalKey.Enter, EditShortcut.None)]
+    [InlineData(Key.Z, KeyModifiers.Meta, PhysicalKey.Z, EditShortcut.Undo)]
+    public void Resolve_WithPhysicalKey_NumpadEnterOpensTheDialog(
+        Key key, KeyModifiers modifiers, PhysicalKey physicalKey, EditShortcut expected) =>
+        Assert.Equal(expected, EditShortcuts.Resolve(key, modifiers, KeyModifiers.Meta, physicalKey));
+
     [Fact]
     public void Resolve_WithControlCommandModifier_ZClearsUndo() =>
         Assert.Equal(EditShortcut.Undo, EditShortcuts.Resolve(Key.Z, KeyModifiers.Control, KeyModifiers.Control));

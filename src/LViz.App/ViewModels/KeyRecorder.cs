@@ -124,12 +124,14 @@ public sealed record RecordedKey(string ZmkName, ZmkModifiers Modifiers);
 /// <item>A chord of two or more modifiers records nothing until all are
 /// released; recording then starts fresh.</item>
 /// <item>An unmapped key press records nothing but ends a pending solo
-/// modifier and keeps the recording alive.</item>
+/// modifier and keeps the recording alive; once every key is released again,
+/// a fresh solo modifier can be recorded.</item>
 /// </list>
 /// </summary>
 public sealed class KeyRecorder
 {
     private readonly HashSet<PhysicalKey> _heldModifiers = new();
+    private readonly HashSet<PhysicalKey> _heldUnmapped = new();
     private PhysicalKey? _soloCandidate;
     private bool _nonModifierPressed;
     private bool _chordHeld;
@@ -169,9 +171,11 @@ public sealed class KeyRecorder
         if (name is null)
         {
             // Unmapped key: recording goes on, but a still-held modifier has
-            // lost its solo chance.
+            // lost its solo chance. Kept in the held set so the flag clears
+            // again when the key comes back up.
             _soloCandidate = null;
             _nonModifierPressed = true;
+            _heldUnmapped.Add(key);
             return null;
         }
 
@@ -186,20 +190,26 @@ public sealed class KeyRecorder
     /// </summary>
     public RecordedKey? KeyUp(PhysicalKey key)
     {
-        if (IsDone || !_heldModifiers.Remove(key))
+        if (IsDone)
             return null;
 
-        if (_soloCandidate == key)
+        var wasHeldModifier = _heldModifiers.Remove(key);
+        _heldUnmapped.Remove(key);
+
+        if (wasHeldModifier && _soloCandidate == key)
         {
             IsDone = true;
             _soloCandidate = null;
             return new RecordedKey(KeyRecorderMap.ToZmk(key)!, ZmkModifiers.None);
         }
 
-        // Chorded or invalidated: only after every modifier is up can a new
-        // solo candidate be tracked again.
-        if (_heldModifiers.Count == 0)
+        // Chorded or invalidated: only once every modifier and every unmapped
+        // key is up again can a new solo candidate be tracked.
+        if (_heldModifiers.Count == 0 && _heldUnmapped.Count == 0)
+        {
             _chordHeld = false;
+            _nonModifierPressed = false;
+        }
 
         return null;
     }

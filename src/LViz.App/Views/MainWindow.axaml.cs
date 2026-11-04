@@ -159,7 +159,8 @@ public partial class MainWindow : Window
         var shortcut = EditShortcuts.Resolve(
             e.Key,
             e.KeyModifiers,
-            PlatformSettings?.HotkeyConfiguration.CommandModifiers ?? KeyModifiers.Control);
+            PlatformSettings?.HotkeyConfiguration.CommandModifiers ?? KeyModifiers.Control,
+            e.PhysicalKey);
 
         switch (shortcut)
         {

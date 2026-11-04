@@ -48,6 +48,7 @@ public partial class KeyDialog : Window
         if (DataContext is KeyDialogViewModel vm)
             vm.PropertyChanged += OnViewModelPropertyChanged;
         SyncPickerWatch();
+        FocusBehaviorFilterIfShown();
     }
 
     // ─── Result ───────────────────────────────────────────────────────────
@@ -116,7 +117,19 @@ public partial class KeyDialog : Window
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(KeyDialogViewModel.CurrentParam))
+        {
             SyncPickerWatch();
+            FocusBehaviorFilterIfShown();
+        }
+    }
+
+    // The behavior tab stays in the tree (only hidden), so unlike the keycode
+    // search it can't focus on attach: focus it each time the tab is shown.
+    // Posted so the tab's IsVisible binding has updated first.
+    private void FocusBehaviorFilterIfShown()
+    {
+        if (DataContext is KeyDialogViewModel { CurrentParam: null })
+            Dispatcher.UIThread.Post(() => BehaviorFilterBox.Focus());
     }
 
     private void SyncPickerWatch()
@@ -213,6 +226,8 @@ public partial class KeyDialog : Window
         "keycodes" => (list.DataContext as KeycodeParamViewModel)?.Picker.SelectedItem,
         "categories" => (list.DataContext as KeycodeParamViewModel)?.Picker.SelectedCategory,
         "behaviors" => (list.DataContext as KeyDialogViewModel)?.SelectedOtherBehavior,
+        "commands" => (list.DataContext as CommandParamViewModel)?.SelectedCommand,
+        "profiles" => (list.DataContext as CommandParamViewModel)?.SelectedProfile,
         _ => null,
     };
 

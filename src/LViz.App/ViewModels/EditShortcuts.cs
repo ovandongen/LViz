@@ -55,8 +55,15 @@ public static class EditShortcuts
     /// command key (<c>Meta</c> on macOS, <c>Control</c> elsewhere, from
     /// <c>PlatformSettings.HotkeyConfiguration.CommandModifiers</c>), so
     /// Cmd+Z on a Mac and Ctrl+Z elsewhere hit the same rule.
+    /// <paramref name="physicalKey"/> is the pressed key's position
+    /// (<c>KeyEventArgs.PhysicalKey</c>): the numpad Enter matches on it,
+    /// because the <see cref="Key"/> value it reports differs per platform.
     /// </summary>
-    public static EditShortcut Resolve(Key key, KeyModifiers modifiers, KeyModifiers commandModifier)
+    public static EditShortcut Resolve(
+        Key key,
+        KeyModifiers modifiers,
+        KeyModifiers commandModifier,
+        PhysicalKey physicalKey = PhysicalKey.None)
     {
         // "cmd" means every flag of the platform command modifier is down, so
         // a Meta+Control setup could not be short-circuited by holding one.
@@ -89,6 +96,11 @@ public static class EditShortcuts
             return EditShortcut.ClearSelection;
 
         if (key == Key.Enter && modifiers == KeyModifiers.None)
+            return EditShortcut.OpenKeyDialog;
+
+        // Numpad Enter: its Key value differs per platform, its physical
+        // position does not, so match on the position and ignore the Key.
+        if (physicalKey == PhysicalKey.NumPadEnter && modifiers == KeyModifiers.None)
             return EditShortcut.OpenKeyDialog;
 
         return EditShortcut.None;

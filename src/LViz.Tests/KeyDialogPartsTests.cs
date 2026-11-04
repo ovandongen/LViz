@@ -1,7 +1,9 @@
+using LViz.App.Localization;
 using LViz.App.ViewModels;
 using LViz.Core.Keymap.Catalog;
 using LViz.Core.Keymap.Parser;
 using LViz.Core.Models;
+using LViz.Tests.Keymap;
 using Xunit;
 
 namespace LViz.Tests;
@@ -9,7 +11,7 @@ namespace LViz.Tests;
 /// <summary>
 /// The key dialog's building blocks: the behavior list in its fixed order
 /// with translated names, the behavior filter, the per-kind parameter
-/// editors (keycode, layer, raw) and the parameter captions.
+/// editors (keycode, layer, raw, command) and the parameter captions.
 /// </summary>
 public class KeyDialogPartsTests
 {
@@ -52,6 +54,13 @@ public class KeyDialogPartsTests
 
     private static readonly ZmkKeycodeUsage Usage = ZmkKeycodeUsage.Count(Config);
 
+    // The catalog behaviors in the fixed list after the plain layer behaviors.
+    private static readonly string[] NewCodes =
+    [
+        "&bt", "&out", "&rgb_ug", "&mkp", "&msc", "&mmv",
+        "&caps_word", "&key_repeat", "&bootloader", "&sys_reset", "&soft_off", "&studio_unlock",
+    ];
+
     // --- Behavior choices ---------------------------------------------------
 
     [Fact]
@@ -69,7 +78,14 @@ public class KeyDialogPartsTests
         var others = KeyBehaviorChoices.Others(Config);
 
         Assert.Equal(
-            new[] { "&mt", "&lt", "&hm", "&m1", "&to", "&mo", "&tog", "&sl", "&sk", "" },
+            new[]
+            {
+                "&kp", "&trans", "&none",
+                "&mt", "&lt", "&hm", "&m1", "&to", "&mo", "&tog", "&sl", "&sk",
+                "&bt", "&out", "&rgb_ug", "&mkp", "&msc", "&mmv",
+                "&caps_word", "&key_repeat", "&bootloader", "&sys_reset", "&soft_off", "&studio_unlock",
+                "",
+            },
             others.Select(c => c.Code));
         Assert.True(others[^1].IsCustom);
         Assert.All(others.Take(others.Count - 1), c => Assert.False(c.IsCustom));
@@ -81,7 +97,14 @@ public class KeyDialogPartsTests
         var others = KeyBehaviorChoices.Others(null);
 
         Assert.Equal(
-            new[] { "&mt", "&lt", "&to", "&mo", "&tog", "&sl", "&sk", "" },
+            new[]
+            {
+                "&kp", "&trans", "&none",
+                "&mt", "&lt", "&to", "&mo", "&tog", "&sl", "&sk",
+                "&bt", "&out", "&rgb_ug", "&mkp", "&msc", "&mmv",
+                "&caps_word", "&key_repeat", "&bootloader", "&sys_reset", "&soft_off", "&studio_unlock",
+                "",
+            },
             others.Select(c => c.Code));
     }
 
@@ -94,6 +117,48 @@ public class KeyDialogPartsTests
             Assert.DoesNotContain("[", choice.Name);
             Assert.DoesNotContain("[", choice.Help);
         }
+    }
+
+    [Fact]
+    public void CommandStrings_EveryBundledCommandAndFixedKeyResolves()
+    {
+        foreach (var code in ZmkCommandCatalog.Behaviors)
+        {
+            foreach (var command in ZmkCommandCatalog.Bundled(code))
+            {
+                Assert.DoesNotContain("[", Loc.Instance[$"Command_{command.Name}_Name"]);
+                Assert.DoesNotContain("[", Loc.Instance[$"Command_{command.Name}_Help"]);
+            }
+        }
+
+        foreach (var key in new[]
+                 {
+                     "KeyDialog_ParamCommand",
+                     "KeyDialog_ParamProfile",
+                     "KeyDialog_CommandProfileFormat",
+                     "Command_FromKeymap_Help",
+                 })
+        {
+            Assert.DoesNotContain("[", Loc.Instance[key]);
+        }
+    }
+
+    [Fact]
+    public void NewChoices_BehaviorIsTheCatalogEntry()
+    {
+        var others = KeyBehaviorChoices.Others(null);
+
+        foreach (var code in NewCodes)
+        {
+            var choice = others.Single(c => c.Code == code);
+            Assert.NotNull(choice.Behavior);
+            Assert.Same(ZmkBehaviorCatalog.Find(null, code), choice.Behavior);
+        }
+
+        Assert.Equal(
+            new[] { ZmkBehaviorParamKind.Command },
+            others.Single(c => c.Code == "&bt").Behavior!.Params);
+        Assert.Empty(others.Single(c => c.Code == "&bootloader").Behavior!.Params);
     }
 
     [Fact]
@@ -124,6 +189,21 @@ public class KeyDialogPartsTests
         Assert.DoesNotContain(all, c => KeyBehaviorChoices.Matches(c, "zzz"));
     }
 
+    [Fact]
+    public void Matches_NewChoices_FilterOnCodeIsCaseInsensitive()
+    {
+        var all = All();
+        var rgbUg = all.Single(c => c.Code == "&rgb_ug");
+        var sysReset = all.Single(c => c.Code == "&sys_reset");
+        var bt = all.Single(c => c.Code == "&bt");
+
+        // Assert on the code only: the name is translated text and the test
+        // culture may not be English.
+        Assert.True(KeyBehaviorChoices.Matches(rgbUg, "RGB_UG"));
+        Assert.True(KeyBehaviorChoices.Matches(sysReset, "sys_"));
+        Assert.False(KeyBehaviorChoices.Matches(bt, "rgb"));
+    }
+
     // --- Parameter labels -----------------------------------------------------
 
     [Fact]
@@ -140,6 +220,14 @@ public class KeyDialogPartsTests
         // Without a config the macro is not one: its single Raw parameter is
         // "Parameter 1" through the kind rule instead.
         Assert.Equal(new[] { "Parameter 1" }, KeyParamLabels.For(Behavior("&m1"), null));
+    }
+
+    [Fact]
+    public void Labels_CommandParameter_IsNamedCommand()
+    {
+        Assert.Equal(
+            new[] { Loc.Instance["KeyDialog_ParamCommand"] },
+            KeyParamLabels.For(ZmkBehaviorCatalog.Find(null, "&bt")!, null));
     }
 
     // --- Layer parameter --------------------------------------------------------
@@ -255,6 +343,157 @@ public class KeyDialogPartsTests
         var vm = new KeycodeParamViewModel("Key", ZmkBehaviorParamKind.Keycode, Usage);
 
         Assert.True(vm.Picker.Categories[0].IsUsed);
+    }
+
+    // --- Command parameter ------------------------------------------------------
+
+    [Fact]
+    public void CommandParam_EveryBundledCommand_NameAndHelpResolve()
+    {
+        foreach (var code in ZmkCommandCatalog.Behaviors)
+        {
+            var vm = new CommandParamViewModel("Command", code, null);
+
+            foreach (var choice in vm.Commands)
+            {
+                // A missing resx key renders as "[Key]".
+                Assert.DoesNotContain("[", choice.Name);
+                Assert.DoesNotContain("[", choice.Help);
+            }
+        }
+    }
+
+    [Fact]
+    public void CommandParam_BtNoConfig_CatalogOrder_ProfileButtons_NoValueYet()
+    {
+        var vm = new CommandParamViewModel("Command", "&bt", null);
+
+        Assert.Equal(ZmkBehaviorParamKind.Command, vm.Kind);
+        Assert.Equal("Command", vm.Label);
+        Assert.Equal(Loc.Instance["KeyDialog_ParamProfile"], vm.ProfileLabel);
+        Assert.Equal(
+            ZmkCommandCatalog.Bundled("&bt").Select(c => c.Name),
+            vm.Commands.Select(c => c.Command.Name));
+        Assert.Equal(new[] { "0", "1", "2", "3", "4" }, vm.Profiles.Select(p => p.Text));
+        Assert.Null(vm.Values);
+        Assert.False(vm.HasValue);
+        Assert.Equal("", vm.ValueText);
+    }
+
+    [Fact]
+    public void CommandParam_Out_PickPlainCommand_WritesItsName()
+    {
+        var vm = new CommandParamViewModel("Command", "&out", null);
+        var usb = vm.Commands.Single(c => c.Command.Name == "OUT_USB");
+
+        vm.SelectedCommand = usb;
+
+        Assert.Equal(new[] { "OUT_USB" }, vm.Values);
+        Assert.True(vm.HasValue);
+        Assert.Equal(usb.Name, vm.ValueText);
+        Assert.False(vm.NeedsProfile);
+    }
+
+    [Fact]
+    public void CommandParam_Bt_ProfileCompletesTheValue_AndSurvivesCommandChange()
+    {
+        var vm = new CommandParamViewModel("Command", "&bt", null);
+        var sel = vm.Commands.Single(c => c.Command.Name == "BT_SEL");
+        var nxt = vm.Commands.Single(c => c.Command.Name == "BT_NXT");
+
+        vm.SelectedCommand = sel;
+        Assert.True(vm.NeedsProfile);
+        Assert.Null(vm.Values);
+
+        vm.SelectedProfile = vm.Profiles.Single(p => p.Number == 2);
+        Assert.Equal(new[] { "BT_SEL", "2" }, vm.Values);
+        Assert.Equal(Loc.Instance.Format("KeyDialog_CommandProfileFormat", sel.Name, 2), vm.ValueText);
+
+        vm.SelectedCommand = nxt;
+        Assert.Equal(new[] { "BT_NXT" }, vm.Values);
+        Assert.False(vm.NeedsProfile);
+
+        vm.SelectedCommand = sel;
+        Assert.Equal(new[] { "BT_SEL", "2" }, vm.Values);
+    }
+
+    [Fact]
+    public void CommandParam_ChangedFiresOncePerPick()
+    {
+        var vm = new CommandParamViewModel("Command", "&bt", null);
+        int changes = 0;
+        vm.Changed += (_, _) => changes++;
+
+        vm.SelectedCommand = vm.Commands.Single(c => c.Command.Name == "BT_SEL");
+        Assert.Equal(1, changes);
+
+        vm.SelectedProfile = vm.Profiles.Single(p => p.Number == 2);
+        Assert.Equal(2, changes);
+
+        // Re-picking the same command or profile raises nothing.
+        vm.SelectedCommand = vm.Commands.Single(c => c.Command.Name == "BT_SEL");
+        vm.SelectedProfile = vm.Profiles.Single(p => p.Number == 2);
+        Assert.Equal(2, changes);
+    }
+
+    [Fact]
+    public void CommandParam_Seed_TakesArityAndNumber_AndAddsHighNumbers()
+    {
+        var vm = new CommandParamViewModel("Command", "&bt", null);
+
+        Assert.True(vm.Seed(new[] { new[] { "BT_DISC" }, new[] { "3" } }));
+        Assert.Equal("BT_DISC", vm.SelectedCommand!.Command.Name);
+        Assert.Equal(3, vm.SelectedProfile!.Number);
+        Assert.Equal(new[] { "BT_DISC", "3" }, vm.Values);
+
+        Assert.True(vm.Seed(new[] { new[] { "BT_SEL" }, new[] { "7" } }));
+        Assert.Equal(new[] { 0, 1, 2, 3, 4, 7 }, vm.Profiles.Select(p => p.Number));
+        Assert.Equal(7, vm.SelectedProfile!.Number);
+        Assert.Equal(new[] { "BT_SEL", "7" }, vm.Values);
+    }
+
+    [Fact]
+    public void CommandParam_Seed_RejectsWrongShapeAndUnknownNames()
+    {
+        IReadOnlyList<IReadOnlyList<string>>[] rejected =
+        [
+            new[] { new[] { "BT_SEL" } }, // needs its profile number
+            new[] { new[] { "BT_CLR" }, new[] { "0" } }, // command takes no number
+            new[] { new[] { "NOPE" } }, // not a listed command
+            new[] { new[] { "BT_SEL" }, new[] { "x" } }, // not a number
+            new[] { new[] { "BT_SEL" }, new[] { "-1" } }, // negative number
+            Array.Empty<IReadOnlyList<string>>(), // no groups
+            new[] { new[] { "BT_SEL" }, new[] { "1" }, new[] { "2" } }, // three groups
+            new[] { new[] { "LS", "A" } }, // a group of two tokens
+        ];
+
+        foreach (var groups in rejected)
+        {
+            var vm = new CommandParamViewModel("Command", "&bt", null);
+
+            Assert.False(vm.Seed(groups));
+            Assert.Null(vm.SelectedCommand);
+            Assert.Null(vm.SelectedProfile);
+            Assert.Null(vm.Values);
+        }
+    }
+
+    [Fact]
+    public void CommandParam_KeymapExtras_ShowTheirOwnName_AndSeed()
+    {
+        var config = ZmkKeymapLoader.LoadFromText(
+            KeymapFixtures.Read("glove80-editor.keymap"), "glove80");
+        var vm = new CommandParamViewModel("Command", "&rgb_ug", config);
+
+        var extra = vm.Commands[^1];
+        Assert.Equal("RGB_STATUS", extra.Command.Name);
+        Assert.True(extra.Command.FromKeymap);
+        Assert.Equal("RGB_STATUS", extra.Name);
+        Assert.Equal(Loc.Instance["Command_FromKeymap_Help"], extra.Help);
+
+        Assert.True(vm.Seed(new[] { new[] { "RGB_STATUS" } }));
+        Assert.Equal("RGB_STATUS", vm.SelectedCommand!.Command.Name);
+        Assert.Equal(new[] { "RGB_STATUS" }, vm.Values);
     }
 
     // --- helpers ------------------------------------------------------------

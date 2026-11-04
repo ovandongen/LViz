@@ -129,6 +129,52 @@ public class KeyRecorderTests
     }
 
     [Fact]
+    public void UnmappedKey_Released_SoloModifierRecordsAgain()
+    {
+        var recorder = new KeyRecorder();
+
+        Assert.Null(recorder.KeyDown(PhysicalKey.BrowserBack, KeyModifiers.None));
+        Assert.Null(recorder.KeyUp(PhysicalKey.BrowserBack));
+
+        Assert.Null(recorder.KeyDown(PhysicalKey.ShiftLeft, KeyModifiers.Shift));
+        var result = recorder.KeyUp(PhysicalKey.ShiftLeft);
+
+        Assert.NotNull(result);
+        Assert.Equal("LEFT_SHIFT", result!.ZmkName);
+        Assert.Equal(ZmkModifiers.None, result.Modifiers);
+        Assert.True(recorder.IsDone);
+    }
+
+    [Fact]
+    public void UnmappedKeyWhileModifierHeld_RecordsNothing_ButUnsticksAfterwards()
+    {
+        var recorder = new KeyRecorder();
+
+        Assert.Null(recorder.KeyDown(PhysicalKey.ShiftLeft, KeyModifiers.Shift));
+        Assert.Null(recorder.KeyDown(PhysicalKey.BrowserBack, KeyModifiers.Shift));
+        Assert.Null(recorder.KeyUp(PhysicalKey.BrowserBack));
+        Assert.Null(recorder.KeyUp(PhysicalKey.ShiftLeft));
+        Assert.False(recorder.IsDone);
+
+        Assert.Null(recorder.KeyDown(PhysicalKey.ShiftLeft, KeyModifiers.Shift));
+        var result = recorder.KeyUp(PhysicalKey.ShiftLeft);
+
+        Assert.NotNull(result);
+        Assert.Equal("LEFT_SHIFT", result!.ZmkName);
+    }
+
+    [Fact]
+    public void SoloModifier_WhileUnmappedKeyStillHeld_RecordsNothing()
+    {
+        var recorder = new KeyRecorder();
+
+        Assert.Null(recorder.KeyDown(PhysicalKey.BrowserBack, KeyModifiers.None));
+        Assert.Null(recorder.KeyDown(PhysicalKey.ShiftLeft, KeyModifiers.Shift));
+        Assert.Null(recorder.KeyUp(PhysicalKey.ShiftLeft));
+        Assert.False(recorder.IsDone);
+    }
+
+    [Fact]
     public void ModifierAutoRepeat_StaysTheSoloCandidate()
     {
         var recorder = new KeyRecorder();
