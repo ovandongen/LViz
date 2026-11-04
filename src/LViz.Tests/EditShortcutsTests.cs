@@ -27,6 +27,12 @@ public class EditShortcutsTests
     [InlineData(Key.Escape, KeyModifiers.Shift, EditShortcut.None)]
     [InlineData(Key.Enter, KeyModifiers.None, EditShortcut.OpenKeyDialog)]
     [InlineData(Key.Enter, KeyModifiers.Shift, EditShortcut.None)]
+    [InlineData(Key.N, KeyModifiers.Meta | KeyModifiers.Shift, EditShortcut.NewLayer)]
+    [InlineData(Key.N, KeyModifiers.Meta, EditShortcut.None)]
+    [InlineData(Key.D, KeyModifiers.Meta | KeyModifiers.Shift, EditShortcut.DuplicateLayer)]
+    [InlineData(Key.Left, KeyModifiers.Meta | KeyModifiers.Alt, EditShortcut.MoveLayerLeft)]
+    [InlineData(Key.Right, KeyModifiers.Meta | KeyModifiers.Alt, EditShortcut.MoveLayerRight)]
+    [InlineData(Key.Left, KeyModifiers.Meta | KeyModifiers.Alt | KeyModifiers.Shift, EditShortcut.None)]
     [InlineData(Key.A, KeyModifiers.None, EditShortcut.None)]
     public void Resolve_WithMetaCommandModifier(Key key, KeyModifiers modifiers, EditShortcut expected) =>
         Assert.Equal(expected, EditShortcuts.Resolve(key, modifiers, KeyModifiers.Meta));
@@ -34,4 +40,9 @@ public class EditShortcutsTests
     [Fact]
     public void Resolve_WithControlCommandModifier_ZClearsUndo() =>
         Assert.Equal(EditShortcut.Undo, EditShortcuts.Resolve(Key.Z, KeyModifiers.Control, KeyModifiers.Control));
+
+    [Fact]
+    public void Resolve_WithControlCommandModifier_NShiftNewLayer() =>
+        Assert.Equal(EditShortcut.NewLayer,
+            EditShortcuts.Resolve(Key.N, KeyModifiers.Control | KeyModifiers.Shift, KeyModifiers.Control));
 }

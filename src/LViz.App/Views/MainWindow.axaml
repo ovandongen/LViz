@@ -452,25 +452,28 @@
                     Padding="12,4">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
-                        <Button Command="{Binding Edit.UndoCommand}"
+                        <Button Classes="onAccent"
+                                Command="{Binding Edit.UndoCommand}"
                                 Focusable="False"
                                 Padding="8,4"
                                 ToolTip.Tip="{Binding [Tooltip_EditUndo], Source={StaticResource Loc}}">
                             <PathIcon Width="14" Height="14"
                                       Data="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z" />
                         </Button>
-                        <Button Command="{Binding Edit.RedoCommand}"
+                        <Button Classes="onAccent"
+                                Command="{Binding Edit.RedoCommand}"
                                 Focusable="False"
                                 Padding="8,4"
                                 ToolTip.Tip="{Binding [Tooltip_EditRedo], Source={StaticResource Loc}}">
                             <PathIcon Width="14" Height="14"
                                       Data="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z" />
                         </Button>
-                        <Button Command="{Binding DiscardEditCommand}"
+                        <Button Classes="onAccent"
+                                Command="{Binding DiscardEditCommand}"
                                 Focusable="False"
                                 Padding="8,4"
                                 Content="{Binding [Edit_Discard], Source={StaticResource Loc}}" />
-                        <Button Classes="accent"
+                        <Button Classes="onAccent primary"
                                 Focusable="False"
                                 Padding="8,4"
                                 Command="{Binding SaveEditCommand}">
@@ -601,31 +604,86 @@
             <Border x:Name="LayerTabs" Grid.Row="2"
                     Background="{Binding TabBackground, Converter={StaticResource HexToBrush}}"
                     Padding="8,2">
-                <ItemsControl ItemsSource="{Binding Layers}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel Orientation="Horizontal" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:LayerViewModel">
-                            <Button Command="{Binding SelectCommand}"
-                                    MinWidth="48"
-                                    Classes="toggle layerTab"
-                                    Classes.active="{Binding IsSelected}"
-                                    IsVisible="{Binding IsShown}"
-                                    HorizontalContentAlignment="Center"
-                                    Padding="8,4">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <Border Width="10" Height="10" CornerRadius="5"
-                                            Background="{Binding TabColor, Converter={StaticResource HexToBrush}}" />
-                                    <TextBlock Text="{Binding DisplayName}"
-                                               VerticalAlignment="Center" />
-                                </StackPanel>
-                            </Button>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <DockPanel>
+                    <!-- Layer actions: edit mode only, right-aligned, styled like
+                         the edit banner's buttons. The tab strip fills the rest
+                         of the row. The "⋮" menu rides the shown-layer commands,
+                         so its items grey out exactly like the shortcuts. -->
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4"
+                                IsVisible="{Binding IsEditing}">
+                        <Button Command="{Binding NewLayerCommand}"
+                                Focusable="False"
+                                Padding="8,4"
+                                ToolTip.Tip="{Binding [Tooltip_EditAddLayer], Source={StaticResource Loc}}">
+                            <TextBlock Text="+" FontSize="14" />
+                        </Button>
+                        <Button Focusable="False"
+                                Padding="8,4"
+                                ToolTip.Tip="{Binding [Tooltip_EditLayerMenu], Source={StaticResource Loc}}">
+                            <TextBlock Text="⋮" FontSize="16" />
+                            <Button.Flyout>
+                                <MenuFlyout Placement="Bottom">
+                                    <MenuItem Header="{Binding [Edit_LayerMenuRename], Source={StaticResource Loc}}"
+                                              Command="{Binding RenameShownLayerCommand}" />
+                                    <MenuItem Header="{Binding [Edit_LayerMenuDuplicate], Source={StaticResource Loc}}"
+                                              Command="{Binding DuplicateShownLayerCommand}" />
+                                    <MenuItem Header="{Binding [Edit_LayerMenuMoveLeft], Source={StaticResource Loc}}"
+                                              Command="{Binding MoveShownLayerLeftCommand}" />
+                                    <MenuItem Header="{Binding [Edit_LayerMenuMoveRight], Source={StaticResource Loc}}"
+                                              Command="{Binding MoveShownLayerRightCommand}" />
+                                    <Separator />
+                                    <MenuItem Header="{Binding [Edit_LayerMenuDelete], Source={StaticResource Loc}}"
+                                              Command="{Binding DeleteShownLayerCommand}" />
+                                </MenuFlyout>
+                            </Button.Flyout>
+                        </Button>
+                    </StackPanel>
+                    <ItemsControl ItemsSource="{Binding Layers}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:LayerViewModel">
+                                <!-- Right-click menu and double-click rename act on
+                                     this tab's own commands; the Opening handler
+                                     cancels the menu outside edit mode. -->
+                                <Button Command="{Binding SelectCommand}"
+                                        MinWidth="48"
+                                        Classes="toggle layerTab"
+                                        Classes.active="{Binding IsSelected}"
+                                        IsVisible="{Binding IsShown}"
+                                        HorizontalContentAlignment="Center"
+                                        Padding="8,4"
+                                        Loaded="OnLayerTabLoaded"
+                                        DoubleTapped="OnLayerTabDoubleTapped">
+                                    <Button.ContextMenu>
+                                        <ContextMenu Opening="OnLayerTabMenuOpening">
+                                            <MenuItem Header="{Binding [Edit_LayerMenuRename], Source={StaticResource Loc}}"
+                                                      Command="{Binding RenameCommand}" />
+                                            <MenuItem Header="{Binding [Edit_LayerMenuDuplicate], Source={StaticResource Loc}}"
+                                                      Command="{Binding DuplicateCommand}" />
+                                            <MenuItem Header="{Binding [Edit_LayerMenuMoveLeft], Source={StaticResource Loc}}"
+                                                      Command="{Binding MoveLeftCommand}" />
+                                            <MenuItem Header="{Binding [Edit_LayerMenuMoveRight], Source={StaticResource Loc}}"
+                                                      Command="{Binding MoveRightCommand}" />
+                                            <Separator />
+                                            <MenuItem Header="{Binding [Edit_LayerMenuDelete], Source={StaticResource Loc}}"
+                                                      Command="{Binding DeleteCommand}" />
+                                        </ContextMenu>
+                                    </Button.ContextMenu>
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Border Width="10" Height="10" CornerRadius="5"
+                                                Background="{Binding TabColor, Converter={StaticResource HexToBrush}}" />
+                                        <TextBlock Text="{Binding DisplayName}"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </DockPanel>
             </Border>
         </Grid>
 

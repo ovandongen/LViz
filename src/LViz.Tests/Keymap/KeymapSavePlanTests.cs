@@ -128,8 +128,9 @@ public class KeymapSavePlanTests
 
         var plan = KeymapSavePlan.Build(source, session);
 
-        var structureEdit = Assert.Single(plan.StructureEdits);
-        Assert.Same(edit, structureEdit);
+        var structureEdit = Assert.IsType<Add>(Assert.Single(plan.StructureEdits));
+        Assert.Equal((7, "Test"), (structureEdit.AtIndex, structureEdit.Name));
+        Assert.Equal(edit.Bindings.Select(b => b.Display), structureEdit.Bindings.Select(b => b.Display));
         Assert.Empty(plan.BindingChanges);
         Assert.Empty(plan.Renames);
 

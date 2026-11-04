@@ -1,4 +1,5 @@
 using LViz.App.Localization;
+using LViz.Core.Keymap.Writer;
 
 namespace LViz.App.ViewModels;
 
@@ -16,8 +17,9 @@ public sealed record ChoiceDialogOption(string Id, string Label, bool IsAccent);
 /// and a row of options, each closing the window with its id. Read-only by
 /// design — every string is resolved through <see cref="Loc"/> at construction,
 /// so nothing here raises <see cref="System.ComponentModel.INotifyPropertyChanged"/>.
-/// The <see cref="Conflict"/> and <see cref="QuitWithUnsavedEdits"/> factories
-/// cover the two prompts the app shows today.
+/// The <see cref="Conflict"/>, <see cref="QuitWithUnsavedEdits"/>,
+/// <see cref="LayerDeleteBlocked"/> and <see cref="LayerSettingsNotice"/>
+/// factories cover the prompts the app shows today.
 /// </summary>
 public sealed class ChoiceDialogViewModel(
     string title,
@@ -61,6 +63,52 @@ public sealed class ChoiceDialogViewModel(
             new ChoiceDialogOption("cancel", Loc.Instance["Edit_Cancel"], false),
             new ChoiceDialogOption("quit", Loc.Instance["Edit_QuitConfirm"], true),
         ]);
+
+    /// <summary>
+    /// The blocked-delete prompt naming the layer and listing one bulleted
+    /// line per reason the delete was refused. The user only acknowledges it
+    /// — there is nothing to fix from here, the blockers live in the file.
+    /// </summary>
+    public static ChoiceDialogViewModel LayerDeleteBlocked(LayerDeleteBlockedRequest request) => new(
+        Loc.Instance["Edit_DeleteBlockedTitle"],
+        Bulleted(
+            Loc.Instance.Format("Edit_DeleteBlockedFormat", request.LayerName),
+            request.Blockers.Select(BlockerText)),
+        [new ChoiceDialogOption("ok", Loc.Instance["Edit_Ok"], true)]);
+
+    /// <summary>
+    /// The after-save notice about layer settings the structural save moved:
+    /// one bulleted line per setting that was dropped or needs a look. The
+    /// lines arrive already translated — the remap owns their content, this
+    /// prompt only frames them.
+    /// </summary>
+    public static ChoiceDialogViewModel LayerSettingsNotice(IReadOnlyList<string> lines) => new(
+        Loc.Instance["Edit_LayerSettingsNoticeTitle"],
+        Bulleted(Loc.Instance["Edit_LayerSettingsNoticeIntro"], lines),
+        [new ChoiceDialogOption("ok", Loc.Instance["Edit_Ok"], true)]);
+
+    /// <summary>The intro line followed by every other line as a bullet.</summary>
+    private static string Bulleted(string intro, IEnumerable<string> lines) =>
+        string.Join("\n", [intro, .. lines.Select(line => "• " + line)]);
+
+    /// <summary>
+    /// The sentence for one delete blocker. Named blockers name themselves;
+    /// an unnamed <see cref="LayerDeleteBlockerKind.Other"/> blocker falls
+    /// back to a phrasing that only cites the line.
+    /// </summary>
+    private static string BlockerText(LayerDeleteBlocker blocker) => blocker.Kind switch
+    {
+        LayerDeleteBlockerKind.LastLayer => Loc.Instance["Edit_BlockerLastLayer"],
+        LayerDeleteBlockerKind.Combo => Loc.Instance.Format(
+            "Edit_BlockerComboFormat", blocker.Name),
+        LayerDeleteBlockerKind.ConditionalLayer => Loc.Instance.Format(
+            "Edit_BlockerConditionalFormat", blocker.Name, blocker.Line),
+        LayerDeleteBlockerKind.DefineUsage => Loc.Instance.Format(
+            "Edit_BlockerDefineFormat", blocker.Name, blocker.Line),
+        _ => blocker.Name.Length > 0
+            ? Loc.Instance.Format("Edit_BlockerOtherFormat", blocker.Name, blocker.Line)
+            : Loc.Instance.Format("Edit_BlockerOtherUnnamedFormat", blocker.Line),
+    };
 
     /// <summary>
     /// Maps a dialog result back to a save-conflict answer. Anything that is

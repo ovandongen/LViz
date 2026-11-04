@@ -80,6 +80,57 @@
             <Setter Property="Opacity" Value="0.7" />
         </Style>
 
+        <!-- Button on an AccentBlue surface (Classes="onAccent": the edit
+             banner). Fluent's default white-on-light text doesn't read there, so
+             it follows the accent rule: dark BgBase text with a BgBase outline,
+             inverting to a dark fill with accent text on hover. Add "primary"
+             for the banner's main action, which is dark from the start. -->
+        <Style Selector="Button.onAccent">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource BgBase}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BgBase}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Button.onAccent:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource BgBase}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentBlue}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BgBase}" />
+        </Style>
+        <Style Selector="Button.onAccent:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource BgBase}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentBlue}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BgBase}" />
+            <Setter Property="Opacity" Value="0.85" />
+        </Style>
+        <Style Selector="Button.onAccent:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource BgBase}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BgBase}" />
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+        <!-- A PathIcon doesn't pick up the button's Foreground (Fluent gives
+             icons their own), so the banner's undo/redo icons follow it here. -->
+        <Style Selector="Button.onAccent PathIcon">
+            <Setter Property="Foreground" Value="{DynamicResource BgBase}" />
+        </Style>
+        <Style Selector="Button.onAccent:pointerover PathIcon, Button.onAccent:pressed PathIcon">
+            <Setter Property="Foreground" Value="{DynamicResource AccentBlue}" />
+        </Style>
+        <Style Selector="Button.onAccent:disabled PathIcon">
+            <Setter Property="Foreground" Value="{DynamicResource BgBase}" />
+        </Style>
+        <Style Selector="Button.onAccent.primary">
+            <Setter Property="Background" Value="{DynamicResource BgBase}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentBlue}" />
+        </Style>
+        <Style Selector="Button.onAccent.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Opacity" Value="0.85" />
+        </Style>
+        <Style Selector="Button.onAccent.primary:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource BgBase}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentBlue}" />
+        </Style>
+
         <!-- Text link styled as a button (Classes="link"): no background or
              border in any state, accent text that brightens on hover. -->
         <Style Selector="Button.link">

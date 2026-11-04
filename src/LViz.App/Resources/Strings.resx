@@ -1551,6 +1551,30 @@
     <value>Can't save: {0}</value>
     <comment/>
   </data>
+  <data name="Edit_LayerDeletedFormat" xml:space="preserve">
+    <value>Deleted layer {0}; {1} keys that pointed at it were cleared. Undo brings them back.</value>
+    <comment/>
+  </data>
+  <data name="Edit_LayerDeletedNoRefsFormat" xml:space="preserve">
+    <value>Deleted layer {0}. Undo brings it back.</value>
+    <comment/>
+  </data>
+  <data name="Edit_LayerActionFailedFormat" xml:space="preserve">
+    <value>Can't change the layers: {0}</value>
+    <comment/>
+  </data>
+  <data name="Edit_NoticeAppRuleRemovedFormat" xml:space="preserve">
+    <value>Auto-switch rule for "{0}" removed: its layer {1} was deleted.</value>
+    <comment/>
+  </data>
+  <data name="Edit_NoticeMouseLayerClearedFormat" xml:space="preserve">
+    <value>Mouse layer setting cleared: layer {0} was deleted.</value>
+    <comment/>
+  </data>
+  <data name="Edit_NoticePipelineCheckFormat" xml:space="preserve">
+    <value>Pipeline "{0}" switches to layer {1}, which was moved or deleted. Please check it.</value>
+    <comment/>
+  </data>
   <data name="Tooltip_EditKeymap" xml:space="preserve">
     <value>Edit keymap</value>
     <comment/>
@@ -1881,6 +1905,90 @@
   </data>
   <data name="KeyDialog_UseCountFormat" xml:space="preserve">
     <value>×{0}</value>
+    <comment/>
+  </data>
+  <data name="Edit_RenameLayerTitle" xml:space="preserve">
+    <value>Rename layer</value>
+    <comment/>
+  </data>
+  <data name="Edit_RenameLayerPromptFormat" xml:space="preserve">
+    <value>New name for layer {0} ({1}):</value>
+    <comment/>
+  </data>
+  <data name="Edit_RenameLayerConfirm" xml:space="preserve">
+    <value>Rename</value>
+    <comment/>
+  </data>
+  <data name="Edit_Ok" xml:space="preserve">
+    <value>OK</value>
+    <comment/>
+  </data>
+  <data name="Edit_DeleteBlockedTitle" xml:space="preserve">
+    <value>Can't delete layer</value>
+    <comment/>
+  </data>
+  <data name="Edit_DeleteBlockedFormat" xml:space="preserve">
+    <value>Layer {0} can't be deleted:</value>
+    <comment/>
+  </data>
+  <data name="Edit_BlockerLastLayer" xml:space="preserve">
+    <value>it is the keymap's only layer</value>
+    <comment/>
+  </data>
+  <data name="Edit_BlockerComboFormat" xml:space="preserve">
+    <value>combo {0} uses it</value>
+    <comment/>
+  </data>
+  <data name="Edit_BlockerConditionalFormat" xml:space="preserve">
+    <value>conditional layer {0} uses it (line {1})</value>
+    <comment/>
+  </data>
+  <data name="Edit_BlockerDefineFormat" xml:space="preserve">
+    <value>its name {0} is used outside the layers (line {1})</value>
+    <comment/>
+  </data>
+  <data name="Edit_BlockerOtherFormat" xml:space="preserve">
+    <value>{0} refers to it (line {1})</value>
+    <comment/>
+  </data>
+  <data name="Edit_BlockerOtherUnnamedFormat" xml:space="preserve">
+    <value>the file refers to it outside the layers (line {0})</value>
+    <comment/>
+  </data>
+  <data name="Edit_LayerSettingsNoticeTitle" xml:space="preserve">
+    <value>Settings updated</value>
+    <comment/>
+  </data>
+  <data name="Edit_LayerSettingsNoticeIntro" xml:space="preserve">
+    <value>The layers changed, so LViz moved your layer settings. Some need a look:</value>
+    <comment/>
+  </data>
+  <data name="Tooltip_EditAddLayer" xml:space="preserve">
+    <value>New layer (Cmd/Ctrl+Shift+N)</value>
+    <comment/>
+  </data>
+  <data name="Tooltip_EditLayerMenu" xml:space="preserve">
+    <value>Layer actions for the shown layer</value>
+    <comment/>
+  </data>
+  <data name="Edit_LayerMenuRename" xml:space="preserve">
+    <value>Rename…</value>
+    <comment/>
+  </data>
+  <data name="Edit_LayerMenuDuplicate" xml:space="preserve">
+    <value>Duplicate (Cmd/Ctrl+Shift+D)</value>
+    <comment/>
+  </data>
+  <data name="Edit_LayerMenuMoveLeft" xml:space="preserve">
+    <value>Move left (Cmd/Ctrl+Alt+←)</value>
+    <comment/>
+  </data>
+  <data name="Edit_LayerMenuMoveRight" xml:space="preserve">
+    <value>Move right (Cmd/Ctrl+Alt+→)</value>
+    <comment/>
+  </data>
+  <data name="Edit_LayerMenuDelete" xml:space="preserve">
+    <value>Delete</value>
     <comment/>
   </data>
 </root>

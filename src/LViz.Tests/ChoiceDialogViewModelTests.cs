@@ -1,5 +1,6 @@
 using LViz.App.Localization;
 using LViz.App.ViewModels;
+using LViz.Core.Keymap.Writer;
 using Xunit;
 
 namespace LViz.Tests;
@@ -81,6 +82,72 @@ public class ChoiceDialogViewModelTests
         Assert.Equal(expected, ChoiceDialogViewModel.ToConflictChoice(id));
 
     [Fact]
+    public void LayerDeleteBlocked_ListsEveryBlocker_BelowTheLayerLine()
+    {
+        var vm = ChoiceDialogViewModel.LayerDeleteBlocked(new LayerDeleteBlockedRequest(
+            "Raise",
+            [
+                new LayerDeleteBlocker(LayerDeleteBlockerKind.Combo, "combo_raise", 0),
+                new LayerDeleteBlocker(LayerDeleteBlockerKind.DefineUsage, "LAYER_Raise", 42),
+            ]));
+
+        Assert.Equal(Loc.Instance["Edit_DeleteBlockedTitle"], vm.Title);
+        Assert.StartsWith(Loc.Instance.Format("Edit_DeleteBlockedFormat", "Raise"), vm.Message);
+        Assert.Contains(
+            "• " + Loc.Instance.Format("Edit_BlockerComboFormat", "combo_raise"),
+            vm.Message);
+        Assert.Contains(
+            "• " + Loc.Instance.Format("Edit_BlockerDefineFormat", "LAYER_Raise", 42),
+            vm.Message);
+
+        var ok = Assert.Single(vm.Options);
+        Assert.Equal("ok", ok.Id);
+        Assert.Equal(Loc.Instance["Edit_Ok"], ok.Label);
+        Assert.True(ok.IsAccent);
+    }
+
+    [Fact]
+    public void LayerDeleteBlocked_OtherWithoutName_UsesUnnamedPhrasing()
+    {
+        var vm = ChoiceDialogViewModel.LayerDeleteBlocked(new LayerDeleteBlockedRequest(
+            "Raise",
+            [new LayerDeleteBlocker(LayerDeleteBlockerKind.Other, "", 7)]));
+
+        Assert.Contains(
+            "• " + Loc.Instance.Format("Edit_BlockerOtherUnnamedFormat", 7),
+            vm.Message);
+        Assert.DoesNotContain(
+            "• " + Loc.Instance.Format("Edit_BlockerOtherFormat", "", 7),
+            vm.Message);
+    }
+
+    [Fact]
+    public void LayerDeleteBlocked_LastLayer_UsesItsOwnPhrasing()
+    {
+        var vm = ChoiceDialogViewModel.LayerDeleteBlocked(new LayerDeleteBlockedRequest(
+            "Def",
+            [new LayerDeleteBlocker(LayerDeleteBlockerKind.LastLayer, "Base", 0)]));
+
+        Assert.Contains("• " + Loc.Instance["Edit_BlockerLastLayer"], vm.Message);
+        Assert.Single(vm.Options);
+    }
+
+    [Fact]
+    public void LayerSettingsNotice_JoinsLines_AsBullets_WithSingleOk()
+    {
+        var vm = ChoiceDialogViewModel.LayerSettingsNotice(["a", "b"]);
+
+        Assert.Equal(Loc.Instance["Edit_LayerSettingsNoticeTitle"], vm.Title);
+        Assert.Equal(
+            Loc.Instance["Edit_LayerSettingsNoticeIntro"] + "\n• a\n• b",
+            vm.Message);
+
+        var ok = Assert.Single(vm.Options);
+        Assert.Equal("ok", ok.Id);
+        Assert.True(ok.IsAccent);
+    }
+
+    [Fact]
     public void EveryPrompt_TitleMessageAndLabel_ResolvesLocally()
     {
         var dialogs = new[]
@@ -88,6 +155,17 @@ public class ChoiceDialogViewModelTests
             ChoiceDialogViewModel.Conflict(new KeymapConflictRequest(false, "x.keymap")),
             ChoiceDialogViewModel.Conflict(new KeymapConflictRequest(true, "o/r (main)")),
             ChoiceDialogViewModel.QuitWithUnsavedEdits(3),
+            ChoiceDialogViewModel.LayerDeleteBlocked(new LayerDeleteBlockedRequest(
+                "Raise",
+                [
+                    new LayerDeleteBlocker(LayerDeleteBlockerKind.LastLayer, "Base", 0),
+                    new LayerDeleteBlocker(LayerDeleteBlockerKind.Combo, "combo_raise", 0),
+                    new LayerDeleteBlocker(LayerDeleteBlockerKind.ConditionalLayer, "cond", 5),
+                    new LayerDeleteBlocker(LayerDeleteBlockerKind.DefineUsage, "LAYER_Raise", 42),
+                    new LayerDeleteBlocker(LayerDeleteBlockerKind.Other, "something", 9),
+                    new LayerDeleteBlocker(LayerDeleteBlockerKind.Other, "", 9),
+                ])),
+            ChoiceDialogViewModel.LayerSettingsNotice(["moved a colour", "dropped a rule"]),
         };
 
         var texts = dialogs

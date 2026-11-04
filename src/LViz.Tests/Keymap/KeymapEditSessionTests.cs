@@ -426,7 +426,7 @@ public class KeymapEditSessionTests
         Assert.False(session.IsLayerAdded(2));
         Assert.Equal(1, session.ChangeCount); // the layer itself; its own keys read as unchanged
         Assert.False(session.IsKeyChanged(1, 0));
-        Assert.Same(edit, Assert.Single(session.PendingStructureEdits));
+        AssertSameEdit(edit, Assert.Single(session.PendingStructureEdits));
         Assert.Equal(1, raised);
         Assert.True(session.CanUndo);
         Assert.False(session.CanRedo);
@@ -442,7 +442,7 @@ public class KeymapEditSessionTests
         Assert.Same(after, session.Current);
         Assert.True(session.IsLayerAdded(1));
         Assert.Equal(1, session.ChangeCount);
-        Assert.Same(edit, Assert.Single(session.PendingStructureEdits));
+        AssertSameEdit(edit, Assert.Single(session.PendingStructureEdits));
         Assert.Equal(3, raised);
     }
 
@@ -502,7 +502,7 @@ public class KeymapEditSessionTests
         Assert.Same(after, session.Current);
         Assert.Equal(2, session.Current.Layers.Count);
         Assert.Equal(1, session.ChangeCount);
-        Assert.Same(edit, Assert.Single(session.PendingStructureEdits));
+        AssertSameEdit(edit, Assert.Single(session.PendingStructureEdits));
         Assert.False(session.IsLayerAdded(0));
         Assert.False(session.IsLayerAdded(2)); // outside the keymap now
 
@@ -588,7 +588,7 @@ public class KeymapEditSessionTests
 
         Assert.Same(afterMove, session.Current);
         Assert.Equal(1, session.ChangeCount); // the order, nothing else
-        Assert.Same(move, Assert.Single(session.PendingStructureEdits));
+        Assert.Equal(move, Assert.Single(session.PendingStructureEdits));
 
         var back = WithLayers(config, config.Layers[0], config.Layers[1], config.Layers[2]);
         Assert.True(session.ApplyStructure(new LayerStructureEdit.Move(2, 0), back));
@@ -640,7 +640,7 @@ public class KeymapEditSessionTests
     }
 
     [Fact]
-    public void PendingStructureEdits_AreOldestFirst_AndSkipTheNonStructuralSteps()
+    public void PendingStructureEdits_AreTheNetEdits_NotTheHistory()
     {
         var config = Config();
         var session = new KeymapEditSession(config);
@@ -653,19 +653,125 @@ public class KeymapEditSessionTests
 
         var moved = new LayerStructureEdit.Move(0, 3);
         var afterMove = WithLayers(
-            config, config.Layers[0], config.Layers[1], config.Layers[2], withAdded.Layers[0]);
+            config, config.Layers[0], config.Layers[1], config.Layers[2], session.Current.Layers[0]);
         Assert.True(session.ApplyStructure(moved, afterMove));
 
-        var edits = session.PendingStructureEdits;
-        Assert.Equal(2, edits.Count);
-        Assert.Same(add, edits[0]); // oldest first: the save path replays them in order
-        Assert.Same(moved, edits[1]);
+        // add-at-0 then move-to-the-end is one add at the end, with the bindings
+        // it was added with (the key edit comes out of the binding diff)
+        AssertSameEdit(
+            new LayerStructureEdit.Add(3, "extra", added.Bindings),
+            Assert.Single(session.PendingStructureEdits));
 
         // the binding step rode along: undoing the move puts the layer back under it
         Assert.True(session.Undo());
         Assert.True(session.Undo());
         Assert.False(session.IsKeyChanged(0, 0));
         Assert.Equal("&kp N0", session.Current.Layers[0].Bindings[0].Display);
+    }
+
+    [Fact]
+    public void PendingStructureEdits_AMoveTheUserReversedByHand_IsDropped()
+    {
+        var config = Config();
+        var session = new KeymapEditSession(config);
+        var added = Added("extra");
+        Assert.True(session.ApplyStructure(
+            new LayerStructureEdit.Add(3, "extra", added.Bindings),
+            WithLayers(config, config.Layers[0], config.Layers[1], config.Layers[2], added)));
+        var c = session.Current;
+        Assert.True(session.ApplyStructure(
+            new LayerStructureEdit.Move(1, 2), WithLayers(c, c.Layers[0], c.Layers[2], c.Layers[1], c.Layers[3])));
+        c = session.Current;
+        Assert.True(session.ApplyStructure(
+            new LayerStructureEdit.Move(2, 1), WithLayers(c, c.Layers[0], c.Layers[2], c.Layers[1], c.Layers[3])));
+
+        AssertSameEdit(
+            new LayerStructureEdit.Add(3, "extra", added.Bindings),
+            Assert.Single(session.PendingStructureEdits));
+    }
+
+    [Fact]
+    public void PendingStructureEdits_DeletesComeHighestFirst_InBaselineNumbers_ThenMovesThenAdds()
+    {
+        var config = WithLayers(Config(), Config().Layers[0], Config().Layers[1], Config().Layers[2],
+            Added("d", "D"), Added("e", "E"));
+        var session = new KeymapEditSession(config);
+        var added = Added("extra");
+        var l = config.Layers;
+
+        // delete 1 → [0,2,3,4]; delete (now) 2 = baseline 3 → [0,2,4]
+        Assert.True(session.ApplyStructure(new LayerStructureEdit.Delete(1), WithLayers(config, l[0], l[2], l[3], l[4])));
+        Assert.True(session.ApplyStructure(new LayerStructureEdit.Delete(2), WithLayers(config, l[0], l[2], l[4])));
+        // move 4 to the front → [4,0,2]; add at 1 → [4,extra,0,2]
+        Assert.True(session.ApplyStructure(new LayerStructureEdit.Move(2, 0), WithLayers(config, l[4], l[0], l[2])));
+        Assert.True(session.ApplyStructure(
+            new LayerStructureEdit.Add(1, "extra", added.Bindings), WithLayers(config, l[4], added, l[0], l[2])));
+
+        var edits = session.PendingStructureEdits;
+        Assert.Equal(4, edits.Count);
+        Assert.Equal(new LayerStructureEdit.Delete(3), edits[0]);
+        Assert.Equal(new LayerStructureEdit.Delete(1), edits[1]);
+        Assert.Equal(new LayerStructureEdit.Move(2, 0), edits[2]);
+        AssertSameEdit(new LayerStructureEdit.Add(1, "extra", added.Bindings), edits[3]);
+    }
+
+    [Fact]
+    public void PendingStructureEdits_ReplayedOntoTheBaselineIds_GiveTheCurrentOrder()
+    {
+        // every permutation of 4 layers: the net moves rebuild exactly that order
+        var config = WithLayers(Config(), Config().Layers[0], Config().Layers[1], Config().Layers[2], Added("d", "D"));
+        foreach (var order in Permutations([0, 1, 2, 3]))
+        {
+            var session = new KeymapEditSession(config);
+            var ids = new List<int> { 0, 1, 2, 3 };
+            // reach the order by moving each target layer into place
+            for (int p = 0; p < order.Count; p++)
+            {
+                var from = ids.IndexOf(order[p]);
+                if (from == p) continue;
+                var c = session.Current;
+                var layers = c.Layers.ToList();
+                var layer = layers[from];
+                layers.RemoveAt(from);
+                layers.Insert(p, layer);
+                Assert.True(session.ApplyStructure(new LayerStructureEdit.Move(from, p), WithLayers(c, [.. layers])));
+                ids.RemoveAt(from);
+                ids.Insert(p, order[p]);
+            }
+
+            var replay = new List<int> { 0, 1, 2, 3 };
+            foreach (var edit in session.PendingStructureEdits)
+            {
+                var move = Assert.IsType<LayerStructureEdit.Move>(edit);
+                var id = replay[move.From];
+                replay.RemoveAt(move.From);
+                replay.Insert(move.To, id);
+            }
+            Assert.Equal(order, replay);
+        }
+    }
+
+    private static IEnumerable<List<int>> Permutations(List<int> items)
+    {
+        if (items.Count <= 1) { yield return [.. items]; yield break; }
+        foreach (var item in items)
+            foreach (var rest in Permutations(items.Where(i => i != item).ToList()))
+                yield return [item, .. rest];
+    }
+
+    /// <summary>Record equality compares an Add's bindings list by reference;
+    /// compare its fields and the bindings by content instead.</summary>
+    private static void AssertSameEdit(LayerStructureEdit expected, LayerStructureEdit actual)
+    {
+        if (expected is LayerStructureEdit.Add add)
+        {
+            var other = Assert.IsType<LayerStructureEdit.Add>(actual);
+            Assert.Equal(add.AtIndex, other.AtIndex);
+            Assert.Equal(add.Name, other.Name);
+            Assert.Equal(add.Bindings.Select(b => b.Display), other.Bindings.Select(b => b.Display));
+            return;
+        }
+        Assert.Equal(expected, actual);
     }
 
     [Fact]
@@ -824,6 +930,119 @@ public class KeymapEditSessionTests
             WithLayers(config, config.Layers[0], added, config.Layers[1], config.Layers[2]));
 
         Assert.False(session.IsLayerAdded(layer));
+    }
+
+    // ---- baseline layer identity ------------------------------------------------
+
+    [Fact]
+    public void BaselineIdentity_FreshSession_EveryIdEqualsItsPosition()
+    {
+        var session = new KeymapEditSession(Config());
+
+        Assert.Equal(0, session.BaselineIndexOf(0));
+        Assert.Equal(1, session.BaselineIndexOf(1));
+        Assert.Equal(2, session.BaselineIndexOf(2));
+        Assert.Null(session.BaselineIndexOf(3));
+        Assert.Null(session.BaselineIndexOf(-1));
+        Assert.Equal([0, 1, 2], session.BaselineLayerMap());
+    }
+
+    [Fact]
+    public void BaselineIdentity_AfterAnAdd_TheAddedLayerHasNoBaselineAndTheRestShift()
+    {
+        var config = Config();
+        var session = new KeymapEditSession(config);
+        var added = Added("extra");
+        session.ApplyStructure(
+            new LayerStructureEdit.Add(1, "extra", added.Bindings),
+            WithLayers(config, config.Layers[0], added, config.Layers[1], config.Layers[2]));
+
+        Assert.Null(session.BaselineIndexOf(1));
+        Assert.Equal(1, session.BaselineIndexOf(2));
+        Assert.Equal(2, session.BaselineIndexOf(3));
+        Assert.Equal([0, 2, 3], session.BaselineLayerMap());
+    }
+
+    [Fact]
+    public void BaselineIdentity_AfterADelete_TheDeletedBaselineLayerMapsToNull()
+    {
+        var config = Config();
+        var session = new KeymapEditSession(config);
+        session.ApplyStructure(
+            new LayerStructureEdit.Delete(1),
+            WithLayers(config, config.Layers[0], config.Layers[2]));
+
+        Assert.Equal(2, session.BaselineIndexOf(1));
+        Assert.Equal([0, null, 1], session.BaselineLayerMap());
+    }
+
+    [Fact]
+    public void BaselineIdentity_AfterAMove_TheMapFollowsTheLayers()
+    {
+        var config = Config();
+        var session = new KeymapEditSession(config);
+        session.ApplyStructure(
+            new LayerStructureEdit.Move(0, 2),
+            WithLayers(config, config.Layers[1], config.Layers[2], config.Layers[0]));
+
+        Assert.Equal(0, session.BaselineIndexOf(2));
+        Assert.Equal(1, session.BaselineIndexOf(0));
+        Assert.Equal([2, 0, 1], session.BaselineLayerMap());
+
+        // undo/redo walk the map with the layer list
+        Assert.True(session.Undo());
+        Assert.Equal([0, 1, 2], session.BaselineLayerMap());
+
+        Assert.True(session.Redo());
+        Assert.Equal([2, 0, 1], session.BaselineLayerMap());
+    }
+
+    [Fact]
+    public void LayerId_StaysWithItsLayer_ThroughMoveUndoAndRedo()
+    {
+        var config = Config();
+        var session = new KeymapEditSession(config);
+        var id = session.LayerIdAt(0)!.Value;
+        session.ApplyStructure(
+            new LayerStructureEdit.Move(0, 2),
+            WithLayers(config, config.Layers[1], config.Layers[2], config.Layers[0]));
+
+        Assert.Equal(2, session.IndexOfLayerId(id));
+        Assert.True(session.Undo());
+        Assert.Equal(0, session.IndexOfLayerId(id));
+        Assert.True(session.Redo());
+        Assert.Equal(2, session.IndexOfLayerId(id));
+
+        Assert.Null(session.LayerIdAt(3));
+        Assert.Null(session.LayerIdAt(-1));
+    }
+
+    [Fact]
+    public void IndexOfLayerId_AnUndoneAdd_IsGone()
+    {
+        var config = Config();
+        var session = new KeymapEditSession(config);
+        var added = Added("extra");
+        session.ApplyStructure(
+            new LayerStructureEdit.Add(3, "extra", added.Bindings),
+            WithLayers(config, config.Layers[0], config.Layers[1], config.Layers[2], added));
+        var id = session.LayerIdAt(3)!.Value;
+
+        Assert.True(session.Undo());
+
+        Assert.Null(session.IndexOfLayerId(id));
+    }
+
+    [Fact]
+    public void BaselineLayerMap_IsANewListEveryCall()
+    {
+        var session = new KeymapEditSession(Config());
+
+        var first = session.BaselineLayerMap();
+        var second = session.BaselineLayerMap();
+
+        Assert.NotSame(first, second);
+        Assert.Equal(first, second);
     }
 
     [Fact]

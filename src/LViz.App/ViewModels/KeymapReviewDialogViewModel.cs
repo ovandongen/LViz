@@ -1,3 +1,4 @@
+using CommunityToolkit.Mvvm.ComponentModel;
 using LViz.App.Localization;
 using LViz.Core.Keymap.Editing;
 
@@ -7,14 +8,13 @@ namespace LViz.App.ViewModels;
 /// View model for the review-before-saving dialog: what saving
 /// <see cref="KeymapSavePlan"/> amounts to, as one translated line per change —
 /// structure edits first, then renames, then keys — plus the commit message a
-/// GitHub save would carry (null for a local file).
+/// GitHub save will carry (null for a local file), which the user may edit.
 /// <para>
-/// Read-only by design: the dialog shows a frozen plan and cannot change it, so
-/// <see cref="Lines"/> is built once in the constructor and nothing here raises
-/// <see cref="System.ComponentModel.INotifyPropertyChanged"/>.
+/// The change list is a frozen plan, built once in the constructor; only the
+/// commit message changes, and with it whether Save is possible.
 /// </para>
 /// </summary>
-public sealed class KeymapReviewDialogViewModel
+public sealed partial class KeymapReviewDialogViewModel : ObservableObject
 {
     private readonly KeymapReviewRequest _request;
 
@@ -23,6 +23,7 @@ public sealed class KeymapReviewDialogViewModel
         ArgumentNullException.ThrowIfNull(request);
         _request = request;
         Lines = BuildLines(request.Plan);
+        _commitMessage = request.CommitMessage;
     }
 
     /// <summary>"These changes will be saved to &lt;target&gt;:".</summary>
@@ -32,13 +33,24 @@ public sealed class KeymapReviewDialogViewModel
     /// order structure edits, renames, keys.</summary>
     public IReadOnlyList<string> Lines { get; }
 
-    /// <summary>The message a GitHub commit would carry, else
-    /// <see langword="null"/>. Shown verbatim — it is what goes to GitHub, so it
-    /// is not translated.</summary>
-    public string? CommitMessage => _request.CommitMessage;
+    /// <summary>The message the GitHub commit will carry, starting at the
+    /// generated one; <see langword="null"/> for a local file. Not translated
+    /// — it is what goes to GitHub.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSave))]
+    private string? _commitMessage;
 
     /// <summary>False for a local file, where there is nothing to commit.</summary>
-    public bool HasCommitMessage => CommitMessage is not null;
+    public bool HasCommitMessage => _request.CommitMessage is not null;
+
+    /// <summary>False while a GitHub save's commit message is blank: GitHub
+    /// refuses a commit without one.</summary>
+    public bool CanSave => !HasCommitMessage || !string.IsNullOrWhiteSpace(CommitMessage);
+
+    /// <summary>The go-ahead with the commit message trimmed, or
+    /// <see langword="null"/> while <see cref="CanSave"/> is false.</summary>
+    public KeymapReviewAnswer? Answer() =>
+        !CanSave ? null : new KeymapReviewAnswer(HasCommitMessage ? CommitMessage!.Trim() : null);
 
     private static IReadOnlyList<string> BuildLines(KeymapSavePlan plan)
     {

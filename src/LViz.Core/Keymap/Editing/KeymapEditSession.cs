@@ -310,14 +310,20 @@ public sealed class KeymapEditSession
     }
 
     /// <summary>
-    /// The structural steps still on the undo stack, oldest first — what the save
-    /// path replays against the <c>.keymap</c> text before writing out the diff of
-    /// the result.
+    /// The layer adds, deletes and moves that turn the baseline layer list into
+    /// the current one, in the order the save path replays them against the
+    /// <c>.keymap</c> text before writing out the diff of the result. Derived
+    /// from where each layer started and where it is now, not from the undo
+    /// history, so steps the user reversed by hand (a move and the move back, an
+    /// add and the delete of that layer) never show up.
     /// </summary>
     /// <remarks>
-    /// Deliberately empty whenever the layer ids are back to the baseline list: a
-    /// move and the move back, or an add and the delete of that layer, leave
-    /// nothing structural to save even though the steps are still undoable.
+    /// The order: deletes from the highest baseline position down (so every
+    /// index is still the baseline one), then moves, leaving the longest run of
+    /// layers that is already in baseline order where it is, then adds at their
+    /// final positions, lowest first. An add carries the layer's current name and
+    /// the bindings it was added with; key edits on it come out of the binding
+    /// diff. Empty whenever the layer ids are back to the baseline list.
     /// </remarks>
     public IReadOnlyList<LayerStructureEdit> PendingStructureEdits
     {
@@ -326,13 +332,66 @@ public sealed class KeymapEditSession
             if (IdsMatchBaseline()) return [];
 
             var edits = new List<LayerStructureEdit>();
-            foreach (var step in _undo) // the stack enumerates newest first
-                if (step is StructureStep structure)
-                    edits.Add(structure.Edit);
+            var work = Enumerable.Range(0, _baselineLayerCount).ToList();
+            var kept = _layerIds.Where(id => id < _baselineLayerCount).ToList();
+            var keptSet = kept.ToHashSet();
 
-            edits.Reverse();
+            for (int i = work.Count - 1; i >= 0; i--)
+            {
+                if (keptSet.Contains(work[i])) continue;
+                edits.Add(new LayerStructureEdit.Delete(i));
+                work.RemoveAt(i);
+            }
+
+            // Each moved layer lands right after its predecessor in the current
+            // order. Processing them in that order keeps everything placed so far,
+            // plus the run that stays, in current order.
+            var stays = LongestIncreasingRun(kept);
+            for (int p = 0; p < kept.Count; p++)
+            {
+                var id = kept[p];
+                if (stays.Contains(id)) continue;
+                var from = work.IndexOf(id);
+                work.RemoveAt(from);
+                var to = p == 0 ? 0 : work.IndexOf(kept[p - 1]) + 1;
+                work.Insert(to, id);
+                if (from != to) edits.Add(new LayerStructureEdit.Move(from, to));
+            }
+
+            for (int p = 0; p < _layerIds.Count; p++)
+            {
+                var id = _layerIds[p];
+                if (id < _baselineLayerCount) continue;
+                edits.Add(new LayerStructureEdit.Add(p, Current.Layers[p].Name, _origins[id].Bindings));
+            }
+
             return edits;
         }
+    }
+
+    /// <summary>The ids on one longest strictly increasing subsequence of
+    /// <paramref name="ids"/>: the layers a reorder can leave where they are.</summary>
+    private static HashSet<int> LongestIncreasingRun(IReadOnlyList<int> ids)
+    {
+        var length = new int[ids.Count];
+        var previous = new int[ids.Count];
+        var best = -1;
+        for (int i = 0; i < ids.Count; i++)
+        {
+            length[i] = 1;
+            previous[i] = -1;
+            for (int j = 0; j < i; j++)
+                if (ids[j] < ids[i] && length[j] + 1 > length[i])
+                {
+                    length[i] = length[j] + 1;
+                    previous[i] = j;
+                }
+            if (best < 0 || length[i] > length[best]) best = i;
+        }
+
+        var run = new HashSet<int>();
+        for (var i = best; i >= 0; i = previous[i]) run.Add(ids[i]);
+        return run;
     }
 
     private static string Describe(LayerStructureEdit edit) => edit switch
@@ -429,6 +488,67 @@ public sealed class KeymapEditSession
     {
         if (layerIndex < 0 || layerIndex >= _layerIds.Count) return false;
         return _layerIds[layerIndex] >= _baselineLayerCount;
+    }
+
+    /// <summary>
+    /// Which baseline layer the layer now at <paramref name="layerIndex"/> is: its
+    /// position in <see cref="Baseline"/>. <see langword="null"/> for a layer this
+    /// session added, and for an index outside <see cref="Current"/>.
+    /// </summary>
+    /// <remarks>
+    /// What lets per-layer settings (tab colours, hidden layers, …) follow a layer
+    /// that moved: pass the current position, get the identity the settings were
+    /// keyed by. The inverse lookup — where a baseline layer sits now — is
+    /// <see cref="BaselineLayerMap"/>.
+    /// </remarks>
+    public int? BaselineIndexOf(int layerIndex)
+    {
+        if (layerIndex < 0 || layerIndex >= _layerIds.Count) return null;
+        var id = _layerIds[layerIndex];
+        return id < _baselineLayerCount ? id : null;
+    }
+
+    /// <summary>
+    /// The session's id of the layer now at <paramref name="layerIndex"/>, or
+    /// <see langword="null"/> for an index outside <see cref="Current"/>. Ids
+    /// stay with their layer through moves, undo and redo and are never reused,
+    /// so a caller can hold one to find the same layer again with
+    /// <see cref="IndexOfLayerId"/>.
+    /// </summary>
+    public int? LayerIdAt(int layerIndex) =>
+        layerIndex >= 0 && layerIndex < _layerIds.Count ? _layerIds[layerIndex] : null;
+
+    /// <summary>
+    /// Where the layer with id <paramref name="layerId"/> sits now in
+    /// <see cref="Current"/>.Layers, or <see langword="null"/> when it isn't
+    /// there (deleted, or its add was undone).
+    /// </summary>
+    public int? IndexOfLayerId(int layerId)
+    {
+        var position = _layerIds.IndexOf(layerId);
+        return position < 0 ? null : position;
+    }
+
+    /// <summary>
+    /// Where every baseline layer sits now: one entry per baseline layer
+    /// (<see cref="Baseline"/>.Layers.Count), entry <c>b</c> being the position in
+    /// <see cref="Current"/>.Layers where baseline layer <c>b</c> now is, or
+    /// <see langword="null"/> when it was deleted. A fresh session maps every layer
+    /// to its own position: <c>[0, 1, …, n−1]</c>.
+    /// </summary>
+    /// <remarks>
+    /// What the save path uses to move per-layer settings along with their layer.
+    /// A new list on every call — mutating it cannot affect the session.
+    /// </remarks>
+    public IReadOnlyList<int?> BaselineLayerMap()
+    {
+        var map = new int?[_baselineLayerCount];
+        for (int position = 0; position < _layerIds.Count; position++)
+        {
+            var id = _layerIds[position];
+            if (id < _baselineLayerCount) map[id] = position;
+        }
+        return map;
     }
 
     /// <summary>

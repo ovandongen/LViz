@@ -1551,6 +1551,30 @@
     <value>Kan niet opslaan: {0}</value>
     <comment/>
   </data>
+  <data name="Edit_LayerDeletedFormat" xml:space="preserve">
+    <value>Laag {0} verwijderd; {1} toetsen die ernaar verwezen zijn leeggemaakt. Ongedaan maken zet ze terug.</value>
+    <comment/>
+  </data>
+  <data name="Edit_LayerDeletedNoRefsFormat" xml:space="preserve">
+    <value>Laag {0} verwijderd. Ongedaan maken zet hem terug.</value>
+    <comment/>
+  </data>
+  <data name="Edit_LayerActionFailedFormat" xml:space="preserve">
+    <value>Kan de lagen niet wijzigen: {0}</value>
+    <comment/>
+  </data>
+  <data name="Edit_NoticeAppRuleRemovedFormat" xml:space="preserve">
+    <value>Regel voor automatisch wisselen bij "{0}" verwijderd: laag {1} is verwijderd.</value>
+    <comment/>
+  </data>
+  <data name="Edit_NoticeMouseLayerClearedFormat" xml:space="preserve">
+    <value>Muislaag-instelling gewist: laag {0} is verwijderd.</value>
+    <comment/>
+  </data>
+  <data name="Edit_NoticePipelineCheckFormat" xml:space="preserve">
+    <value>Pipeline "{0}" schakelt naar laag {1}, die verplaatst of verwijderd is. Controleer hem.</value>
+    <comment/>
+  </data>
   <data name="Tooltip_EditKeymap" xml:space="preserve">
     <value>Keymap bewerken</value>
     <comment/>
@@ -1881,6 +1905,90 @@
   </data>
   <data name="KeyDialog_UseCountFormat" xml:space="preserve">
     <value>×{0}</value>
+    <comment/>
+  </data>
+  <data name="Edit_RenameLayerTitle" xml:space="preserve">
+    <value>Laag hernoemen</value>
+    <comment/>
+  </data>
+  <data name="Edit_RenameLayerPromptFormat" xml:space="preserve">
+    <value>Nieuwe naam voor laag {0} ({1}):</value>
+    <comment/>
+  </data>
+  <data name="Edit_RenameLayerConfirm" xml:space="preserve">
+    <value>Hernoemen</value>
+    <comment/>
+  </data>
+  <data name="Edit_Ok" xml:space="preserve">
+    <value>OK</value>
+    <comment/>
+  </data>
+  <data name="Edit_DeleteBlockedTitle" xml:space="preserve">
+    <value>Laag kan niet worden verwijderd</value>
+    <comment/>
+  </data>
+  <data name="Edit_DeleteBlockedFormat" xml:space="preserve">
+    <value>Laag {0} kan niet worden verwijderd:</value>
+    <comment/>
+  </data>
+  <data name="Edit_BlockerLastLayer" xml:space="preserve">
+    <value>het is de enige laag van de keymap</value>
+    <comment/>
+  </data>
+  <data name="Edit_BlockerComboFormat" xml:space="preserve">
+    <value>combo {0} gebruikt hem</value>
+    <comment/>
+  </data>
+  <data name="Edit_BlockerConditionalFormat" xml:space="preserve">
+    <value>voorwaardelijke laag {0} gebruikt hem (regel {1})</value>
+    <comment/>
+  </data>
+  <data name="Edit_BlockerDefineFormat" xml:space="preserve">
+    <value>de naam {0} wordt buiten de lagen gebruikt (regel {1})</value>
+    <comment/>
+  </data>
+  <data name="Edit_BlockerOtherFormat" xml:space="preserve">
+    <value>{0} verwijst ernaar (regel {1})</value>
+    <comment/>
+  </data>
+  <data name="Edit_BlockerOtherUnnamedFormat" xml:space="preserve">
+    <value>het bestand verwijst ernaar buiten de lagen (regel {0})</value>
+    <comment/>
+  </data>
+  <data name="Edit_LayerSettingsNoticeTitle" xml:space="preserve">
+    <value>Instellingen bijgewerkt</value>
+    <comment/>
+  </data>
+  <data name="Edit_LayerSettingsNoticeIntro" xml:space="preserve">
+    <value>De lagen zijn gewijzigd, dus LViz heeft je laaginstellingen verplaatst. Een paar hebben aandacht nodig:</value>
+    <comment/>
+  </data>
+  <data name="Tooltip_EditAddLayer" xml:space="preserve">
+    <value>Nieuwe laag (Cmd/Ctrl+Shift+N)</value>
+    <comment/>
+  </data>
+  <data name="Tooltip_EditLayerMenu" xml:space="preserve">
+    <value>Laagacties voor de getoonde laag</value>
+    <comment/>
+  </data>
+  <data name="Edit_LayerMenuRename" xml:space="preserve">
+    <value>Hernoemen…</value>
+    <comment/>
+  </data>
+  <data name="Edit_LayerMenuDuplicate" xml:space="preserve">
+    <value>Dupliceren (Cmd/Ctrl+Shift+D)</value>
+    <comment/>
+  </data>
+  <data name="Edit_LayerMenuMoveLeft" xml:space="preserve">
+    <value>Naar links (Cmd/Ctrl+Alt+←)</value>
+    <comment/>
+  </data>
+  <data name="Edit_LayerMenuMoveRight" xml:space="preserve">
+    <value>Naar rechts (Cmd/Ctrl+Alt+→)</value>
+    <comment/>
+  </data>
+  <data name="Edit_LayerMenuDelete" xml:space="preserve">
+    <value>Verwijderen</value>
     <comment/>
   </data>
 </root>

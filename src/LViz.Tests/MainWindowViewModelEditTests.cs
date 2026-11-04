@@ -4,6 +4,7 @@ using LViz.App.Services;
 using LViz.App.ViewModels;
 using LViz.Core.Keymap;
 using LViz.Core.Keymap.Parser;
+using LViz.Core.Keymap.Writer;
 using LViz.Core.Layout;
 using LViz.Core.Models;
 using LViz.Core.Persistence;
@@ -16,10 +17,12 @@ namespace LViz.Tests;
 /// Keymap edit mode on <see cref="MainWindowViewModel"/>: entering and
 /// discarding an edit, rendering the edited keymap (literal <c>&amp;trans</c>,
 /// changed/selected marks, hidden tabs shown), key selection input, the locks
-/// that refuse keymap/board switching while an edit is open, and saving —
+/// that refuse keymap/board switching while an edit is open, saving —
 /// writing the file, staying on the active layer, and the review/conflict
-/// callbacks. Uses the real <see cref="KeymapStateService"/> over temp
-/// <c>.keymap</c> files and a temp <see cref="KeymapBackupStore"/> root.
+/// callbacks — and the layer operations (add/duplicate/move/rename/delete with
+/// the shown-layer decisions, status report and blocker dialog). Uses the real
+/// <see cref="KeymapStateService"/> over temp <c>.keymap</c> files and a temp
+/// <see cref="KeymapBackupStore"/> root.
 /// </summary>
 public class MainWindowViewModelEditTests : IDisposable
 {
@@ -174,6 +177,17 @@ public class MainWindowViewModelEditTests : IDisposable
         return vm;
     }
 
+    /// <summary>Loads the three-layer ("Base", "Lower", "Raise") temp keymap
+    /// and enters edit mode.</summary>
+    private MainWindowViewModel StartEditing3()
+    {
+        var vm = NewVm(NewSettings());
+        vm.LoadLayoutFromPath(WriteTempKeymap(text: KeymapText3()));
+        vm.StartEditCommand.Execute(null);
+        Assert.True(vm.IsEditing);
+        return vm;
+    }
+
     public void Dispose()
     {
         foreach (var file in _tempFiles)
@@ -310,11 +324,15 @@ public class MainWindowViewModelEditTests : IDisposable
 
         vm.StartEditCommand.Execute(null);
 
-        Assert.True(vm.Layers[1].IsShown);
+        // Edit mode shows every tab and hands each one the layer actions.
+        Assert.All(vm.Layers, l => Assert.True(l.IsShown));
+        Assert.All(vm.Layers, l => Assert.True(l.IsEditable));
 
         vm.DiscardEditCommand.Execute(null);
 
         Assert.False(vm.Layers[1].IsShown);
+        // Leaving edit mode rebuilds the plain tabs — no actions again.
+        Assert.All(vm.Layers, l => Assert.False(l.IsEditable));
         // "in memory only, never persisted": the hidden setting survived untouched.
         Assert.Equal(new[] { 1 }, settings.Current.HiddenLayers["Corne"]);
     }
@@ -537,7 +555,7 @@ public class MainWindowViewModelEditTests : IDisposable
         vm.ReviewChangesRequested = request =>
         {
             captured = request;
-            return Task.FromResult(false);
+            return Task.FromResult<KeymapReviewAnswer?>(null);
         };
         ClearKeyZero(vm);
 
@@ -844,5 +862,426 @@ public class MainWindowViewModelEditTests : IDisposable
         // The switch is refused and the combo is re-raised so it snaps back.
         Assert.Same(active, vm.SelectedKeyboard);
         Assert.Equal(active, settingsVm.SelectedKeyboardProfile);
+    }
+
+    // ---- layer operations ---------------------------------------------------------
+
+    private static List<string> LayerNames(MainWindowViewModel vm) =>
+        vm.Edit!.Session.Current.Layers.Select(l => l.Name).ToList();
+
+    [Fact]
+    public void NewLayer_AppendsShowsCounts_UndoOfAddClampsShownLayer()
+    {
+        var vm = StartEditing(out _);
+
+        Assert.True(vm.NewLayerCommand.CanExecute(null));
+        vm.NewLayerCommand.Execute(null);
+
+        Assert.Equal(3, vm.Edit!.Session.Current.Layers.Count);
+        Assert.Equal(2, vm.ActiveLayerIndex);
+        Assert.Equal(1, vm.UnsavedEditCount);
+
+        // Undoing the add removes the shown layer — the board falls back to
+        // the last remaining one instead of painting nothing.
+        vm.Edit.UndoCommand.Execute(null);
+
+        Assert.Equal(2, vm.Edit.Session.Current.Layers.Count);
+        Assert.Equal(1, vm.ActiveLayerIndex);
+    }
+
+    [Fact]
+    public void DuplicateShownLayer_OnUpper_CopiesAfterItAndShowsTheCopy()
+    {
+        var vm = StartEditing(out _);
+        vm.Layers[1].SelectCommand.Execute(null);
+
+        vm.DuplicateShownLayerCommand.Execute(null);
+
+        Assert.Equal("Lower copy", LayerNames(vm)[2]);
+        Assert.Equal(2, vm.ActiveLayerIndex);
+    }
+
+    [Fact]
+    public void MoveShownLayerRight_MovesItStaysShown_EndsDisableTheMove()
+    {
+        var vm = StartEditing3();
+        vm.Layers[1].SelectCommand.Execute(null); // Lower
+
+        vm.MoveShownLayerRightCommand.Execute(null);
+
+        Assert.Equal(new[] { "Base", "Raise", "Lower" }, LayerNames(vm));
+        Assert.Equal(2, vm.ActiveLayerIndex);
+        Assert.False(vm.MoveShownLayerRightCommand.CanExecute(null));
+        Assert.True(vm.MoveShownLayerLeftCommand.CanExecute(null));
+
+        vm.Layers[0].SelectCommand.Execute(null);
+        Assert.False(vm.MoveShownLayerLeftCommand.CanExecute(null));
+        Assert.True(vm.MoveShownLayerRightCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void UndoAndRedoOfAMove_TheBoardFollowsTheLayer()
+    {
+        var vm = StartEditing3();
+        vm.Layers[1].SelectCommand.Execute(null); // Lower
+        vm.MoveShownLayerRightCommand.Execute(null);
+        Assert.Equal(2, vm.ActiveLayerIndex);
+
+        vm.Edit!.UndoCommand.Execute(null);
+        Assert.Equal(new[] { "Base", "Lower", "Raise" }, LayerNames(vm));
+        Assert.Equal(1, vm.ActiveLayerIndex);
+
+        vm.Edit!.RedoCommand.Execute(null);
+        Assert.Equal(new[] { "Base", "Raise", "Lower" }, LayerNames(vm));
+        Assert.Equal(2, vm.ActiveLayerIndex);
+    }
+
+    [Fact]
+    public void UndoOfAMove_WhileAnotherLayerIsShown_KeepsShowingThatLayer()
+    {
+        var vm = StartEditing3();
+        vm.MoveLayer(0, 2);                       // Lower, Raise, Base — Base shown at 2
+        vm.Layers[1].SelectCommand.Execute(null); // Raise
+
+        vm.Edit!.UndoCommand.Execute(null);       // Base, Lower, Raise
+
+        Assert.Equal(2, vm.ActiveLayerIndex);     // still Raise
+    }
+
+    [Fact]
+    public async Task RenameLayer_CallbackAnswers_RequestCarriesOldName_NewNameLands()
+    {
+        var vm = StartEditing3();
+        RenameLayerRequest? captured = null;
+        vm.RenameLayerRequested = request =>
+        {
+            captured = request;
+            return Task.FromResult<string?>("Nav");
+        };
+
+        await vm.RenameLayerAsync(1);
+
+        Assert.NotNull(captured);
+        Assert.Equal(1, captured!.LayerIndex);
+        Assert.Equal("Lower", captured.CurrentName);
+        Assert.Equal("Nav", LayerNames(vm)[1]);
+    }
+
+    [Fact]
+    public async Task RenameLayer_CallbackCancels_ChangesNothing()
+    {
+        var vm = StartEditing3();
+        vm.RenameLayerRequested = _ => Task.FromResult<string?>(null);
+
+        await vm.RenameLayerAsync(1);
+
+        Assert.Equal("Lower", LayerNames(vm)[1]);
+        Assert.Equal(0, vm.UnsavedEditCount);
+    }
+
+    [Fact]
+    public async Task RenameLayer_NoCallback_DoesNothing()
+    {
+        var vm = StartEditing3();
+
+        await vm.RenameLayerAsync(1);
+
+        Assert.Equal("Lower", LayerNames(vm)[1]);
+        Assert.Equal(0, vm.UnsavedEditCount);
+    }
+
+    [Fact]
+    public async Task DeleteLayer_Allowed_DeletesShowsPrevious_ReportsInStatusBar()
+    {
+        var vm = StartEditing3();
+        var blockedCalled = false;
+        vm.LayerDeleteBlockedRequested = _ =>
+        {
+            blockedCalled = true;
+            return Task.CompletedTask;
+        };
+
+        await vm.DeleteLayerAsync(1); // "Lower", unreferenced
+
+        Assert.False(blockedCalled);
+        Assert.Equal(new[] { "Base", "Raise" }, LayerNames(vm));
+        Assert.Equal(0, vm.ActiveLayerIndex);
+        Assert.Equal(Loc.Instance.Format("Edit_LayerDeletedNoRefsFormat", "Lower"), vm.StatusMessage);
+        Assert.DoesNotContain("[Key", vm.StatusMessage);
+    }
+
+    [Fact]
+    public async Task DeleteLayer_LastLayerRemaining_BlockedDialogNamesIt_NothingChanges()
+    {
+        var vm = StartEditing(out _); // "Base", "Lower"
+        LayerDeleteBlockedRequest? blocked = null;
+        vm.LayerDeleteBlockedRequested = request =>
+        {
+            blocked = request;
+            return Task.CompletedTask;
+        };
+
+        await vm.DeleteLayerAsync(1); // allowed — Lower goes first
+        Assert.Equal("Base", Assert.Single(LayerNames(vm)));
+
+        await vm.DeleteLayerAsync(0); // Base is now the only layer
+
+        Assert.NotNull(blocked);
+        Assert.Equal("Base", blocked!.LayerName);
+        var blocker = Assert.Single(blocked.Blockers);
+        Assert.Equal(LayerDeleteBlockerKind.LastLayer, blocker.Kind);
+        Assert.Equal("Base", Assert.Single(LayerNames(vm)));
+        Assert.Equal(0, vm.ActiveLayerIndex);
+    }
+
+    [Fact]
+    public void LayerCommands_NotEditing_AllDisabled_AddLayerDoesNothing()
+    {
+        var vm = NewVm(NewSettings());
+
+        Assert.False(vm.NewLayerCommand.CanExecute(null));
+        Assert.False(vm.DuplicateShownLayerCommand.CanExecute(null));
+        Assert.False(vm.MoveShownLayerLeftCommand.CanExecute(null));
+        Assert.False(vm.MoveShownLayerRightCommand.CanExecute(null));
+        Assert.False(vm.RenameShownLayerCommand.CanExecute(null));
+        Assert.False(vm.DeleteShownLayerCommand.CanExecute(null));
+
+        vm.AddLayer();
+
+        Assert.Null(vm.Edit);
+    }
+
+    // ---- the layer tabs follow the edit ---------------------------------------------
+
+    [Fact]
+    public void AddLayer_RebuildsTabs_NewTabShownSelectedWithDefaultPositionColor()
+    {
+        var vm = StartEditing(out _);
+
+        vm.AddLayer();
+
+        Assert.Equal(3, vm.Layers.Count);
+        Assert.Equal("2 : Layer 2", vm.Layers[2].DisplayName);
+        Assert.True(vm.Layers[2].IsSelected);
+        Assert.False(vm.Layers[0].IsSelected);
+        // A new layer has no baseline, so it gets the palette default of its
+        // position rather than any override.
+        Assert.Equal(LayerColorPalette.GetDefaultColor(2), vm.Layers[2].TabColor);
+    }
+
+    [Fact]
+    public void MoveLayer_TabColorFollowsTheLayer()
+    {
+        // The VM seeds the static palette from these settings at construction —
+        // layer 1 owns a custom colour and nothing else is touched.
+        var settings = NewSettings(new UserSettings
+        {
+            LayerColors = new Dictionary<string, Dictionary<int, string>>
+            {
+                ["Corne"] = new() { [1] = "#123456" },
+            },
+        });
+        var vm = NewVm(settings);
+        vm.LoadLayoutFromPath(WriteTempKeymap(text: KeymapText3()));
+        vm.StartEditCommand.Execute(null);
+        Assert.Equal("#123456", vm.Layers[1].TabColor);
+
+        vm.MoveLayer(1, 1); // Base, Raise, Lower
+
+        Assert.Equal("2 : Lower", vm.Layers[2].DisplayName);
+        // The colour travels with the layer it belongs to…
+        Assert.Equal("#123456", vm.Layers[2].TabColor);
+        // …and the vacated position reads as the layer now standing there.
+        Assert.Equal(LayerColorPalette.GetDefaultColor(2), vm.Layers[1].TabColor);
+    }
+
+    [Fact]
+    public void Rename_InSession_TabCaptionFollowsAtOnce()
+    {
+        var vm = StartEditing3();
+
+        vm.Edit!.RenameLayer(1, "Nav");
+
+        Assert.Equal("1 : Nav", vm.Layers[1].DisplayName);
+    }
+
+    [Fact]
+    public void KeyEdit_KeepsTheSameTabInstances()
+    {
+        var vm = StartEditing(out _);
+        var tabs = vm.Layers.ToList();
+
+        Tap(vm, 0);
+        vm.EditClearSelectedKey(toNone: false);
+
+        // A plain key edit must not replace the tab buttons — only structural
+        // changes rebuild the strip.
+        Assert.Equal(tabs.Count, vm.Layers.Count);
+        for (var i = 0; i < tabs.Count; i++)
+            Assert.Same(tabs[i], vm.Layers[i]);
+    }
+
+    [Fact]
+    public void NotEditing_TabsCarryNoActions()
+    {
+        var vm = NewVm(NewSettings());
+        vm.LoadLayoutFromPath(WriteTempKeymap());
+
+        Assert.Equal(2, vm.Layers.Count);
+        Assert.All(vm.Layers, tab =>
+        {
+            Assert.False(tab.IsEditable);
+            Assert.False(tab.RenameCommand.CanExecute(null));
+            Assert.False(tab.DuplicateCommand.CanExecute(null));
+            Assert.False(tab.MoveLeftCommand.CanExecute(null));
+            Assert.False(tab.MoveRightCommand.CanExecute(null));
+            Assert.False(tab.DeleteCommand.CanExecute(null));
+        });
+    }
+
+    // ---- per-layer settings follow a save that moved layers -------------------------
+
+    /// <summary>A Corne seed with layer 1 coloured, layer 2 hidden and one
+    /// app→layer rule on layer 1 — everything a layer move must carry along.</summary>
+    private static UserSettings LayerScopedCorneSettings() => new()
+    {
+        LayerColors = new Dictionary<string, Dictionary<int, string>>
+        {
+            ["Corne"] = new() { [1] = "#123456" },
+        },
+        HiddenLayers = new Dictionary<string, List<int>> { ["Corne"] = new() { 2 } },
+        AppLayerRules = new Dictionary<string, List<AppLayerRule>>
+        {
+            ["Corne"] = new() { new AppLayerRule("code", 1) },
+        },
+    };
+
+    /// <summary>The seeded per-layer settings, asserted unchanged.</summary>
+    private static void AssertSettingsUnchanged(UserSettings saved)
+    {
+        Assert.Equal(new Dictionary<int, string> { [1] = "#123456" }, saved.LayerColors["Corne"]);
+        Assert.Equal(new[] { 2 }, saved.HiddenLayers["Corne"]);
+        Assert.Equal(new AppLayerRule("code", 1), Assert.Single(saved.AppLayerRules["Corne"]));
+    }
+
+    [Fact]
+    public async Task SaveEdit_MovedLayers_SettingsTravelWithTheirLayer()
+    {
+        var settings = NewSettings(LayerScopedCorneSettings());
+        var vm = StartEditing3(settings);
+        IReadOnlyList<string>? shown = null;
+        vm.LayerSettingsNoticeRequested = lines =>
+        {
+            shown = lines;
+            return Task.CompletedTask;
+        };
+
+        vm.MoveLayer(1, 1); // Base, Raise, Lower
+
+        await vm.SaveEditCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsEditing);
+        var saved = settings.Current;
+        Assert.Equal(new Dictionary<int, string> { [2] = "#123456" }, saved.LayerColors["Corne"]);
+        Assert.Equal(new[] { 1 }, saved.HiddenLayers["Corne"]);
+        Assert.Equal(new AppLayerRule("code", 2), Assert.Single(saved.AppLayerRules["Corne"]));
+        // The in-memory engine list follows the persisted rules.
+        Assert.Equal(new AppLayerRule("code", 2), Assert.Single(vm.AutoSwitch.AppLayerRules));
+        // The reloaded tabs read the remapped palette.
+        Assert.Equal("2 : Lower", vm.Layers[2].DisplayName);
+        Assert.Equal("#123456", vm.Layers[2].TabColor);
+        // Nothing was dropped — nothing is reported.
+        Assert.Null(shown);
+    }
+
+    [Fact]
+    public async Task SaveEdit_DeletedRuleLayer_RemovesTheRuleAndReportsIt()
+    {
+        var settings = NewSettings(new UserSettings
+        {
+            AppLayerRules = new Dictionary<string, List<AppLayerRule>>
+            {
+                ["Corne"] = new() { new AppLayerRule("code", 1) },
+            },
+        });
+        var vm = StartEditing3(settings);
+        IReadOnlyList<string>? shown = null;
+        vm.LayerSettingsNoticeRequested = lines =>
+        {
+            shown = lines;
+            return Task.CompletedTask;
+        };
+
+        await vm.DeleteLayerAsync(1); // "Lower", unreferenced
+
+        await vm.SaveEditCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsEditing);
+        // The rule aimed at the deleted layer is gone, and one line says so.
+        Assert.False(settings.Current.AppLayerRules.ContainsKey("Corne"));
+        Assert.Equal(
+            Loc.Instance.Format("Edit_NoticeAppRuleRemovedFormat", "code", 1),
+            Assert.Single(shown!));
+    }
+
+    [Fact]
+    public async Task SaveEdit_KeyChangeOnly_LeavesSettingsAndCallbackUntouched()
+    {
+        var settings = NewSettings(LayerScopedCorneSettings());
+        var vm = StartEditing3(settings);
+        IReadOnlyList<string>? shown = null;
+        vm.LayerSettingsNoticeRequested = lines =>
+        {
+            shown = lines;
+            return Task.CompletedTask;
+        };
+
+        ClearKeyZero(vm);
+
+        await vm.SaveEditCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsEditing);
+        // Only bindings were written — the layer numbers never moved.
+        AssertSettingsUnchanged(settings.Current);
+        Assert.Null(shown);
+    }
+
+    [Fact]
+    public async Task SaveEdit_MoveAndMoveBack_LeavesSettingsUntouched()
+    {
+        var settings = NewSettings(LayerScopedCorneSettings());
+        var vm = StartEditing3(settings);
+        IReadOnlyList<string>? shown = null;
+        vm.LayerSettingsNoticeRequested = lines =>
+        {
+            shown = lines;
+            return Task.CompletedTask;
+        };
+
+        vm.MoveLayer(1, 1);
+        vm.MoveLayer(2, -1); // back to the baseline order
+        vm.Layers[0].SelectCommand.Execute(null);
+        ClearKeyZero(vm);
+
+        await vm.SaveEditCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsEditing);
+        // The layer list is back to the baseline, so there was nothing to move.
+        AssertSettingsUnchanged(settings.Current);
+        Assert.Null(shown);
+    }
+
+    [Fact]
+    public void DiscardEdit_AfterMove_LeavesSettingsUntouched()
+    {
+        var settings = NewSettings(LayerScopedCorneSettings());
+        var vm = StartEditing3(settings);
+
+        vm.MoveLayer(1, 1);
+        vm.DiscardEditCommand.Execute(null);
+
+        Assert.False(vm.IsEditing);
+        // Only a save moves settings — a discarded move never does.
+        AssertSettingsUnchanged(settings.Current);
     }
 }

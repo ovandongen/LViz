@@ -8,8 +8,8 @@ namespace LViz.Tests;
 
 /// <summary>
 /// The review-before-saving dialog's view model: one translated line per change
-/// the save writes — structure edits, then renames, then keys — plus the commit
-/// message it shows for a GitHub save. Plans are built by hand; the view model
+/// the save writes — structure edits, then renames, then keys — plus the
+/// editable commit message for a GitHub save. Plans are built by hand; the view model
 /// renders what <see cref="KeymapSavePlan"/> says and derives nothing itself.
 /// <para>
 /// Expected text is always built through <see cref="Loc"/> so the assertions
@@ -135,6 +135,40 @@ public class KeymapReviewDialogViewModelTests
 
         Assert.True(vm.HasCommitMessage);
         Assert.Equal("LViz: edit 1 key", vm.CommitMessage);
+    }
+
+    [Fact]
+    public void CommitMessage_Edited_TheAnswerCarriesItTrimmed()
+    {
+        var vm = Review(Plan(), "octocat/zmk-config (main)", "LViz: edit 1 key");
+
+        vm.CommitMessage = "  Swap the B key\n";
+
+        Assert.True(vm.CanSave);
+        Assert.Equal("Swap the B key", vm.Answer()!.CommitMessage);
+    }
+
+    [Fact]
+    public void CommitMessage_Blank_CannotSave_AndRaisesCanSave()
+    {
+        var vm = Review(Plan(), "octocat/zmk-config (main)", "LViz: edit 1 key");
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.CommitMessage = "   ";
+
+        Assert.False(vm.CanSave);
+        Assert.Null(vm.Answer());
+        Assert.Contains(nameof(KeymapReviewDialogViewModel.CanSave), raised);
+    }
+
+    [Fact]
+    public void LocalSave_CanSave_WithNoCommitMessage()
+    {
+        var vm = Review(Plan());
+
+        Assert.True(vm.CanSave);
+        Assert.Null(vm.Answer()!.CommitMessage);
     }
 
     [Fact]

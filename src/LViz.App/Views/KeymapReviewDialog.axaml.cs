@@ -1,14 +1,15 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using LViz.App.ViewModels;
 
 namespace LViz.App.Views;
 
 /// <summary>
-/// Modal "review changes before saving" dialog. Its result is the user's answer:
-/// <c>true</c> = save the plan, <c>false</c> = keep editing. Esc and the window's
-/// close button both answer <c>false</c> (a window closed without a result
-/// reads back as <c>default(bool)</c>).
+/// Modal "review changes before saving" dialog. Its result is a
+/// <see cref="KeymapReviewAnswer"/> carrying the (edited) commit message to
+/// save the plan, or <c>null</c> to keep editing: Esc, Cancel and the window's
+/// close button all answer <c>null</c>.
 /// </summary>
 public partial class KeymapReviewDialog : Window
 {
@@ -22,12 +23,13 @@ public partial class KeymapReviewDialog : Window
     {
         if (e.Key == Key.Escape)
         {
-            Close(false);
+            Close(null);
             e.Handled = true;
         }
     }
 
-    private void OnSaveClick(object? sender, RoutedEventArgs e) => Close(true);
+    private void OnSaveClick(object? sender, RoutedEventArgs e) =>
+        Close(DataContext is KeymapReviewDialogViewModel vm ? vm.Answer() : null);
 
-    private void OnCancelClick(object? sender, RoutedEventArgs e) => Close(false);
+    private void OnCancelClick(object? sender, RoutedEventArgs e) => Close(null);
 }

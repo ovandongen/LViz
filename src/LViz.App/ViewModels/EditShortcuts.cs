@@ -28,6 +28,18 @@ public enum EditShortcut
 
     /// <summary>Open the key dialog on the selected key.</summary>
     OpenKeyDialog,
+
+    /// <summary>Append a new layer to the keymap.</summary>
+    NewLayer,
+
+    /// <summary>Copy the shown layer right after itself.</summary>
+    DuplicateLayer,
+
+    /// <summary>Move the shown layer one place earlier.</summary>
+    MoveLayerLeft,
+
+    /// <summary>Move the shown layer one place later.</summary>
+    MoveLayerRight,
 }
 
 /// <summary>
@@ -51,6 +63,18 @@ public static class EditShortcuts
         var cmd = modifiers.HasFlag(commandModifier);
         var shift = modifiers.HasFlag(KeyModifiers.Shift);
         var alt = modifiers.HasFlag(KeyModifiers.Alt);
+
+        if (key == Key.N && cmd && shift && !alt)
+            return EditShortcut.NewLayer;
+
+        if (key == Key.D && cmd && shift && !alt)
+            return EditShortcut.DuplicateLayer;
+
+        if (key == Key.Left && cmd && alt && !shift)
+            return EditShortcut.MoveLayerLeft;
+
+        if (key == Key.Right && cmd && alt && !shift)
+            return EditShortcut.MoveLayerRight;
 
         if (key == Key.Z && cmd)
             return shift ? EditShortcut.Redo : EditShortcut.Undo;
