@@ -45,9 +45,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public Action<int>? OnKeyTapped => IsEditing ? OnEditKeyTapped : null;
 
     /// <summary>
-    /// Double-click on a cap while editing selects it and opens the key dialog
+    /// Double-click on a cap while editing selects it and opens the key editor
     /// on it (see <see cref="EditSelectedKeyAsync"/>). Null outside edit mode,
-    /// where the board has no dialog to open.
+    /// where the board has no editor to open.
     /// </summary>
     public Action<int>? OnKeyDoubleTapped => IsEditing ? OnEditKeyDoubleTapped : null;
 
@@ -1447,7 +1447,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     }
 
     /// <summary>Double-click on a key while editing selects it and opens the
-    /// key dialog on it — fire and forget, the dialog owns its own errors.</summary>
+    /// key editor on it — fire and forget, the editor owns its own errors.</summary>
     private void OnEditKeyDoubleTapped(int keyIndex)
     {
         OnEditKeyTapped(keyIndex);
@@ -1510,15 +1510,14 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// <summary>
     /// Open the key editor on the selected key of the shown layer and apply
     /// what it answers as one undo step: the ring when <see cref="UseRingKeyEditor"/>
-    /// says so (and <paramref name="otherEditor"/> does not invert that —
-    /// Shift+Enter always opens the other editor), the key dialog otherwise.
+    /// is on and a ring host is wired up, the key dialog otherwise.
     /// Does nothing when not editing, when nothing is selected, when the
     /// selection sits outside the active layer, when no callback is wired up,
     /// or while an earlier editor is still open. A cancelled editor (null)
     /// changes nothing; so does a result once the edit it was opened on has
     /// been replaced underneath the await.
     /// </summary>
-    public async Task EditSelectedKeyAsync(bool otherEditor = false)
+    public async Task EditSelectedKeyAsync()
     {
         if (Edit is not { } edit) return;
         if (edit.SelectedKeyIndex is not int key) return;
@@ -1528,9 +1527,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         if (layer < 0 || layer >= layers.Count) return;
         if (key < 0 || key >= layers[layer].Bindings.Count) return;
 
-        // The ring when the setting (inverted by Shift) picks it and a host is
-        // wired up; the key dialog in every other case.
-        var callback = UseRingKeyEditor != otherEditor && KeyRingRequested is not null
+        // The ring when the setting picks it and a host is wired up; the key
+        // dialog in every other case.
+        var callback = UseRingKeyEditor && KeyRingRequested is not null
             ? KeyRingRequested
             : KeyDialogRequested;
         if (callback is not { } open) return;

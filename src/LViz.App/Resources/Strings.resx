@@ -354,11 +354,11 @@
     <comment/>
   </data>
   <data name="Settings_RingKeyEditor" xml:space="preserve">
-    <value>Ring key editor (experimental)</value>
+    <value>Ring key editor</value>
     <comment/>
   </data>
   <data name="Settings_RingKeyEditorHint" xml:space="preserve">
-    <value>Double-click or Enter opens the ring instead of the key dialog. Shift+Enter always opens the other one.</value>
+    <value>Double-click or Enter opens the ring. Turn this off to use the key dialog instead; the ring's bottom-right button always opens the key dialog.</value>
     <comment/>
   </data>
   <data name="Settings_GlobalHotkey" xml:space="preserve">
@@ -2684,7 +2684,7 @@
     <comment/>
   </data>
   <data name="Ring_OpenInDialog" xml:space="preserve">
-    <value>Open in the key dialog (Shift+Enter)</value>
+    <value>Open in the key dialog</value>
     <comment/>
   </data>
   <data name="Ring_Panel_Layers" xml:space="preserve">

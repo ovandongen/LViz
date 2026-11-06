@@ -26,7 +26,7 @@ public class EditShortcutsTests
     [InlineData(Key.Escape, KeyModifiers.None, EditShortcut.ClearSelection)]
     [InlineData(Key.Escape, KeyModifiers.Shift, EditShortcut.None)]
     [InlineData(Key.Enter, KeyModifiers.None, EditShortcut.OpenKeyDialog)]
-    [InlineData(Key.Enter, KeyModifiers.Shift, EditShortcut.OpenOtherKeyEditor)]
+    [InlineData(Key.Enter, KeyModifiers.Shift, EditShortcut.None)]
     [InlineData(Key.Enter, KeyModifiers.Meta, EditShortcut.None)]
     [InlineData(Key.N, KeyModifiers.Meta | KeyModifiers.Shift, EditShortcut.NewLayer)]
     [InlineData(Key.N, KeyModifiers.Meta, EditShortcut.None)]
@@ -47,7 +47,7 @@ public class EditShortcutsTests
     [InlineData(Key.Enter, KeyModifiers.None, PhysicalKey.NumPadEnter, EditShortcut.OpenKeyDialog)]
     [InlineData(Key.None, KeyModifiers.None, PhysicalKey.NumPadEnter, EditShortcut.OpenKeyDialog)]
     [InlineData(Key.A, KeyModifiers.None, PhysicalKey.NumPadEnter, EditShortcut.OpenKeyDialog)]
-    [InlineData(Key.None, KeyModifiers.Shift, PhysicalKey.NumPadEnter, EditShortcut.OpenOtherKeyEditor)]
+    [InlineData(Key.None, KeyModifiers.Shift, PhysicalKey.NumPadEnter, EditShortcut.None)]
     [InlineData(Key.None, KeyModifiers.None, PhysicalKey.Enter, EditShortcut.None)]
     [InlineData(Key.Z, KeyModifiers.Meta, PhysicalKey.Z, EditShortcut.Undo)]
     public void Resolve_WithPhysicalKey_NumpadEnterOpensTheDialog(

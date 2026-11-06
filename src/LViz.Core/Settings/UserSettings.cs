@@ -93,11 +93,11 @@ public record UserSettings
     public bool ColorTrayIconByActiveLayer { get; init; } = true;
 
     /// <summary>
-    /// When true, double-clicking a key or pressing Enter while editing opens
-    /// the ring key editor instead of the key dialog. Experimental —
-    /// Shift+Enter always opens the other one.
+    /// When true (the default), double-clicking a key or pressing Enter while
+    /// editing opens the ring key editor; when false, the key dialog. The
+    /// ring's bottom-right button always opens the key dialog.
     /// </summary>
-    public bool RingKeyEditor { get; init; } = false;
+    public bool RingKeyEditor { get; init; } = true;
 
     /// <summary>
     /// Show/hide global hotkey, neutral key name ("F12", "F18"). Registered

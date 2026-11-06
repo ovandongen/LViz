@@ -161,11 +161,25 @@ public class UserSettingsJsonRoundTripTests
     }
 
     [Fact]
-    public void Load_MissingRingKeyEditor_DefaultsFalse()
+    public void Load_MissingRingKeyEditor_DefaultsTrue()
     {
         // Settings files written before the ring editor existed have no
-        // RingKeyEditor key — the setting must default to off.
+        // RingKeyEditor key — the ring is the default key editor now, so the
+        // setting must default to on.
         var json = """{"SchemaVersion": 1, "Keyboard": "GO60"}""";
+
+        var parsed = JsonSerializer.Deserialize<UserSettings>(json, Options);
+
+        Assert.NotNull(parsed);
+        Assert.True(parsed!.RingKeyEditor);
+    }
+
+    [Fact]
+    public void Load_SavedRingKeyEditorFalse_StaysFalse()
+    {
+        // The new default must not steamroll a deliberate opt-out: a file
+        // that saved RingKeyEditor false loads back as false.
+        var json = """{"SchemaVersion": 1, "Keyboard": "GO60", "RingKeyEditor": false}""";
 
         var parsed = JsonSerializer.Deserialize<UserSettings>(json, Options);
 

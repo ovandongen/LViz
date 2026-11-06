@@ -859,9 +859,37 @@ public class MainWindowViewModelEditTests : IDisposable
     // ---- the ring editor routing -----------------------------------------------------
 
     [Fact]
+    public async Task RingSetting_Default_IsOn()
+    {
+        // The ring became the default key editor: a fresh view-model opens it
+        // without anyone touching the setting.
+        var vm = StartEditing(out _);
+        Assert.True(vm.UseRingKeyEditor);
+        Tap(vm, 1);
+        var dialogCalls = 0;
+        var ringCalls = 0;
+        vm.KeyDialogRequested = _ =>
+        {
+            dialogCalls++;
+            return Task.FromResult<KeyBinding?>(null);
+        };
+        vm.KeyRingRequested = _ =>
+        {
+            ringCalls++;
+            return Task.FromResult<KeyBinding?>(null);
+        };
+
+        await vm.EditSelectedKeyAsync();
+
+        Assert.Equal(1, ringCalls);
+        Assert.Equal(0, dialogCalls);
+    }
+
+    [Fact]
     public async Task RingSetting_Off_OpensDialog_NotTheRing()
     {
         var vm = StartEditing(out _);
+        vm.UseRingKeyEditor = false; // the ring is the default — switch it off explicitly
         Tap(vm, 1);
         var dialogCalls = 0;
         var ringCalls = 0;
@@ -911,26 +939,6 @@ public class MainWindowViewModelEditTests : IDisposable
         Assert.Equal("&kp", now.Behavior);
         Assert.Equal("B", now.Params[0]);
         Assert.Equal(1, vm.UnsavedEditCount);
-    }
-
-    [Fact]
-    public async Task RingSetting_On_OtherEditorOpensDialog_TheRingStaysClosed()
-    {
-        var vm = StartEditing(out _);
-        vm.UseRingKeyEditor = true;
-        Tap(vm, 1);
-        var ringCalls = 0;
-        vm.KeyRingRequested = _ =>
-        {
-            ringCalls++;
-            return Task.FromResult<KeyBinding?>(Kp("B"));
-        };
-        vm.KeyDialogRequested = _ => Task.FromResult<KeyBinding?>(Kp("C"));
-
-        await vm.EditSelectedKeyAsync(otherEditor: true);
-
-        Assert.Equal(0, ringCalls);
-        Assert.Equal("C", vm.Edit!.Session.Current.Layers[0].Bindings[1].Params[0]);
     }
 
     [Fact]

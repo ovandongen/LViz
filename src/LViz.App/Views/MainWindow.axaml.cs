@@ -197,10 +197,6 @@ public partial class MainWindow : Window
                 _ = vm.EditSelectedKeyAsync();
                 e.Handled = true;
                 break;
-            case EditShortcut.OpenOtherKeyEditor:
-                _ = vm.EditSelectedKeyAsync(otherEditor: true);
-                e.Handled = true;
-                break;
             case EditShortcut.NewLayer:
                 if (vm.NewLayerCommand.CanExecute(null))
                     vm.NewLayerCommand.Execute(null);

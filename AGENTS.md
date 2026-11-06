@@ -244,7 +244,12 @@ After creating or editing a view, rebuild the App project before trusting a
   (`KeyRingViewModel.PicksAValue`: not `keys:`/`mod:`) and the binding is
   complete; the second click is never hit-tested, because the ring has usually
   moved on under the pointer. Pointing at a segment shows its full label and
-  sub in the centre. Ring snapshots for review are written by
+  sub in the centre. The ring is the default key editor
+  (`UserSettings.RingKeyEditor`, default true); its bottom-right button is the
+  only way from the ring to the key dialog (there is no Shift+Enter).
+  `KeyRingControl` marks every left press handled, so only a press on the
+  panel's padding reaches the window's "press on `Host` cancels" check
+  (`KeyRingWindowTests` pins it). Ring snapshots for review are written by
   `KeyRingSnapshotTests` to the gitignored `docs/ideas/ring-snapshots/`.
 - **Three layout importers, one result.** `Core/Layout/Import/` turns board
   files into `ImportedLayout`s (keys as `DtsiKeyPhysical` in ZMK units, in
@@ -739,7 +744,10 @@ LViz-specific (extend this list as we hit more):
   `window.MouseDown`/`MouseUp` route real input, and two quick clicks give
   `ClickCount == 2`. An animated state settles only after a few
   `Thread.Sleep(25)` + `AvaloniaHeadlessPlatform.ForceRenderTimerTick()` +
-  `Dispatcher.UIThread.RunJobs()` rounds before `CaptureRenderedFrame`.
+  `Dispatcher.UIThread.RunJobs()` rounds before `CaptureRenderedFrame` (or
+  before `TranslatePoint`/hit-test assertions). A headless press's source is
+  the topmost hit-testable visual, and a `Canvas` is one only where it has a
+  `Background`.
 
 - **`LocalizationKeyTests` finds keys only in the literal forms
   `Loc.Instance["X"]` and `Loc.Instance.Format("X", …)`.** A local alias

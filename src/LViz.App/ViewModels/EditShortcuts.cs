@@ -29,11 +29,6 @@ public enum EditShortcut
     /// <summary>Open the key dialog on the selected key.</summary>
     OpenKeyDialog,
 
-    /// <summary>Open the key editor the setting does <em>not</em> pick —
-    /// Shift+Enter always shows the dialog when the ring is the default,
-    /// and the ring when the dialog is.</summary>
-    OpenOtherKeyEditor,
-
     /// <summary>Append a new layer to the keymap.</summary>
     NewLayer,
 
@@ -107,11 +102,6 @@ public static class EditShortcuts
         // position does not, so match on the position and ignore the Key.
         if (physicalKey == PhysicalKey.NumPadEnter && modifiers == KeyModifiers.None)
             return EditShortcut.OpenKeyDialog;
-
-        // Shift+Enter (either Enter) opens the other key editor. Cmd/Alt
-        // combos stay nobody's business (Cmd+Enter is a text-field chord).
-        if ((key == Key.Enter || physicalKey == PhysicalKey.NumPadEnter) && shift && !cmd && !alt)
-            return EditShortcut.OpenOtherKeyEditor;
 
         return EditShortcut.None;
     }
