@@ -8,8 +8,8 @@ namespace LViz.Tests;
 
 /// <summary>
 /// The key dialog's keycode picker: category list ("Used in this keymap"
-/// ranked first), search, the left-side wrap toggles, the flat param value
-/// it produces, seeding from an existing binding, and recorded keys.
+/// ranked first), search, the wrap toggles for both hands, the flat param
+/// value it produces, seeding from an existing binding, and recorded keys.
 /// </summary>
 public class KeycodePickerViewModelTests
 {
@@ -150,6 +150,50 @@ public class KeycodePickerViewModelTests
         Assert.Equal(2, changes);
     }
 
+    [Fact]
+    public void IsRightShift_Unchecked_ClearsTheWrap_AndRaisesChangedOnce()
+    {
+        var vm = new KeycodePickerViewModel(Usage, modifiersFirst: false);
+        vm.Seed(new[] { "RS", "A" });
+        int changes = 0;
+        vm.Changed += (_, _) => changes++;
+
+        vm.IsRightShift = false;
+
+        Assert.Equal(new[] { "A" }, vm.Value);
+        Assert.Equal(1, changes);
+    }
+
+    // --- ToggleWrap ---------------------------------------------------------
+
+    [Fact]
+    public void ToggleWrap_RightGui_FlipsOnThenOff_RaisingChangedPerStep()
+    {
+        var vm = new KeycodePickerViewModel(Usage, modifiersFirst: false);
+        vm.SelectedKeycode = Code("A");
+        int changes = 0;
+        vm.Changed += (_, _) => changes++;
+
+        vm.ToggleWrap(ZmkModifiers.RightGui);
+        Assert.Equal(new[] { "RG", "A" }, vm.Value);
+
+        vm.ToggleWrap(ZmkModifiers.RightGui);
+        Assert.Equal(new[] { "A" }, vm.Value);
+
+        Assert.Equal(2, changes);
+    }
+
+    [Fact]
+    public void ToggleWrap_NotExactlyOneFlag_Throws()
+    {
+        var vm = new KeycodePickerViewModel(Usage, modifiersFirst: false);
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => vm.ToggleWrap(ZmkModifiers.LeftShift | ZmkModifiers.LeftCtrl));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => vm.ToggleWrap(ZmkModifiers.None));
+    }
+
     // --- Seeding ------------------------------------------------------------
 
     [Fact]
@@ -185,6 +229,32 @@ public class KeycodePickerViewModelTests
         // Same keycode, same flags — in Wrap's fixed order.
         Assert.Equal(new[] { "LC", "RS", "A" }, vm.Value);
         Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void Seed_RightHandGroup_ChecksRightToggle_AndValueKeepsIt()
+    {
+        var vm = new KeycodePickerViewModel(Usage, modifiersFirst: false);
+
+        Assert.True(vm.Seed(new[] { "RS", "A" }));
+
+        Assert.True(vm.IsRightShift);
+        Assert.False(vm.IsShift);
+        Assert.Equal(new[] { "RS", "A" }, vm.Value);
+    }
+
+    [Fact]
+    public void Seed_BothHands_TogglesWrapFlagsAndWrapOrder()
+    {
+        var vm = new KeycodePickerViewModel(Usage, modifiersFirst: false);
+
+        Assert.True(vm.Seed(new[] { "LC", "RA", "T" }));
+
+        Assert.True(vm.IsCtrl);
+        Assert.True(vm.IsRightAlt);
+        Assert.Equal(ZmkModifiers.LeftCtrl | ZmkModifiers.RightAlt, vm.WrapFlags);
+        // Wrap's fixed order LC LS LA LG RC RS RA RG puts LC before RA.
+        Assert.Equal(new[] { "LC", "RA", "T" }, vm.Value);
     }
 
     [Fact]
@@ -293,6 +363,24 @@ public class KeycodePickerViewModelTests
         Assert.False(vm.IsCtrl); // modifiers from the recording replace the toggles
         Assert.Equal(Code("PERIOD"), vm.SelectedKeycode);
         Assert.Equal(new[] { "DOT" }, vm.Value);
+    }
+
+    [Fact]
+    public void ApplyRecorded_AfterRightHandSeed_ClearsRightToggles()
+    {
+        var vm = new KeycodePickerViewModel(Usage, modifiersFirst: false);
+        vm.Seed(new[] { "RS", "RA", "A" });
+        vm.ToggleRecordingCommand.Execute(null);
+        int changes = 0;
+        vm.Changed += (_, _) => changes++;
+
+        Assert.True(vm.ApplyRecorded(new RecordedKey("NUMBER_1", ZmkModifiers.LeftShift)));
+
+        Assert.False(vm.IsRightShift);
+        Assert.False(vm.IsRightAlt);
+        Assert.True(vm.IsShift);
+        Assert.Equal(new[] { "LS", "N1" }, vm.Value);
+        Assert.Equal(1, changes);
     }
 
     // --- Construction -----------------------------------------------------------

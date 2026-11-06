@@ -51,7 +51,8 @@ src/
                  hotkey (Carbon on macOS, User32 on Windows), tray,
                  custom chrome, EN/NL localization, per-key label
                  overrides + FontAwesome icon picker, OS secret stores
-                 (Services/Secrets/), GitHub service (Services/GitHub/).
+                 (Services/Secrets/), GitHub service (Services/GitHub/),
+                 key ring geometry (Ring/).
   LViz.Core/   → pure .NET — dtsi physical-layout parser, keyboard
                  profiles, .keymap parser (Keymap/Parser/) + Moergo
                  .json loader (MoergoJsonKeymapLoader), Raw HID
@@ -77,7 +78,13 @@ git submodule update --init --recursive            # first-time clone, or a fres
 dotnet build                                       # full solution build
 dotnet test                                        # run all xUnit tests
 dotnet run --project src/LViz.App                  # launch the app
+dotnet build src/LViz.App/LViz.App.csproj -t:Rebuild  # after XAML edits (see below)
 ```
+
+An incremental `dotnet build` can skip Avalonia's XAML compilation and hide
+its errors (the app then fails at runtime with "No precompiled XAML found").
+After creating or editing a view, rebuild the App project before trusting a
+0/0 build.
 
 ## Conventions
 
@@ -126,6 +133,9 @@ dotnet run --project src/LViz.App                  # launch the app
   matches on `PhysicalKey` (`NumPadEnter`): its `Key` value differs per
   platform. The commit message
   (`KeymapCommitMessage`) is English by decision, not resx text.
+  The selection belongs to the layer it was made on: `ApplyActiveLayer`
+  clears it when the shown layer *id* changes, so a layer switch drops it and
+  undo/redo or the repaint after a save keep it.
 - **`Core/Keymap/Parser/` is the `.keymap` pipeline.** Preprocess →
   devicetree lex/parse → two-pass interpret produces a `KeyboardConfig`.
   Lean v1 by design — function-like `#define`, `#include` resolution,
@@ -220,6 +230,22 @@ dotnet run --project src/LViz.App                  # launch the app
   filter finds them. A `KeyDialog` `ListBox` that must keep its selection needs
   `Tag` + `AttachedToVisualTree="OnSelectionListAttached"` *and* a matching
   `WantedSelection` case; one without the other loses the selection.
+- **Key ring: a second view over `KeyDialogViewModel`.** `KeyRingViewModel`
+  holds only its own step state and derives everything else from the dialog
+  on read, raising `PropertyChanged(string.Empty)` for any change. Sectors are
+  prefix-addressed ids (`cat:`, `beh:`, `layer:`, `cmd:`, `prof:`, `keys:`,
+  `mod:`, `keycode:`), parsed strictly. Geometry (angles 0 = up, clockwise;
+  constant pixel gap) lives only in `App/Ring/RingGeometry`. The ring opens
+  only in `KeyRingWindow`, a transparent window over the working area of the
+  key's screen, so placement is against the monitor, never the main window;
+  the main window just dims the board and outlines the key. A press on the
+  window's backdrop, losing activation, or a main-window resize cancels. A
+  double-click saves only when its first click picked a value
+  (`KeyRingViewModel.PicksAValue`: not `keys:`/`mod:`) and the binding is
+  complete; the second click is never hit-tested, because the ring has usually
+  moved on under the pointer. Pointing at a segment shows its full label and
+  sub in the centre. Ring snapshots for review are written by
+  `KeyRingSnapshotTests` to the gitignored `docs/ideas/ring-snapshots/`.
 - **Three layout importers, one result.** `Core/Layout/Import/` turns board
   files into `ImportedLayout`s (keys as `DtsiKeyPhysical` in ZMK units, in
   keymap binding order, plus warnings): `PhysicalLayoutImporter`
@@ -629,6 +655,10 @@ LViz-specific (extend this list as we hit more):
   with `FormattedText` needs `new Typeface(FontFamily.Default)`, because a bare
   `new Typeface()` has no family and throws inside `Render` on every frame,
   which freezes the window. Tests can't catch any of this; only a real render does.
+  A plain `Control` has no `Background`, so it is hit-tested only where
+  `Render` drew: fill `Brushes.Transparent` over the bounds first to take
+  every press (`KeyRingControl`). A `TextLayout` with `maxWidth: 0` clamps to
+  an empty line: pass `double.PositiveInfinity` for "unlimited".
 
 - **A test that calls a `[SupportedOSPlatform]` App type trips CA1416** (the
   early `if (OperatingSystem.IsMacOS()) return;` doesn't count as a guard).
@@ -682,3 +712,40 @@ LViz-specific (extend this list as we hit more):
 - **FontAwesome icon names:** `icons.json` is embedded in the Projektanker
   FontAwesome assembly (`FontAwesomeCatalog` reads it); brand icons need the
   `fa-brands` prefix (`fa-brands fa-github`).
+
+- **A `UserControl` clips to its bounds** (`ClipToBounds` is true for it,
+  unlike `Canvas`). A view whose content reaches outside its own size (the key
+  ring's list panel) sets `ClipToBounds="False"` on the `UserControl` itself,
+  not only on its root panel.
+
+- **A transparent window lets clicks on fully transparent pixels through on
+  macOS** (to the window below). A window that must catch clicks everywhere
+  paints an alpha-1 fill (`#01000000`), as `KeyRingWindow` does.
+
+- **`Avalonia.Input.KeyBinding` collides with `LViz.Core.Models.KeyBinding`.**
+  In a file that imports `Avalonia.Input`, alias the model:
+  `using ZmkKeyBinding = LViz.Core.Models.KeyBinding;`.
+
+- **Avalonia 11.3 API differences:** no `CubicEase`/`EasingMode` (use
+  `new CubicEaseOut()`); `TransformOperations.Parse` needs `px` on translate
+  values and a transition interpolates only between identical operation
+  lists; `Line` has one `StrokeLineCap`; `Window` has no virtual
+  `OnDeactivated` (subscribe to `Deactivated`); `Rect.Union`/`Inflate` return
+  new rects.
+
+- **Headless view tests** (`[AvaloniaFact]`): `HeadlessTestApp` loads the
+  Fluent theme (dark) but not the app's resources, so a view under test uses
+  literal colours and `{Binding [Key], Source={x:Static loc:Loc.Instance}}`.
+  `window.MouseDown`/`MouseUp` route real input, and two quick clicks give
+  `ClickCount == 2`. An animated state settles only after a few
+  `Thread.Sleep(25)` + `AvaloniaHeadlessPlatform.ForceRenderTimerTick()` +
+  `Dispatcher.UIThread.RunJobs()` rounds before `CaptureRenderedFrame`.
+
+- **`LocalizationKeyTests` finds keys only in the literal forms
+  `Loc.Instance["X"]` and `Loc.Instance.Format("X", …)`.** A local alias
+  (`var loc = Loc.Instance; loc["X"]`) hides the key from it; keep the alias
+  for runtime-built keys only, and cover those with a test that resolves them
+  (`KeyRingViewModelTests.EveryRingLabelAndSub_BuildsToAnExistingResxKey`).
+
+- **A `.keymap` test fixture needs the same binding count on every layer**:
+  `KeyboardConfigValidator` rejects the file otherwise.

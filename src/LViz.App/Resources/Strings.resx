@@ -353,6 +353,14 @@
     <value>Tint the system tray icon with the active layer's color so you can read the layer at a glance when the window is hidden. Turn off if it clashes with your menu bar.</value>
     <comment/>
   </data>
+  <data name="Settings_RingKeyEditor" xml:space="preserve">
+    <value>Ring key editor (experimental)</value>
+    <comment/>
+  </data>
+  <data name="Settings_RingKeyEditorHint" xml:space="preserve">
+    <value>Double-click or Enter opens the ring instead of the key dialog. Shift+Enter always opens the other one.</value>
+    <comment/>
+  </data>
   <data name="Settings_GlobalHotkey" xml:space="preserve">
     <value>Global show/hide hotkey</value>
     <comment/>
@@ -2381,6 +2389,314 @@
   </data>
   <data name="Edit_LayerMenuDelete" xml:space="preserve">
     <value>Delete</value>
+    <comment/>
+  </data>
+  <data name="Ring_Category_Key" xml:space="preserve">
+    <value>Key</value>
+    <comment/>
+  </data>
+  <data name="Ring_Category_HoldTap" xml:space="preserve">
+    <value>Hold-tap</value>
+    <comment/>
+  </data>
+  <data name="Ring_Category_Layer" xml:space="preserve">
+    <value>Layer</value>
+    <comment/>
+  </data>
+  <data name="Ring_Category_Bluetooth" xml:space="preserve">
+    <value>Bluetooth</value>
+    <comment/>
+  </data>
+  <data name="Ring_Category_Output" xml:space="preserve">
+    <value>Output</value>
+    <comment/>
+  </data>
+  <data name="Ring_Category_Lighting" xml:space="preserve">
+    <value>Lighting</value>
+    <comment/>
+  </data>
+  <data name="Ring_Category_Mouse" xml:space="preserve">
+    <value>Mouse</value>
+    <comment/>
+  </data>
+  <data name="Ring_Category_System" xml:space="preserve">
+    <value>System</value>
+    <comment/>
+  </data>
+  <data name="Ring_Category_Clear" xml:space="preserve">
+    <value>Clear</value>
+    <comment/>
+  </data>
+  <data name="Ring_Category_Keymap" xml:space="preserve">
+    <value>Keymap</value>
+    <comment/>
+  </data>
+  <data name="Ring_Category_KeymapSub" xml:space="preserve">
+    <value>own + custom</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_Kp" xml:space="preserve">
+    <value>key press</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_Sk" xml:space="preserve">
+    <value>sticky key</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_CapsWord" xml:space="preserve">
+    <value>caps word</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_KeyRepeat" xml:space="preserve">
+    <value>repeat</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_Mt" xml:space="preserve">
+    <value>mod / tap</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_Lt" xml:space="preserve">
+    <value>layer / tap</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_Mo" xml:space="preserve">
+    <value>while held</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_To" xml:space="preserve">
+    <value>switch to</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_Tog" xml:space="preserve">
+    <value>toggle</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_Sl" xml:space="preserve">
+    <value>one-shot</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_Bt" xml:space="preserve">
+    <value>Bluetooth</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_Out" xml:space="preserve">
+    <value>output</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_RgbUg" xml:space="preserve">
+    <value>lighting</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_Mkp" xml:space="preserve">
+    <value>button</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_Msc" xml:space="preserve">
+    <value>scroll</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_Mmv" xml:space="preserve">
+    <value>move</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_Bootloader" xml:space="preserve">
+    <value>bootloader</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_SysReset" xml:space="preserve">
+    <value>restart</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_SoftOff" xml:space="preserve">
+    <value>turn off</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_StudioUnlock" xml:space="preserve">
+    <value>studio</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_Trans" xml:space="preserve">
+    <value>transparent</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_None" xml:space="preserve">
+    <value>nothing</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_Own" xml:space="preserve">
+    <value>own</value>
+    <comment/>
+  </data>
+  <data name="Ring_Short_Custom" xml:space="preserve">
+    <value>type it</value>
+    <comment/>
+  </data>
+  <data name="Ring_Custom_Name" xml:space="preserve">
+    <value>Custom…</value>
+    <comment/>
+  </data>
+  <data name="Ring_CaptionFormat" xml:space="preserve">
+    <value>Key {0} · {1}</value>
+    <comment/>
+  </data>
+  <data name="Ring_Center_Choose" xml:space="preserve">
+    <value>Point to choose</value>
+    <comment/>
+  </data>
+  <data name="Ring_Center_Save" xml:space="preserve">
+    <value>✓ Click to save</value>
+    <comment/>
+  </data>
+  <data name="Ring_Center_PickFormat" xml:space="preserve">
+    <value>Pick: {0}</value>
+    <comment/>
+  </data>
+  <data name="Ring_Center_TypeBinding" xml:space="preserve">
+    <value>Type a binding</value>
+    <comment/>
+  </data>
+  <data name="Ring_DescriptionItemFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+    <comment/>
+  </data>
+  <data name="Ring_CrumbOpenFormat" xml:space="preserve">
+    <value>{0}: ?</value>
+    <comment/>
+  </data>
+  <data name="Ring_Hint_Choose" xml:space="preserve">
+    <value>Click to choose · right-click: back · Esc: cancel</value>
+    <comment/>
+  </data>
+  <data name="Ring_Hint_Summary" xml:space="preserve">
+    <value>Click a step above, or a category to change the behavior · Esc: close</value>
+    <comment/>
+  </data>
+  <data name="Ring_Hint_Text" xml:space="preserve">
+    <value>Type the binding · Enter: save · Esc: cancel</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_Used" xml:space="preserve">
+    <value>Used here</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_Used_SubFormat" xml:space="preserve">
+    <value>{0} keys</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_Modifiers" xml:space="preserve">
+    <value>Modifiers</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_Modifiers_Sub" xml:space="preserve">
+    <value>Shift Ctrl …</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_Letters" xml:space="preserve">
+    <value>Letters</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_Letters_Sub" xml:space="preserve">
+    <value>A–Z</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_Digits" xml:space="preserve">
+    <value>Digits</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_Digits_Sub" xml:space="preserve">
+    <value>0–9</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_Punctuation" xml:space="preserve">
+    <value>Punctuation</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_Punctuation_Sub" xml:space="preserve">
+    <value>. , ; '</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_Symbols" xml:space="preserve">
+    <value>Symbols</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_Symbols_Sub" xml:space="preserve">
+    <value>! @ # …</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_Navigation" xml:space="preserve">
+    <value>Navigation</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_Navigation_Sub" xml:space="preserve">
+    <value>arrows, Home …</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_Editing" xml:space="preserve">
+    <value>Editing</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_Editing_Sub" xml:space="preserve">
+    <value>Esc Bspc Del …</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_Function" xml:space="preserve">
+    <value>F-keys</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_Function_Sub" xml:space="preserve">
+    <value>F1–F24</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_More" xml:space="preserve">
+    <value>More</value>
+    <comment/>
+  </data>
+  <data name="Ring_Keys_More_Sub" xml:space="preserve">
+    <value>keypad, media …</value>
+    <comment/>
+  </data>
+  <data name="Ring_Mod_Ctrl" xml:space="preserve">
+    <value>Ctrl</value>
+    <comment/>
+  </data>
+  <data name="Ring_Mod_Shift" xml:space="preserve">
+    <value>Shift</value>
+    <comment/>
+  </data>
+  <data name="Ring_Mod_Alt" xml:space="preserve">
+    <value>Alt</value>
+    <comment/>
+  </data>
+  <data name="Ring_Mod_Gui" xml:space="preserve">
+    <value>Gui</value>
+    <comment/>
+  </data>
+  <data name="Ring_Mod_Left" xml:space="preserve">
+    <value>L</value>
+    <comment/>
+  </data>
+  <data name="Ring_Mod_Right" xml:space="preserve">
+    <value>R</value>
+    <comment/>
+  </data>
+  <data name="Ring_Profile_Sub" xml:space="preserve">
+    <value>profile</value>
+    <comment/>
+  </data>
+  <data name="Ring_OpenInDialog" xml:space="preserve">
+    <value>Open in the key dialog (Shift+Enter)</value>
+    <comment/>
+  </data>
+  <data name="Ring_Panel_Layers" xml:space="preserve">
+    <value>Layers</value>
+    <comment/>
+  </data>
+  <data name="Ring_Panel_Search" xml:space="preserve">
+    <value>Search…</value>
+    <comment/>
+  </data>
+  <data name="Ring_Panel_Hint" xml:space="preserve">
+    <value>↵ pick · ↑↓ move</value>
     <comment/>
   </data>
 </root>

@@ -34,7 +34,8 @@ public sealed record KeycodeItem(
 /// <summary>
 /// The keycode list of the key dialog: category dropdown ("Used in this
 /// keymap" first when the open keymap uses keys), search, the
-/// Shift/Ctrl/Alt/GUI wrap toggles, key recording, and the flat params the
+/// Shift/Ctrl/Alt/GUI wrap toggles for both hands (the key dialog shows the
+/// left-hand ones), key recording, and the flat params the
 /// selection produces (<see cref="Value"/>, e.g. <c>["LS","A"]</c> for
 /// <c>&amp;kp LS(A)</c>). One instance per keycode parameter of a binding
 /// (<c>&amp;kp</c>'s key, <c>&amp;mt</c>'s hold and tap); part 5 wires the
@@ -44,19 +45,11 @@ public sealed partial class KeycodePickerViewModel : ObservableObject
 {
     private const string KpPrefix = "&kp ";
 
-    private static readonly ZmkModifiers RightFlags =
-        ZmkModifiers.RightCtrl | ZmkModifiers.RightShift |
-        ZmkModifiers.RightAlt | ZmkModifiers.RightGui;
-
     private readonly ZmkKeycodeUsage _usage;
     private readonly bool _modifiersFirst;
 
     /// <summary>Canonical name → the keycode it produces with Shift.</summary>
     private readonly Dictionary<string, ZmkKeycode> _shiftedByOf;
-
-    /// <summary>Right-side wrap flags carried in by <see cref="Seed"/>; the
-    /// toggles only ever edit the left-side ones.</summary>
-    private ZmkModifiers _keptRightFlags;
 
     /// <summary>Keycode and exact spelling <see cref="Seed"/> opened with;
     /// re-selecting that keycode keeps writing the old spelling.</summary>
@@ -120,7 +113,7 @@ public sealed partial class KeycodePickerViewModel : ObservableObject
             var name = _seedKeycode == keycode && _seedSpelling is { } spelling
                 ? spelling
                 : _usage.NameFor(keycode);
-            return ZmkModifierWrap.Wrap(name, LeftToggleFlags | _keptRightFlags);
+            return ZmkModifierWrap.Wrap(name, LeftToggleFlags | RightToggleFlags);
         }
     }
 
@@ -139,6 +132,10 @@ public sealed partial class KeycodePickerViewModel : ObservableObject
                 : text;
         }
     }
+
+    /// <summary>The wrap flags the toggles add, both hands combined; the
+    /// radial key editor's inner ring reads this.</summary>
+    public ZmkModifiers WrapFlags => LeftToggleFlags | RightToggleFlags;
 
     /// <summary>Raised once per user action that may change
     /// <see cref="Value"/>: picking a keycode, flipping a toggle, seeding or
@@ -180,25 +177,57 @@ public sealed partial class KeycodePickerViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(Value))]
     [NotifyPropertyChangedFor(nameof(HasValue))]
     [NotifyPropertyChangedFor(nameof(ValueText))]
+    [NotifyPropertyChangedFor(nameof(WrapFlags))]
     private bool _isShift;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Value))]
     [NotifyPropertyChangedFor(nameof(HasValue))]
     [NotifyPropertyChangedFor(nameof(ValueText))]
+    [NotifyPropertyChangedFor(nameof(WrapFlags))]
     private bool _isCtrl;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Value))]
     [NotifyPropertyChangedFor(nameof(HasValue))]
     [NotifyPropertyChangedFor(nameof(ValueText))]
+    [NotifyPropertyChangedFor(nameof(WrapFlags))]
     private bool _isAlt;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Value))]
     [NotifyPropertyChangedFor(nameof(HasValue))]
     [NotifyPropertyChangedFor(nameof(ValueText))]
+    [NotifyPropertyChangedFor(nameof(WrapFlags))]
     private bool _isGui;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Value))]
+    [NotifyPropertyChangedFor(nameof(HasValue))]
+    [NotifyPropertyChangedFor(nameof(ValueText))]
+    [NotifyPropertyChangedFor(nameof(WrapFlags))]
+    private bool _isRightShift;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Value))]
+    [NotifyPropertyChangedFor(nameof(HasValue))]
+    [NotifyPropertyChangedFor(nameof(ValueText))]
+    [NotifyPropertyChangedFor(nameof(WrapFlags))]
+    private bool _isRightCtrl;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Value))]
+    [NotifyPropertyChangedFor(nameof(HasValue))]
+    [NotifyPropertyChangedFor(nameof(ValueText))]
+    [NotifyPropertyChangedFor(nameof(WrapFlags))]
+    private bool _isRightAlt;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Value))]
+    [NotifyPropertyChangedFor(nameof(HasValue))]
+    [NotifyPropertyChangedFor(nameof(ValueText))]
+    [NotifyPropertyChangedFor(nameof(WrapFlags))]
+    private bool _isRightGui;
 
     [ObservableProperty]
     private bool _isRecording;
@@ -215,6 +244,14 @@ public sealed partial class KeycodePickerViewModel : ObservableObject
 
     partial void OnIsGuiChanged(bool value) => RaiseChanged();
 
+    partial void OnIsRightShiftChanged(bool value) => RaiseChanged();
+
+    partial void OnIsRightCtrlChanged(bool value) => RaiseChanged();
+
+    partial void OnIsRightAltChanged(bool value) => RaiseChanged();
+
+    partial void OnIsRightGuiChanged(bool value) => RaiseChanged();
+
     /// <summary>Starts or stops key recording; the view feeds
     /// <see cref="ApplyRecorded"/> once the recorder has a result.</summary>
     [RelayCommand]
@@ -223,7 +260,7 @@ public sealed partial class KeycodePickerViewModel : ObservableObject
     /// <summary>
     /// Opens the picker on one existing logical param (the flat form of a
     /// <c>&amp;kp</c> key, e.g. <c>["LS","N1"]</c>): selects its keycode,
-    /// checks the left-side toggles, keeps the right-side wraps, and
+    /// checks the wrap toggles of both hands from its modifiers, and
     /// remembers the exact spelling. Unknown wrapper or keycode → false and
     /// nothing changes. Afterwards <see cref="Value"/> is the same keycode
     /// spelling and the same flags, in
@@ -240,7 +277,7 @@ public sealed partial class KeycodePickerViewModel : ObservableObject
         {
             SelectedKeycode = keycode;
             ApplyLeftFlags(unwrapped.Modifiers);
-            _keptRightFlags = unwrapped.Modifiers & RightFlags;
+            ApplyRightFlags(unwrapped.Modifiers);
             _seedKeycode = keycode;
             _seedSpelling = unwrapped.Keycode;
         }
@@ -255,8 +292,8 @@ public sealed partial class KeycodePickerViewModel : ObservableObject
 
     /// <summary>
     /// Applies one recorded key: selects its keycode, sets the toggles from
-    /// the recorded modifiers (left side only, right-side carry-overs
-    /// dropped) and shows the keycode's own category. An unknown name only
+    /// the recorded modifiers (right-side carry-overs dropped) and shows the
+    /// keycode's own category. An unknown name only
     /// stops the recording. Either way recording ends; the return says
     /// whether the key took.
     /// </summary>
@@ -273,7 +310,7 @@ public sealed partial class KeycodePickerViewModel : ObservableObject
         {
             SelectedKeycode = keycode;
             ApplyLeftFlags(key.Modifiers);
-            _keptRightFlags = ZmkModifiers.None;
+            ApplyRightFlags(ZmkModifiers.None);
             SearchText = "";
             SelectedCategory = Categories.First(c => c.Category == keycode.Category);
             IsRecording = false;
@@ -293,12 +330,51 @@ public sealed partial class KeycodePickerViewModel : ObservableObject
         (IsAlt ? ZmkModifiers.LeftAlt : ZmkModifiers.None) |
         (IsGui ? ZmkModifiers.LeftGui : ZmkModifiers.None);
 
+    private ZmkModifiers RightToggleFlags =>
+        (IsRightShift ? ZmkModifiers.RightShift : ZmkModifiers.None) |
+        (IsRightCtrl ? ZmkModifiers.RightCtrl : ZmkModifiers.None) |
+        (IsRightAlt ? ZmkModifiers.RightAlt : ZmkModifiers.None) |
+        (IsRightGui ? ZmkModifiers.RightGui : ZmkModifiers.None);
+
+    /// <summary>Flips the one wrap toggle a single flag names
+    /// (<see cref="ZmkModifiers.LeftShift"/> → <see cref="IsShift"/>,
+    /// <see cref="ZmkModifiers.RightGui"/> → <see cref="IsRightGui"/>, …),
+    /// through the normal property setter, so <see cref="Changed"/> fires
+    /// once. The radial key editor's inner ring calls this.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="flag"/> is not exactly one of the eight single
+    /// modifier flags.</exception>
+    public void ToggleWrap(ZmkModifiers flag)
+    {
+        switch (flag)
+        {
+            case ZmkModifiers.LeftShift: IsShift = !IsShift; break;
+            case ZmkModifiers.LeftCtrl: IsCtrl = !IsCtrl; break;
+            case ZmkModifiers.LeftAlt: IsAlt = !IsAlt; break;
+            case ZmkModifiers.LeftGui: IsGui = !IsGui; break;
+            case ZmkModifiers.RightShift: IsRightShift = !IsRightShift; break;
+            case ZmkModifiers.RightCtrl: IsRightCtrl = !IsRightCtrl; break;
+            case ZmkModifiers.RightAlt: IsRightAlt = !IsRightAlt; break;
+            case ZmkModifiers.RightGui: IsRightGui = !IsRightGui; break;
+            default: throw new ArgumentOutOfRangeException(
+                nameof(flag), flag, "Not exactly one of the eight modifier flags.");
+        }
+    }
+
     private void ApplyLeftFlags(ZmkModifiers flags)
     {
         IsShift = flags.HasFlag(ZmkModifiers.LeftShift);
         IsCtrl = flags.HasFlag(ZmkModifiers.LeftCtrl);
         IsAlt = flags.HasFlag(ZmkModifiers.LeftAlt);
         IsGui = flags.HasFlag(ZmkModifiers.LeftGui);
+    }
+
+    private void ApplyRightFlags(ZmkModifiers flags)
+    {
+        IsRightShift = flags.HasFlag(ZmkModifiers.RightShift);
+        IsRightCtrl = flags.HasFlag(ZmkModifiers.RightCtrl);
+        IsRightAlt = flags.HasFlag(ZmkModifiers.RightAlt);
+        IsRightGui = flags.HasFlag(ZmkModifiers.RightGui);
     }
 
     private void RebuildItems()

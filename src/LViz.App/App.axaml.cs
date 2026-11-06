@@ -342,6 +342,11 @@ public partial class App : Application
                 return await dlg.ShowDialog<KeyBinding?>(mainWindow);
             };
 
+            // Key ring: hosted by the main window as an overlay (a dialog
+            // fallback while the window is too small); same lifecycle as the
+            // key dialog — it answers the new binding, or null on cancel.
+            viewModel.KeyRingRequested = request => mainWindow.ShowKeyRingAsync(request);
+
             // Save conflict: the target changed underneath the edit. Modal,
             // awaited by the save command, which applies the answer (reload /
             // overwrite / keep editing) directly.

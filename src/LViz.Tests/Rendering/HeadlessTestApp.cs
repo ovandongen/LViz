@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Headless;
 using Avalonia.Media;
+using Avalonia.Styling;
+using Avalonia.Themes.Fluent;
 using Projektanker.Icons.Avalonia;
 using Projektanker.Icons.Avalonia.FontAwesome;
 
@@ -12,9 +14,12 @@ namespace LViz.Tests.Rendering;
 /// The Avalonia app behind every <c>[AvaloniaFact]</c>: headless, but drawing
 /// real pixels with Skia (<c>UseHeadlessDrawing = false</c>), with Inter as the
 /// default font and the Font Awesome icons registered, like the real app.
-/// Plain <c>[Fact]</c> tests don't start it. No theme or app resources are
-/// loaded, so only self-drawn controls (custom <c>Render</c>) render as in the
-/// app; XAML views with <c>StaticResource</c> lookups don't belong here.
+/// Plain <c>[Fact]</c> tests don't start it.
+/// The Fluent theme (dark, like the app) loads because templated controls
+/// (<c>TextBox</c>, <c>ScrollViewer</c>) render nothing without templates;
+/// the app's own resources still do not, so views under test must carry
+/// literal colours and <c>Loc.Instance</c> bindings instead of
+/// <c>StaticResource</c> lookups.
 /// </summary>
 public sealed class HeadlessTestApp : Application
 {
@@ -27,6 +32,13 @@ public sealed class HeadlessTestApp : Application
 
     private static readonly object IconLock = new();
     private static bool _iconsRegistered;
+
+    public override void Initialize()
+    {
+        RequestedThemeVariant = ThemeVariant.Dark;
+        Styles.Add(new FluentTheme());
+        base.Initialize();
+    }
 
     public override void OnFrameworkInitializationCompleted()
     {

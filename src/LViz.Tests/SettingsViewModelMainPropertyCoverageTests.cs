@@ -45,6 +45,7 @@ public class SettingsViewModelMainPropertyCoverageTests
         "IsLiveHighlightingEnabled",
         "IsAutoLayerSwitchEnabled",
         "IsAlwaysOnTop",
+        "UseRingKeyEditor",
 
         // The auto-switch engine, exposed directly (SettingsVM binds its
         // observable state without a MainVM facade).

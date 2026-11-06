@@ -262,6 +262,39 @@ public class MainWindowViewModelEditTests : IDisposable
     }
 
     [Fact]
+    public void EditMode_SwitchingLayer_DropsTheSelection_ChangedOutlineStaysOnItsLayer()
+    {
+        var vm = StartEditing(out _);
+        vm.Layers[1].SelectCommand.Execute(null);
+        Tap(vm, 0);
+        vm.EditClearSelectedKey(toNone: true);
+        Assert.True(vm.Keys[0].IsEditChanged);
+
+        vm.Layers[0].SelectCommand.Execute(null);
+
+        Assert.False(vm.Keys[0].IsEditChanged);
+        Assert.False(vm.Keys[0].IsEditSelected);
+        Assert.Null(vm.Edit!.SelectedKeyIndex);
+
+        vm.Layers[1].SelectCommand.Execute(null);
+
+        Assert.True(vm.Keys[0].IsEditChanged);
+        Assert.False(vm.Keys[0].IsEditSelected);
+    }
+
+    [Fact]
+    public void EditMode_Undo_KeepsTheSelection()
+    {
+        var vm = StartEditing(out _);
+        Tap(vm, 0);
+        vm.EditClearSelectedKey(toNone: false);
+
+        vm.Edit!.UndoCommand.Execute(null);
+
+        Assert.True(vm.Keys[0].IsEditSelected);
+    }
+
+    [Fact]
     public void EditMode_LowerLayer_LiteralTransShowsItself_NoFallThroughToBase()
     {
         var vm = StartEditing(out _);
@@ -821,6 +854,97 @@ public class MainWindowViewModelEditTests : IDisposable
         Assert.True(vm.Keys[1].IsEditSelected);
         Assert.NotNull(captured);
         Assert.Equal(1, captured!.KeyIndex);
+    }
+
+    // ---- the ring editor routing -----------------------------------------------------
+
+    [Fact]
+    public async Task RingSetting_Off_OpensDialog_NotTheRing()
+    {
+        var vm = StartEditing(out _);
+        Tap(vm, 1);
+        var dialogCalls = 0;
+        var ringCalls = 0;
+        vm.KeyDialogRequested = _ =>
+        {
+            dialogCalls++;
+            return Task.FromResult<KeyBinding?>(null);
+        };
+        vm.KeyRingRequested = _ =>
+        {
+            ringCalls++;
+            return Task.FromResult<KeyBinding?>(null);
+        };
+
+        await vm.EditSelectedKeyAsync();
+
+        Assert.Equal(1, dialogCalls);
+        Assert.Equal(0, ringCalls);
+    }
+
+    [Fact]
+    public async Task RingSetting_On_RingCallbackOpens_AndItsAnswerAppliesAsOneStep()
+    {
+        var vm = StartEditing(out _);
+        vm.UseRingKeyEditor = true;
+        Tap(vm, 1);
+        var dialogCalls = 0;
+        KeyDialogRequest? captured = null;
+        vm.KeyDialogRequested = _ =>
+        {
+            dialogCalls++;
+            return Task.FromResult<KeyBinding?>(Kp("C"));
+        };
+        vm.KeyRingRequested = request =>
+        {
+            captured = request;
+            return Task.FromResult<KeyBinding?>(Kp("B"));
+        };
+
+        await vm.EditSelectedKeyAsync();
+
+        Assert.Equal(0, dialogCalls);
+        Assert.NotNull(captured);
+        Assert.Equal(vm.ActiveLayerIndex, captured!.LayerIndex);
+        Assert.Equal(1, captured.KeyIndex);
+        var now = vm.Edit!.Session.Current.Layers[0].Bindings[1];
+        Assert.Equal("&kp", now.Behavior);
+        Assert.Equal("B", now.Params[0]);
+        Assert.Equal(1, vm.UnsavedEditCount);
+    }
+
+    [Fact]
+    public async Task RingSetting_On_OtherEditorOpensDialog_TheRingStaysClosed()
+    {
+        var vm = StartEditing(out _);
+        vm.UseRingKeyEditor = true;
+        Tap(vm, 1);
+        var ringCalls = 0;
+        vm.KeyRingRequested = _ =>
+        {
+            ringCalls++;
+            return Task.FromResult<KeyBinding?>(Kp("B"));
+        };
+        vm.KeyDialogRequested = _ => Task.FromResult<KeyBinding?>(Kp("C"));
+
+        await vm.EditSelectedKeyAsync(otherEditor: true);
+
+        Assert.Equal(0, ringCalls);
+        Assert.Equal("C", vm.Edit!.Session.Current.Layers[0].Bindings[1].Params[0]);
+    }
+
+    [Fact]
+    public async Task RingSetting_On_NoRingCallback_OpensDialogInstead()
+    {
+        var vm = StartEditing(out _);
+        vm.UseRingKeyEditor = true;
+        Tap(vm, 1);
+        vm.KeyDialogRequested = _ => Task.FromResult<KeyBinding?>(Kp("C"));
+
+        await vm.EditSelectedKeyAsync();
+
+        Assert.Equal("C", vm.Edit!.Session.Current.Layers[0].Bindings[1].Params[0]);
+        Assert.Equal(1, vm.UnsavedEditCount);
     }
 
     // ---- the Settings keyboard picker lock ------------------------------------------
