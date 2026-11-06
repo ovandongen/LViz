@@ -179,7 +179,7 @@
 
                     <Border Height="1" Background="{StaticResource BgSurface0}" />
 
-                    <!-- Ring key editor (experimental) -->
+                    <!-- Ring key editor -->
                     <StackPanel Spacing="4">
                         <CheckBox Content="{Binding [Settings_RingKeyEditor], Source={StaticResource Loc}}"
                                   IsChecked="{Binding MainViewModel.UseRingKeyEditor, Mode=TwoWay}" />

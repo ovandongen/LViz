@@ -154,13 +154,6 @@ public partial class KeyRingView : UserControl
         }
 
         bool enter = e.Key == Key.Enter || e.PhysicalKey == PhysicalKey.NumPadEnter;
-        if (enter && e.KeyModifiers == KeyModifiers.Shift)
-        {
-            RaiseClosed(null, openInDialog: true);
-            e.Handled = true;
-            return;
-        }
-
         if (enter && e.KeyModifiers == KeyModifiers.None)
         {
             if (RingControl.ActivateKeyboardHighlight())

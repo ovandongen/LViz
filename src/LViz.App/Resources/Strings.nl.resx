@@ -354,11 +354,11 @@
     <comment/>
   </data>
   <data name="Settings_RingKeyEditor" xml:space="preserve">
-    <value>Ring-toetseditor (experimenteel)</value>
+    <value>Ring-toetseditor</value>
     <comment/>
   </data>
   <data name="Settings_RingKeyEditorHint" xml:space="preserve">
-    <value>Dubbelklik of Enter opent de ring in plaats van het toetsvenster. Shift+Enter opent altijd de andere.</value>
+    <value>Dubbelklik of Enter opent de ring. Zet dit uit om het toetsvenster te gebruiken; de knop rechtsonder in de ring opent altijd het toetsvenster.</value>
     <comment/>
   </data>
   <data name="Settings_GlobalHotkey" xml:space="preserve">
@@ -2684,7 +2684,7 @@
     <comment/>
   </data>
   <data name="Ring_OpenInDialog" xml:space="preserve">
-    <value>Openen in het toetsvenster (Shift+Enter)</value>
+    <value>Openen in het toetsvenster</value>
     <comment/>
   </data>
   <data name="Ring_Panel_Layers" xml:space="preserve">

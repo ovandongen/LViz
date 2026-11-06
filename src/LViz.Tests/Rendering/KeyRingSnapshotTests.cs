@@ -73,6 +73,8 @@ public class KeyRingSnapshotTests
         "ring-7-rgb-13.png",
         "ring-8-keyboard.png",
         "ring-9-scaled.png",
+        "ring-10-view-keycode.png",
+        "ring-11-view-text.png",
     ];
 
     /// <summary>Category ring with the Layer category hovered and its
