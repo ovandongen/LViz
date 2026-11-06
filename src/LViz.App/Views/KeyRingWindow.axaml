@@ -1,0 +1,22 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LViz.App.Views.KeyRingWindow"
+        SystemDecorations="None"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        ShowInTaskbar="False"
+        Topmost="True"
+        CanResize="False"
+        ShowActivated="True">
+
+    <!-- The window covers the working area of the key's screen. The host
+         canvas is filled with a near-transparent colour (alpha 1/255): a fully
+         transparent pixel lets the click through to the window below on
+         macOS, so without it a click beside the ring would never reach us.
+         No app resources: the view brings its own literals (KeyRingView.axaml). -->
+    <Canvas x:Name="Host" Background="#01000000" ClipToBounds="False">
+        <Line x:Name="Tether" Stroke="#99E8B45A" StrokeThickness="1.5"
+              StrokeLineCap="Round" IsHitTestVisible="False" IsVisible="False" />
+    </Canvas>
+
+</Window>

@@ -731,6 +731,19 @@
             </Button>
         </Border>
 
+        <!-- Key ring backdrop: while the ring is open (in its own window, see
+             KeyRingWindow) the board dims behind a scrim and the edited key
+             gets a gold outline. Last child of the root grid, spanning all
+             three rows, so it covers bars, board and toast. -->
+        <Panel x:Name="KeyRingLayer" Grid.Row="0" Grid.RowSpan="3" IsVisible="False">
+            <Border x:Name="KeyRingScrim" Background="#B811111B"
+                    PointerPressed="OnKeyRingScrimPressed" />
+            <Canvas>
+                <Border x:Name="KeyRingKeyOutline" BorderBrush="#E8B45A" BorderThickness="2"
+                        CornerRadius="8" IsHitTestVisible="False" />
+            </Canvas>
+        </Panel>
+
     </Grid>
 
 </Window>

@@ -149,6 +149,31 @@ public class UserSettingsJsonRoundTripTests
     }
 
     [Fact]
+    public void RoundTrip_PreservesRingKeyEditor()
+    {
+        var original = new UserSettings { RingKeyEditor = true };
+
+        var json = JsonSerializer.Serialize(original, Options);
+        var rehydrated = JsonSerializer.Deserialize<UserSettings>(json, Options);
+
+        Assert.NotNull(rehydrated);
+        Assert.True(rehydrated!.RingKeyEditor);
+    }
+
+    [Fact]
+    public void Load_MissingRingKeyEditor_DefaultsFalse()
+    {
+        // Settings files written before the ring editor existed have no
+        // RingKeyEditor key — the setting must default to off.
+        var json = """{"SchemaVersion": 1, "Keyboard": "GO60"}""";
+
+        var parsed = JsonSerializer.Deserialize<UserSettings>(json, Options);
+
+        Assert.NotNull(parsed);
+        Assert.False(parsed!.RingKeyEditor);
+    }
+
+    [Fact]
     public void Load_MissingRecentKeymapPaths_ResolvesToEmpty()
     {
         // Settings files written before the recents feature (schema v1) have

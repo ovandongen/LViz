@@ -198,6 +198,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     [ObservableProperty] private bool _isAlwaysOnTop;
     [ObservableProperty] private bool _colorTrayIconByActiveLayer;
+    [ObservableProperty] private bool _useRingKeyEditor;
     [ObservableProperty] private bool _isLiveHighlightingEnabled;
     [ObservableProperty] private bool _isAutoLayerSwitchEnabled;
     [ObservableProperty] private bool _hasLayoutLoaded;
@@ -276,6 +277,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     partial void OnColorTrayIconByActiveLayerChanged(bool value) =>
         PersistSetting(s => s with { ColorTrayIconByActiveLayer = value });
+
+    partial void OnUseRingKeyEditorChanged(bool value) =>
+        PersistSetting(s => s with { RingKeyEditor = value });
 
     /// <summary>Canvas geometry + stacked-mode offsets for the board render
     /// surface, extracted into its own VM. Bound by BoardView and the settings
@@ -692,6 +696,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         _selectedKeyboard = _profile;
         _isAlwaysOnTop = s.AlwaysOnTop;
         _colorTrayIconByActiveLayer = s.ColorTrayIconByActiveLayer;
+        _useRingKeyEditor = s.RingKeyEditor;
         _isLiveHighlightingEnabled = s.LiveKeyHighlighting;
         _isAutoLayerSwitchEnabled = s.AutoLayerSwitch;
         _backgroundOpacity = Math.Clamp(s.BackgroundOpacity, 0.0, 1.0);
@@ -1489,19 +1494,31 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// </summary>
     public Func<KeyDialogRequest, Task<KeyBinding?>>? KeyDialogRequested { get; set; }
 
+    /// <summary>
+    /// Invoked when the user asks to rebind a key and the ring editor is the
+    /// one to open (see <see cref="UseRingKeyEditor"/>): the callback (set by
+    /// <c>App.axaml.cs</c>, part 10) owns the ring's lifecycle and answers the
+    /// new binding, or <see langword="null"/> when the ring was cancelled.
+    /// Null means the ring isn't wired up — the key dialog is used instead.
+    /// </summary>
+    public Func<KeyDialogRequest, Task<KeyBinding?>>? KeyRingRequested { get; set; }
+
     /// <summary>True while a callback from an earlier <see cref="EditSelectedKeyAsync"/>
     /// is still open; a second Enter/double-click is ignored until it closes.</summary>
     private bool _keyDialogOpen;
 
     /// <summary>
-    /// Open the key dialog on the selected key of the shown layer and apply
-    /// what it answers as one undo step. Does nothing when not editing, when
-    /// nothing is selected, when the selection sits outside the active layer,
-    /// when no callback is wired up, or while an earlier dialog is still open.
-    /// A cancelled dialog (null) changes nothing; so does a result once the
-    /// edit it was opened on has been replaced underneath the await.
+    /// Open the key editor on the selected key of the shown layer and apply
+    /// what it answers as one undo step: the ring when <see cref="UseRingKeyEditor"/>
+    /// says so (and <paramref name="otherEditor"/> does not invert that —
+    /// Shift+Enter always opens the other editor), the key dialog otherwise.
+    /// Does nothing when not editing, when nothing is selected, when the
+    /// selection sits outside the active layer, when no callback is wired up,
+    /// or while an earlier editor is still open. A cancelled editor (null)
+    /// changes nothing; so does a result once the edit it was opened on has
+    /// been replaced underneath the await.
     /// </summary>
-    public async Task EditSelectedKeyAsync()
+    public async Task EditSelectedKeyAsync(bool otherEditor = false)
     {
         if (Edit is not { } edit) return;
         if (edit.SelectedKeyIndex is not int key) return;
@@ -1511,13 +1528,18 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         if (layer < 0 || layer >= layers.Count) return;
         if (key < 0 || key >= layers[layer].Bindings.Count) return;
 
-        if (KeyDialogRequested is not { } callback) return;
+        // The ring when the setting (inverted by Shift) picks it and a host is
+        // wired up; the key dialog in every other case.
+        var callback = UseRingKeyEditor != otherEditor && KeyRingRequested is not null
+            ? KeyRingRequested
+            : KeyDialogRequested;
+        if (callback is not { } open) return;
         if (_keyDialogOpen) return;
 
         _keyDialogOpen = true;
         try
         {
-            var result = await callback(
+            var result = await open(
                 new KeyDialogRequest(edit.Session.Current, edit.Defines, layer, key));
 
             if (result is not null && ReferenceEquals(Edit, edit))
@@ -2315,8 +2337,15 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         if (km is null) return;
         if (index < 0 || index >= km.LayerCount) return;
 
+        var previousLayerId = _shownLayerId;
         ActiveLayerIndex = index;
         _shownLayerId = edit?.Session.LayerIdAt(index);
+
+        // A selection is a key on the layer it was made on: showing another
+        // layer drops it. Undo/redo and the repaint after a save keep the
+        // same layer id, so they keep it.
+        if (edit is not null && previousLayerId is not null && previousLayerId != _shownLayerId)
+            edit.ClearSelection();
 
         for (int i = 0; i < Keys.Count; i++)
         {

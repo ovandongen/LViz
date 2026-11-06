@@ -111,6 +111,10 @@ public static class KeyBehaviorChoices
             || choice.Name.Contains(text, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>The resx stem (Behavior_&lt;Stem&gt;_Name/Help) for a built-in
+    /// behavior code, or null when the code is not a built-in one.</summary>
+    public static string? StemOf(string code) => Stems.GetValueOrDefault(code);
+
     private static KeyBehaviorChoice BuiltIn(string code)
     {
         var stem = Stems[code];

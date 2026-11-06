@@ -1,0 +1,147 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LViz.App.ViewModels"
+        xmlns:views="using:LViz.App.Views"
+        xmlns:loc="using:LViz.App.Localization"
+        xmlns:i="https://github.com/projektanker/icons.avalonia"
+        x:Class="LViz.App.Views.KeyRingView"
+        x:DataType="vm:KeyRingViewModel"
+        Focusable="True"
+        ClipToBounds="False"
+        Width="448" Height="514">
+
+    <!-- No app-level resources: every colour is a literal so the view also
+         renders in the headless test app (HeadlessTestApp loads only the
+         Fluent theme, not App.axaml). The Fluent state styles for TextBox
+         and Button paint hover/focus on template parts, so those overrides
+         target the parts (AGENTS.md). -->
+
+    <UserControl.Resources>
+        <views:UpperCaseConverter x:Key="Upper" />
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- The centre box keeps its gold frame through hover and focus. -->
+        <Style Selector="TextBox#CenterText:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#181825" />
+            <Setter Property="BorderBrush" Value="#E8B45A" />
+        </Style>
+        <Style Selector="TextBox#CenterText:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#181825" />
+            <Setter Property="BorderBrush" Value="#E8B45A" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+
+        <Style Selector="TextBox#SearchBox">
+            <Setter Property="Background" Value="#181825" />
+            <Setter Property="BorderBrush" Value="#45475A" />
+        </Style>
+        <Style Selector="TextBox#SearchBox:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#181825" />
+            <Setter Property="BorderBrush" Value="#45475A" />
+        </Style>
+        <Style Selector="TextBox#SearchBox:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#181825" />
+            <Setter Property="BorderBrush" Value="#E8B45A" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+
+        <!-- The open-in-dialog button stays flat #313244. -->
+        <Style Selector="Button#OpenInDialogButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#313244" />
+        </Style>
+        <Style Selector="Button#OpenInDialogButton:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#313244" />
+        </Style>
+    </UserControl.Styles>
+
+    <Canvas Width="448" Height="514" ClipToBounds="False">
+
+        <views:KeyRingControl x:Name="RingControl" Canvas.Left="0" Canvas.Top="0"
+                              Ring="{Binding}" />
+
+        <!-- The free-text step's editor; visible only while StepKind is Text
+             (the code-behind toggles this and focuses the box). -->
+        <TextBox x:Name="CenterText" Canvas.Left="170" Canvas.Top="246"
+                 Width="108" Height="28" MinHeight="28"
+                 FontFamily="Menlo, Consolas, monospace" FontSize="12"
+                 Background="#181825" BorderBrush="#E8B45A" BorderThickness="1" CornerRadius="6"
+                 Foreground="#CDD6F4" Padding="4,0"
+                 Text="{Binding Text, Mode=TwoWay}" IsVisible="False" />
+
+        <Button x:Name="OpenInDialogButton" Canvas.Left="418" Canvas.Top="492"
+                Width="30" Height="22" MinWidth="0" MinHeight="0" Padding="0"
+                CornerRadius="11" Background="#313244" BorderBrush="Transparent" BorderThickness="0"
+                ToolTip.Tip="{Binding [Ring_OpenInDialog], Source={x:Static loc:Loc.Instance}}">
+            <i:Icon Value="fa-solid fa-up-right-from-square" FontSize="11" Foreground="#A6ADC8" />
+        </Button>
+
+        <!-- The list panel; the host places it with SetPanelPosition. -->
+        <Border x:Name="PanelBorder"
+                x:DataType="vm:KeyRingPanelViewModel"
+                DataContext="{Binding Panel}"
+                IsVisible="False"
+                Width="260" Height="300"
+                Background="#1E1E2E" BorderBrush="#45475A" BorderThickness="1"
+                CornerRadius="10" BoxShadow="0 10 28 0 #80000000" Padding="12">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="{Binding Title, Converter={StaticResource Upper}}"
+                           FontSize="10" FontWeight="SemiBold" Foreground="#6C7086"
+                           LetterSpacing="0.6" Margin="2,0,0,6" />
+                <TextBox x:Name="SearchBox" DockPanel.Dock="Top" Margin="0,0,0,6"
+                         Watermark="{Binding [Ring_Panel_Search], Source={x:Static loc:Loc.Instance}}"
+                         Text="{Binding SearchText, Mode=TwoWay}" />
+                <TextBlock DockPanel.Dock="Bottom" Margin="0,6,0,0"
+                           HorizontalAlignment="Center" FontSize="10" Foreground="#6C7086"
+                           Text="{Binding [Ring_Panel_Hint], Source={x:Static loc:Loc.Instance}}" />
+                <ScrollViewer x:Name="PanelScroll" HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto">
+                    <ItemsControl x:Name="PanelItems" ItemsSource="{Binding Rows}">
+                        <ItemsControl.Styles>
+                            <!-- Late wins ties: selected beats highlighted beats hover. -->
+                            <Style Selector="Border.row">
+                                <Setter Property="Background" Value="Transparent" />
+                            </Style>
+                            <Style Selector="Border.row:pointerover">
+                                <Setter Property="Background" Value="#313244" />
+                            </Style>
+                            <Style Selector="Border.row.highlighted">
+                                <Setter Property="Background" Value="#45475A" />
+                            </Style>
+                            <Style Selector="Border.row.selected">
+                                <Setter Property="Background" Value="#29E8B45A" />
+                            </Style>
+                            <Style Selector="TextBlock.label">
+                                <Setter Property="Foreground" Value="#CDD6F4" />
+                            </Style>
+                            <Style Selector="Border.row.selected TextBlock.label">
+                                <Setter Property="Foreground" Value="#E8B45A" />
+                            </Style>
+                            <Style Selector="TextBlock.code">
+                                <Setter Property="FontFamily" Value="Menlo, Consolas, monospace" />
+                            </Style>
+                        </ItemsControl.Styles>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:KeyRingPanelRow">
+                                <Border Classes="row" Height="26" CornerRadius="6" Padding="8,0" Margin="0,1"
+                                        Classes.selected="{Binding IsSelected}"
+                                        Classes.highlighted="{Binding IsHighlighted}"
+                                        PointerPressed="OnRowPointerPressed">
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding Sub}"
+                                                   FontSize="11" Foreground="#A6ADC8"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Margin="8,0,0,0" VerticalAlignment="Center" />
+                                        <TextBlock Classes="label" Classes.code="{Binding LabelIsCode}"
+                                                   Text="{Binding Label}" FontSize="12" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+    </Canvas>
+</UserControl>
