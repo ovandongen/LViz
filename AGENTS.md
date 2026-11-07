@@ -121,21 +121,38 @@ After creating or editing a view, rebuild the App project before trusting a
   legend; mirrored when the bars sit at the bottom): a new bar sets its row in
   both the XAML and `UpdateBarPosition`.
 - **Keymap edit mode lives in `KeymapEditViewModel` on
-  `MainWindowViewModel.Edit`.** `KeymapSavePlan.Build` (Core/Keymap/Editing)
-  is the one save pipeline (structure → re-parse → diff → `KeymapWriter`);
-  catch `ZmkKeymapParseException` + `ArgumentException` once at the Save call
-  site. While `IsEditing`, every keymap/board load path returns early, so a
-  save or a conflict reload calls `LeaveEdit()` first, and a save re-applies
-  `ActiveLayerIndex` afterwards because a load lands on layer 0. The edit
-  commands' enable state is re-queried only through `NotifyEditCommandState()`.
+  `MainWindowViewModel.Edit`.** The main VM only starts and leaves an edit
+  (`StartEdit`, `LeaveEdit`, `DiscardEdit`) and repaints on `Edit.Changed`.
+  Every edit action lives on the edit VM (partials `.Layers` for layer
+  commands, `.Dialogs` for the key editor and combos, `.Save` for the save
+  flow), and XAML binds `Edit.XCommand` directly: a null `Command` leaves an
+  Avalonia button enabled, so such a control must only be visible while
+  editing. Dialogs go through `IKeymapEditDialogs` (`AvaloniaKeymapEditDialogs`
+  in the app, `FakeKeymapEditDialogs` in tests, whose key/combo/rename handlers
+  throw unless a test sets them); `AskAsync` in `.Dialogs` is the one "one
+  dialog at a time, drop an answer that arrives after `Close()`" helper. The
+  edit VM never touches settings or loading: it raises `Reported` (status or
+  toast) and an awaited `Completed` (`Saved` / `ReloadRequested`), and the
+  main VM moves layer settings and combo labels, calls `LeaveEdit()` (which
+  calls `Edit.Close()`), reloads and restores the layer with
+  `NearestShownLayer`. `KeymapSavePlan.Build` (Core/Keymap/Editing) is the one
+  save pipeline (structure → re-parse → diff → `KeymapWriter`); catch
+  `ZmkKeymapParseException` + `ArgumentException` once where the plan is built.
+  While `IsEditing`, every keymap/board load path returns early, so the main
+  VM leaves the edit before any reload, and re-applies the layer afterwards
+  because a load lands on layer 0. The edit commands' enable state is
+  re-queried only through the edit VM's `NotifyCommandState()`.
   Edit-mode key gestures are rules in `EditShortcuts.Resolve` (tested as a
-  table); `MainWindow.OnEditKeyDown` only dispatches. A numpad gesture
-  matches on `PhysicalKey` (`NumPadEnter`): its `Key` value differs per
-  platform. The commit message
+  table); `MainWindow.OnEditKeyDown` only dispatches to `Edit`. A numpad
+  gesture matches on `PhysicalKey` (`NumPadEnter`): its `Key` value differs
+  per platform. The commit message
   (`KeymapCommitMessage`) is English by decision, not resx text.
-  The selection belongs to the layer it was made on: `ApplyActiveLayer`
-  clears it when the shown layer *id* changes, so a layer switch drops it and
-  undo/redo or the repaint after a save keep it.
+  The shown layer while editing is `Edit.ShownLayerIndex`, followed by layer
+  id through undo/redo and moves; a tab click calls `Edit.ShowLayer`, and the
+  main VM only mirrors it into `ApplyActiveLayer`. The selection belongs to
+  the layer it was made on: the edit VM clears it when the shown layer *id*
+  changes, so a layer switch drops it and undo/redo or the repaint after a
+  save keep it.
 - **`Core/Keymap/Parser/` is the `.keymap` pipeline.** Preprocess →
   devicetree lex/parse → two-pass interpret produces a `KeyboardConfig`.
   Lean v1 by design — function-like `#define`, `#include` resolution,
@@ -232,16 +249,24 @@ After creating or editing a view, rebuild the App project before trusting a
   `WantedSelection` case; one without the other loses the selection.
 - **Key ring: a second view over `KeyDialogViewModel`.** `KeyRingViewModel`
   holds only its own step state and derives everything else from the dialog
-  on read, raising `PropertyChanged(string.Empty)` for any change. Sectors are
-  prefix-addressed ids (`cat:`, `beh:`, `layer:`, `cmd:`, `prof:`, `keys:`,
-  `mod:`, `keycode:`), parsed strictly. Geometry (angles 0 = up, clockwise;
+  on read, raising `PropertyChanged(string.Empty)` for any change. Each sector
+  (`KeyRingSegment`, or a list-panel `KeyRingPanelRow`) carries a typed
+  `KeyRingTarget` (`Category`, `Behavior`, `Layer`, `Command`, `Profile`,
+  `KeyGroup`, `Modifier`, `Keycode`; in `KeyRingParts.cs`), and `Choose`,
+  `BandFor` and `KeyRingTarget.PicksAValue` dispatch by type. `Target.Key` /
+  `Id` is only a stable string key for the control's hover and animation state
+  and for tests: never parse it back. The VM is split into partials
+  (`.Sectors`, `.Display`); the control into `App/Ring/RingLayout` (pure slots
+  and hit-testing, which returns a typed `RingHit`; unit-tested),
+  `Views/KeyRingPainter` (all drawing) and `KeyRingControl` (view state, input,
+  animation). Geometry (angles 0 = up, clockwise;
   constant pixel gap) lives only in `App/Ring/RingGeometry`. The ring opens
   only in `KeyRingWindow`, a transparent window over the working area of the
   key's screen, so placement is against the monitor, never the main window;
   the main window just dims the board and outlines the key. A press on the
   window's backdrop, losing activation, or a main-window resize cancels. A
   double-click saves only when its first click picked a value
-  (`KeyRingViewModel.PicksAValue`: not `keys:`/`mod:`) and the binding is
+  (`KeyRingTarget.PicksAValue`: not `KeyGroup`/`Modifier`) and the binding is
   complete; the second click is never hit-tested, because the ring has usually
   moved on under the pointer. Pointing at a segment shows its full label and
   sub in the centre. The ring is the default key editor
@@ -251,12 +276,15 @@ After creating or editing a view, rebuild the App project before trusting a
   panel's padding reaches the window's "press on `Host` cancels" check
   (`KeyRingWindowTests` pins it). Ring snapshots for review are written by
   `KeyRingSnapshotTests` to the gitignored `docs/ideas/ring-snapshots/`.
-  `KeyEditorHost` (App/Views) opens the user's editor from any window:
-  `EditAsync(owner, anchor, request, useRing)` anchors the ring on a control.
+  `KeyEditorHost` (App/Views) is the one ring-or-dialog fallback ("the ring
+  when asked and it fits, else the dialog; a ring hand-over continues in the
+  dialog"): `EditAsync(owner, request, KeyEditorRingAnchor?)`, plus
+  `EditAsync(owner, anchor, request, useRing)` to anchor the ring on a control.
   A `KeyDialogRequest` with `Binding` set edits that binding instead of a key
-  (`KeyIndex` is then ignored; `Caption` replaces the title). `MainWindow`
-  keeps its scrim and outline and cancels its ring through one
-  `CancellationTokenSource` (resize and scrim press).
+  (`KeyIndex` is then ignored; `Caption` replaces the title).
+  `MainWindow.EditKeyAsync(request, useRing)` adds its scrim and outline and
+  cancels its ring through one `CancellationTokenSource` (resize and scrim
+  press); `AvaloniaKeymapEditDialogs` reads `RingKeyEditor` on every open.
 - **Hold-tap params: `Ignored` and a pinned layer.** A hold-tap side whose
   behavior takes 0 cells is `ZmkBehaviorParamKind.Ignored`: the key dialog
   shows no editor for it and keeps the cell's value (`0` on a fresh pick).
@@ -270,7 +298,10 @@ After creating or editing a view, rebuild the App project before trusting a
   (`Add`/`Change`/`Delete`) addresses a combo by `ZmkCombo.NodeName`; `Name`
   is the label when the node has one, else the node name, and a rename moves
   `Name` only for an unlabelled node. A combo without `layers` parses as
-  `[-1]`. `KeymapComboWriter` touches only properties that differ (a default
+  `[-1]`; test a layer list for "every layer" only with
+  `ZmkCombo.IsAllLayers(layers)` (empty or holding `-1`; it also takes a draft
+  scope), not with `AppliesToAllLayers`, which is false for an empty list.
+  `KeymapComboWriter` touches only properties that differ (a default
   value removes its line), spells positions as defines only when the file's
   combos already do, and re-parses as a guard. `KeymapEditSession` tracks
   combos by never-reused ids like layers; `PendingComboEdits` is the net list
@@ -293,7 +324,13 @@ After creating or editing a view, rebuild the App project before trusting a
   it is one line). Malformed input throws `LayoutImportException` with a
   1-based line; "nothing found" is an empty list. The dtsi-based ones share
   `Dtsi/DtsiText`: `MaskComments` keeps length and newlines, so offsets and
-  line numbers found on masked text are valid in the original. Bundled
+  line numbers found on masked text are valid in the original. `DtsiText` is
+  also the one devicetree text scanner for the keymap writers:
+  `FindChildNodes` (direct children with name span, label flag, header line,
+  indent and braces) and the line helpers (`LineStartOf`, `EndOfLine`,
+  `LeadingWhitespace`, `EndOfClosingLine`, `NameBeforeBrace`); the writers
+  project from it instead of scanning themselves, and share `WriterText`
+  (`EscapeDisplayName`, `Num`). Bundled
   board resources still go through `DtsiPhysicalLayoutParser.Parse`, which
   insists on exactly one physical-layout node. Test fixtures under
   `LViz.Tests/Layout/Fixtures/` are embedded by wildcard: drop a file in and
