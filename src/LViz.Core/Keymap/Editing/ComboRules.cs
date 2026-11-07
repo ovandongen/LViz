@@ -189,13 +189,10 @@ public static class ComboRules
     /// (an empty list or a list holding -1) or the two layer sets intersect.</summary>
     private static bool ScopesOverlap(IReadOnlyList<int> a, IReadOnlyList<int> b)
     {
-        bool allA = IsAllLayers(a);
-        bool allB = IsAllLayers(b);
+        bool allA = ZmkCombo.IsAllLayers(a);
+        bool allB = ZmkCombo.IsAllLayers(b);
         return allA || allB || a.Intersect(b).Any();
     }
-
-    private static bool IsAllLayers(IReadOnlyList<int> layers) =>
-        layers.Count == 0 || layers.Contains(-1);
 
     private static bool IsStartChar(char c) => c is >= 'A' and <= 'Z' or >= 'a' and <= 'z';
 

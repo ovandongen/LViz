@@ -138,7 +138,7 @@ public partial class ComboDialogViewModel : ObservableObject, IBoardSurface
         _labelLayer = layers[Math.Clamp(request.ShownLayerIndex, 0, layers.Count - 1)];
 
         var scope = _original?.Layers;
-        var allLayers = scope is null || IsAllLayers(scope);
+        var allLayers = scope is null || ZmkCombo.IsAllLayers(scope);
         var toggles = new List<ComboLayerToggle>(_config.Layers.Count);
         for (var i = 0; i < _config.Layers.Count; i++)
         {
@@ -357,12 +357,6 @@ public partial class ComboDialogViewModel : ObservableObject, IBoardSurface
     private IEnumerable<string> TakenNames() => _others.Select(Identity);
 
     private static string Identity(ZmkCombo combo) => combo.NodeName ?? combo.Name;
-
-    /// <summary>The layer scope ZMK reads as "every layer": the writer's lone
-    /// <c>-1</c>, or nothing at all, which is what the parser gives a node
-    /// with no <c>layers</c> property.</summary>
-    private static bool IsAllLayers(IReadOnlyList<int> layers) =>
-        layers.Count == 0 || layers.Contains(-1);
 
     private static bool IsNone(KeyBinding binding) =>
         string.Equals(binding.Behavior, KeyBinding.None.Behavior, StringComparison.Ordinal);

@@ -165,7 +165,7 @@ internal sealed class KeymapLayerText
             throw new ZmkKeymapParseException("No 'zmk,keymap' node found in source.");
 
         var keymap = keymaps[0];
-        var blocks = FindChildNodes(masked, keymap.BodyStart, keymap.BodyEnd);
+        var blocks = FindLayerBlocks(masked, keymap.BodyStart, keymap.BodyEnd);
         if (blocks.Count != config.Layers.Count)
             throw new ZmkKeymapParseException(
                 $"keymap (line {DtsiText.LineOf(masked, keymap.BodyStart - 1)}): found {blocks.Count} layer nodes "
@@ -265,7 +265,7 @@ internal sealed class KeymapLayerText
             switch (Masked[i])
             {
                 case '{':
-                    names.Add(NameBeforeBrace(Masked, i));
+                    names.Add(DtsiText.NameBeforeBrace(Masked, i));
                     break;
                 case '}' when names.Count > 0:
                     names.RemoveAt(names.Count - 1);
@@ -278,54 +278,11 @@ internal sealed class KeymapLayerText
 
     // ---- layer nodes ------------------------------------------------------------
 
-    /// <summary>
-    /// The direct child nodes of a body, in order: every <c>name {</c> at depth
-    /// 0, brace-matched to its <c>}</c> and the <c>;</c> after it. An unclosed
-    /// child is dropped, which makes the caller's layer-count check fail loudly.
-    /// </summary>
-    private static List<LayerBlock> FindChildNodes(string masked, int bodyStart, int bodyEnd)
-    {
-        var blocks = new List<LayerBlock>();
-        int depth = 0;
-        int headerStart = 0;
-        string nodeName = string.Empty;
-        string indent = string.Empty;
-
-        for (int i = bodyStart; i < bodyEnd; i++)
-        {
-            char c = masked[i];
-
-            if (c == '{')
-            {
-                if (depth == 0)
-                {
-                    nodeName = NameBeforeBrace(masked, i);
-                    headerStart = LineStartOf(masked, i);
-                    indent = LeadingWhitespace(masked, headerStart);
-                }
-                depth++;
-            }
-            else if (c == '}' && depth > 0)
-            {
-                depth--;
-                if (depth == 0)
-                    blocks.Add(new LayerBlock(headerStart, EndOfClosingLine(masked, i), nodeName, indent));
-            }
-        }
-
-        return blocks;
-    }
-
-    /// <summary>Offset just past the newline ending the line that holds the
-    /// closing <c>}</c> (and its <c>;</c>), or the text length when the file
-    /// has no newline there.</summary>
-    private static int EndOfClosingLine(string text, int closeBrace)
-    {
-        int p = closeBrace + 1;
-        while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
-        int newline = text.IndexOf('\n', p);
-        return newline < 0 ? text.Length : newline + 1;
-    }
+    private static List<LayerBlock> FindLayerBlocks(string masked, int bodyStart, int bodyEnd) =>
+        DtsiText.FindChildNodes(masked, bodyStart, bodyEnd)
+            .Select(n => new LayerBlock(
+                n.HeaderLineStart, DtsiText.EndOfClosingLine(masked, n.CloseBrace), n.Name, n.Indent))
+            .ToList();
 
     // ---- layer defines ----------------------------------------------------------
 
@@ -337,7 +294,7 @@ internal sealed class KeymapLayerText
         var directives = new List<Directive>();
         foreach (Match match in DirectiveRegex.Matches(masked))
         {
-            int lineEnd = EndOfLine(masked, match.Index);
+            int lineEnd = DtsiText.EndOfLine(masked, match.Index);
             directives.Add(new Directive(
                 match.Groups[1].Value,
                 match.Groups[2].Value,
@@ -550,43 +507,6 @@ internal sealed class KeymapLayerText
     private bool InsideLayerBlock(int offset) =>
         Layers.Any(b => offset >= b.Start && offset < b.End);
 
-    /// <summary>Offset of the first character of the line holding
-    /// <paramref name="offset"/>.</summary>
-    private static int LineStartOf(string text, int offset)
-    {
-        int newline = offset <= 0 ? -1 : text.LastIndexOf('\n', offset - 1);
-        return newline + 1;
-    }
-
-    /// <summary>Offset just past the newline that ends the line holding
-    /// <paramref name="offset"/>, or the text length when there is none.</summary>
-    private static int EndOfLine(string text, int offset)
-    {
-        int newline = text.IndexOf('\n', Math.Min(offset, text.Length));
-        return newline < 0 ? text.Length : newline + 1;
-    }
-
-    private static string LeadingWhitespace(string text, int lineStart)
-    {
-        int p = lineStart;
-        while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
-        return text[lineStart..p];
-    }
-
-    /// <summary>The node name directly before a <c>{</c>, with any
-    /// <c>label:</c> prefix left out.</summary>
-    private static string NameBeforeBrace(string text, int braceIndex)
-    {
-        int i = braceIndex - 1;
-        while (i >= 0 && char.IsWhiteSpace(text[i])) i--;
-        int end = i + 1;
-        while (i >= 0 && IsNodeNameChar(text[i])) i--;
-        return text[(i + 1)..end];
-    }
-
     private static bool IsIdentifierChar(char c) =>
         char.IsAsciiLetterOrDigit(c) || c == '_';
-
-    private static bool IsNodeNameChar(char c) =>
-        char.IsAsciiLetterOrDigit(c) || c is '_' or '@' or ',' or '+' or '-' or '.';
 }

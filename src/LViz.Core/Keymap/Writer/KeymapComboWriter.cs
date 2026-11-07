@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using LViz.Core.Keymap.Editing;
@@ -160,7 +159,7 @@ public static class KeymapComboWriter
             throw new ZmkKeymapParseException(
                 $"the keymap holds no '{KeymapCompatible}' node to place a new combos node next to.");
 
-        var ind = text.LeadingWhitespace(text.KeymapHeaderStart);
+        var ind = DtsiText.LeadingWhitespace(text.Masked, text.KeymapHeaderStart);
         var child = ind + "    ";
 
         var insertion =
@@ -355,13 +354,10 @@ public static class KeymapComboWriter
     /// -1 is "all layers", which no <c>layers</c> property spells.</summary>
     private static bool SameLayerScope(IReadOnlyList<int> a, IReadOnlyList<int> b)
     {
-        bool allA = IsAllLayers(a);
-        bool allB = IsAllLayers(b);
+        bool allA = ZmkCombo.IsAllLayers(a);
+        bool allB = ZmkCombo.IsAllLayers(b);
         return allA || allB ? allA == allB : new HashSet<int>(a).SetEquals(b);
     }
-
-    private static bool IsAllLayers(IReadOnlyList<int> layers) =>
-        layers.Count == 0 || layers.Contains(-1);
 
     // ---- bug guard -------------------------------------------------------------------
 
@@ -430,13 +426,10 @@ public static class KeymapComboWriter
 
     private static string Describe(ZmkCombo combo) =>
         $"node '{combo.NodeName}' name '{combo.Name}' keys [{Join(combo.KeyPositions)}] layers [{Join(combo.Layers)}] "
-        + $"firing '{combo.Binding.Display}' timeout-ms {Num(combo.TimeoutMs)} "
-        + $"require-prior-idle-ms {Num(combo.RequirePriorIdleMs)} slow-release {combo.SlowRelease}";
+        + $"firing '{combo.Binding.Display}' timeout-ms {WriterText.Num(combo.TimeoutMs)} "
+        + $"require-prior-idle-ms {WriterText.Num(combo.RequirePriorIdleMs)} slow-release {combo.SlowRelease}";
 
     private static string Join(IReadOnlyList<int> values) => string.Join(' ', values);
-
-    private static string Num(int? value) =>
-        value?.ToString(CultureInfo.InvariantCulture) ?? "-";
 
     // ---- where things sit in the text ----------------------------------------------
 
@@ -519,7 +512,7 @@ public static class KeymapComboWriter
         /// <summary>The indent of the combos node's header line, empty when the
         /// file has no combos node.</summary>
         public string CombosIndent =>
-            Combos is { } node ? LeadingWhitespace(LineStartOf(Masked, node.BodyStart - 1)) : string.Empty;
+            Combos is { } node ? DtsiText.LeadingWhitespace(Masked, DtsiText.LineStartOf(Masked, node.BodyStart - 1)) : string.Empty;
 
         /// <summary>The indent a new child node gets: the first existing child's,
         /// or the combos node's own indent plus four spaces.</summary>
@@ -544,7 +537,10 @@ public static class KeymapComboWriter
 
             var combos = found.Count > 0 ? found[0] : (DtsiText.DtsiNode?)null;
             var nodes = combos is { } node
-                ? FindChildNodes(masked, node.BodyStart, node.BodyEnd)
+                ? DtsiText.FindChildNodes(masked, node.BodyStart, node.BodyEnd)
+                    .Select(n => new ComboNode(
+                        n.Name, n.NameStart, n.NameEnd, n.OpenBrace + 1, n.CloseBrace, n.Labelled, n.Indent))
+                    .ToList()
                 : new List<ComboNode>();
             var keymap = DtsiText.FindNodesByCompatible(masked, KeymapCompatible);
 
@@ -554,7 +550,7 @@ public static class KeymapComboWriter
                 source.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n",
                 combos,
                 nodes,
-                keymap.Count > 0 ? LineStartOf(masked, keymap[0].BodyStart - 1) : -1,
+                keymap.Count > 0 ? DtsiText.LineStartOf(masked, keymap[0].BodyStart - 1) : -1,
                 config);
         }
 
@@ -591,8 +587,8 @@ public static class KeymapComboWriter
         {
             if (statement.OwnLines)
             {
-                int start = LineStartOf(Masked, statement.NameStart);
-                int end = EndOfLine(Masked, statement.SpanEnd - 1);
+                int start = DtsiText.LineStartOf(Masked, statement.NameStart);
+                int end = DtsiText.EndOfLine(Masked, statement.SpanEnd - 1);
                 return (start, string.Empty, end - start);
             }
 
@@ -608,7 +604,7 @@ public static class KeymapComboWriter
         /// stays one line.</summary>
         public (int Offset, string Replacement, int ReplacedLength) Insertion(ComboNode node, string statement)
         {
-            int closingLineStart = LineStartOf(Masked, node.CloseBrace);
+            int closingLineStart = DtsiText.LineStartOf(Masked, node.CloseBrace);
             if (AllWhitespace(closingLineStart, node.CloseBrace))
                 return (closingLineStart, PropertyIndent(node) + statement + ";" + NewLine, 0);
 
@@ -625,7 +621,7 @@ public static class KeymapComboWriter
             {
                 int newline = Masked.IndexOf('\n', i);
                 int lineEnd = newline < 0 ? Masked.Length : newline;
-                if (Masked[i..lineEnd].Trim().Length > 0) return LeadingWhitespace(LineStartOf(Masked, i));
+                if (Masked[i..lineEnd].Trim().Length > 0) return DtsiText.LeadingWhitespace(Masked, DtsiText.LineStartOf(Masked, i));
                 i = newline < 0 ? Masked.Length : newline + 1;
             }
 
@@ -650,15 +646,15 @@ public static class KeymapComboWriter
         public string? FormatStatement(string property, ZmkCombo combo) => property switch
         {
             "key-positions" => "key-positions = <" + string.Join(' ', combo.KeyPositions.Select(FormatPosition)) + ">",
-            "layers" => IsAllLayers(combo.Layers)
+            "layers" => ZmkCombo.IsAllLayers(combo.Layers)
                 ? null
                 : "layers = <" + string.Join(' ', combo.Layers.Select(FormatLayer)) + ">",
             "bindings" => "bindings = <" + ZmkBindingFormatter.Format(combo.Binding, LayerDefines, _config.HoldTaps) + ">",
             "timeout-ms" => combo.TimeoutMs is int timeout
-                ? "timeout-ms = <" + Num(timeout) + ">"
+                ? "timeout-ms = <" + WriterText.Num(timeout) + ">"
                 : null,
             "require-prior-idle-ms" => combo.RequirePriorIdleMs is int idle
-                ? "require-prior-idle-ms = <" + Num(idle) + ">"
+                ? "require-prior-idle-ms = <" + WriterText.Num(idle) + ">"
                 : null,
             "slow-release" => combo.SlowRelease ? "slow-release" : null,
             _ => throw new ArgumentException($"'{property}' is not a combo property.", nameof(property)),
@@ -670,9 +666,9 @@ public static class KeymapComboWriter
         /// value is this number. Numbers otherwise.</summary>
         private string FormatPosition(int position)
         {
-            if (_positionPrefixes.Count == 0) return Num(position);
+            if (_positionPrefixes.Count == 0) return WriterText.Num(position);
 
-            string value = Num(position);
+            string value = WriterText.Num(position);
             foreach (var define in Defines)
             {
                 if (!string.Equals(define.Value, value, StringComparison.Ordinal)) continue;
@@ -687,7 +683,7 @@ public static class KeymapComboWriter
         /// as a layer reference and whose value is this number.</summary>
         private string FormatLayer(int layer)
         {
-            string value = Num(layer);
+            string value = WriterText.Num(layer);
             foreach (var define in LayerDefines)
                 if (string.Equals(define.Value, value, StringComparison.Ordinal)) return define.Key;
             return value;
@@ -737,12 +733,12 @@ public static class KeymapComboWriter
                 return (spaces, combos.BodyEnd - spaces, NewLine + node + CombosIndent);
             }
 
-            if (Nodes.Count > 0) return (EndOfLine(Masked, Nodes[^1].CloseBrace), 0, NewLine + node);
+            if (Nodes.Count > 0) return (DtsiText.EndOfLine(Masked, Nodes[^1].CloseBrace), 0, NewLine + node);
 
             int slot = combos.BodyStart;
             for (int i = combos.BodyStart; i < combos.BodyEnd;)
             {
-                int lineEnd = EndOfLine(Source, i);
+                int lineEnd = DtsiText.EndOfLine(Source, i);
                 if (!IsBlank(i, Math.Min(lineEnd, combos.BodyEnd)))
                     slot = Math.Min(lineEnd, combos.BodyEnd);
                 i = lineEnd;
@@ -755,8 +751,8 @@ public static class KeymapComboWriter
         /// <paramref name="offset"/>'s line and that offset.</summary>
         private bool StartsItsLine(int offset)
         {
-            int start = LineStartOf(Masked, offset - 1);
-            return LeadingWhitespace(Masked, start).Length == offset - start;
+            int start = DtsiText.LineStartOf(Masked, offset - 1);
+            return DtsiText.LeadingWhitespace(Masked, start).Length == offset - start;
         }
 
         private static bool IsSpaceOrTab(char c) => c is ' ' or '\t';
@@ -769,14 +765,14 @@ public static class KeymapComboWriter
         /// remains, and comments around the node are untouched.</summary>
         public (int Offset, string Replacement, int ReplacedLength) NodeRemoval(ComboNode node)
         {
-            int start = LineStartOf(Masked, node.NameStart);
-            int end = EndOfLine(Masked, node.CloseBrace);
-            int before = start > 0 ? LineStartOf(Masked, start - 1) : -1;
+            int start = DtsiText.LineStartOf(Masked, node.NameStart);
+            int end = DtsiText.EndOfLine(Masked, node.CloseBrace);
+            int before = start > 0 ? DtsiText.LineStartOf(Masked, start - 1) : -1;
             bool blankBefore = before >= 0 && IsBlank(before, start);
 
             if (end >= Source.Length) return (start, string.Empty, end - start);
 
-            int afterEnd = EndOfLine(Source, end);
+            int afterEnd = DtsiText.EndOfLine(Source, end);
             if (blankBefore && IsBlank(end, afterEnd))
                 return (start, string.Empty, afterEnd - start);
 
@@ -784,61 +780,6 @@ public static class KeymapComboWriter
                 return (before, string.Empty, end - before);
 
             return (start, string.Empty, end - start);
-        }
-
-        /// <summary>The direct child nodes of a body, in order: every
-        /// <c>[label:] name {</c> at depth 0, brace-matched to its <c>}</c>. An
-        /// unclosed child is dropped, which makes the caller's combo-count check
-        /// fail loudly.</summary>
-        private static List<ComboNode> FindChildNodes(string masked, int bodyStart, int bodyEnd)
-        {
-            var nodes = new List<ComboNode>();
-            int depth = 0;
-            int nameStart = 0;
-            int nameEnd = 0;
-            int open = 0;
-            bool labelled = false;
-            string name = string.Empty;
-            string indent = string.Empty;
-
-            for (int i = bodyStart; i < bodyEnd; i++)
-            {
-                char c = masked[i];
-
-                if (c == '{')
-                {
-                    if (depth == 0)
-                    {
-                        nameEnd = i;
-                        while (nameEnd > 0 && char.IsWhiteSpace(masked[nameEnd - 1])) nameEnd--;
-                        nameStart = nameEnd;
-                        while (nameStart > 0 && IsNodeNameChar(masked[nameStart - 1])) nameStart--;
-                        name = masked[nameStart..nameEnd];
-                        labelled = HasLabelPrefix(masked, nameStart);
-                        open = i + 1;
-                        indent = LeadingWhitespace(masked, LineStartOf(masked, i));
-                    }
-
-                    depth++;
-                }
-                else if (c == '}' && depth > 0)
-                {
-                    depth--;
-                    if (depth == 0)
-                        nodes.Add(new ComboNode(name, nameStart, nameEnd, open, i, labelled, indent));
-                }
-            }
-
-            return nodes;
-        }
-
-        /// <summary>Does a <c>label:</c> sit before the node name? Only spaces and
-        /// tabs separate the two, so the walk never leaves the header line.</summary>
-        private static bool HasLabelPrefix(string masked, int nameStart)
-        {
-            int p = nameStart - 1;
-            while (p >= 0 && (masked[p] == ' ' || masked[p] == '\t')) p--;
-            return p >= 0 && masked[p] == ':';
         }
 
         // ---- text helpers -------------------------------------------------------
@@ -869,10 +810,10 @@ public static class KeymapComboWriter
         /// its <c>;</c> on that line is whitespace.</summary>
         private bool OwnLines(int nameStart, int semicolon)
         {
-            for (int i = LineStartOf(Masked, nameStart); i < nameStart; i++)
+            for (int i = DtsiText.LineStartOf(Masked, nameStart); i < nameStart; i++)
                 if (!char.IsWhiteSpace(Masked[i])) return false;
 
-            for (int i = semicolon + 1, end = EndOfLine(Masked, semicolon); i < end; i++)
+            for (int i = semicolon + 1, end = DtsiText.EndOfLine(Masked, semicolon); i < end; i++)
                 if (!char.IsWhiteSpace(Masked[i])) return false;
 
             return true;
@@ -908,31 +849,5 @@ public static class KeymapComboWriter
 
             return true;
         }
-
-        public string LeadingWhitespace(int lineStart) => LeadingWhitespace(Masked, lineStart);
-
-        private static string LeadingWhitespace(string text, int lineStart)
-        {
-            int p = lineStart;
-            while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
-            return text[lineStart..p];
-        }
-
-        private static int LineStartOf(string text, int offset)
-        {
-            int newline = offset <= 0 ? -1 : text.LastIndexOf('\n', offset - 1);
-            return newline + 1;
-        }
-
-        private static int EndOfLine(string text, int offset)
-        {
-            int newline = text.IndexOf('\n', Math.Min(offset, text.Length));
-            return newline < 0 ? text.Length : newline + 1;
-        }
-
-        private static bool IsNodeNameChar(char c) =>
-            char.IsAsciiLetterOrDigit(c) || c is '_' or '@' or ',' or '+' or '-' or '.';
-
-        private static string Num(int value) => value.ToString(CultureInfo.InvariantCulture);
     }
 }

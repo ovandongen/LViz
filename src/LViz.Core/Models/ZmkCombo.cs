@@ -35,6 +35,12 @@ public sealed record ZmkCombo(
     /// <summary>True when this combo is active on every layer (i.e. <c>Layers == [-1]</c>).</summary>
     public bool AppliesToAllLayers => Layers.Count > 0 && Layers.Contains(-1);
 
+    /// <summary>The layer scope ZMK reads as "every layer": a list holding the
+    /// <c>-1</c> sentinel, or an empty one (a node with no <c>layers</c> property
+    /// parses as <c>[-1]</c>). Takes a bare list so a draft scope can be tested.</summary>
+    public static bool IsAllLayers(IReadOnlyList<int> layers) =>
+        layers.Count == 0 || layers.Contains(-1);
+
     /// <summary>True when this combo is active on the given layer index.</summary>
     public bool AppliesToLayer(int layerIndex) => AppliesToAllLayers || Layers.Contains(layerIndex);
 
@@ -62,8 +68,8 @@ public sealed record ZmkCombo(
     /// list, which no writer emits) is "all layers".</summary>
     private static bool SameLayerScope(IReadOnlyList<int> a, IReadOnlyList<int> b)
     {
-        bool allA = a.Count == 0 || a.Contains(-1);
-        bool allB = b.Count == 0 || b.Contains(-1);
+        bool allA = IsAllLayers(a);
+        bool allB = IsAllLayers(b);
         return allA || allB ? allA == allB : SameSet(a, b);
     }
 }

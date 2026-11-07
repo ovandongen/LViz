@@ -144,7 +144,7 @@ public static class KeymapWriter
         foreach (var rename in realRenames)
         {
             var map = maps[rename.LayerIndex];
-            var escaped = EscapeDisplayName(rename.Name);
+            var escaped = WriterText.EscapeDisplayName(rename.Name);
             if (map.DisplayNameValue is { } value)
                 changes.Add((value.Start, escaped, value.Length));
             else
@@ -240,12 +240,6 @@ public static class KeymapWriter
     }
 
     // ---- rename ----------------------------------------------------------------
-
-    /// <summary>Escapes a layer name for inside a devicetree string
-    /// literal: backslash first, then the quote.</summary>
-    private static string EscapeDisplayName(string name) =>
-        name.Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal);
 
     /// <summary>
     /// The insertion for a layer without a <c>display-name</c>: as its own

@@ -332,7 +332,7 @@ public static class KeymapLayerWriter
         string text = scan.Source;
         var maps = KeymapSourceMap.Build(text, config);
         string indent = scan.Layers[0].Indent;
-        string inner = IndentOf(text, maps[0].BindingsKeywordOffset);
+        string inner = DtsiText.LeadingWhitespace(text, DtsiText.LineStartOf(text, maps[0].BindingsKeywordOffset));
         var rows = RowLengths(text, maps[0].Bindings);
         var defines = LayerReferenceDefines(scan);
 
@@ -343,7 +343,7 @@ public static class KeymapLayerWriter
         string nl = scan.NewLine;
         var sb = new StringBuilder();
         sb.Append(indent).Append(NodeNameFor(scan.Layers, add.Name)).Append(" {").Append(nl);
-        sb.Append(inner).Append("display-name = \"").Append(EscapeDisplayName(add.Name)).Append("\";").Append(nl);
+        sb.Append(inner).Append("display-name = \"").Append(WriterText.EscapeDisplayName(add.Name)).Append("\";").Append(nl);
         sb.Append(inner).Append("bindings = <").Append(nl);
 
         // The row lengths add up to layer 0's binding count, which the remapper
@@ -412,16 +412,6 @@ public static class KeymapLayerWriter
         return rows;
     }
 
-    /// <summary>The leading whitespace of the line holding
-    /// <paramref name="offset"/>.</summary>
-    private static string IndentOf(string text, int offset)
-    {
-        int start = text.LastIndexOf('\n', Math.Max(0, offset - 1)) + 1;
-        int p = start;
-        while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
-        return text[start..p];
-    }
-
     /// <summary>
     /// The defines allowed to stand in for a layer number in text this writer
     /// writes: the layer defines that the file itself uses where a layer number
@@ -447,12 +437,6 @@ public static class KeymapLayerWriter
             throw new ArgumentException("A new layer name may not contain a control character.", "edit");
     }
 
-    /// <summary>Escapes a layer name for inside a devicetree string literal:
-    /// backslash first, then the quote, as <see cref="KeymapWriter"/> does.</summary>
-    private static string EscapeDisplayName(string name) =>
-        name.Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal);
-
     // ---- delete ------------------------------------------------------------------
 
     /// <summary>
@@ -470,7 +454,7 @@ public static class KeymapLayerWriter
         int count = config.Layers.Count;
         if (index < 0 || index >= count)
             throw new ArgumentOutOfRangeException(
-                nameof(index), index, $"layer {Num(index)} is out of range 0…{Num(count - 1)}.");
+                nameof(index), index, $"layer {WriterText.Num(index)} is out of range 0…{WriterText.Num(count - 1)}.");
 
         var blockers = new List<LayerDeleteBlocker>();
 
@@ -604,7 +588,7 @@ public static class KeymapLayerWriter
             ? $" '{config.Layers[index].Name}'"
             : string.Empty;
 
-        return $"layer {Num(index)}{name} cannot be deleted: "
+        return $"layer {WriterText.Num(index)}{name} cannot be deleted: "
             + string.Join("; ", blockers.Select(Describe)) + ".";
     }
 
@@ -613,13 +597,12 @@ public static class KeymapLayerWriter
         LayerDeleteBlockerKind.LastLayer => "it is the keymap's only layer",
         LayerDeleteBlockerKind.Combo => $"combo '{blocker.Name}' uses it",
         LayerDeleteBlockerKind.ConditionalLayer =>
-            $"conditional layer '{blocker.Name}' references it on line {Num(blocker.Line)}",
+            $"conditional layer '{blocker.Name}' references it on line {WriterText.Num(blocker.Line)}",
         LayerDeleteBlockerKind.DefineUsage =>
-            $"define '{blocker.Name}' is used outside the layer blocks on line {Num(blocker.Line)}",
-        _ => $"'{blocker.Name}' references it on line {Num(blocker.Line)}",
+            $"define '{blocker.Name}' is used outside the layer blocks on line {WriterText.Num(blocker.Line)}",
+        _ => $"'{blocker.Name}' references it on line {WriterText.Num(blocker.Line)}",
     };
 
-    private static string Num(int value) => value.ToString(CultureInfo.InvariantCulture);
 
     // ---- bug guard ---------------------------------------------------------------
 
