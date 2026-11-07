@@ -58,6 +58,14 @@ public partial class GitHubOpenViewModel : ObservableObject
     /// <summary>Opens a URL in the user's browser; set by the window.</summary>
     public Action<string>? OpenUrl { get; set; }
 
+    /// <summary>
+    /// Product names of the plugged-in keyboards, so a keymap's "fits
+    /// &lt;board&gt;" hint names the board opening it lands on (see
+    /// <see cref="KeyboardProfileRegistry.FindByKeyCount"/>). Set by the app
+    /// from <c>MainWindowViewModel.AttachedHidNames</c>; none by default.
+    /// </summary>
+    public Func<IReadOnlyCollection<string>> AttachedHidNames { get; set; } = () => [];
+
     /// <summary>Raised with the chosen keymap, or null when the user cancels.</summary>
     public event Action<GitHubOpenSelection?>? CloseRequested;
 
@@ -357,7 +365,8 @@ public partial class GitHubOpenViewModel : ObservableObject
         try
         {
             var result = await _service.FetchRepoAsync(repo.Owner, repo.Name, branch);
-            var items = await Task.Run(() => ScanKeymaps(result.Folder));
+            var attached = AttachedHidNames();
+            var items = await Task.Run(() => ScanKeymaps(result.Folder, attached));
             if (items.Count == 0)
             {
                 ErrorText = Loc.Instance.Format("GitHub_NoKeymapFormat", repo.FullName, branch);
@@ -398,9 +407,12 @@ public partial class GitHubOpenViewModel : ObservableObject
     /// Every <c>.keymap</c> in the cache folder <paramref name="folder"/>,
     /// ordinal-sorted by repo-relative path, each described by the board its
     /// first layer's key count resolves to ("no layout yet" for a count no
-    /// board has, "can't be read" for a broken file). Runs off the UI thread.
+    /// board has, "can't be read" for a broken file). A key-count tie goes to
+    /// the board whose HID name is in <paramref name="attachedHidNames"/>, as
+    /// in the load's auto-switch. Runs off the UI thread.
     /// </summary>
-    internal static List<GitHubKeymapItem> ScanKeymaps(string folder)
+    internal static List<GitHubKeymapItem> ScanKeymaps(
+        string folder, IReadOnlyCollection<string>? attachedHidNames = null)
     {
         var items = new List<GitHubKeymapItem>();
         foreach (var path in ZmkConfigScanner.ScanFolder(folder).KeymapPaths)
@@ -411,7 +423,7 @@ public partial class GitHubOpenViewModel : ObservableObject
             {
                 var config = ZmkKeymapLoader.Load(path, "github-pick");
                 var count = config.Layers.Count > 0 ? config.Layers[0].Bindings.Count : 0;
-                detail = KeyboardProfileRegistry.FindByKeyCount(count) is IKeyboardProfile profile
+                detail = KeyboardProfileRegistry.FindByKeyCount(count, attachedHidNames) is IKeyboardProfile profile
                     ? Loc.Instance.Format("GitHub_KeymapBoardFormat", count, profile.DisplayName)
                     : Loc.Instance.Format("GitHub_KeymapNoLayoutFormat", count);
             }
