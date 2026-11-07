@@ -7,7 +7,6 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
-using LViz.App.Ring;
 using LViz.App.Services;
 using LViz.App.ViewModels;
 using LViz.Core.Diagnostics;
@@ -24,6 +23,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        KeyRingLayer.BoardRoot = this;
         PositionChanged += OnPositionChanged;
         Opened += (_, _) =>
         {
@@ -158,7 +158,7 @@ public partial class MainWindow : Window
     {
         // While the ring is open it owns the keyboard — its own tunnel handler
         // decides Esc/Enter/arrows, so the window's shortcuts must not act.
-        if (_keyRingOpen) return;
+        if (KeyRingLayer.IsOpen) return;
 
         if (DataContext is not MainWindowViewModel { IsEditing: true } vm) return;
         if (e.Source is TextBox) return;
@@ -343,125 +343,8 @@ public partial class MainWindow : Window
 
     // ---- key ring ---------------------------------------------------------------
 
-    /// <summary>True while <see cref="EditKeyAsync"/> hosts the ring: edit
-    /// shortcuts pause (the ring owns the keyboard) and a scrim press cancels it.</summary>
-    private bool _keyRingOpen;
-
-    /// <summary>Cancels the currently open ring: a scrim press and a resize
-    /// both close it as a cancel through this.</summary>
-    private CancellationTokenSource? _keyRingCancel;
-
-    /// <summary>A click on the dimmed board cancels the ring. The ring's window
-    /// normally covers the board and catches that click itself; this covers a
-    /// board outside the screen's working area.</summary>
-    private void OnKeyRingScrimPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (!_keyRingOpen) return;
-        _keyRingCancel?.Cancel();
-        e.Handled = true;
-    }
-
-    /// <summary>
-    /// Opens the user's key editor for <paramref name="request"/>. With
-    /// <paramref name="useRing"/> the board dims, the edited key gets a gold
-    /// outline, and the ring opens on the key in a <see cref="KeyRingWindow"/>
-    /// over the key's screen, so it is placed against the monitor, not this
-    /// window; a resize or a press on the dimmed board cancels it. Without it
-    /// (or when the ring has no room, or hands over) the key dialog opens. The
-    /// ring-versus-dialog fallback itself is <see cref="KeyEditorHost"/>'s.
-    /// Answers the new binding, or null on cancel. The caller (the edit view-model)
-    /// allows one editor at a time.
-    /// </summary>
-    public async Task<ZmkKeyBinding?> EditKeyAsync(KeyDialogRequest request, bool useRing)
-    {
-        if (!useRing) return await KeyEditorHost.EditAsync(this, request, null);
-
-        // Whatever happens on the way, the scrim comes down and the edit
-        // shortcuts come back; otherwise one exception leaves the board
-        // dimmed and the keyboard dead until restart.
-        _keyRingOpen = true;
-        var cts = new CancellationTokenSource();
-        _keyRingCancel = cts;
-        EventHandler<SizeChangedEventArgs> sizeCancel = (_, _) => cts.Cancel();
-        try
-        {
-            // A collapsed panel has no bounds, so show the layer before finding
-            // the key in it.
-            KeyRingLayer.IsVisible = true;
-            UpdateLayout();
-            var key = FindKeyRect(request.KeyIndex, KeyRingLayer.Bounds.Size);
-
-            // The ring's window covers the working area of the key's screen;
-            // the host turns these screen-pixel corners into DIPs inside it.
-            var keyTopLeft = KeyRingLayer.PointToScreen(key.TopLeft);
-            var keyBottomRight = KeyRingLayer.PointToScreen(key.BottomRight);
-
-            // The board stays dimmed behind the ring, its key outlined in gold.
-            // The host's placement never moves the key, so the outline is set
-            // from the key rect before the ring opens.
-            var outline = key.Inflate(3);
-            Canvas.SetLeft(KeyRingKeyOutline, outline.X);
-            Canvas.SetTop(KeyRingKeyOutline, outline.Y);
-            KeyRingKeyOutline.Width = outline.Width;
-            KeyRingKeyOutline.Height = outline.Height;
-
-            // A resize moves the board under the outline: cancel. A press on
-            // the dimmed board cancels through the same source
-            // (OnKeyRingScrimPressed).
-            SizeChanged += sizeCancel;
-
-            return await KeyEditorHost.EditAsync(
-                this,
-                request,
-                new KeyEditorRingAnchor(
-                    keyTopLeft, keyBottomRight, cts.Token,
-                    BeforeDialog: () => KeyRingLayer.IsVisible = false));
-        }
-        finally
-        {
-            SizeChanged -= sizeCancel;
-            _keyRingCancel = null;
-            cts.Dispose();
-            KeyRingLayer.IsVisible = false;
-            _keyRingOpen = false;
-        }
-    }
-
-    /// <summary>
-    /// The edited key's rotated bounding box in <see cref="KeyRingLayer"/>
-    /// coordinates: the four corners of its template Grid through
-    /// <c>TranslatePoint</c>, which folds in the rotation. A zero-size rect at
-    /// the layer centre when the key is not on screen.
-    /// </summary>
-    private Rect FindKeyRect(int keyIndex, Size area)
-    {
-        // Pre-order traversal: the outermost matching Grid — the key template's
-        // root, not the label boxes nested in it — comes first.
-        var target = this.GetVisualDescendants()
-            .OfType<Grid>()
-            .FirstOrDefault(g => g.DataContext is KeyViewModel key && key.Position.Index == keyIndex);
-        if (target is null)
-            return new Rect(new Point(area.Width / 2, area.Height / 2), new Size(0, 0));
-
-        double minX = double.MaxValue, minY = double.MaxValue;
-        double maxX = double.MinValue, maxY = double.MinValue;
-        foreach (var corner in new[]
-                 {
-                     new Point(0, 0),
-                     new Point(target.Bounds.Width, 0),
-                     new Point(target.Bounds.Width, target.Bounds.Height),
-                     new Point(0, target.Bounds.Height),
-                 })
-        {
-            if (target.TranslatePoint(corner, KeyRingLayer) is not { } p) continue;
-            minX = Math.Min(minX, p.X);
-            maxX = Math.Max(maxX, p.X);
-            minY = Math.Min(minY, p.Y);
-            maxY = Math.Max(maxY, p.Y);
-        }
-
-        return minX <= maxX && minY <= maxY
-            ? new Rect(minX, minY, maxX - minX, maxY - minY)
-            : new Rect(new Point(area.Width / 2, area.Height / 2), new Size(0, 0));
-    }
+    /// <summary>Opens the user's key editor; the ring hosting lives in
+    /// <see cref="KeyRingOverlay"/>.</summary>
+    public Task<ZmkKeyBinding?> EditKeyAsync(KeyDialogRequest request, bool useRing) =>
+        KeyRingLayer.EditKeyAsync(request, useRing);
 }

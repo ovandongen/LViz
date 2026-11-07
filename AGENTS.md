@@ -120,6 +120,20 @@ After creating or editing a view, rebuild the App project before trusting a
   app. `BarsPanel` has four rows (status bar, edit banner, layer tabs, combo
   legend; mirrored when the bars sit at the bottom): a new bar sets its row in
   both the XAML and `UpdateBarPosition`.
+- **`MainWindowViewModel` is the core plus child VMs.** The core (show a
+  keymap on a board) is split into partial files by concern:
+  `MainWindowViewModel.cs` (state, ctor, commands, init/shutdown, active
+  layer, live highlighting, key-label overrides), `.Loading` (load, GitHub
+  open/check, diagnostics), `.Boards` (profiles, board switch, user layouts,
+  wizard results), `.Edit` (edit lifecycle, post-save settings moves).
+  Everything with its own seam is a child VM bound directly: `Preferences`
+  (`WindowPreferencesViewModel`: always-on-top, opacity + `BoardBackground`/
+  `TabBackground`, hotkey, tray colouring, ring editor, modifier style; each
+  persists itself, a modifier-style change raises `ModifierStyleChanged` for
+  the relabel, Settings re-raises derived values from
+  `_preferencesPropagators`), `LayerTabs`, `ComboLegend`, `Recents`, `Edit`,
+  `BoardLayout`, `BoardStyle`, plus `Devices` (`DeviceStack`). A new window
+  preference goes on `Preferences`, not on the main VM.
 - **Keymap edit mode lives in `KeymapEditViewModel` on
   `MainWindowViewModel.Edit`.** The main VM only starts and leaves an edit
   (`StartEdit`, `LeaveEdit`, `DiscardEdit`) and repaints on `Edit.Changed`.
@@ -290,9 +304,13 @@ After creating or editing a view, rebuild the App project before trusting a
   `EditAsync(owner, anchor, request, useRing)` to anchor the ring on a control.
   A `KeyDialogRequest` with `Binding` set edits that binding instead of a key
   (`KeyIndex` is then ignored; `Caption` replaces the title).
-  `MainWindow.EditKeyAsync(request, useRing)` adds its scrim and outline and
-  cancels its ring through one `CancellationTokenSource` (resize and scrim
-  press); `AvaloniaKeymapEditDialogs` reads `RingKeyEditor` on every open.
+  `KeyRingOverlay` (App/Views; the `KeyRingLayer` over the main window's root
+  grid, `MainWindow.EditKeyAsync` only forwards to it) owns the scrim, the
+  gold key outline, the open flag (`IsOpen`, which pauses the edit shortcuts
+  in `MainWindow.OnEditKeyDown`) and one `CancellationTokenSource` cancelled
+  by a scrim press or the owner window's `SizeChanged`; `MainWindow` sets its
+  `BoardRoot` so it can find the key. `AvaloniaKeymapEditDialogs` reads the
+  persisted `RingKeyEditor` setting on every open.
 - **Hold-tap params: `Ignored` and a pinned layer.** A hold-tap side whose
   behavior takes 0 cells is `ZmkBehaviorParamKind.Ignored`: the key dialog
   shows no editor for it and keeps the cell's value (`0` on a fresh pick).
@@ -395,10 +413,13 @@ After creating or editing a view, rebuild the App project before trusting a
   passes its split answer, everything else falls back to `HasSplitGap`
   (innermost centres ≥ 1.25u apart). Bounding-box gaps don't work for that:
   Corne's angled inner thumbs overlap in X.
-- **Wizard grid default from the keymap.** Keys per half defaults to the
-  keymap until the user *changes* one of the three counts (a write of the
-  same value, e.g. a binding echo, doesn't count); the split toggle re-runs
-  the default rather than ending it.
+- **Wizard grid answers: `GridQuestionsViewModel` (`wizard.Grid`).** It owns
+  split / keys per half / columns / thumbs (clamped in hand-written setters),
+  the summary lines and the keymap default; the wizard reads `Grid.Options`
+  and calls `Grid.KeymapChanged()` whenever its keymap changes. Keys per half
+  defaults to the keymap until the user *changes* one of the three counts (a
+  write of the same value, e.g. a binding echo, doesn't count); the split
+  toggle re-runs the default rather than ending it.
 - **Per-key label overrides are scoped `(profileId, layerIndex, keyIndex)`**
   → `KeyLabelOverride` (main label, subscript, top-left badge, FA icon,
   font size, bold). Persisted via `UserSettings.KeyLabelOverrides` through
@@ -431,7 +452,9 @@ After creating or editing a view, rebuild the App project before trusting a
   that part. Palette brushes inside `Application.Styles` need `DynamicResource`:
   `Application.Resources` is parsed after the styles.
 - **GitHub keymaps: one HTTP class, refs in the normal settings lists.**
-  `Core/GitHub/GitHubClient` is the only code that talks HTTP; every call goes
+  `Core/GitHub/GitHubClient` (a partial class: plumbing in `GitHubClient.cs`,
+  `.Auth`, `.Repos`, `.Contents` by API area) is the only code that talks
+  HTTP; every call goes
   through its private `ApiRequest`/`SendAsync`/`SendForJsonAsync`, which own
   the status → `GitHubErrorKind` mapping; `DownloadTarballAsync`'s body reads
   map a mid-body drop to `Network` (destination writes stay unmapped).

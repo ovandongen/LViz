@@ -77,7 +77,7 @@
                 <TextBlock Text="{Binding [Wizard_GridHeader], Source={StaticResource Loc}}"
                            FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                 <CheckBox Content="{Binding [Wizard_GridSplit], Source={StaticResource Loc}}"
-                          IsChecked="{Binding GridSplit, Mode=TwoWay}" />
+                          IsChecked="{Binding Grid.Split, Mode=TwoWay}" />
                 <!-- Same shape as the Settings steppers: label column, then a
                      140px stepper column, so the number isn't cut off by the
                      spinner buttons. -->
@@ -88,33 +88,33 @@
                                FontSize="12" Foreground="{StaticResource Text}"
                                VerticalAlignment="Center" />
                     <NumericUpDown Grid.Row="0" Grid.Column="1"
-                                   Value="{Binding GridKeysPerHalf, Mode=TwoWay}"
-                                   Minimum="{Binding GridMinKeysPerHalf}" Maximum="{Binding GridMaxKeysPerHalf}"
+                                   Value="{Binding Grid.KeysPerHalf, Mode=TwoWay}"
+                                   Minimum="{Binding Grid.MinKeysPerHalf}" Maximum="{Binding Grid.MaxKeysPerHalf}"
                                    Increment="1" FormatString="0" />
                     <TextBlock Grid.Row="1" Grid.Column="0"
                                Text="{Binding [Wizard_GridColumns], Source={StaticResource Loc}}"
                                FontSize="12" Foreground="{StaticResource Text}"
                                VerticalAlignment="Center" />
                     <NumericUpDown Grid.Row="1" Grid.Column="1"
-                                   Value="{Binding GridColumns, Mode=TwoWay}"
-                                   Minimum="{Binding GridMinColumns}" Maximum="{Binding GridMaxColumns}"
+                                   Value="{Binding Grid.Columns, Mode=TwoWay}"
+                                   Minimum="{Binding Grid.MinColumns}" Maximum="{Binding Grid.MaxColumns}"
                                    Increment="1" FormatString="0" />
                     <TextBlock Grid.Row="2" Grid.Column="0"
                                Text="{Binding [Wizard_GridThumbKeys], Source={StaticResource Loc}}"
                                FontSize="12" Foreground="{StaticResource Text}"
                                VerticalAlignment="Center" />
                     <NumericUpDown Grid.Row="2" Grid.Column="1"
-                                   Value="{Binding GridThumbKeys, Mode=TwoWay}"
-                                   Minimum="{Binding GridMinThumbKeys}" Maximum="{Binding GridMaxThumbKeys}"
+                                   Value="{Binding Grid.ThumbKeys, Mode=TwoWay}"
+                                   Minimum="{Binding Grid.MinThumbKeys}" Maximum="{Binding Grid.MaxThumbKeys}"
                                    Increment="1" FormatString="0" />
                 </Grid>
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                    <TextBlock Text="{Binding GridKeyCountText}"
+                    <TextBlock Text="{Binding Grid.KeyCountText}"
                                FontSize="12" Foreground="{StaticResource Text}" />
                     <TextBlock Text="✓"
                                FontSize="12" FontWeight="Bold"
                                Foreground="{StaticResource AccentGreen}"
-                               IsVisible="{Binding GridMatchesKeymap}" />
+                               IsVisible="{Binding Grid.MatchesKeymap}" />
                 </StackPanel>
                 <TextBlock Text="{Binding [Wizard_GridHint], Source={StaticResource Loc}}"
                            FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource TextSubtle}" />

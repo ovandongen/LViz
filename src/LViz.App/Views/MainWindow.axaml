@@ -18,7 +18,7 @@
         ExtendClientAreaChromeHints="NoChrome"
         ExtendClientAreaTitleBarHeightHint="0"
         SystemDecorations="None"
-        Topmost="{Binding IsAlwaysOnTop}">
+        Topmost="{Binding Preferences.IsAlwaysOnTop}">
 
     <Window.Resources>
         <conv:HexColorToBrushConverter x:Key="HexToBrush" />
@@ -335,11 +335,11 @@
                         <!-- Modifier symbol style: Apple icon = Mac (⌘ ⌥ ⌃ ⇪), Windows-logo icon = Windows (⊞ Alt Ctrl ⇧).
                              Not a Classes="toggle" — both states are equally "on", the icon itself communicates state. -->
                         <Button x:Name="ModifierStyleButton"
-                                Command="{Binding ToggleWindowsModifierStyleCommand}"
+                                Command="{Binding Preferences.ToggleWindowsModifierStyleCommand}"
                                 Padding="8,4"
                                 ToolTip.Tip="{Binding [Tooltip_ModifierStyle], Source={StaticResource Loc}}">
                             <PathIcon Width="14" Height="14"
-                                      Data="{Binding ModifierStyleIconData}" />
+                                      Data="{Binding Preferences.ModifierStyleIconData}" />
                         </Button>
 
                         <!-- Refresh loaded JSON from disk -->
@@ -354,9 +354,9 @@
 
                         <!-- Pin (always on top) -->
                         <Button x:Name="PinButton"
-                                Command="{Binding TogglePinCommand}"
+                                Command="{Binding Preferences.TogglePinCommand}"
                                 Classes="toggle"
-                                Classes.active="{Binding IsAlwaysOnTop}"
+                                Classes.active="{Binding Preferences.IsAlwaysOnTop}"
                                 Padding="8,4"
                                 ToolTip.Tip="{Binding [Tooltip_AlwaysOnTop], Source={StaticResource Loc}}">
                             <PathIcon Width="16" Height="16"
@@ -491,14 +491,14 @@
                  are off. Row placement and background stay here. -->
             <Border x:Name="ComboLegend" Grid.Row="3"
                     IsVisible="{Binding ComboLegend.IsLegendVisible}"
-                    Background="{Binding TabBackground, Converter={StaticResource HexToBrush}}"
+                    Background="{Binding Preferences.TabBackground, Converter={StaticResource HexToBrush}}"
                     Padding="8,4">
                 <views:ComboLegendView DataContext="{Binding ComboLegend}" />
             </Border>
 
             <!-- Layer tabs -->
             <Border x:Name="LayerTabs" Grid.Row="2"
-                    Background="{Binding TabBackground, Converter={StaticResource HexToBrush}}"
+                    Background="{Binding Preferences.TabBackground, Converter={StaticResource HexToBrush}}"
                     Padding="8,2">
                 <views:LayerTabsView DataContext="{Binding LayerTabs}" />
             </Border>
@@ -506,7 +506,7 @@
 
         <!-- Board visualization area -->
         <Border Grid.Row="1" Padding="16"
-                Background="{Binding BoardBackground, Converter={StaticResource HexToBrush}}">
+                Background="{Binding Preferences.BoardBackground, Converter={StaticResource HexToBrush}}">
             <views:BoardView DataContext="{Binding}" />
         </Border>
 
@@ -548,18 +548,9 @@
             </Button>
         </Border>
 
-        <!-- Key ring backdrop: while the ring is open (in its own window, see
-             KeyRingWindow) the board dims behind a scrim and the edited key
-             gets a gold outline. Last child of the root grid, spanning all
-             three rows, so it covers bars, board and toast. -->
-        <Panel x:Name="KeyRingLayer" Grid.Row="0" Grid.RowSpan="3" IsVisible="False">
-            <Border x:Name="KeyRingScrim" Background="#B811111B"
-                    PointerPressed="OnKeyRingScrimPressed" />
-            <Canvas>
-                <Border x:Name="KeyRingKeyOutline" BorderBrush="{StaticResource AccentGold}" BorderThickness="2"
-                        CornerRadius="8" IsHitTestVisible="False" />
-            </Canvas>
-        </Panel>
+        <!-- Key ring backdrop: last child of the root grid, spanning all three
+             rows, so it covers bars, board and toast. -->
+        <views:KeyRingOverlay x:Name="KeyRingLayer" Grid.Row="0" Grid.RowSpan="3" />
 
     </Grid>
 

@@ -47,11 +47,15 @@ internal sealed class TrayIconController
         _viewModel.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(MainWindowViewModel.ActiveLayerTintColor)
-                or nameof(MainWindowViewModel.ColorTrayIconByActiveLayer)
                 or nameof(MainWindowViewModel.SelectedKeyboard))
             {
                 Dispatcher.UIThread.Post(ApplyIcon);
             }
+        };
+        _viewModel.Preferences.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(WindowPreferencesViewModel.ColorTrayIconByActiveLayer))
+                Dispatcher.UIThread.Post(ApplyIcon);
         };
 
         LocalizeMenu();
@@ -65,7 +69,7 @@ internal sealed class TrayIconController
 
     private void ApplyIcon()
     {
-        var icon = _viewModel.ColorTrayIconByActiveLayer
+        var icon = _viewModel.Preferences.ColorTrayIconByActiveLayer
             ? _tinter.GetTinted(_viewModel.ActiveLayerTintColor)
             : _tinter.GetOriginal();
         _trayIcon.Icon = icon;

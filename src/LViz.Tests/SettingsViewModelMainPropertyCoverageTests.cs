@@ -37,14 +37,12 @@ public class SettingsViewModelMainPropertyCoverageTests
     private static readonly HashSet<string> IgnoredMainProperties = new()
     {
         // Bound directly in SettingsWindow.axaml — no SettingsVM transform needed.
-        "HotkeyKey",
-        "HotkeyModifiers",
-        "IsWindowsModifierStyle",
-        "ColorTrayIconByActiveLayer",
+        // Window preferences child VM, bound directly; SettingsVM re-raises the
+        // opacity percent off its PropertyChanged.
+        "Preferences",
+
         "IsLiveHighlightingEnabled",
         "IsAutoLayerSwitchEnabled",
-        "IsAlwaysOnTop",
-        "UseRingKeyEditor",
 
         // The auto-switch engine, exposed directly (SettingsVM binds its
         // observable state without a MainVM facade).
@@ -78,9 +76,6 @@ public class SettingsViewModelMainPropertyCoverageTests
         "LoadInfoTooltip",
         "ActiveLayerTintColor",
         "ActiveLayerIndex",
-        "BoardBackground",
-        "TabBackground",
-        "ModifierStyleIconData",
         "KeyboardStatusHint",
         "IsAppRulesTabVisible",
         "LoadedLayoutPath",

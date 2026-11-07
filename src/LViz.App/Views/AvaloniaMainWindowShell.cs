@@ -109,13 +109,13 @@ internal sealed class AvaloniaMainWindowShell : IMainWindowShell
         // and looks lost.
         void SyncTopmost(object? _, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(MainWindowViewModel.IsAlwaysOnTop))
-                window.Topmost = viewModel.IsAlwaysOnTop;
+            if (e.PropertyName == nameof(WindowPreferencesViewModel.IsAlwaysOnTop))
+                window.Topmost = viewModel.Preferences.IsAlwaysOnTop;
         }
-        viewModel.PropertyChanged += SyncTopmost;
+        viewModel.Preferences.PropertyChanged += SyncTopmost;
         window.Closed += (_, _) =>
         {
-            viewModel.PropertyChanged -= SyncTopmost;
+            viewModel.Preferences.PropertyChanged -= SyncTopmost;
             settingsVm.Dispose();
             _settingsWindow = null;
         };

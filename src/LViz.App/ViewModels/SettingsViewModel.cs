@@ -77,9 +77,10 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         MouseLayer = new MouseLayerSettingsViewModel(settingsService, mainViewModel);
         About = new AboutSettingsViewModel(
             settingsService, updateService, cliToolInstaller ?? new CliToolInstaller());
-        HotkeyKeyChoices = PlatformCapabilities.GetAvailableFKeys(mainViewModel.HotkeyKey);
+        HotkeyKeyChoices = PlatformCapabilities.GetAvailableFKeys(mainViewModel.Preferences.HotkeyKey);
         _mainViewModel.PropertyChanged += OnMainPropertyChanged;
         _mainViewModel.BoardStyle.PropertyChanged += OnBoardStylePropertyChanged;
+        _mainViewModel.Preferences.PropertyChanged += OnPreferencesPropertyChanged;
         _mainViewModel.LayerTabs.Layers.CollectionChanged += OnLayersCollectionChanged;
 
         RebuildLayerEntries();
@@ -174,6 +175,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         _disposed = true;
         _mainViewModel.PropertyChanged -= OnMainPropertyChanged;
         _mainViewModel.BoardStyle.PropertyChanged -= OnBoardStylePropertyChanged;
+        _mainViewModel.Preferences.PropertyChanged -= OnPreferencesPropertyChanged;
         _mainViewModel.LayerTabs.Layers.CollectionChanged -= OnLayersCollectionChanged;
         AutoSwitch.Dispose();
         About.Dispose();
@@ -184,7 +186,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     /// <summary>Formatted percentage label next to the opacity slider. Reads
     /// straight off the main VM — re-raised by <see cref="OnMainPropertyChanged"/>
     /// when BackgroundOpacity changes.</summary>
-    public string BackgroundOpacityPercent => $"{(int)(_mainViewModel.BackgroundOpacity * 100)}%";
+    public string BackgroundOpacityPercent => $"{(int)(_mainViewModel.Preferences.BackgroundOpacity * 100)}%";
 
     /// <summary>
     /// Press-highlight color exposed as Avalonia <see cref="Color"/> so the
@@ -243,7 +245,6 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     // appear here, plus the keyboard-switch fan-out to the tab VMs.
     private static readonly Dictionary<string, Action<SettingsViewModel>> _mainPropagators = new()
     {
-        [nameof(MainWindowViewModel.BackgroundOpacity)] = s => s.OnPropertyChanged(nameof(BackgroundOpacityPercent)),
         [nameof(MainWindowViewModel.SelectedKeyboard)] = s =>
         {
             s.RebuildLayerEntries();
@@ -259,6 +260,20 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     private void OnMainPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is { } name && _mainPropagators.TryGetValue(name, out var propagate))
+            propagate(this);
+    }
+
+    // Re-raises the SettingsVM display properties derived from the window
+    // preferences. The preferences themselves are bound straight to
+    // MainViewModel.Preferences in the General tab.
+    private static readonly Dictionary<string, Action<SettingsViewModel>> _preferencesPropagators = new()
+    {
+        [nameof(WindowPreferencesViewModel.BackgroundOpacity)] = s => s.OnPropertyChanged(nameof(BackgroundOpacityPercent)),
+    };
+
+    private void OnPreferencesPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is { } name && _preferencesPropagators.TryGetValue(name, out var propagate))
             propagate(this);
     }
 

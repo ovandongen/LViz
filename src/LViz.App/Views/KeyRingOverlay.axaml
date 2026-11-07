@@ -1,0 +1,16 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="LViz.App.Views.KeyRingOverlay"
+             IsVisible="False">
+    <!-- Key ring backdrop: while the ring is open (in its own window, see
+         KeyRingWindow) the board dims behind a scrim and the edited key gets
+         a gold outline. The host places this over everything it should dim. -->
+    <Panel>
+        <Border x:Name="Scrim" Background="#B811111B"
+                PointerPressed="OnScrimPressed" />
+        <Canvas>
+            <Border x:Name="KeyOutline" BorderBrush="{StaticResource AccentGold}" BorderThickness="2"
+                    CornerRadius="8" IsHitTestVisible="False" />
+        </Canvas>
+    </Panel>
+</UserControl>

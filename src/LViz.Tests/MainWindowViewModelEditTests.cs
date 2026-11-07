@@ -858,10 +858,10 @@ public class MainWindowViewModelEditTests : IDisposable
         // setting must reach the settings service the moment it changes.
         var settings = NewSettings();
         var vm = NewVm(settings);
-        Assert.True(vm.UseRingKeyEditor);
+        Assert.True(vm.Preferences.UseRingKeyEditor);
         Assert.True(settings.Current.RingKeyEditor);
 
-        vm.UseRingKeyEditor = false;
+        vm.Preferences.UseRingKeyEditor = false;
 
         Assert.False(settings.Current.RingKeyEditor);
     }

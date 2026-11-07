@@ -47,7 +47,7 @@
                             Minimum="0" Maximum="1"
                             TickFrequency="0.05"
                             IsSnapToTickEnabled="True"
-                            Value="{Binding MainViewModel.BackgroundOpacity, Mode=TwoWay}"
+                            Value="{Binding MainViewModel.Preferences.BackgroundOpacity, Mode=TwoWay}"
                             VerticalAlignment="Center" />
                     <TextBlock Grid.Column="1"
                                Text="{Binding BackgroundOpacityPercent}"
@@ -96,7 +96,7 @@
                 <ComboBox MinWidth="120" Margin="0,4,0,0"
                           HorizontalAlignment="Left"
                           ItemsSource="{Binding HotkeyKeyChoices}"
-                          SelectedItem="{Binding MainViewModel.HotkeyKey, Mode=TwoWay}" />
+                          SelectedItem="{Binding MainViewModel.Preferences.HotkeyKey, Mode=TwoWay}" />
             </StackPanel>
 
             <Border Height="1" Background="{StaticResource BgSurface0}" IsVisible="{Binding IsGlobalHotkeySupported}" />
@@ -104,7 +104,7 @@
             <!-- Tray icon active-layer tint -->
             <StackPanel Spacing="4">
                 <CheckBox Content="{Binding [Settings_ColorTrayIcon], Source={StaticResource Loc}}"
-                          IsChecked="{Binding MainViewModel.ColorTrayIconByActiveLayer, Mode=TwoWay}" />
+                          IsChecked="{Binding MainViewModel.Preferences.ColorTrayIconByActiveLayer, Mode=TwoWay}" />
                 <TextBlock Text="{Binding [Settings_ColorTrayIconHint], Source={StaticResource Loc}}"
                            Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
             </StackPanel>
@@ -114,7 +114,7 @@
             <!-- Ring key editor -->
             <StackPanel Spacing="4">
                 <CheckBox Content="{Binding [Settings_RingKeyEditor], Source={StaticResource Loc}}"
-                          IsChecked="{Binding MainViewModel.UseRingKeyEditor, Mode=TwoWay}" />
+                          IsChecked="{Binding MainViewModel.Preferences.UseRingKeyEditor, Mode=TwoWay}" />
                 <TextBlock Text="{Binding [Settings_RingKeyEditorHint], Source={StaticResource Loc}}"
                            Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
             </StackPanel>

@@ -120,8 +120,8 @@ public partial class App : Application
         hotkeyService.HotkeyPressed = lifecycle.Toggle;
         hotkeyService.UpdateHotkey(initialSettings.HotkeyKey, initialSettings.HotkeyModifiers);
         hotkeyService.Start();
-        viewModel.HotkeyKeyChanged += newKey =>
-            hotkeyService.UpdateHotkey(newKey, viewModel.HotkeyModifiers);
+        viewModel.Preferences.HotkeyKeyChanged += newKey =>
+            hotkeyService.UpdateHotkey(newKey, viewModel.Preferences.HotkeyModifiers);
     }
 
     /// <summary>One-shot background update check ~5s after launch. No-ops when

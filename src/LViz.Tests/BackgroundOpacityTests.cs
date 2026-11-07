@@ -22,7 +22,7 @@ public class BackgroundOpacityTests
     [InlineData(1.0, "#181825FF")]
     public void BoardBackground_AlphaScalesLinearlyAcrossSlider(double opacity, string expected)
     {
-        Assert.Equal(expected, NewVm(opacity).BoardBackground);
+        Assert.Equal(expected, NewVm(opacity).Preferences.BoardBackground);
     }
 
     [Theory]
@@ -32,7 +32,7 @@ public class BackgroundOpacityTests
     [InlineData(1.0, "#181825FF")]
     public void TabBackground_BlendsBaseAlphaWithSlider(double opacity, string expected)
     {
-        Assert.Equal(expected, NewVm(opacity).TabBackground);
+        Assert.Equal(expected, NewVm(opacity).Preferences.TabBackground);
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public class BackgroundOpacityTests
     {
         var settings = new InMemorySettingsService();
         var vm = new MainWindowViewModel(settings);
-        vm.BackgroundOpacity = 0.25;
+        vm.Preferences.BackgroundOpacity = 0.25;
         Assert.Equal(0.25, settings.Current.BackgroundOpacity);
     }
 }
