@@ -49,6 +49,9 @@ public partial class App : Application
 
             DiagnosticLog.Info("Startup", "Creating MainWindowViewModel...");
             var viewModel = services.GetRequiredService<MainWindowViewModel>();
+            // The CLI pipe opens here, not in the stack's construction, so a
+            // view-model built in a test never listens.
+            viewModel.Devices.StartIpc();
             var mainWindow = new MainWindow { DataContext = viewModel };
             desktop.MainWindow = mainWindow;
 

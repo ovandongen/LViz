@@ -703,7 +703,9 @@ LViz-specific (extend this list as we hit more):
   (App/Services).** `DeviceStack.Create` builds the HID pipeline, capability
   bus and router, pipeline runner, signal and app-layer dispatchers, IPC
   server and push coordinator; `Start`, `Stop(isAppExit)`, `SwitchProfile` and
-  `Dispose` own the order. `MainWindowViewModel.Devices` exposes it, so reach
+  `Dispose` own the order. Building it opens nothing: the CLI pipe opens only
+  in `StartIpc()`, which `App.axaml.cs` calls once, so a view-model built in a
+  test never listens on the pipe. `MainWindowViewModel.Devices` exposes it, so reach
   `Devices.Hid`, `Devices.Push`, … instead of adding VM pass-throughs.
   `DeviceStackTests` pins the order with recording doubles (the bus slot is
   unrecorded: `RawHidDeviceBus` is sealed).

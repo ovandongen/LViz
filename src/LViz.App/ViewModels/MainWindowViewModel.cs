@@ -1,7 +1,4 @@
-using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Text;
-using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LViz.App.Localization;
@@ -9,19 +6,13 @@ using LViz.App.Services;
 using LViz.App.Services.GitHub;
 using LViz.App.Services.MouseIdle;
 using LViz.Core.Diagnostics;
-using LViz.Core.GitHub;
-using LViz.Core.Input;
 using LViz.Core.Keymap;
-using LViz.Core.Keymap.Editing;
-using LViz.Core.Keymap.Parser;
-using LViz.Core.Keymap.Writer;
 using LViz.Core.Layout;
 using LViz.Core.Models;
 using LViz.Core.Persistence;
 using LViz.Core.Settings;
 using ZmkHidProtocol.ActiveWindow;
 using ZmkHidProtocol.Protocol;
-using ZmkHidProtocol.Transport;
 
 namespace LViz.App.ViewModels;
 

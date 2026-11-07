@@ -95,6 +95,12 @@ public class DeviceStackTests
         public void Dispose() => log.Add(name);
     }
 
+    private sealed class RecIpc(Log log) : IIpcHost
+    {
+        public void Start() => log.Add("ipc.start");
+        public void Dispose() => log.Add("ipc.dispose");
+    }
+
     private sealed class NoPipelines : IPipelineRunner
     {
         public Task RunAsync(ActionPipeline pipeline, CancellationToken cancellationToken = default) => Task.CompletedTask;
@@ -105,7 +111,7 @@ public class DeviceStackTests
         var log = new Log();
         var stack = new DeviceStack(
             new RecHid(log), new RawHidDeviceBus(), new RecRouter(log), new NoPipelines(),
-            new RecSignals(log), new RecDisposable(log, "ipc.dispose"), new RecPush(log),
+            new RecSignals(log), new RecIpc(log), new RecPush(log),
             new RecDisposable(log, "appLayer.dispose"));
         return (stack, log);
     }
@@ -116,6 +122,19 @@ public class DeviceStackTests
         var (stack, log) = Build();
         stack.Start();
         Assert.Equal(["hid.start", "router.start", "signals.start"], log.Entries);
+    }
+
+    [Fact]
+    public void Ipc_OpensOnlyOnStartIpc_NeverWithLiveTracking()
+    {
+        var (stack, log) = Build();
+
+        Assert.Empty(log.Entries); // building the stack opens nothing
+        stack.Start();
+        Assert.DoesNotContain("ipc.start", log.Entries);
+
+        stack.StartIpc();
+        Assert.Equal("ipc.start", log.Entries[^1]);
     }
 
     [Fact]

@@ -11,8 +11,9 @@ namespace LViz.App.Services;
 /// between the app and the hardware. HID pipeline (the keyboard), capability
 /// bus + router (the other raw-HID devices), the action-pipeline runner with
 /// its signal / app-layer / IPC triggers, and the layer-push coordinator
-/// (AutoSwitch + MouseLayer). Construction is eager but opens nothing except
-/// the IPC pipe; <see cref="Start"/> begins hardware discovery.
+/// (AutoSwitch + MouseLayer). Construction is eager but opens nothing:
+/// <see cref="StartIpc"/> opens the CLI pipe (the app does, once, at startup)
+/// and <see cref="Start"/> begins hardware discovery.
 ///
 /// <para>The keyboard is opened only by <see cref="Hid"/>: the bus excludes it
 /// by the live profile matcher AND by <c>Hid.OpenDevicePath</c>. Keep both.</para>
@@ -26,7 +27,7 @@ public sealed class DeviceStack : IDisposable
 {
     private readonly RawHidDeviceBus _bus;
     private readonly ISignalDispatcher _signals;
-    private readonly IDisposable _ipcServer;
+    private readonly IIpcHost _ipcServer;
     private readonly IDisposable _appLayerDispatcher;
 
     public IHidPipeline Hid { get; }
@@ -48,7 +49,7 @@ public sealed class DeviceStack : IDisposable
         ICapabilityRouter router,
         IPipelineRunner pipelines,
         ISignalDispatcher signals,
-        IDisposable ipcServer,
+        IIpcHost ipcServer,
         ILayerPushCoordinator push,
         IDisposable appLayerDispatcher)
     {
@@ -95,9 +96,9 @@ public sealed class DeviceStack : IDisposable
 
         // Host IPC: the CLI ('lviz event …', 'status', 'devices') forwards a line
         // over a named pipe. Live for the app's whole lifetime, independent of
-        // the live-tracking toggle.
+        // the live-tracking toggle — but only once StartIpc() is called, so a
+        // stack built in a test never opens the pipe.
         var ipcServer = new LvizIpcServer(new IpcCommandService(settings, router, runner).Handle);
-        ipcServer.Start();
 
         // The coordinator owns AutoSwitch + MouseLayer and the handoff between
         // them; both route their pushes through the HID pipeline.
@@ -109,6 +110,11 @@ public sealed class DeviceStack : IDisposable
 
         return new DeviceStack(hid, bus, router, runner, signals, ipcServer, push, appLayer);
     }
+
+    /// <summary>Opens the CLI's named pipe for the app's lifetime (independent of
+    /// live tracking). Called once by the app's composition step; a stack built
+    /// in tests never calls it, so tests open no pipe.</summary>
+    public void StartIpc() => _ipcServer.Start();
 
     /// <summary>
     /// Starts live tracking. Discovery (bus + router inventory) runs regardless

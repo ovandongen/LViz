@@ -3,6 +3,13 @@ using LViz.Core.Diagnostics;
 
 namespace LViz.App.Services;
 
+/// <summary>The IPC listener as <see cref="DeviceStack"/> holds it: started once
+/// by the app's composition step, disposed with the stack.</summary>
+public interface IIpcHost : IDisposable
+{
+    void Start();
+}
+
 /// <summary>
 /// The local IPC surface the resident LViz app exposes to host software (the CLI,
 /// build scripts, app-focus watchers — see <c>lviz-host-agent-cli-spec.md</c> §5).
@@ -15,7 +22,7 @@ namespace LViz.App.Services;
 /// slow command can't block the next connection, then loops to accept again. Runs for
 /// the app's lifetime — <see cref="Start"/> at launch, <see cref="Stop"/> on exit.</para>
 /// </summary>
-public sealed class LvizIpcServer : IDisposable
+public sealed class LvizIpcServer : IIpcHost
 {
     public const string PipeName = "lviz";
 
