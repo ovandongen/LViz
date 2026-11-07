@@ -16,27 +16,27 @@ public class PressHighlightColorTests
     [Fact]
     public void DefaultHighlightColor_MatchesOriginalYellow()
     {
-        var vm = new MainWindowViewModel(new InMemorySettingsService());
-        Assert.Equal("#FFD60A", vm.BoardStyle.PressHighlightColor);
+        var vm = TestMainVm.Create(new InMemorySettingsService());
+        Assert.Equal("#FFD60A", vm.Board.BoardStyle.PressHighlightColor);
         // 0xFF * 0.55 = 140.25 → 140 = 0x8C, 0xD6 * 0.55 = 117.7 → 117 = 0x75, 0x0A * 0.55 = 5.5 → 5 = 0x05
-        Assert.Equal("#8C7505", vm.BoardStyle.PressHighlightStrokeColor);
+        Assert.Equal("#8C7505", vm.Board.BoardStyle.PressHighlightStrokeColor);
     }
 
     [Fact]
     public void StrokeColor_DerivesFromFill()
     {
-        var vm = new MainWindowViewModel(new InMemorySettingsService());
-        vm.BoardStyle.PressHighlightColor = "#FF00FF";
+        var vm = TestMainVm.Create(new InMemorySettingsService());
+        vm.Board.BoardStyle.PressHighlightColor = "#FF00FF";
         // 0xFF * 0.55 = 140 = 0x8C; 0x00 stays 0x00
-        Assert.Equal("#8C008C", vm.BoardStyle.PressHighlightStrokeColor);
+        Assert.Equal("#8C008C", vm.Board.BoardStyle.PressHighlightStrokeColor);
     }
 
     [Fact]
     public void SettingChange_PersistsToSettingsService()
     {
         var settings = new InMemorySettingsService();
-        var vm = new MainWindowViewModel(settings);
-        vm.BoardStyle.PressHighlightColor = "#123456";
+        var vm = TestMainVm.Create(settings);
+        vm.Board.BoardStyle.PressHighlightColor = "#123456";
         Assert.Equal("#123456", settings.Current.PressHighlightColor);
     }
 
@@ -44,7 +44,7 @@ public class PressHighlightColorTests
     public void SeedsFromExistingSettings()
     {
         var settings = new InMemorySettingsService { Current = new UserSettings { PressHighlightColor = "#ABCDEF" } };
-        var vm = new MainWindowViewModel(settings);
-        Assert.Equal("#ABCDEF", vm.BoardStyle.PressHighlightColor);
+        var vm = TestMainVm.Create(settings);
+        Assert.Equal("#ABCDEF", vm.Board.BoardStyle.PressHighlightColor);
     }
 }

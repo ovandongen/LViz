@@ -124,18 +124,8 @@ public sealed partial class AboutSettingsViewModel : ObservableObject, IDisposab
     [ObservableProperty]
     private bool _autoCheckForUpdates;
 
-    partial void OnAutoCheckForUpdatesChanged(bool value)
-    {
-        try
-        {
-            var s = _settingsService.Load();
-            _settingsService.Save(s with { AutoCheckForUpdates = value });
-        }
-        catch (Exception ex)
-        {
-            DiagnosticLog.Warn("Settings", $"Persist AutoCheckForUpdates failed: {ex.Message}");
-        }
-    }
+    partial void OnAutoCheckForUpdatesChanged(bool value) =>
+        _settingsService.Update(s => s with { AutoCheckForUpdates = value }, "Settings");
 
     [RelayCommand]
     private async Task CheckForUpdatesAsync()

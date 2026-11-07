@@ -10,7 +10,7 @@ namespace LViz.App.ViewModels;
 /// plus the per-hand translation offsets for both side-by-side and vertically
 /// stacked layouts. Composed by <see cref="MainWindowViewModel"/> (persisted,
 /// profile-switchable) and <see cref="ExitKeyPickerViewModel"/> (a fixed,
-/// never-stacked profile), and exposed through <see cref="IBoardSurface"/> so
+/// never-stacked profile), and exposed through <see cref="BoardSurfaceViewModel"/> so
 /// <c>BoardView</c> binds one geometry source for both hosts. The stacked-vs-
 /// horizontal placement math itself lives on <see cref="BoardLayoutGeometry"/>;
 /// this VM owns the observable toggles, the persisted state, and the per-hand

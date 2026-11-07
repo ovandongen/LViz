@@ -103,7 +103,7 @@ public partial class MainWindowViewModel
 
         LayerTabs.Rebuild(_keymap.Current);
         ApplyActiveLayer(0);
-        ComboLegend.Rebuild(_keymap.Current);
+        Board.ComboLegend.Rebuild(_keymap.Current);
         HasLayoutLoaded = true;
 
         // Booked for the profile the keymap ended up on (_profile is already

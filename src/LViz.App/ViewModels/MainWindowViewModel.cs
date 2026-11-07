@@ -30,30 +30,21 @@ namespace LViz.App.ViewModels;
 /// active layer, the live-key tracker, and persists the user's choice of
 /// keyboard + last-loaded JSON path.
 /// </summary>
-public partial class MainWindowViewModel : ObservableObject, IBoardSurface
+public partial class MainWindowViewModel : ObservableObject
 {
     /// <summary>
-    /// Null on the main VM outside keymap edit mode — the main window's
-    /// BoardView is read-only there. While editing it selects the tapped key
-    /// (<see cref="OnEditKeyTapped"/>). The picker VM
-    /// (<see cref="ExitKeyPickerViewModel"/>) provides a real handler so taps
-    /// register selections.
+    /// Points the board's key callbacks at what the current mode allows. Outside
+    /// keymap edit mode a tap is inert (null, so the press falls through to the
+    /// window drag) and a right-click opens the per-key label-override editor;
+    /// while editing a tap selects the key, a double-click opens the key editor
+    /// on it, and the label dialog doesn't apply.
     /// </summary>
-    public Action<int>? OnKeyTapped => IsEditing ? OnEditKeyTapped : null;
-
-    /// <summary>
-    /// Double-click on a cap while editing selects it and opens the key editor
-    /// on it (see <see cref="EditSelectedKeyAsync"/>). Null outside edit mode,
-    /// where the board has no editor to open.
-    /// </summary>
-    public Action<int>? OnKeyDoubleTapped => IsEditing ? OnEditKeyDoubleTapped : null;
-
-    /// <summary>
-    /// Right-click on a key opens the per-key label-override editor, inert
-    /// while editing a keymap, where the label dialog doesn't apply. The dialog
-    /// itself is the <see cref="IMainWindowShell"/>'s; the answer is applied here.
-    /// </summary>
-    public Action<int>? OnKeyRightTapped => IsEditing ? null : OnKeyRightTappedInternal;
+    private void SyncKeyCallbacks()
+    {
+        Board.OnKeyTapped = IsEditing ? OnEditKeyTapped : null;
+        Board.OnKeyDoubleTapped = IsEditing ? OnEditKeyDoubleTapped : null;
+        Board.OnKeyRightTapped = IsEditing ? null : OnKeyRightTappedInternal;
+    }
 
     private async void OnKeyRightTappedInternal(int keyIndex)
     {
@@ -104,7 +95,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     // Press-highlight pipeline: per-layer (mod-set + keycode) → KeyViewModel
     // lookup, held-modifier set, modifier-grace deferral, per-key pulse.
-    // Built lazily once the Keys collection is populated.
+    // Built lazily once the board's Keys collection is populated.
     private IKeyHighlightTracker? _highlightTracker;
 
     // --- UI-bindable state ---
@@ -195,20 +186,13 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// <summary>The persisted window preferences (always-on-top, opacity, hotkey, tray colouring, key editor, modifier style); bound directly.</summary>
     public WindowPreferencesViewModel Preferences { get; }
 
-    /// <summary>Canvas geometry + stacked-mode offsets for the board render
-    /// surface, extracted into its own VM. Bound by BoardView and the settings
-    /// window; owns the persisted stacked-layout toggles.</summary>
-    public BoardLayoutViewModel BoardLayout { get; }
-
-    /// <summary>Press-highlight fill/stroke colors for the per-key press dot,
-    /// extracted into its own VM. Owns the persisted highlight color.</summary>
-    public BoardStyleViewModel BoardStyle { get; }
+    /// <summary>The board on screen: keys, canvas geometry (owns the persisted
+    /// stacked-layout toggles), press style (owns the persisted highlight
+    /// colour), combo legend and key callbacks. <c>BoardView</c>'s DataContext.</summary>
+    public BoardSurfaceViewModel Board { get; }
 
     /// <summary>The layer tab strip: tabs, colours, hidden layers, edit-mode tab actions.</summary>
     public LayerTabsViewModel LayerTabs { get; }
-
-    /// <summary>The combo legend: tiles, overlay toggle, label overrides, hover highlight.</summary>
-    public ComboLegendViewModel ComboLegend { get; }
 
     /// <summary>
     /// Sets or clears a per-(layer, key) label override for the currently
@@ -240,7 +224,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         var km = _keymap.Current;
         if (km is null) return null;
         if (layerIndex < 0 || layerIndex >= km.LayerCount) return null;
-        if (keyIndex < 0 || keyIndex >= Keys.Count) return null;
+        if (keyIndex < 0 || keyIndex >= Board.Keys.Count) return null;
 
         var r = km.Resolve(layerIndex, keyIndex);
         var (label, sub, top) = KeyLabelFormatter.FormatBinding(r.Binding, r.TargetLayerName, r.HoldTap, km.MacrosByName);
@@ -253,12 +237,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         var existing = KeyLabelOverrides.Get(_profile.Id, layerIndex, keyIndex);
         return (hint, existing);
     }
-
-    public ObservableCollection<KeyViewModel> Keys { get; } = new();
-    /// <summary>Left-hand subset of <see cref="Keys"/>. Bound separately so the stacked-layout renderer can translate the half independently.</summary>
-    public ObservableCollection<KeyViewModel> LeftKeys { get; } = new();
-    /// <summary>Right-hand subset of <see cref="Keys"/>. Bound separately so the stacked-layout renderer can translate the half independently.</summary>
-    public ObservableCollection<KeyViewModel> RightKeys { get; } = new();
 
     /// <summary>All keyboard profiles the user can switch between, for the picker flyout.</summary>
     public IReadOnlyList<IKeyboardProfile> AvailableKeyboards => KeyboardProfileRegistry.All;
@@ -335,23 +313,23 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     public MainWindowViewModel(
         ISettingsService settingsService,
-        IActiveWindowMonitor? activeWindowMonitor = null,
-        IMouseIdleMonitor? mouseIdleMonitor = null,
-        IKeymapStateService? keymapState = null,
-        ICapabilityControl? capabilityControl = null,
-        IHostActionExecutor? hostActionExecutor = null,
-        IGitHubKeymapService? gitHub = null,
-        KeymapBackupStore? keymapBackups = null,
-        IKeymapEditDialogs? editDialogs = null,
-        IMainWindowShell? shell = null)
+        IKeymapStateService keymapState,
+        KeymapBackupStore keymapBackups,
+        IKeymapEditDialogs editDialogs,
+        IMainWindowShell shell,
+        IHostActionExecutor hostActionExecutor,
+        ICapabilityControl capabilityControl,
+        IGitHubKeymapService? gitHub,
+        IActiveWindowMonitor? activeWindowMonitor,
+        IMouseIdleMonitor? mouseIdleMonitor)
     {
         _settingsService = settingsService;
         Library = new KeymapLibrary(settingsService, gitHub);
-        _editDialogs = editDialogs ?? new UnavailableKeymapEditDialogs();
-        _shell = shell ?? new UnavailableMainWindowShell();
-        _keymap = keymapState ?? new KeymapStateService();
+        _editDialogs = editDialogs;
+        _shell = shell;
+        _keymap = keymapState;
         _gitHub = gitHub;
-        _keymapBackups = keymapBackups ?? new KeymapBackupStore(KeymapBackupStore.DefaultRoot);
+        _keymapBackups = keymapBackups;
         var s = settingsService.Load();
         _profile = KeyboardProfileRegistry.TryResolve(s.Keyboard, out var p) ? p : new CorneProfile();
         Recents = new RecentKeymapsViewModel(
@@ -378,16 +356,21 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         // Board geometry + press-style live in their own VMs now; seed them from
         // the same settings load. Each owns its own persistence (StackedLayout /
         // StackedTopHand / PressHighlightColor) via the injected settings service.
-        BoardLayout = new BoardLayoutViewModel(
+        // Board geometry + press-style own their persistence (StackedLayout /
+        // StackedTopHand / PressHighlightColor) via the injected settings service.
+        var boardLayout = new BoardLayoutViewModel(
             _profile, settingsService, s.StackedLayout,
             string.IsNullOrWhiteSpace(s.StackedTopHand) ? "Left" : s.StackedTopHand);
-        BoardStyle = new BoardStyleViewModel(
+        var boardStyle = new BoardStyleViewModel(
             string.IsNullOrWhiteSpace(s.PressHighlightColor)
                 ? AppTheme.PressHighlightDefaultHex
                 : s.PressHighlightColor,
             settingsService);
-        ComboLegend = new ComboLegendViewModel(
-            Keys, BoardStyle, s.ComboOverlayVisible, () => _profile.Id, settingsService, _shell);
+        Board = new BoardSurfaceViewModel(
+            _profile, boardLayout, boardStyle,
+            keys => new ComboLegendViewModel(
+                keys, boardStyle, s.ComboOverlayVisible, () => _profile.Id, settingsService, _shell));
+        SyncKeyCallbacks();
         LayerTabs = new LayerTabsViewModel(() => _profile.Id, settingsService);
         LayerTabs.LayerPicked += OnLayerPicked;
         LayerTabs.ColorsChanged += OnLayerColorsChanged;
@@ -397,7 +380,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         KeyLabelOverrides.SetOverrides(s.KeyLabelOverrides);
         ComboLabelOverrides.SetOverrides(s.ComboLabelOverrides);
 
-        _hostActionExecutor = hostActionExecutor ?? new HostActionExecutor();
+        _hostActionExecutor = hostActionExecutor;
         Devices = DeviceStack.Create(
             _profile, settingsService, () => ActiveLayerIndex,
             activeWindowMonitor, mouseIdleMonitor, capabilityControl, _hostActionExecutor);
@@ -458,7 +441,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         OpenHelpCommand = new RelayCommand(() => _hostActionExecutor.Launch(UpdateService.WikiUrl));
         OpenShortcutsCommand = new AsyncRelayCommand(_shell.ShowShortcutsAsync);
 
-        BuildKeysFromProfile();
     }
 
     /// <summary>
@@ -553,14 +535,14 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
         ActiveLayerIndex = index;
 
-        for (int i = 0; i < Keys.Count; i++)
+        for (int i = 0; i < Board.Keys.Count; i++)
         {
             if (edit is null)
             {
                 // Resolution (including &trans fall-through) lives on LoadedKeymap;
                 // here we just paint the resolved binding onto the key VM.
                 var r = km.Resolve(index, i);
-                Keys[i].ApplyBinding(
+                Board.Keys[i].ApplyBinding(
                     r.Binding,
                     activeLayerIndex: index,
                     targetLayer: r.TargetLayer,
@@ -568,8 +550,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                     profileId: _profile.Id,
                     holdTap: r.HoldTap,
                     macros: km.MacrosByName);
-                Keys[i].IsEditChanged = false;
-                Keys[i].IsEditSelected = false;
+                Board.Keys[i].IsEditChanged = false;
+                Board.Keys[i].IsEditSelected = false;
                 continue;
             }
 
@@ -580,7 +562,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             var literal = i < bindings.Count ? bindings[i] : KeyBinding.Transparent;
             if (literal.Behavior is "&trans" or "&none")
             {
-                Keys[i].ApplyBinding(
+                Board.Keys[i].ApplyBinding(
                     literal,
                     activeLayerIndex: index,
                     targetLayer: null,
@@ -591,7 +573,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             else
             {
                 var r = km.Resolve(index, i);
-                Keys[i].ApplyBinding(
+                Board.Keys[i].ApplyBinding(
                     r.Binding,
                     activeLayerIndex: index,
                     targetLayer: r.TargetLayer,
@@ -601,8 +583,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                     macros: km.MacrosByName,
                     ignoreLabelOverride: true);
             }
-            Keys[i].IsEditChanged = edit.Session.IsKeyChanged(index, i);
-            Keys[i].IsEditSelected = edit.SelectedKeyIndex == i;
+            Board.Keys[i].IsEditChanged = edit.Session.IsKeyChanged(index, i);
+            Board.Keys[i].IsEditSelected = edit.SelectedKeyIndex == i;
         }
 
         LayerTabs.SetActive(index);
@@ -610,11 +592,11 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     /// <summary>
     /// Lazily-instantiated press-highlight tracker. Constructed on first use
-    /// so it captures the <see cref="Keys"/> collection after
-    /// <see cref="BuildKeysFromProfile"/> has populated it.
+    /// so it captures the <see cref="BoardSurfaceViewModel.Keys"/> collection after
+    /// <see cref="BoardSurfaceViewModel.SetProfile"/> has populated it.
     /// </summary>
     private IKeyHighlightTracker HighlightTracker =>
-        _highlightTracker ??= new KeyHighlightTracker(Keys);
+        _highlightTracker ??= new KeyHighlightTracker(Board.Keys);
 
 
     private void ToggleLiveHighlighting()
@@ -691,7 +673,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     /// <summary>
     /// Press-highlight path for the HID source: the firmware reports the
-    /// physical matrix position so we go straight to <see cref="Keys"/>[position].
+    /// physical matrix position so we go straight to <see cref="BoardSurfaceViewModel.Keys"/>[position].
     /// </summary>
     private void OnKeyPositionForHighlight(int position, bool pressed)
     {

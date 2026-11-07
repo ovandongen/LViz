@@ -70,7 +70,7 @@ public sealed class DeviceStack : IDisposable
         Func<int> getRenderedLayer,
         IActiveWindowMonitor? activeWindowMonitor,
         IMouseIdleMonitor? mouseIdleMonitor,
-        ICapabilityControl? capabilityControl,
+        ICapabilityControl capabilityControl,
         IHostActionExecutor hostActionExecutor)
     {
         // The underlying RawHidLayerSource doesn't open the device until Start().
@@ -85,12 +85,10 @@ public sealed class DeviceStack : IDisposable
 
         // signal.fire → action-pipeline. The runner drives bus devices through
         // capability control + the keyboard through the HID layer-push path.
-        // CapabilityControl is stateless, so a private one doesn't conflict with
-        // the DI singleton.
         var runner = new PipelineRunner(
             router,
-            capabilityControl ?? new CapabilityControl(),
-            hostActionExecutor ?? new HostActionExecutor(),
+            capabilityControl,
+            hostActionExecutor,
             hid.PushLayer,
             () => settings.Load().ActionPipelines);
         var signals = new SignalDispatcher(router, settings, runner);

@@ -82,9 +82,10 @@ public static class KeymapLayerWriter
             // Refuse before writing anything, and refuse for the same reasons the
             // caller sees in CheckDelete: a caller that skipped the pre-check gets
             // the blockers in the exception instead of a silently loosened keymap.
-            var blockers = CheckDelete(config, KeymapLayerText.Parse(source, config), delete.Index);
-            if (!blockers.CanDelete)
-                throw new InvalidOperationException(DescribeBlockers(config, delete.Index, blockers.Blockers));
+            var check = CheckDelete(config, source, delete.Index);
+            if (!check.CanDelete)
+                throw new InvalidOperationException(
+                    LayerDeleteRules.DescribeBlockers(config, delete.Index, check.Blockers));
 
             var expected = LayerReferenceRemapper.Apply(config, delete);
             var result = ApplyDelete(source, config, expected, delete);
@@ -123,7 +124,38 @@ public static class KeymapLayerWriter
     public static LayerDeleteCheck CheckDelete(string source, int index)
     {
         var config = ZmkKeymapLoader.LoadFromText(source, "writer");
-        return CheckDelete(config, KeymapLayerText.Parse(source, config), index);
+        return CheckDelete(config, source, index);
+    }
+
+    /// <summary>The policy is <see cref="LayerDeleteRules"/>; this scans the text
+    /// for the uses it cannot see in the model: a layer number outside the layer
+    /// blocks and the combos node (a combo's own number is reported as the combo),
+    /// and the layer's <c>#define</c> names, which anything can use — a hold-tap
+    /// spelled <c>ZMK_TD_LAYER</c>, an input listener's <c>layers</c> list.</summary>
+    private static LayerDeleteCheck CheckDelete(KeyboardConfig config, string source, int index)
+    {
+        var text = KeymapLayerText.Parse(source, config);
+
+        var uses = text.References
+            .Where(r => r.Site is not (ReferenceSite.LayerBlock or ReferenceSite.Combo))
+            .Select(r => new LayerTextUse(
+                r.Layer,
+                r.Site == ReferenceSite.ConditionalLayer
+                    ? LayerDeleteBlockerKind.ConditionalLayer
+                    : LayerDeleteBlockerKind.Other,
+                text.EnclosingNodeName(r.Offset),
+                r.Line))
+            .ToList();
+
+        // A layer can be named by more than one define, so the usages are merged
+        // into file order.
+        uses.AddRange(text.LayerDefines
+            .SelectMany(d => text.FindNameUsages(d.Name).Select(offset => (offset, d)))
+            .OrderBy(u => u.offset)
+            .Select(u => new LayerTextUse(
+                u.d.LayerIndex, LayerDeleteBlockerKind.DefineUsage, u.d.Name, DtsiText.LineOf(text.Masked, u.offset))));
+
+        return LayerDeleteRules.Check(config, uses, index);
     }
 
     // ---- move --------------------------------------------------------------------
@@ -440,65 +472,6 @@ public static class KeymapLayerWriter
     // ---- delete ------------------------------------------------------------------
 
     /// <summary>
-    /// The pre-check behind <see cref="CheckDelete(string,int)"/>, on an already
-    /// parsed source. A delete is refused when the layer is used by something this
-    /// writer cannot rewrite: a combo (whose <c>layers</c> list, left empty, would
-    /// silently apply to <b>every</b> layer), a tri-layer, or a define name used
-    /// outside the layer blocks. References inside layer bindings are not
-    /// blockers — those are cleared — and
-    /// <see cref="LayerReferenceRemapper.CountClearedBindings"/> counts them.
-    /// </summary>
-    private static LayerDeleteCheck CheckDelete(
-        KeyboardConfig config, KeymapLayerText text, int index)
-    {
-        int count = config.Layers.Count;
-        if (index < 0 || index >= count)
-            throw new ArgumentOutOfRangeException(
-                nameof(index), index, $"layer {WriterText.Num(index)} is out of range 0…{WriterText.Num(count - 1)}.");
-
-        var blockers = new List<LayerDeleteBlocker>();
-
-        if (count == 1)
-            blockers.Add(new(LayerDeleteBlockerKind.LastLayer, config.Layers[0].Name, 0));
-
-        // The model first: the combo — not the line inside it — is the unit the
-        // user has to fix, and its binding and its layer scope sit apart.
-        var holdTaps = LayerReferenceRemapper.HoldTapLookup(config);
-        foreach (var combo in config.Combos)
-            if (TargetLayerOf(combo.Binding, holdTaps) == index || combo.Layers.Contains(index))
-                blockers.Add(new(LayerDeleteBlockerKind.Combo, combo.Name, 0));
-
-        // Then the text: a layer number outside the layer blocks and outside the
-        // combos node. A combo's own number turns up here too; it was already
-        // reported, once, as the combo.
-        foreach (var reference in text.References)
-        {
-            if (reference.Layer != index) continue;
-            if (reference.Site is ReferenceSite.LayerBlock or ReferenceSite.Combo) continue;
-
-            blockers.Add(new(
-                reference.Site == ReferenceSite.ConditionalLayer
-                    ? LayerDeleteBlockerKind.ConditionalLayer
-                    : LayerDeleteBlockerKind.Other,
-                text.EnclosingNodeName(reference.Offset),
-                reference.Line));
-        }
-
-        // And the define names, which anything can use: a hold-tap spelled
-        // ZMK_TD_LAYER, an input listener's layers list. A layer can be named by
-        // more than one define, so the usages are merged into file order.
-        var usages = text.LayerDefines
-            .Where(d => d.LayerIndex == index)
-            .SelectMany(d => text.FindNameUsages(d.Name).Select(offset => (offset, d.Name)))
-            .OrderBy(u => u.offset);
-
-        foreach (var (offset, name) in usages)
-            blockers.Add(new(LayerDeleteBlockerKind.DefineUsage, name, DtsiText.LineOf(text.Masked, offset)));
-
-        return new LayerDeleteCheck(blockers, LayerReferenceRemapper.CountClearedBindings(config, index));
-    }
-
-    /// <summary>
     /// A delete changes three unrelated things, so it runs in three phases and no
     /// offset ever has to be re-based across another:
     /// <list type="number">
@@ -517,7 +490,7 @@ public static class KeymapLayerWriter
     private static string ApplyDelete(
         string source, KeyboardConfig config, KeyboardConfig expected, LayerStructureEdit.Delete delete)
     {
-        var cleared = KeymapWriter.Apply(source, ClearedEdits(config, expected, delete.Index), []);
+        var cleared = KeymapWriter.Apply(source, LayerDeleteRules.ClearedEdits(config, expected, delete.Index), []);
 
         var clearedConfig = ZmkKeymapLoader.LoadFromText(cleared, "writer");
         var text = KeymapLayerText.Parse(cleared, clearedConfig);
@@ -539,70 +512,6 @@ public static class KeymapLayerWriter
         var (cutStart, cutEnd) = CutSpan(KeymapLayerText.Parse(renumbered, cutConfig).Layers, delete.Index);
         return renumbered.Remove(cutStart, cutEnd - cutStart);
     }
-
-    /// <summary>
-    /// One edit per binding that points at the deleted layer, carrying the cleared
-    /// binding read back out of <paramref name="expected"/> — the model the
-    /// remapper says the file holds afterwards. Reading it there instead of
-    /// re-deriving the clear rule here is what guarantees phase 0 and the final
-    /// validation want the same text. Indices stay in the <b>old</b> space:
-    /// phase 0 runs before anything is renumbered or removed.
-    /// </summary>
-    private static List<BindingEdit> ClearedEdits(
-        KeyboardConfig config, KeyboardConfig expected, int index)
-    {
-        var holdTaps = LayerReferenceRemapper.HoldTapLookup(config);
-        var edits = new List<BindingEdit>();
-
-        for (int layer = 0; layer < config.Layers.Count; layer++)
-        {
-            if (layer == index) continue;
-
-            // Where this layer lands once the deleted one is gone: the row of
-            // `expected` its cleared bindings were written into.
-            int next = layer < index ? layer : layer - 1;
-            var bindings = config.Layers[layer].Bindings;
-
-            for (int key = 0; key < bindings.Count; key++)
-                if (TargetLayerOf(bindings[key], holdTaps) == index)
-                    edits.Add(new BindingEdit(layer, key, expected.Layers[next].Bindings[key]));
-        }
-
-        return edits;
-    }
-
-    /// <summary>Which layer a binding pushes, its hold-tap included; null when it
-    /// pushes none. The same rule the remapper and the overlay use.</summary>
-    private static int? TargetLayerOf(KeyBinding binding, Dictionary<string, HoldTap> holdTaps) =>
-        LayerBindingResolver.ResolveTargetLayer(binding, holdTaps.GetValueOrDefault(binding.Behavior));
-
-    /// <summary>
-    /// The refusal for a caller that skipped <see cref="CheckDelete(string,int)"/>.
-    /// The dialog translates the check itself; this string is for the log and the
-    /// stack trace, so it names every blocker rather than the first.
-    /// </summary>
-    private static string DescribeBlockers(
-        KeyboardConfig config, int index, IReadOnlyList<LayerDeleteBlocker> blockers)
-    {
-        string name = index >= 0 && index < config.Layers.Count
-            ? $" '{config.Layers[index].Name}'"
-            : string.Empty;
-
-        return $"layer {WriterText.Num(index)}{name} cannot be deleted: "
-            + string.Join("; ", blockers.Select(Describe)) + ".";
-    }
-
-    private static string Describe(LayerDeleteBlocker blocker) => blocker.Kind switch
-    {
-        LayerDeleteBlockerKind.LastLayer => "it is the keymap's only layer",
-        LayerDeleteBlockerKind.Combo => $"combo '{blocker.Name}' uses it",
-        LayerDeleteBlockerKind.ConditionalLayer =>
-            $"conditional layer '{blocker.Name}' references it on line {WriterText.Num(blocker.Line)}",
-        LayerDeleteBlockerKind.DefineUsage =>
-            $"define '{blocker.Name}' is used outside the layer blocks on line {WriterText.Num(blocker.Line)}",
-        _ => $"'{blocker.Name}' references it on line {WriterText.Num(blocker.Line)}",
-    };
-
 
     // ---- bug guard ---------------------------------------------------------------
 

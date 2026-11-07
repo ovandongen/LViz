@@ -118,13 +118,15 @@ internal sealed class MainWindowLifecycle
     {
         var window = Window;
         if (window.WindowState == WindowState.Minimized) return;
-        _settings.Save(_settings.Load() with
+        // Through Update: a failed write is logged and quit carries on to
+        // Shutdown (which resets the keyboard to layer 0), never aborted.
+        _settings.Update(s => s with
         {
             WindowX = window.Position.X,
             WindowY = window.Position.Y,
             WindowWidth = window.Width,
             WindowHeight = window.Height,
-        });
+        }, "Window");
     }
 
     private async Task<bool> ConfirmDiscardEditsAsync()

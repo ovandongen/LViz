@@ -19,7 +19,7 @@ public sealed class MainWindowViewModelShellTests
     private static (MainWindowViewModel Vm, FakeMainWindowShell Shell) Build()
     {
         var shell = new FakeMainWindowShell();
-        return (new MainWindowViewModel(new InMemorySettingsService(), shell: shell), shell);
+        return (TestMainVm.Create(new InMemorySettingsService(), shell: shell), shell);
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public sealed class MainWindowViewModelShellTests
     {
         var (vm, shell) = Build();
 
-        vm.ComboLegend.RequestEdit("0,1");
+        vm.Board.ComboLegend.RequestEdit("0,1");
 
         Assert.Empty(shell.ComboLabelRequests);
     }

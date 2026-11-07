@@ -23,28 +23,10 @@ using ZmkHidProtocol.ActiveWindow;
 
 namespace LViz.App.ViewModels;
 
-/// <summary>Board selection: building keys from a profile, switching boards, user-layout profiles and the layout wizard/editor.</summary>
+/// <summary>Board selection: switching boards, user-layout profiles and the layout wizard/editor.</summary>
 public partial class MainWindowViewModel
 {
     // --- Internals ---
-
-    private void BuildKeysFromProfile()
-    {
-        Keys.Clear();
-        LeftKeys.Clear();
-        RightKeys.Clear();
-
-        foreach (var pos in _profile.Keys)
-        {
-            var vm = new KeyViewModel(pos);
-            Keys.Add(vm);
-            (pos.Hand == Hand.Left ? LeftKeys : RightKeys).Add(vm);
-        }
-
-        // The board-layout VM owns the per-hand bounds + geometry; hand it the
-        // active profile so it recomputes and raises its own geometry changes.
-        BoardLayout.SetProfile(_profile);
-    }
 
     /// <summary>
     /// A board the user picked (toolbar flyout, Settings picker): the picked
@@ -201,7 +183,7 @@ public partial class MainWindowViewModel
     {
         _profile = profile;
         SelectedKeyboard = profile;
-        BuildKeysFromProfile();
+        Board.SetProfile(profile);
         Devices.Push.SetActiveProfile(profile);
     }
 

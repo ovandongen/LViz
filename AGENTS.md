@@ -131,9 +131,23 @@ After creating or editing a view, rebuild the App project before trusting a
   `TabBackground`, hotkey, tray colouring, ring editor, modifier style; each
   persists itself, a modifier-style change raises `ModifierStyleChanged` for
   the relabel, Settings re-raises derived values from
-  `_preferencesPropagators`), `LayerTabs`, `ComboLegend`, `Recents`, `Edit`,
-  `BoardLayout`, `BoardStyle`, plus `Devices` (`DeviceStack`). A new window
-  preference goes on `Preferences`, not on the main VM.
+  `_preferencesPropagators`), `Board`, `LayerTabs`, `Recents`, `Edit`, plus
+  `Devices` (`DeviceStack`). A new window preference goes on `Preferences`,
+  not on the main VM.
+- **One board object: `BoardSurfaceViewModel`.** `MainWindowViewModel.Board`,
+  `ComboDialogViewModel.Board` and `ExitKeyPickerViewModel.Board` each own one,
+  and `BoardView`'s DataContext is that surface (`DataContext="{Binding Board}"`).
+  It owns `Keys`/`LeftKeys`/`RightKeys`, `BoardLayout`, `BoardStyle`,
+  `ComboLegend` and the three key callbacks. `Board.SetProfile(profile)`
+  rebuilds the keys in place (the legend and press tracker keep the
+  collection); a host's key look is the `keyFactory` argument. A null callback
+  leaves the press unhandled, which the main window needs for its window drag
+  outside edit mode, so `MainWindowViewModel.SyncKeyCallbacks()` re-points the
+  callbacks when `Edit` changes: never assign a no-op. Reach the parts as
+  `vm.Board.X`; the coverage test ignores `Board` as one entry. The key
+  position style in `BoardView` is `ItemsControl.keys > ContentPresenter`
+  (`>` is the logical tree): a bare `ContentPresenter` also matched the nested
+  combo-badge presenters.
 - **Keymap edit mode lives in `KeymapEditViewModel` on
   `MainWindowViewModel.Edit`.** The main VM only starts and leaves an edit
   (`StartEdit`, `LeaveEdit`, `DiscardEdit`) and repaints on `Edit.Changed`.
@@ -227,7 +241,12 @@ After creating or editing a view, rebuild the App project before trusting a
   an in-range value, used as a layer reference or named `LAYER_<sanitised
   layer name>`; a MoErgo `#ifndef` fallback is never touched. A name defined
   twice makes the guard refuse the edit, by decision. `CheckDelete` returns
-  exactly the set `Apply` refuses. `ZmkKeymapInterpreter` counts every child
+  exactly the set `Apply` refuses: the delete *policy* (may it go, what it
+  clears, the refusal text) is `LayerDeleteRules` (Core/Keymap/Editing), on
+  the parsed config plus `LayerTextUse` facts the writer scans from the text;
+  `CheckDelete` and `Apply` both go through it, and
+  `CheckDelete_RefusesExactlyWhatApplyRefuses` pins it over every fixture
+  layer. `ZmkKeymapInterpreter` counts every child
   of the keymap node as a layer.
 - **Two keymap loaders, one output.** `MoergoJsonKeymapLoader` parses the
   Moergo Layout Editor `.json` export (glove80.com / go60) into the *same*
@@ -339,9 +358,10 @@ After creating or editing a view, rebuild the App project before trusting a
   hover highlight (`SetHighlighted`) and the combo label overrides
   (`RequestEdit`, `SetLabelOverride`, `MoveLabelOverrides` after a save). The
   main VM feeds it only through `SetEditing(edit)` and `Rebuild(loadedKeymap)`;
-  the active board comes in as a `Func<string>`. `IBoardSurface.ComboLegend`
-  replaces the old bool: the exit-key picker and the combo dialog build an
-  inert legend (no settings, no shell), like their `BoardLayout`/`BoardStyle`.
+  the active board comes in as a `Func<string>`. It lives on the board surface
+  (`Board.ComboLegend`): the exit-key picker and the combo dialog build an
+  inert legend (no settings, no shell); badge hover highlights the legend of
+  whichever surface hosts the `BoardView`.
   The tiles are `ComboLegendView` (DataContext = the legend VM); `MainWindow.axaml`
   keeps only the `ComboLegend` border (row 3, visibility, background). An
   `ElementName` can't reach into a UserControl's namescope, so bindings inside
@@ -477,7 +497,7 @@ After creating or editing a view, rebuild the App project before trusting a
   keymaps come from is `App/Services/KeymapLibrary` (booking in
   `LayoutJsonPaths`, per-profile recents, `TryResolveEntry`/`TryGetBooked`
   with these prune rules, `CheckGitHubAsync`; tested in `KeymapLibraryTests`,
-  tests fake the disk check with `Library = { FileExists = … }`);
+  tests fake the disk check with `TestMainVm.Create(…, fileExists: …)`);
   `MainWindowViewModel` only applies a load (`LoadLayoutFromPath`,
   `_loadedEntry`, board switch, status). The recents flyout binds the child
   VM `MainWindowViewModel.Recents` (`RecentKeymapsViewModel`) directly. The wizard
@@ -728,6 +748,16 @@ LViz-specific (extend this list as we hit more):
   `IgnoredMainProperties` in that test, with a one-line reason. Main-window-only state (e.g.
   a child VM such as `Recents` or `LayerTabs`) belongs on the ignore list. Plan for this edit when a
   change adds a VM property; it is the one expected change to an existing test.
+
+- **`AppServices` is the one composition root.** `MainWindowViewModel` takes
+  every collaborator as a required constructor parameter and builds none
+  itself (except `DeviceStack`, which needs the VM's `ActiveLayerIndex`).
+  Only `gitHub`, `activeWindowMonitor` and `mouseIdleMonitor` may be null,
+  each with a meaning (no GitHub service, no app-focus switching, no
+  `MouseLayer`). Tests build the VM with `TestMainVm.Create(settings, …)`,
+  which supplies `FakeMainWindowShell`, `FakeKeymapEditDialogs` and a
+  temp-dir `KeymapBackupStore`; never add a `= null` default or a throwing
+  stand-in to make a test shorter.
 
 - **Main-window actions go through `IMainWindowShell`, never a nullable
   callback on the VM.** Quit, show, file picker, clipboard, Settings,

@@ -62,7 +62,8 @@ public partial class MainWindowViewModel
     {
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(CanStartEdit));
-        ComboLegend.SetEditing(value);
+        Board.ComboLegend.SetEditing(value);
+        SyncKeyCallbacks();
         LayerTabs.SetEditing(value);
         StartEditCommand.NotifyCanExecuteChanged();
         DiscardEditCommand.NotifyCanExecuteChanged();
@@ -108,7 +109,7 @@ public partial class MainWindowViewModel
 
         // The legend follows the edit too: it shows the edited combos, and
         // every tile becomes editable with its pending-change mark.
-        ComboLegend.Rebuild(_keymap.Current);
+        Board.ComboLegend.Rebuild(_keymap.Current);
     }
 
     /// <summary>One edit change: repaint the board off the edited keymap. The
@@ -128,7 +129,7 @@ public partial class MainWindowViewModel
 
         // The legend re-reads the edited combos — a key edit can retake a
         // tile's labels, an undo can add or drop tiles entirely.
-        ComboLegend.Rebuild(_keymap.Current);
+        Board.ComboLegend.Rebuild(_keymap.Current);
     }
 
     /// <summary>The edit showed another layer on purpose (an added or moved
@@ -190,7 +191,7 @@ public partial class MainWindowViewModel
 
                 // Combo labels follow their combo the same way layer
                 // settings follow their layers — before the edit closes.
-                ComboLegend.MoveLabelOverrides(saved.Plan.ComboChanges);
+                Board.ComboLegend.MoveLabelOverrides(saved.Plan.ComboChanges);
 
                 LeaveEdit();
                 LoadLayoutFromPath(saved.ReloadPath, edit.Source.Entry);
@@ -236,7 +237,7 @@ public partial class MainWindowViewModel
 
         // Back to the loaded keymap's combos, and the tiles lose their
         // edit-mode flags with it.
-        ComboLegend.Rebuild(_keymap.Current);
+        Board.ComboLegend.Rebuild(_keymap.Current);
     }
 
     /// <summary>Drop the edit and its changes.</summary>
@@ -263,8 +264,8 @@ public partial class MainWindowViewModel
     private void RefreshEditSelectionFlags()
     {
         if (Edit is not { } edit) return;
-        for (var i = 0; i < Keys.Count; i++)
-            Keys[i].IsEditSelected = edit.SelectedKeyIndex == i;
+        for (var i = 0; i < Board.Keys.Count; i++)
+            Board.Keys[i].IsEditSelected = edit.SelectedKeyIndex == i;
     }
 
     /// <summary>

@@ -116,7 +116,7 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
     public void AddOwnBoardCommand_RunsWizardThroughShell_CancelAppliesNothing()
     {
         var shell = new FakeMainWindowShell();
-        var vm = new MainWindowViewModel(
+        var vm = TestMainVm.Create(
             new InMemorySettingsService(), keymapState: new FakeKeymapStateService(), shell: shell);
         var profileBefore = vm.SelectedKeyboard;
 
@@ -131,7 +131,7 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
     {
         var settings = new InMemorySettingsService();
         var keymap = new FakeKeymapStateService();
-        var vm = new MainWindowViewModel(settings, keymapState: keymap);
+        var vm = TestMainVm.Create(settings, keymapState: keymap);
         KeyboardProfileRegistry.SetUserProfiles([]);
         try
         {
@@ -156,7 +156,7 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
     {
         var settings = new InMemorySettingsService();
         var keymap = new FakeKeymapStateService();
-        var vm = new MainWindowViewModel(settings, keymapState: keymap);
+        var vm = TestMainVm.Create(settings, keymapState: keymap);
         var loaded = KeymapWith(42);
         keymap.Result = Success(loaded, "corne.keymap");
         vm.LoadLayoutFromPath("corne.keymap");
@@ -190,7 +190,7 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
                 new GitHubOpenResult.Loaded(cacheFile, FromCacheOffline: false)),
             OnCacheFolderFor = (owner, repo, branch) => $"cache/{owner}/{repo}/{branch}",
         };
-        var vm = new MainWindowViewModel(settings, keymapState: keymap, gitHub: fake);
+        var vm = TestMainVm.Create(settings, keymapState: keymap, gitHub: fake);
         keymap.Result = Success(KeymapWith(42), cacheFile);
         KeyboardProfileRegistry.SetUserProfiles([]);
         try
@@ -215,7 +215,7 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
     {
         var keymap = new FakeKeymapStateService();
         // Even with the service wired, a local entry yields no GitHub folder.
-        var vm = new MainWindowViewModel(
+        var vm = TestMainVm.Create(
             new InMemorySettingsService(), keymapState: keymap, gitHub: new FakeGitHubKeymapService());
         keymap.Result = Success(KeymapWith(42), "corne.keymap");
         KeyboardProfileRegistry.SetUserProfiles([]);
@@ -236,7 +236,7 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
     {
         var settings = new InMemorySettingsService();
         var keymap = new FakeKeymapStateService();
-        var vm = new MainWindowViewModel(settings, keymapState: keymap);
+        var vm = TestMainVm.Create(settings, keymapState: keymap);
         KeyboardProfileRegistry.SetUserProfiles([]);
         try
         {
@@ -271,7 +271,7 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
         // for it in the wizard, switch away and back — it must come back.
         var settings = new InMemorySettingsService();
         var keymap = new FakeKeymapStateService();
-        var vm = new MainWindowViewModel(settings, keymapState: keymap);
+        var vm = TestMainVm.Create(settings, keymapState: keymap);
         KeyboardProfileRegistry.SetUserProfiles([]);
         var path = Path.Combine(Path.GetTempPath(), $"lviz-wiz-{Guid.NewGuid():N}.keymap");
         File.WriteAllText(path, "/* stand-in */");
@@ -305,7 +305,7 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
     public void ApplyLayoutWizardResult_ExistingId_ReplacesProfile()
     {
         var settings = new InMemorySettingsService();
-        var vm = new MainWindowViewModel(settings, keymapState: new FakeKeymapStateService());
+        var vm = TestMainVm.Create(settings, keymapState: new FakeKeymapStateService());
         KeyboardProfileRegistry.SetUserProfiles([new UserLayoutProfile(Layout("myboard", 7))]);
         try
         {
@@ -325,7 +325,7 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
     [Fact]
     public void CanEditLayout_FalseOnBundledBoard_TrueAfterWizardResult()
     {
-        var vm = new MainWindowViewModel(
+        var vm = TestMainVm.Create(
             new InMemorySettingsService(), keymapState: new FakeKeymapStateService());
         KeyboardProfileRegistry.SetUserProfiles([]);
         try
@@ -349,7 +349,7 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
     [Fact]
     public void GetLayoutEditContext_NullOnBundledBoard_SnapshotsUserLayout()
     {
-        var vm = new MainWindowViewModel(
+        var vm = TestMainVm.Create(
             new InMemorySettingsService(), keymapState: new FakeKeymapStateService());
         KeyboardProfileRegistry.SetUserProfiles([]);
         try
@@ -374,14 +374,14 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
     [Fact]
     public void ApplyEditedLayout_SelectedId_ReplacesProfileAndRefreshesGeometry()
     {
-        var vm = new MainWindowViewModel(
+        var vm = TestMainVm.Create(
             new InMemorySettingsService(), keymapState: new FakeKeymapStateService());
         KeyboardProfileRegistry.SetUserProfiles([]);
         try
         {
             vm.ApplyLayoutWizardResult(new LayoutWizardResult(Layout("myboard", 7), KeymapPathToLoad: null));
             var old = vm.SelectedKeyboard;
-            var key0X = vm.Keys[0].Position.X;
+            var key0X = vm.Board.Keys[0].Position.X;
 
             // Key 0 at X 500 instead of 0 — a geometry-only edit under the
             // selected id. SelectKeyboard's same-id early return must NOT
@@ -390,7 +390,7 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
 
             Assert.NotSame(old, vm.SelectedKeyboard);
             Assert.Equal("user:myboard", vm.SelectedKeyboard.Id);
-            Assert.NotEqual(key0X, vm.Keys[0].Position.X);
+            Assert.NotEqual(key0X, vm.Board.Keys[0].Position.X);
         }
         finally
         {
@@ -402,7 +402,7 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
     public void ApplyEditedLayout_SelectedId_KeepsFittingKeymapPainted()
     {
         var keymap = new FakeKeymapStateService();
-        var vm = new MainWindowViewModel(new InMemorySettingsService(), keymapState: keymap);
+        var vm = TestMainVm.Create(new InMemorySettingsService(), keymapState: keymap);
         KeyboardProfileRegistry.SetUserProfiles([]);
         try
         {
@@ -415,7 +415,7 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
 
             Assert.True(vm.HasLayoutLoaded);
             // Rebuilt key VMs must come back painted, not blank.
-            Assert.All(vm.Keys, k => Assert.Equal("A", k.Label));
+            Assert.All(vm.Board.Keys, k => Assert.Equal("A", k.Label));
         }
         finally
         {
@@ -426,17 +426,17 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
     [Fact]
     public void ApplyLayoutWizardResult_TwiceSameId_RefreshesKeyCount()
     {
-        var vm = new MainWindowViewModel(
+        var vm = TestMainVm.Create(
             new InMemorySettingsService(), keymapState: new FakeKeymapStateService());
         KeyboardProfileRegistry.SetUserProfiles([]);
         try
         {
             vm.ApplyLayoutWizardResult(new LayoutWizardResult(Layout("myboard", 7), KeymapPathToLoad: null));
-            Assert.Equal(7, vm.Keys.Count);
+            Assert.Equal(7, vm.Board.Keys.Count);
 
             vm.ApplyLayoutWizardResult(new LayoutWizardResult(Layout("myboard", 9), KeymapPathToLoad: null));
 
-            Assert.Equal(9, vm.Keys.Count);
+            Assert.Equal(9, vm.Board.Keys.Count);
         }
         finally
         {
@@ -451,7 +451,7 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
         {
             WizardAnswer = new LayoutWizardResult(Layout("myboard", 7), KeymapPathToLoad: null),
         };
-        var vm = new MainWindowViewModel(
+        var vm = TestMainVm.Create(
             new InMemorySettingsService(), keymapState: new FakeKeymapStateService(), shell: shell);
         KeyboardProfileRegistry.SetUserProfiles([]);
         try
@@ -470,18 +470,18 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
     public void EditLayoutCommand_UserBoardActive_AppliesTheEditedFile()
     {
         var shell = new FakeMainWindowShell { EditLayoutAnswer = EditedLayout(500) };
-        var vm = new MainWindowViewModel(
+        var vm = TestMainVm.Create(
             new InMemorySettingsService(), keymapState: new FakeKeymapStateService(), shell: shell);
         KeyboardProfileRegistry.SetUserProfiles([]);
         try
         {
             vm.ApplyLayoutWizardResult(new LayoutWizardResult(Layout("myboard", 7), KeymapPathToLoad: null));
-            var key0X = vm.Keys[0].Position.X;
+            var key0X = vm.Board.Keys[0].Position.X;
 
             vm.EditLayoutCommand.Execute(null);
 
             Assert.Single(shell.EditLayoutContexts);
-            Assert.NotEqual(key0X, vm.Keys[0].Position.X);
+            Assert.NotEqual(key0X, vm.Board.Keys[0].Position.X);
         }
         finally
         {
@@ -493,7 +493,7 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
     public void EditLayoutCommand_BundledBoardActive_OpensNothing()
     {
         var shell = new FakeMainWindowShell();
-        var vm = new MainWindowViewModel(
+        var vm = TestMainVm.Create(
             new InMemorySettingsService(), keymapState: new FakeKeymapStateService(), shell: shell);
 
         vm.EditLayoutCommand.Execute(null);

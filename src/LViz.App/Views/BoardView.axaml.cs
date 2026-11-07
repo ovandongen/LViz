@@ -1,6 +1,5 @@
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.VisualTree;
 using LViz.App.ViewModels;
 
 namespace LViz.App.Views;
@@ -18,29 +17,23 @@ public partial class BoardView : UserControl
     /// Pointer enters a per-combo pill on a key → highlight that single
     /// combo's legend tile (and every participating-key pill across the
     /// board, via <see cref="ComboLegendViewModel.SetHighlighted"/>).
-    /// Inert if the hosting surface isn't the main VM (e.g. the exit-key
-    /// picker).
+    /// Acts on the hosting surface's own legend; the picker's has no badges.
     /// </summary>
     private void OnComboBadgePointerEntered(object? sender, PointerEventArgs e)
     {
-        if (sender is not Control c) return;
-        if (c.DataContext is not KeyComboBadgeViewModel badge) return;
-        if (TryGetMainVm(c) is not MainWindowViewModel mainVm) return;
-        mainVm.ComboLegend.SetHighlighted(new[] { badge.Number });
+        if (sender is not Control { DataContext: KeyComboBadgeViewModel badge }) return;
+        if (DataContext is not BoardSurfaceViewModel surface) return;
+        surface.ComboLegend.SetHighlighted(new[] { badge.Number });
     }
 
     private void OnComboBadgePointerExited(object? sender, PointerEventArgs e)
     {
-        if (sender is not Control c) return;
-        if (TryGetMainVm(c) is not MainWindowViewModel mainVm) return;
-        mainVm.ComboLegend.SetHighlighted(EmptyComboNumbers);
+        if (DataContext is not BoardSurfaceViewModel surface) return;
+        surface.ComboLegend.SetHighlighted(EmptyComboNumbers);
     }
 
-    private static MainWindowViewModel? TryGetMainVm(Control source) =>
-        source.FindAncestorOfType<MainWindow>()?.DataContext as MainWindowViewModel;
-
     /// <summary>
-    /// Routes a cap pointer event to the hosting <see cref="IBoardSurface"/>:
+    /// Routes a cap pointer event to the hosting <see cref="BoardSurfaceViewModel"/>:
     /// left-clicks fire <c>OnKeyTapped</c> (selection in the exit-key picker;
     /// inert in the main window), the second press of a double-click fires
     /// <c>OnKeyDoubleTapped</c> (key dialog on the cap while editing), and
@@ -51,7 +44,7 @@ public partial class BoardView : UserControl
     {
         if (sender is not Control c) return;
         if (c.DataContext is not KeyViewModel keyVm) return;
-        if (DataContext is not IBoardSurface surface) return;
+        if (DataContext is not BoardSurfaceViewModel surface) return;
 
         var point = e.GetCurrentPoint(c);
         if (point.Properties.IsRightButtonPressed)

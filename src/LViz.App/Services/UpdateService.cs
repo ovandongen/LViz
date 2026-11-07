@@ -128,16 +128,6 @@ public sealed class UpdateService
         }
     }
 
-    private void PersistLastChecked()
-    {
-        try
-        {
-            var s = _settingsService.Load();
-            _settingsService.Save(s with { LastUpdateCheckUtc = DateTime.UtcNow });
-        }
-        catch (Exception ex)
-        {
-            DiagnosticLog.Warn("Update", $"Persist LastUpdateCheckUtc failed: {ex.Message}");
-        }
-    }
+    private void PersistLastChecked() =>
+        _settingsService.Update(s => s with { LastUpdateCheckUtc = DateTime.UtcNow }, "Update");
 }

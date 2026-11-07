@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LViz.App.Services;
@@ -12,12 +11,12 @@ namespace LViz.App.ViewModels;
 /// and lets the user click a single cap to choose the firmware key index
 /// that will toggle the auto-switch engine's escape hatch on double-tap.
 ///
-/// <para>Implements <see cref="IBoardSurface"/> so <c>BoardView</c> can
+/// <para>Owns a <see cref="BoardSurfaceViewModel"/> so <c>BoardView</c> can
 /// render it without forking the control — the same canvas math, palette,
 /// and per-cap template apply. The selected cap is tinted green via
 /// <see cref="KeyViewModel.KeyFillColor"/>.</para>
 /// </summary>
-public partial class ExitKeyPickerViewModel : ObservableObject, IBoardSurface
+public partial class ExitKeyPickerViewModel : ObservableObject
 {
     private const string DefaultFill = AppTheme.KeyDefaultFillHex;
     private const string SelectedFill = AppTheme.AccentGreenHex;
@@ -29,20 +28,18 @@ public partial class ExitKeyPickerViewModel : ObservableObject, IBoardSurface
     {
         _profile = profile;
         // Picker never persists and never stacks; it uses a fixed press palette
-        // (no settings service passed → BoardStyle/BoardLayout don't write back).
-        BoardLayout = new BoardLayoutViewModel(profile);
-        BoardStyle = new BoardStyleViewModel(
+        // (no settings service passed → layout/style don't write back) and an
+        // inert legend with the overlay off (no combo earmarks here). Keys are
+        // stripped — empty Label / Subscript / Icon / TopLeftLabel — so the
+        // picker shows the physical layout only; KeyFillColor flips between
+        // default and SelectedFill as the user toggles a cap.
+        var style = new BoardStyleViewModel(
             AppTheme.PressHighlightDefaultHex,
             strokeOverride: AppTheme.PickerPressStrokeHex);
-        ComboLegend = new ComboLegendViewModel(Keys, BoardStyle, overlayVisible: false, profileId: () => "");
-
-        foreach (var pos in _profile.Keys)
-        {
-            // Stripped KeyViewModel: empty Label / Subscript / Icon /
-            // TopLeftLabel so the picker shows the physical layout only,
-            // no semantic clutter. KeyFillColor flips between default and
-            // SelectedFill as the user toggles a cap.
-            var vm = new KeyViewModel(pos)
+        Board = new BoardSurfaceViewModel(
+            profile, new BoardLayoutViewModel(profile), style,
+            keys => new ComboLegendViewModel(keys, style, overlayVisible: false, profileId: () => ""),
+            pos => new KeyViewModel(pos)
             {
                 Label = "",
                 Subscript = "",
@@ -53,41 +50,26 @@ public partial class ExitKeyPickerViewModel : ObservableObject, IBoardSurface
                 IsInCombo = false,
                 IsPressed = false,
                 Tooltip = pos.Description ?? $"#{pos.Index}",
-            };
-            Keys.Add(vm);
-            (pos.Hand == Hand.Left ? LeftKeys : RightKeys).Add(vm);
-        }
+            })
+        {
+            OnKeyTapped = ToggleKey,
+        };
 
         // Apply the initial selection so reopening the picker shows the
         // current configuration. Silently drops an out-of-range index that
         // wouldn't map to a cap on this profile (e.g. carried over from a
         // different keyboard).
-        if (initialSelection is int idx && idx >= 0 && idx < Keys.Count)
+        if (initialSelection is int idx && idx >= 0 && idx < Board.Keys.Count)
         {
             _selectedIndex = idx;
-            Keys[idx].KeyFillColor = SelectedFill;
+            Board.Keys[idx].KeyFillColor = SelectedFill;
         }
 
         UpdateChips();
     }
 
-    public ObservableCollection<KeyViewModel> Keys { get; } = new();
-    public ObservableCollection<KeyViewModel> LeftKeys { get; } = new();
-    public ObservableCollection<KeyViewModel> RightKeys { get; } = new();
-
-    // IBoardSurface — geometry + press style come from the two child VMs,
-    // constructed above with no settings service (picker never persists) and a
-    // fixed picker press palette.
-    public BoardLayoutViewModel BoardLayout { get; }
-    public BoardStyleViewModel BoardStyle { get; }
-
-    // Picker has no combos — an inert legend with the overlay always off, so
-    // the indicator stays hidden (no combo earmarks here).
-    public ComboLegendViewModel ComboLegend { get; }
-
-    public Action<int>? OnKeyTapped => ToggleKey;
-    public Action<int>? OnKeyDoubleTapped => null;
-    public Action<int>? OnKeyRightTapped => null;
+    /// <summary>The board <c>BoardView</c> renders; a tap on a cap toggles it.</summary>
+    public BoardSurfaceViewModel Board { get; }
 
     /// <summary>True when the user has at least one cap selected — drives
     /// the OK button's IsEnabled and the empty-state hint visibility.</summary>
@@ -106,31 +88,31 @@ public partial class ExitKeyPickerViewModel : ObservableObject, IBoardSurface
 
     private void ToggleKey(int index)
     {
-        if (index < 0 || index >= Keys.Count) return;
+        if (index < 0 || index >= Board.Keys.Count) return;
 
         // Tap an already-selected key to deselect.
         if (_selectedIndex == index)
         {
-            Keys[index].KeyFillColor = DefaultFill;
+            Board.Keys[index].KeyFillColor = DefaultFill;
             _selectedIndex = null;
             UpdateChips();
             return;
         }
 
         // Replace the previous selection (single-key picker).
-        if (_selectedIndex is int prev && prev >= 0 && prev < Keys.Count)
-            Keys[prev].KeyFillColor = DefaultFill;
+        if (_selectedIndex is int prev && prev >= 0 && prev < Board.Keys.Count)
+            Board.Keys[prev].KeyFillColor = DefaultFill;
 
         _selectedIndex = index;
-        Keys[index].KeyFillColor = SelectedFill;
+        Board.Keys[index].KeyFillColor = SelectedFill;
         UpdateChips();
     }
 
     [RelayCommand]
     private void ClearSelection()
     {
-        if (_selectedIndex is int idx && idx >= 0 && idx < Keys.Count)
-            Keys[idx].KeyFillColor = DefaultFill;
+        if (_selectedIndex is int idx && idx >= 0 && idx < Board.Keys.Count)
+            Board.Keys[idx].KeyFillColor = DefaultFill;
         _selectedIndex = null;
         UpdateChips();
     }

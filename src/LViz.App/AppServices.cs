@@ -108,6 +108,8 @@ internal static class AppServices
             sp.GetRequiredService<GitHubSession>(),
             sp.GetRequiredService<GitHubRepoCache>()));
 
+        services.AddSingleton<IKeymapStateService, KeymapStateService>();
+        services.AddSingleton(_ => new KeymapBackupStore(KeymapBackupStore.DefaultRoot));
         services.AddSingleton<IKeymapEditDialogs, AvaloniaKeymapEditDialogs>();
 
         // Window lifecycle + the shell the view-model opens windows through;
@@ -118,17 +120,21 @@ internal static class AppServices
         services.AddSingleton<IMainWindowShell>(sp => new AvaloniaMainWindowShell(
             sp, sp.GetRequiredService<MainWindowLifecycle>()));
 
+        // Every dependency is passed explicitly. The monitors are genuinely
+        // optional: no active-window monitor disables app-focus switching, no
+        // mouse-idle monitor leaves MouseLayer null.
         services.AddSingleton<MainWindowViewModel>(sp =>
             new MainWindowViewModel(
                 sp.GetRequiredService<ISettingsService>(),
+                sp.GetRequiredService<IKeymapStateService>(),
+                sp.GetRequiredService<KeymapBackupStore>(),
+                sp.GetRequiredService<IKeymapEditDialogs>(),
+                sp.GetRequiredService<IMainWindowShell>(),
+                sp.GetRequiredService<IHostActionExecutor>(),
+                sp.GetRequiredService<ICapabilityControl>(),
+                sp.GetRequiredService<IGitHubKeymapService>(),
                 sp.GetService<IActiveWindowMonitor>(),
-                sp.GetService<IMouseIdleMonitor>(),
-                keymapState: null,
-                capabilityControl: sp.GetRequiredService<ICapabilityControl>(),
-                hostActionExecutor: sp.GetRequiredService<IHostActionExecutor>(),
-                gitHub: sp.GetRequiredService<IGitHubKeymapService>(),
-                editDialogs: sp.GetRequiredService<IKeymapEditDialogs>(),
-                shell: sp.GetRequiredService<IMainWindowShell>()));
+                sp.GetService<IMouseIdleMonitor>()));
 
         services.AddTransient<SettingsViewModel>(sp =>
             new SettingsViewModel(

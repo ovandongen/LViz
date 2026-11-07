@@ -46,7 +46,7 @@
 
         <Border BorderBrush="{StaticResource BgSurface0}" BorderThickness="1" CornerRadius="6"
                 Background="{StaticResource BgBase}" Padding="12">
-            <views:BoardView />
+            <views:BoardView DataContext="{Binding Board}" />
         </Border>
 
     </DockPanel>

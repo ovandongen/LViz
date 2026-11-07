@@ -54,7 +54,7 @@ public class ComboDialogViewModelTests
 
     private static void Tap(ComboDialogViewModel vm, params int[] indices)
     {
-        var tap = vm.OnKeyTapped!;
+        var tap = vm.Board.OnKeyTapped!;
         foreach (var index in indices) tap(index);
     }
 
@@ -92,9 +92,9 @@ public class ComboDialogViewModelTests
         Tap(vm, 10, 11);
 
         Assert.Equal(new[] { 10, 11 }, vm.SelectedKeys);
-        Assert.Equal(AppTheme.AccentGoldHex, vm.Keys[10].KeyFillColor);
-        Assert.Equal(AppTheme.AccentGoldHex, vm.Keys[11].KeyFillColor);
-        Assert.Equal(AppTheme.KeyDefaultFillHex, vm.Keys[0].KeyFillColor);
+        Assert.Equal(AppTheme.AccentGoldHex, vm.Board.Keys[10].KeyFillColor);
+        Assert.Equal(AppTheme.AccentGoldHex, vm.Board.Keys[11].KeyFillColor);
+        Assert.Equal(AppTheme.KeyDefaultFillHex, vm.Board.Keys[0].KeyFillColor);
     }
 
     [Fact]
@@ -196,7 +196,7 @@ public class ComboDialogViewModelTests
         Assert.True(HasBinding(vm.Binding, "&kp", "F12"));
         Assert.Equal("&kp F12", vm.BindingText);
         Assert.True(vm.CanConfirm);
-        Assert.Equal(AppTheme.AccentGoldHex, vm.Keys[0].KeyFillColor);
+        Assert.Equal(AppTheme.AccentGoldHex, vm.Board.Keys[0].KeyFillColor);
     }
 
     [Fact]
@@ -209,7 +209,7 @@ public class ComboDialogViewModelTests
         Assert.Equal(new[] { 0 }, vm.SelectedKeys);
         Assert.False(vm.CanConfirm);
         Assert.Contains(Loc.Instance["Combo_ErrorTooFewKeys"], vm.Errors);
-        Assert.Equal(AppTheme.KeyDefaultFillHex, vm.Keys[1].KeyFillColor);
+        Assert.Equal(AppTheme.KeyDefaultFillHex, vm.Board.Keys[1].KeyFillColor);
 
         Tap(vm, 1);
 
@@ -368,7 +368,7 @@ public class ComboDialogViewModelTests
 
         // Symbols: &kp LS(AMPS) and &kp LBKT.
         Assert.Equal("& + [", vm.KeysSummary);
-        Assert.Equal(vm.Keys[0].Label + " + " + vm.Keys[1].Label, vm.KeysSummary);
+        Assert.Equal(vm.Board.Keys[0].Label + " + " + vm.Board.Keys[1].Label, vm.KeysSummary);
     }
 
     [Fact]
@@ -398,8 +398,8 @@ public class ComboDialogViewModelTests
         var vm = new ComboDialogViewModel(Request());
 
         // Key 0 sits in f12 alone — the third combo of the keymap.
-        Assert.Equal(new[] { 3 }, vm.Keys[0].ComboBadges.Select(badge => badge.Number).ToArray());
-        Assert.True(vm.ComboLegend.IsOverlayVisible);
+        Assert.Equal(new[] { 3 }, vm.Board.Keys[0].ComboBadges.Select(badge => badge.Number).ToArray());
+        Assert.True(vm.Board.ComboLegend.IsOverlayVisible);
     }
 
     [Fact]
@@ -407,9 +407,9 @@ public class ComboDialogViewModelTests
     {
         var vm = new ComboDialogViewModel(Request(comboIndex: 2));
 
-        Assert.Empty(vm.Keys[0].ComboBadges);
+        Assert.Empty(vm.Board.Keys[0].ComboBadges);
         // syslayer (index 3) is untouched by editing f12.
-        Assert.Equal(new[] { 4 }, vm.Keys[52].ComboBadges.Select(badge => badge.Number).ToArray());
+        Assert.Equal(new[] { 4 }, vm.Board.Keys[52].ComboBadges.Select(badge => badge.Number).ToArray());
     }
 
     [Fact]
@@ -417,7 +417,7 @@ public class ComboDialogViewModelTests
     {
         var vm = new ComboDialogViewModel(Request());
 
-        Assert.Equal("&kp ESCAPE", vm.Keys[10].Tooltip.Split('\n', 3)[2]);
-        Assert.Equal("ESCAPE", vm.Keys[10].Label);
+        Assert.Equal("&kp ESCAPE", vm.Board.Keys[10].Tooltip.Split('\n', 3)[2]);
+        Assert.Equal("ESCAPE", vm.Board.Keys[10].Label);
     }
 }

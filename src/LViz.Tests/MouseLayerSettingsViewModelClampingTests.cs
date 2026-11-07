@@ -26,7 +26,7 @@ public class MouseLayerSettingsViewModelClampingTests
     private static MouseLayerSettingsViewModel NewVm(UserSettings? seed = null)
     {
         var settings = new InMemorySettingsService { Current = seed ?? new UserSettings { Keyboard = "GO60" } };
-        var main = new MainWindowViewModel(settings);
+        var main = TestMainVm.Create(settings);
         // Mouse layer must be enabled for snapshot updates to flow back through
         // the engine without being short-circuited.
         var vm = new SettingsViewModel(settings, main, new UpdateService(settings)).MouseLayer;

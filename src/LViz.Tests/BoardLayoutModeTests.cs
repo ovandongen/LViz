@@ -17,50 +17,50 @@ public class BoardLayoutModeTests
     [Fact]
     public void HorizontalMode_PreservesProfileCanvas()
     {
-        var vm = new MainWindowViewModel(new InMemorySettingsService());
-        Assert.False(vm.BoardLayout.IsStackedLayout);
+        var vm = TestMainVm.Create(new InMemorySettingsService());
+        Assert.False(vm.Board.BoardLayout.IsStackedLayout);
 
         var profile = new CorneProfile();
-        Assert.Equal(profile.CanvasWidth, vm.BoardLayout.CanvasWidth);
-        Assert.Equal(profile.CanvasHeight, vm.BoardLayout.CanvasHeight);
-        Assert.Equal(0, vm.BoardLayout.LeftHandX);
-        Assert.Equal(0, vm.BoardLayout.LeftHandY);
-        Assert.Equal(0, vm.BoardLayout.RightHandX);
-        Assert.Equal(0, vm.BoardLayout.RightHandY);
+        Assert.Equal(profile.CanvasWidth, vm.Board.BoardLayout.CanvasWidth);
+        Assert.Equal(profile.CanvasHeight, vm.Board.BoardLayout.CanvasHeight);
+        Assert.Equal(0, vm.Board.BoardLayout.LeftHandX);
+        Assert.Equal(0, vm.Board.BoardLayout.LeftHandY);
+        Assert.Equal(0, vm.Board.BoardLayout.RightHandX);
+        Assert.Equal(0, vm.Board.BoardLayout.RightHandY);
     }
 
     [Fact]
     public void StackedMode_StacksHalvesVertically()
     {
-        var vm = new MainWindowViewModel(new InMemorySettingsService());
-        vm.BoardLayout.IsStackedLayout = true;
+        var vm = TestMainVm.Create(new InMemorySettingsService());
+        vm.Board.BoardLayout.IsStackedLayout = true;
         var profile = new CorneProfile();
 
         // Stacked canvas should be roughly: each half's height + gap, instead of side-by-side.
-        Assert.True(vm.BoardLayout.CanvasHeight > profile.CanvasHeight,
-            $"Expected stacked height > profile height; got {vm.BoardLayout.CanvasHeight} vs {profile.CanvasHeight}");
-        Assert.True(vm.BoardLayout.CanvasWidth < profile.CanvasWidth,
-            $"Expected stacked width < profile width; got {vm.BoardLayout.CanvasWidth} vs {profile.CanvasWidth}");
+        Assert.True(vm.Board.BoardLayout.CanvasHeight > profile.CanvasHeight,
+            $"Expected stacked height > profile height; got {vm.Board.BoardLayout.CanvasHeight} vs {profile.CanvasHeight}");
+        Assert.True(vm.Board.BoardLayout.CanvasWidth < profile.CanvasWidth,
+            $"Expected stacked width < profile width; got {vm.Board.BoardLayout.CanvasWidth} vs {profile.CanvasWidth}");
     }
 
     [Fact]
     public void StackedMode_LeftOnTop_PutsRightBelow()
     {
-        var vm = new MainWindowViewModel(new InMemorySettingsService());
-        vm.BoardLayout.IsStackedLayout = true;
-        vm.BoardLayout.StackedTopHand = "Left";
-        Assert.True(vm.BoardLayout.RightHandY > vm.BoardLayout.LeftHandY,
-            $"Right should sit below Left; got LeftY={vm.BoardLayout.LeftHandY}, RightY={vm.BoardLayout.RightHandY}");
+        var vm = TestMainVm.Create(new InMemorySettingsService());
+        vm.Board.BoardLayout.IsStackedLayout = true;
+        vm.Board.BoardLayout.StackedTopHand = "Left";
+        Assert.True(vm.Board.BoardLayout.RightHandY > vm.Board.BoardLayout.LeftHandY,
+            $"Right should sit below Left; got LeftY={vm.Board.BoardLayout.LeftHandY}, RightY={vm.Board.BoardLayout.RightHandY}");
     }
 
     [Fact]
     public void StackedMode_RightOnTop_PutsLeftBelow()
     {
-        var vm = new MainWindowViewModel(new InMemorySettingsService());
-        vm.BoardLayout.IsStackedLayout = true;
-        vm.BoardLayout.StackedTopHand = "Right";
-        Assert.True(vm.BoardLayout.LeftHandY > vm.BoardLayout.RightHandY,
-            $"Left should sit below Right; got LeftY={vm.BoardLayout.LeftHandY}, RightY={vm.BoardLayout.RightHandY}");
+        var vm = TestMainVm.Create(new InMemorySettingsService());
+        vm.Board.BoardLayout.IsStackedLayout = true;
+        vm.Board.BoardLayout.StackedTopHand = "Right";
+        Assert.True(vm.Board.BoardLayout.LeftHandY > vm.Board.BoardLayout.RightHandY,
+            $"Left should sit below Right; got LeftY={vm.Board.BoardLayout.LeftHandY}, RightY={vm.Board.BoardLayout.RightHandY}");
     }
 
     [Fact]
@@ -68,13 +68,13 @@ public class BoardLayoutModeTests
     {
         // The two halves don't have to be equal-height, so absolute Y values
         // won't be a literal swap — just the *ordering* should flip.
-        var vm = new MainWindowViewModel(new InMemorySettingsService());
-        vm.BoardLayout.IsStackedLayout = true;
-        vm.BoardLayout.StackedTopHand = "Left";
-        Assert.True(vm.BoardLayout.LeftHandY < vm.BoardLayout.RightHandY);
+        var vm = TestMainVm.Create(new InMemorySettingsService());
+        vm.Board.BoardLayout.IsStackedLayout = true;
+        vm.Board.BoardLayout.StackedTopHand = "Left";
+        Assert.True(vm.Board.BoardLayout.LeftHandY < vm.Board.BoardLayout.RightHandY);
 
-        vm.BoardLayout.StackedTopHand = "Right";
-        Assert.True(vm.BoardLayout.RightHandY < vm.BoardLayout.LeftHandY);
+        vm.Board.BoardLayout.StackedTopHand = "Right";
+        Assert.True(vm.Board.BoardLayout.RightHandY < vm.Board.BoardLayout.LeftHandY);
     }
 
     [Fact]
@@ -94,26 +94,26 @@ public class BoardLayoutModeTests
     public void Settings_RoundTripStackedFields()
     {
         var settings = new InMemorySettingsService();
-        var vm = new MainWindowViewModel(settings);
-        vm.BoardLayout.IsStackedLayout = true;
-        vm.BoardLayout.StackedTopHand = "Right";
+        var vm = TestMainVm.Create(settings);
+        vm.Board.BoardLayout.IsStackedLayout = true;
+        vm.Board.BoardLayout.StackedTopHand = "Right";
         Assert.True(settings.Current.StackedLayout);
         Assert.Equal("Right", settings.Current.StackedTopHand);
 
         // Round-trip: a new VM seeded from the persisted settings should reflect them.
-        var vm2 = new MainWindowViewModel(settings);
-        Assert.True(vm2.BoardLayout.IsStackedLayout);
-        Assert.Equal("Right", vm2.BoardLayout.StackedTopHand);
+        var vm2 = TestMainVm.Create(settings);
+        Assert.True(vm2.Board.BoardLayout.IsStackedLayout);
+        Assert.Equal("Right", vm2.Board.BoardLayout.StackedTopHand);
     }
 
     [Fact]
     public void BuildKeysFromProfile_PartitionsKeysByHand()
     {
-        var vm = new MainWindowViewModel(new InMemorySettingsService());
-        Assert.Equal(42, vm.Keys.Count);
-        Assert.Equal(21, vm.LeftKeys.Count);
-        Assert.Equal(21, vm.RightKeys.Count);
-        Assert.All(vm.LeftKeys, k => Assert.Equal(Hand.Left, k.Position.Hand));
-        Assert.All(vm.RightKeys, k => Assert.Equal(Hand.Right, k.Position.Hand));
+        var vm = TestMainVm.Create(new InMemorySettingsService());
+        Assert.Equal(42, vm.Board.Keys.Count);
+        Assert.Equal(21, vm.Board.LeftKeys.Count);
+        Assert.Equal(21, vm.Board.RightKeys.Count);
+        Assert.All(vm.Board.LeftKeys, k => Assert.Equal(Hand.Left, k.Position.Hand));
+        Assert.All(vm.Board.RightKeys, k => Assert.Equal(Hand.Right, k.Position.Hand));
     }
 }

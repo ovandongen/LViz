@@ -13,7 +13,7 @@ namespace LViz.App.ViewModels;
 /// The combo legend: the numbered tile strip under the keyboard, the overlay
 /// toggle that also numbers the combo badges on the keys, the per-combo label
 /// overrides, and the hover highlight between tiles and keys. A board surface
-/// exposes it as <see cref="IBoardSurface.ComboLegend"/>; the main VM feeds it
+/// exposes it as <see cref="BoardSurfaceViewModel.ComboLegend"/>; the main VM feeds it
 /// through <see cref="SetEditing"/> and <see cref="Rebuild"/>. The picker and
 /// the combo dialog build an inert one (no settings, no shell) that only
 /// carries the overlay flag.

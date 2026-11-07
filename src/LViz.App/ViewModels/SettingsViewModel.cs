@@ -79,7 +79,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
             settingsService, updateService, cliToolInstaller ?? new CliToolInstaller());
         HotkeyKeyChoices = PlatformCapabilities.GetAvailableFKeys(mainViewModel.Preferences.HotkeyKey);
         _mainViewModel.PropertyChanged += OnMainPropertyChanged;
-        _mainViewModel.BoardStyle.PropertyChanged += OnBoardStylePropertyChanged;
+        _mainViewModel.Board.BoardStyle.PropertyChanged += OnBoardStylePropertyChanged;
         _mainViewModel.Preferences.PropertyChanged += OnPreferencesPropertyChanged;
         _mainViewModel.LayerTabs.Layers.CollectionChanged += OnLayersCollectionChanged;
 
@@ -174,7 +174,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         if (_disposed) return;
         _disposed = true;
         _mainViewModel.PropertyChanged -= OnMainPropertyChanged;
-        _mainViewModel.BoardStyle.PropertyChanged -= OnBoardStylePropertyChanged;
+        _mainViewModel.Board.BoardStyle.PropertyChanged -= OnBoardStylePropertyChanged;
         _mainViewModel.Preferences.PropertyChanged -= OnPreferencesPropertyChanged;
         _mainViewModel.LayerTabs.Layers.CollectionChanged -= OnLayersCollectionChanged;
         AutoSwitch.Dispose();
@@ -195,12 +195,12 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     /// </summary>
     public Color PressHighlightColor
     {
-        get => Color.TryParse(_mainViewModel.BoardStyle.PressHighlightColor, out var c) ? c : Colors.Yellow;
-        set => _mainViewModel.BoardStyle.PressHighlightColor = $"#{value.R:X2}{value.G:X2}{value.B:X2}";
+        get => Color.TryParse(_mainViewModel.Board.BoardStyle.PressHighlightColor, out var c) ? c : Colors.Yellow;
+        set => _mainViewModel.Board.BoardStyle.PressHighlightColor = $"#{value.R:X2}{value.G:X2}{value.B:X2}";
     }
 
     /// <summary>Hex string for the swatch preview Border in the picker button.</summary>
-    public string PressHighlightColorHex => _mainViewModel.BoardStyle.PressHighlightColor;
+    public string PressHighlightColorHex => _mainViewModel.Board.BoardStyle.PressHighlightColor;
 
     /// <summary>F-key choices offered for the global hotkey. F13–F24 first
     /// (effectively always free), then F1–F12. Filtered per OS — macOS

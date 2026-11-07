@@ -10,7 +10,7 @@ namespace LViz.App.ViewModels;
 /// darkened version of the fill (or a caller-supplied override). Composed by
 /// <see cref="MainWindowViewModel"/> (user-customizable, persisted) and
 /// <see cref="ExitKeyPickerViewModel"/> (the fixed picker palette), and exposed
-/// through <see cref="IBoardSurface"/> so <c>BoardView</c> binds one style
+/// through <see cref="BoardSurfaceViewModel"/> so <c>BoardView</c> binds one style
 /// source for both hosts.
 /// </summary>
 public partial class BoardStyleViewModel : ObservableObject

@@ -115,7 +115,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
             OnOpen = _ => Task.FromResult<GitHubOpenResult>(
                 new GitHubOpenResult.Loaded(tempPath, FromCacheOffline: false)),
         };
-        var vm = new MainWindowViewModel(settings, keymapState: Ok(), gitHub: fake);
+        var vm = TestMainVm.Create(settings, keymapState: Ok(), gitHub: fake);
 
         await vm.OpenGitHubKeymapAsync(R);
 
@@ -145,7 +145,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
             OnOpen = _ => Task.FromResult<GitHubOpenResult>(
                 new GitHubOpenResult.Loaded(tempPath, FromCacheOffline: true)),
         };
-        var vm = new MainWindowViewModel(settings, keymapState: Ok(), gitHub: fake);
+        var vm = TestMainVm.Create(settings, keymapState: Ok(), gitHub: fake);
 
         await vm.OpenGitHubKeymapAsync(R);
 
@@ -167,7 +167,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
                 new GitHubOpenResult.Failed(GitHubErrorKind.Unauthorized, "sign in")),
         };
         var shell = new FakeMainWindowShell();
-        var vm = new MainWindowViewModel(settings, keymapState: Ok(), gitHub: fake, shell: shell);
+        var vm = TestMainVm.Create(settings, keymapState: Ok(), gitHub: fake, shell: shell);
         var savesBefore = settings.SaveCount;
 
         await vm.OpenGitHubKeymapAsync(R);
@@ -198,7 +198,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
             OnOpen = _ => Task.FromResult<GitHubOpenResult>(
                 new GitHubOpenResult.Failed(GitHubErrorKind.Network, "offline")),
         };
-        var vm = new MainWindowViewModel(settings, keymapState: Ok(), gitHub: fake);
+        var vm = TestMainVm.Create(settings, keymapState: Ok(), gitHub: fake);
         vm.StatusMessage = "Loaded ok.keymap (2 layers)";
         var savesBefore = settings.SaveCount;
 
@@ -233,7 +233,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
             OnOpen = _ => Task.FromResult<GitHubOpenResult>(
                 new GitHubOpenResult.Failed(GitHubErrorKind.NotFound, "nope")),
         };
-        var vm = new MainWindowViewModel(settings, keymapState: Ok(), gitHub: fake);
+        var vm = TestMainVm.Create(settings, keymapState: Ok(), gitHub: fake);
 
         await vm.OpenGitHubKeymapAsync(R);
 
@@ -265,10 +265,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
         };
         // Every local path is "missing" — irrelevant for a GitHub row.
         var keymapState = Ok();
-        var vm = new MainWindowViewModel(settings, keymapState: keymapState, gitHub: fake)
-        {
-            Library = { FileExists = _ => false },
-        };
+        var vm = TestMainVm.Create(settings, keymapState: keymapState, gitHub: fake, fileExists: _ => false);
 
         var row = vm.Recents.Items[0];
         vm.Recents.OpenCommand.Execute(row);
@@ -297,7 +294,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
         };
         var tempPath = TempKeymapFile();
         var fake = new FakeGitHubKeymapService { OnLocalPathFor = _ => tempPath };
-        var vm = new MainWindowViewModel(settings, keymapState: Ok(), gitHub: fake);
+        var vm = TestMainVm.Create(settings, keymapState: Ok(), gitHub: fake);
 
         vm.InitializeAsync();
 
@@ -340,7 +337,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
             },
         };
         var keymapState = Ok();
-        var vm = new MainWindowViewModel(StartupSettings(), keymapState: keymapState, gitHub: fake);
+        var vm = TestMainVm.Create(StartupSettings(), keymapState: keymapState, gitHub: fake);
 
         vm.InitializeAsync();
         await vm.PendingGitHubCheck!;
@@ -362,7 +359,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
             OnFetchRepo = (_, _, _) => Task.FromResult(new GitHubCacheResult("folder", "sha", Downloaded: false)),
         };
         var keymapState = Ok();
-        var vm = new MainWindowViewModel(StartupSettings(), keymapState: keymapState, gitHub: fake);
+        var vm = TestMainVm.Create(StartupSettings(), keymapState: keymapState, gitHub: fake);
 
         vm.InitializeAsync();
         await vm.PendingGitHubCheck!;
@@ -386,7 +383,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
         };
         var keymapState = Ok();
         var shell = new FakeMainWindowShell();
-        var vm = new MainWindowViewModel(StartupSettings(), keymapState: keymapState, gitHub: fake, shell: shell);
+        var vm = TestMainVm.Create(StartupSettings(), keymapState: keymapState, gitHub: fake, shell: shell);
 
         vm.InitializeAsync();
         await vm.PendingGitHubCheck!;
@@ -407,7 +404,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
         // OnLocalPathFor defaults to null — nothing cached; IsSignedIn false.
         var fake = new FakeGitHubKeymapService();
         var keymapState = Ok();
-        var vm = new MainWindowViewModel(settings, keymapState: keymapState, gitHub: fake);
+        var vm = TestMainVm.Create(settings, keymapState: keymapState, gitHub: fake);
 
         vm.InitializeAsync();
 
@@ -433,7 +430,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
             },
         };
         var keymapState = Ok();
-        var vm = new MainWindowViewModel(settings, keymapState: keymapState, gitHub: fake);
+        var vm = TestMainVm.Create(settings, keymapState: keymapState, gitHub: fake);
 
         vm.InitializeAsync();
         await vm.PendingGitHubCheck!;
@@ -465,7 +462,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
         };
         var keymapState = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "gh.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
-        var vm = new MainWindowViewModel(settings, keymapState: keymapState, gitHub: fake);
+        var vm = TestMainVm.Create(settings, keymapState: keymapState, gitHub: fake);
 
         vm.InitializeAsync();
         await vm.PendingGitHubCheck!;
@@ -492,10 +489,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
             OnOpen = _ => Task.FromResult<GitHubOpenResult>(
                 new GitHubOpenResult.Loaded(tempPath, FromCacheOffline: false)),
         };
-        var vm = new MainWindowViewModel(settings, keymapState: Ok(), gitHub: fake)
-        {
-            Library = { FileExists = _ => true },
-        };
+        var vm = TestMainVm.Create(settings, keymapState: Ok(), gitHub: fake, fileExists: _ => true);
         await vm.OpenGitHubKeymapAsync(R);
 
         vm.LoadLayoutFromPath("/keymaps/local.keymap");
@@ -522,7 +516,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
             },
         };
         var tempPath = TempKeymapFile(); // exists on disk, but fails to parse
-        var vm = new MainWindowViewModel(settings, keymapState: Failing());
+        var vm = TestMainVm.Create(settings, keymapState: Failing());
 
         vm.LoadLayoutFromPath(tempPath, TestRefString);
 
@@ -545,7 +539,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
         };
         var keymapState = Ok();
         // No gitHub service at all.
-        var vm = new MainWindowViewModel(settings, keymapState: keymapState);
+        var vm = TestMainVm.Create(settings, keymapState: keymapState);
 
         var row = vm.Recents.Items[0];
         Assert.True(row.IsGitHub);

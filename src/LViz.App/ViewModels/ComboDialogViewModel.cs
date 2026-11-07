@@ -45,14 +45,14 @@ public partial class ComboLayerToggle : ObservableObject
 /// firmware limits that are only advisory; <see cref="Result()"/> builds the
 /// combo the caller writes back.
 ///
-/// <para>Implements <see cref="IBoardSurface"/> like
+/// <para>Owns a <see cref="BoardSurfaceViewModel"/> like
 /// <see cref="ExitKeyPickerViewModel"/>, so <c>BoardView</c> renders it with
 /// the same canvas. The caps carry their labels from
 /// <see cref="LabelLayer"/> (switchable, starting at the shown layer) and the
 /// numbered badges of the <em>other</em> combos, so the keys a combo already
 /// uses are visible while picking.</para>
 /// </summary>
-public partial class ComboDialogViewModel : ObservableObject, IBoardSurface
+public partial class ComboDialogViewModel : ObservableObject
 {
     private const string DefaultFill = AppTheme.KeyDefaultFillHex;
     private const string SelectedFill = AppTheme.AccentGoldHex;
@@ -117,20 +117,18 @@ public partial class ComboDialogViewModel : ObservableObject, IBoardSurface
             .GroupBy(macro => macro.Name, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
 
-        // Picker-style board: fixed press palette, nothing persisted.
-        BoardLayout = new BoardLayoutViewModel(request.Profile);
-        BoardStyle = new BoardStyleViewModel(
+        // Picker-style board: fixed press palette, nothing persisted, legend
+        // always on. Labels, fill and combo pills are set by RefreshBoard below.
+        var style = new BoardStyleViewModel(
             AppTheme.PressHighlightDefaultHex,
             strokeOverride: AppTheme.PickerPressStrokeHex);
-        ComboLegend = new ComboLegendViewModel(Keys, BoardStyle, overlayVisible: true, profileId: () => "");
-
-        foreach (var pos in request.Profile.Keys)
+        Board = new BoardSurfaceViewModel(
+            request.Profile, new BoardLayoutViewModel(request.Profile), style,
+            keys => new ComboLegendViewModel(keys, style, overlayVisible: true, profileId: () => ""),
+            pos => new KeyViewModel(pos) { KeyFillColor = DefaultFill })
         {
-            // Labels, fill and combo pills are set by RefreshBoard below.
-            var vm = new KeyViewModel(pos) { KeyFillColor = DefaultFill };
-            Keys.Add(vm);
-            (pos.Hand == Hand.Left ? LeftKeys : RightKeys).Add(vm);
-        }
+            OnKeyTapped = ToggleKey,
+        };
 
         var layers = new List<LayerChoice>(_config.Layers.Count);
         for (var i = 0; i < _config.Layers.Count; i++)
@@ -167,7 +165,7 @@ public partial class ComboDialogViewModel : ObservableObject, IBoardSurface
             _nodeName = Identity(editedCombo);
             _isNameAuto = false;
             foreach (var key in editedCombo.KeyPositions)
-                if (key >= 0 && key < Keys.Count && !_selected.Contains(key))
+                if (key >= 0 && key < Board.Keys.Count && !_selected.Contains(key))
                     _selected.Add(key);
         }
         else
@@ -183,20 +181,10 @@ public partial class ComboDialogViewModel : ObservableObject, IBoardSurface
 
     // ─── Board ────────────────────────────────────────────────────────────
 
-    public ObservableCollection<KeyViewModel> Keys { get; } = new();
-    public ObservableCollection<KeyViewModel> LeftKeys { get; } = new();
-    public ObservableCollection<KeyViewModel> RightKeys { get; } = new();
-
-    public BoardLayoutViewModel BoardLayout { get; }
-    public BoardStyleViewModel BoardStyle { get; }
-
-    /// <summary>Always on — the picked keys' badges are the point of showing
-    /// the board here.</summary>
-    public ComboLegendViewModel ComboLegend { get; }
-
-    public Action<int>? OnKeyTapped => ToggleKey;
-    public Action<int>? OnKeyDoubleTapped => null;
-    public Action<int>? OnKeyRightTapped => null;
+    /// <summary>The board <c>BoardView</c> renders; a tap on a cap toggles it
+    /// as a trigger key. Its legend is always on — the picked keys' badges are
+    /// the point of showing the board here.</summary>
+    public BoardSurfaceViewModel Board { get; }
 
     // ─── Trigger keys ─────────────────────────────────────────────────────
 
@@ -407,9 +395,9 @@ public partial class ComboDialogViewModel : ObservableObject, IBoardSurface
     private void RefreshBadges()
     {
         string LabelLookup(int index) =>
-            index >= 0 && index < Keys.Count ? Keys[index].Label : "";
+            index >= 0 && index < Board.Keys.Count ? Board.Keys[index].Label : "";
 
-        for (var i = 0; i < Keys.Count; i++)
+        for (var i = 0; i < Board.Keys.Count; i++)
         {
             var combos = new List<ZmkCombo>();
             var numbers = new List<int>();
@@ -420,7 +408,7 @@ public partial class ComboDialogViewModel : ObservableObject, IBoardSurface
                 numbers.Add(_otherNumbers[c]);
             }
 
-            Keys[i].SetCombos(combos, numbers, LabelLookup);
+            Board.Keys[i].SetCombos(combos, numbers, LabelLookup);
         }
     }
 
@@ -430,7 +418,7 @@ public partial class ComboDialogViewModel : ObservableObject, IBoardSurface
     private void RefreshKeyLabels()
     {
         var bindings = _config.Layers[LabelLayer.Index].Bindings;
-        foreach (var key in Keys)
+        foreach (var key in Board.Keys)
         {
             var index = key.Position.Index;
             var binding = index >= 0 && index < bindings.Count ? bindings[index] : KeyBinding.None;
@@ -476,13 +464,13 @@ public partial class ComboDialogViewModel : ObservableObject, IBoardSurface
 
     private void RefreshKeyFills()
     {
-        for (var i = 0; i < Keys.Count; i++)
-            Keys[i].KeyFillColor = _selected.Contains(i) ? SelectedFill : DefaultFill;
+        for (var i = 0; i < Board.Keys.Count; i++)
+            Board.Keys[i].KeyFillColor = _selected.Contains(i) ? SelectedFill : DefaultFill;
     }
 
     private void ToggleKey(int index)
     {
-        if (index < 0 || index >= Keys.Count) return;
+        if (index < 0 || index >= Board.Keys.Count) return;
         if (!_selected.Remove(index)) _selected.Add(index);
         RefreshKeyFills();
         RefreshDerived();
@@ -495,7 +483,7 @@ public partial class ComboDialogViewModel : ObservableObject, IBoardSurface
     {
         SelectedKeys = _selected.ToArray();
         KeysSummary = string.Join(" + ", _selected.Select(index =>
-            Keys[index].Label is { Length: > 0 } label ? label : $"#{index}"));
+            Board.Keys[index].Label is { Length: > 0 } label ? label : $"#{index}"));
         OnPropertyChanged(nameof(SelectedKeys));
         OnPropertyChanged(nameof(KeysSummary));
     }

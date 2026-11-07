@@ -14,7 +14,7 @@ public class BackgroundOpacityTests
     }
 
     private static MainWindowViewModel NewVm(double opacity) =>
-        new(new InMemorySettingsService { Current = new UserSettings { BackgroundOpacity = opacity } });
+        TestMainVm.Create(new InMemorySettingsService { Current = new UserSettings { BackgroundOpacity = opacity } });
 
     [Theory]
     [InlineData(0.0, "#18182500")]
@@ -39,7 +39,7 @@ public class BackgroundOpacityTests
     public void SettingChange_PersistsToSettingsService()
     {
         var settings = new InMemorySettingsService();
-        var vm = new MainWindowViewModel(settings);
+        var vm = TestMainVm.Create(settings);
         vm.Preferences.BackgroundOpacity = 0.25;
         Assert.Equal(0.25, settings.Current.BackgroundOpacity);
     }

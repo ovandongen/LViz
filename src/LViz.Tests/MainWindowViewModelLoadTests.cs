@@ -81,7 +81,7 @@ public class MainWindowViewModelLoadTests
         var settings = new InMemorySettingsService();
         var failing = new FakeKeymapStateService(
             new KeymapLoadResult.Failure("bad.keymap", new InvalidOperationException("boom")));
-        var vm = new MainWindowViewModel(settings, keymapState: failing);
+        var vm = TestMainVm.Create(settings, keymapState: failing);
 
         var profileBefore = vm.SelectedKeyboard;
         vm.LoadLayoutFromPath("bad.keymap");
@@ -99,7 +99,7 @@ public class MainWindowViewModelLoadTests
         // Binding count matches Corne (42) → no auto-switch, stays put.
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
-        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        var vm = TestMainVm.Create(settings, keymapState: ok);
 
         vm.LoadLayoutFromPath("ok.keymap");
 
@@ -115,7 +115,7 @@ public class MainWindowViewModelLoadTests
         // 80 bindings matches the Glove80 profile → the load should auto-switch.
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "glove.keymap", LayerCount: 2, FirstLayerBindingCount: 80));
-        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        var vm = TestMainVm.Create(settings, keymapState: ok);
         Assert.Equal("Corne", vm.SelectedKeyboard.Id);
 
         vm.LoadLayoutFromPath("glove.keymap");
@@ -143,7 +143,7 @@ public class MainWindowViewModelLoadTests
         };
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "glove.keymap", LayerCount: 2, FirstLayerBindingCount: 80));
-        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        var vm = TestMainVm.Create(settings, keymapState: ok);
         Assert.Equal("Corne-app", Assert.Single(vm.AutoSwitch.AppLayerRules).ProcessMatch);
 
         vm.LoadLayoutFromPath("glove.keymap");
@@ -158,7 +158,7 @@ public class MainWindowViewModelLoadTests
         var settings = new InMemorySettingsService();
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "first.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
-        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        var vm = TestMainVm.Create(settings, keymapState: ok);
 
         vm.LoadLayoutFromPath("first.keymap");
 
@@ -173,7 +173,7 @@ public class MainWindowViewModelLoadTests
         // 80 bindings matches the Glove80 profile → the load auto-switches.
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "glove.keymap", LayerCount: 2, FirstLayerBindingCount: 80));
-        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        var vm = TestMainVm.Create(settings, keymapState: ok);
 
         vm.LoadLayoutFromPath("glove.keymap");
 
@@ -191,7 +191,7 @@ public class MainWindowViewModelLoadTests
         // Sofle and GO60 both have 60 keys; with a Go60 plugged in, an
         // explicit open from the 42-key Corne lands on GO60, not Sofle.
         var settings = new InMemorySettingsService();
-        var vm = new MainWindowViewModel(settings, keymapState: SixtyKeymap("go60.keymap"));
+        var vm = TestMainVm.Create(settings, keymapState: SixtyKeymap("go60.keymap"));
         vm.Devices.AttachedHidNames = () => ["Go60 Left"];
 
         vm.LoadLayoutFromPath("go60.keymap");
@@ -205,7 +205,7 @@ public class MainWindowViewModelLoadTests
     public void LoadLayoutFromPath_AutoSwitch_SameKeyCount_NothingAttached_KeepsRegistryOrder()
     {
         var settings = new InMemorySettingsService();
-        var vm = new MainWindowViewModel(settings, keymapState: SixtyKeymap("go60.keymap"));
+        var vm = TestMainVm.Create(settings, keymapState: SixtyKeymap("go60.keymap"));
         vm.Devices.AttachedHidNames = () => [];
 
         vm.LoadLayoutFromPath("go60.keymap");
@@ -240,7 +240,7 @@ public class MainWindowViewModelLoadTests
     {
         var settings = BookedOnGo60("slab.keymap");
         var fake = SlabKeymap("slab.keymap");
-        var vm = new MainWindowViewModel(settings, keymapState: fake);
+        var vm = TestMainVm.Create(settings, keymapState: fake);
 
         vm.LoadLayoutFromPath("slab.keymap", keepBoard: true);
 
@@ -267,7 +267,7 @@ public class MainWindowViewModelLoadTests
         // unbooking would drop the wrong entry.
         var settings = BookedOnGo60("other.keymap");
         var fake = SlabKeymap("slab.keymap");
-        var vm = new MainWindowViewModel(settings, keymapState: fake);
+        var vm = TestMainVm.Create(settings, keymapState: fake);
 
         vm.LoadLayoutFromPath("slab.keymap", keepBoard: true);
 
@@ -285,7 +285,7 @@ public class MainWindowViewModelLoadTests
         };
         var fake = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
-        var vm = new MainWindowViewModel(settings, keymapState: fake);
+        var vm = TestMainVm.Create(settings, keymapState: fake);
 
         vm.LoadLayoutFromPath("ok.keymap", keepBoard: true);
 
@@ -308,7 +308,7 @@ public class MainWindowViewModelLoadTests
         };
         var fake = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "huge.keymap", LayerCount: 2, FirstLayerBindingCount: 12345));
-        var vm = new MainWindowViewModel(settings, keymapState: fake);
+        var vm = TestMainVm.Create(settings, keymapState: fake);
 
         vm.LoadLayoutFromPath("huge.keymap", keepBoard: true);
 
@@ -328,7 +328,7 @@ public class MainWindowViewModelLoadTests
         {
             var settings = BookedOnGo60(path);
             var fake = SlabKeymap(path);
-            var vm = new MainWindowViewModel(settings, keymapState: fake);
+            var vm = TestMainVm.Create(settings, keymapState: fake);
 
             vm.RefreshCommand.Execute(null);
 
@@ -359,7 +359,7 @@ public class MainWindowViewModelLoadTests
         };
         var failing = new FakeKeymapStateService(
             new KeymapLoadResult.Failure("gone.keymap", new InvalidOperationException("boom")));
-        var vm = new MainWindowViewModel(settings, keymapState: failing);
+        var vm = TestMainVm.Create(settings, keymapState: failing);
 
         vm.LoadLayoutFromPath("gone.keymap");
 
@@ -373,7 +373,7 @@ public class MainWindowViewModelLoadTests
         var settings = new InMemorySettingsService();
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
-        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        var vm = TestMainVm.Create(settings, keymapState: ok);
 
         var raised = new List<string?>();
         vm.Recents.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
@@ -388,7 +388,7 @@ public class MainWindowViewModelLoadTests
         var settings = new InMemorySettingsService();
         var failing = new FakeKeymapStateService(
             new KeymapLoadResult.Failure("bad.keymap", new InvalidOperationException("boom")));
-        var vm = new MainWindowViewModel(settings, keymapState: failing);
+        var vm = TestMainVm.Create(settings, keymapState: failing);
 
         var raised = new List<string?>();
         vm.Recents.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
@@ -403,7 +403,7 @@ public class MainWindowViewModelLoadTests
         var settings = new InMemorySettingsService();
         var failing = new FakeKeymapStateService(
             new KeymapLoadResult.Failure("bad.keymap", new InvalidOperationException("boom")));
-        var vm = new MainWindowViewModel(settings, keymapState: failing);
+        var vm = TestMainVm.Create(settings, keymapState: failing);
         var original = settings.Current;
 
         vm.LoadLayoutFromPath("bad.keymap");
@@ -418,7 +418,7 @@ public class MainWindowViewModelLoadTests
         var settings = new InMemorySettingsService();
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
-        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        var vm = TestMainVm.Create(settings, keymapState: ok);
         var glove80 = KeyboardProfileRegistry.All.First(p => p.Id == "Glove80");
 
         var raised = new List<string?>();
@@ -447,10 +447,7 @@ public class MainWindowViewModelLoadTests
         };
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "one.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
-        var vm = new MainWindowViewModel(settings, keymapState: ok)
-        {
-            Library = { FileExists = p => p != "/keymaps/gone.keymap" },
-        };
+        var vm = TestMainVm.Create(settings, keymapState: ok, fileExists: p => p != "/keymaps/gone.keymap");
 
         vm.LoadLayoutFromPath("/keymaps/one.keymap");
 
@@ -477,7 +474,7 @@ public class MainWindowViewModelLoadTests
         var settings = new InMemorySettingsService();
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
-        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        var vm = TestMainVm.Create(settings, keymapState: ok);
 
         Assert.False(vm.Recents.HasAny);
 
@@ -501,7 +498,7 @@ public class MainWindowViewModelLoadTests
         };
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "second.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
-        var vm = new MainWindowViewModel(settings, keymapState: ok) { Library = { FileExists = _ => true } };
+        var vm = TestMainVm.Create(settings, keymapState: ok, fileExists: _ => true);
 
         var target = vm.Recents.Items.First(i => i.Path == "/keymaps/second.keymap");
         vm.Recents.OpenCommand.Execute(target);
@@ -528,10 +525,7 @@ public class MainWindowViewModelLoadTests
         };
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "kept.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
-        var vm = new MainWindowViewModel(settings, keymapState: ok)
-        {
-            Library = { FileExists = p => p == "/keymaps/kept.keymap" },
-        };
+        var vm = TestMainVm.Create(settings, keymapState: ok, fileExists: p => p == "/keymaps/kept.keymap");
 
         var target = vm.Recents.Items.First(i => i.Path == "/keymaps/gone.keymap");
         vm.Recents.OpenCommand.Execute(target);
@@ -563,7 +557,7 @@ public class MainWindowViewModelLoadTests
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "one.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
         // Nothing exists — a null click must not fall through to the prune path.
-        var vm = new MainWindowViewModel(settings, keymapState: ok) { Library = { FileExists = _ => false } };
+        var vm = TestMainVm.Create(settings, keymapState: ok, fileExists: _ => false);
         var savesBefore = settings.SaveCount;
 
         vm.Recents.OpenCommand.Execute(null);
@@ -589,7 +583,7 @@ public class MainWindowViewModelLoadTests
         };
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
-        var vm = new MainWindowViewModel(settings, keymapState: ok) { Library = { FileExists = _ => true } };
+        var vm = TestMainVm.Create(settings, keymapState: ok, fileExists: _ => true);
 
         vm.Recents.ClearCommand.Execute(null);
 
@@ -605,7 +599,7 @@ public class MainWindowViewModelLoadTests
         var settings = new InMemorySettingsService();
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
-        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        var vm = TestMainVm.Create(settings, keymapState: ok);
         var savesBefore = settings.SaveCount;
         var currentBefore = settings.Current;
 
@@ -621,7 +615,7 @@ public class MainWindowViewModelLoadTests
         var settings = new InMemorySettingsService();
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
-        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        var vm = TestMainVm.Create(settings, keymapState: ok);
 
         var raised = new List<string?>();
         vm.Recents.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
@@ -638,7 +632,7 @@ public class MainWindowViewModelLoadTests
         var settings = new InMemorySettingsService();
         var failing = new FakeKeymapStateService(
             new KeymapLoadResult.Failure("bad.keymap", new InvalidOperationException("boom")));
-        var vm = new MainWindowViewModel(settings, keymapState: failing);
+        var vm = TestMainVm.Create(settings, keymapState: failing);
 
         var raised = new List<string?>();
         vm.Recents.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
@@ -665,7 +659,7 @@ public class MainWindowViewModelLoadTests
         };
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
-        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        var vm = TestMainVm.Create(settings, keymapState: ok);
 
         vm.LoadLayoutFromPath("ok.keymap");
 
@@ -682,7 +676,7 @@ public class MainWindowViewModelLoadTests
         var settings = new InMemorySettingsService();
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
-        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        var vm = TestMainVm.Create(settings, keymapState: ok);
         vm.LoadLayoutFromPath("ok.keymap");
 
         vm.LayerTabs.SetShown(1, false);
@@ -702,7 +696,7 @@ public class MainWindowViewModelLoadTests
         var settings = new InMemorySettingsService();
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
-        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        var vm = TestMainVm.Create(settings, keymapState: ok);
         vm.LoadLayoutFromPath("ok.keymap");
 
         vm.LayerTabs.SetShown(0, false);
@@ -753,7 +747,7 @@ public class MainWindowViewModelLoadTests
                 },
             };
             var ok = SixtyKeymap(path);
-            var vm = new MainWindowViewModel(settings, keymapState: ok);
+            var vm = TestMainVm.Create(settings, keymapState: ok);
             vm.LoadLayoutFromPath(path);
             Assert.Equal("Sofle", vm.SelectedKeyboard.Id);
             Assert.False(vm.LayerTabs.Layers[1].IsShown);
@@ -776,7 +770,7 @@ public class MainWindowViewModelLoadTests
         // with nothing booked for GO60 the picked board shows bare.
         var settings = new InMemorySettingsService();
         var ok = SixtyKeymap("sixty.keymap");
-        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        var vm = TestMainVm.Create(settings, keymapState: ok);
         vm.LoadLayoutFromPath("sixty.keymap");
         Assert.Equal("Sofle", vm.SelectedKeyboard.Id);
 
@@ -809,7 +803,7 @@ public class MainWindowViewModelLoadTests
                 },
             };
             var fake = SlabKeymap(path);
-            var vm = new MainWindowViewModel(settings, keymapState: fake);
+            var vm = TestMainVm.Create(settings, keymapState: fake);
 
             vm.SelectKeyboardCommand.Execute(KeyboardProfileRegistry.All.First(p => p.Id == "GO60"));
 
@@ -843,7 +837,7 @@ public class MainWindowViewModelLoadTests
                 },
             };
             var ok = SixtyKeymap(path);
-            var vm = new MainWindowViewModel(settings, keymapState: ok);
+            var vm = TestMainVm.Create(settings, keymapState: ok);
 
             vm.SelectKeyboardCommand.Execute(KeyboardProfileRegistry.All.First(p => p.Id == "GO60"));
 
@@ -862,7 +856,7 @@ public class MainWindowViewModelLoadTests
         var settings = new InMemorySettingsService();
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
-        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        var vm = TestMainVm.Create(settings, keymapState: ok);
         vm.LoadLayoutFromPath("ok.keymap");
         var settingsVm = new SettingsViewModel(settings, vm, new UpdateService(settings));
 

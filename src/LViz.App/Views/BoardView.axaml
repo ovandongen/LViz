@@ -6,7 +6,7 @@
              xmlns:i="https://github.com/projektanker/icons.avalonia"
              x:Class="LViz.App.Views.BoardView"
              x:Name="Board"
-             x:DataType="vm:IBoardSurface">
+             x:DataType="vm:BoardSurfaceViewModel">
 
     <UserControl.Resources>
         <!-- All brushes (KeyStroke, ComboFill, ComboStroke) live in App.axaml
@@ -200,7 +200,7 @@
     <Viewbox Stretch="Uniform" StretchDirection="Both" ClipToBounds="False">
         <Canvas Width="{Binding BoardLayout.CanvasWidth}" Height="{Binding BoardLayout.CanvasHeight}"
                 Background="Transparent" ClipToBounds="False">
-            <ItemsControl ItemsSource="{Binding LeftKeys}"
+            <ItemsControl Classes="keys" ItemsSource="{Binding LeftKeys}"
                           Width="{Binding BoardLayout.BoardSurfaceWidth}"
                           Height="{Binding BoardLayout.BoardSurfaceHeight}"
                           Canvas.Left="{Binding BoardLayout.LeftHandX}"
@@ -213,7 +213,9 @@
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.Styles>
-                    <Style Selector="ContentPresenter">
+                    <!-- Only this list's key containers: a bare ContentPresenter also
+                         matched the nested combo-badge presenters (no Position). -->
+                    <Style Selector="ItemsControl.keys > ContentPresenter">
                         <Setter Property="Canvas.Left" Value="{Binding Position.X}" />
                         <Setter Property="Canvas.Top" Value="{Binding Position.Y}" />
                     </Style>
@@ -258,7 +260,7 @@
                 </ItemsControl.Styles>
             </ItemsControl>
 
-            <ItemsControl ItemsSource="{Binding RightKeys}"
+            <ItemsControl Classes="keys" ItemsSource="{Binding RightKeys}"
                           Width="{Binding BoardLayout.BoardSurfaceWidth}"
                           Height="{Binding BoardLayout.BoardSurfaceHeight}"
                           Canvas.Left="{Binding BoardLayout.RightHandX}"
@@ -271,7 +273,9 @@
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.Styles>
-                    <Style Selector="ContentPresenter">
+                    <!-- Only this list's key containers: a bare ContentPresenter also
+                         matched the nested combo-badge presenters (no Position). -->
+                    <Style Selector="ItemsControl.keys > ContentPresenter">
                         <Setter Property="Canvas.Left" Value="{Binding Position.X}" />
                         <Setter Property="Canvas.Top" Value="{Binding Position.Y}" />
                     </Style>

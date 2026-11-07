@@ -311,9 +311,9 @@
 
                         <!-- Stacked / horizontal layout toggle -->
                         <Button x:Name="StackedLayoutButton"
-                                Command="{Binding BoardLayout.ToggleStackedLayoutCommand}"
+                                Command="{Binding Board.BoardLayout.ToggleStackedLayoutCommand}"
                                 Classes="toggle"
-                                Classes.active="{Binding BoardLayout.IsStackedLayout}"
+                                Classes.active="{Binding Board.BoardLayout.IsStackedLayout}"
                                 Padding="8,4"
                                 ToolTip.Tip="{Binding [Tooltip_StackedLayout], Source={StaticResource Loc}}">
                             <PathIcon Width="14" Height="14"
@@ -323,9 +323,9 @@
                         <!-- Combo overlay toggle — numbered badges on combo
                              keys + legend tiles below the keyboard. -->
                         <Button x:Name="ComboOverlayButton"
-                                Command="{Binding ComboLegend.ToggleOverlayCommand}"
+                                Command="{Binding Board.ComboLegend.ToggleOverlayCommand}"
                                 Classes="toggle"
-                                Classes.active="{Binding ComboLegend.IsOverlayVisible}"
+                                Classes.active="{Binding Board.ComboLegend.IsOverlayVisible}"
                                 Padding="8,4"
                                 ToolTip.Tip="{Binding [Tooltip_ComboOverlay], Source={StaticResource Loc}}">
                             <PathIcon Width="14" Height="14"
@@ -490,10 +490,10 @@
                  OR an open edit, so the row also collapses cleanly when both
                  are off. Row placement and background stay here. -->
             <Border x:Name="ComboLegend" Grid.Row="3"
-                    IsVisible="{Binding ComboLegend.IsLegendVisible}"
+                    IsVisible="{Binding Board.ComboLegend.IsLegendVisible}"
                     Background="{Binding Preferences.TabBackground, Converter={StaticResource HexToBrush}}"
                     Padding="8,4">
-                <views:ComboLegendView DataContext="{Binding ComboLegend}" />
+                <views:ComboLegendView DataContext="{Binding Board.ComboLegend}" />
             </Border>
 
             <!-- Layer tabs -->
@@ -507,7 +507,7 @@
         <!-- Board visualization area -->
         <Border Grid.Row="1" Padding="16"
                 Background="{Binding Preferences.BoardBackground, Converter={StaticResource HexToBrush}}">
-            <views:BoardView DataContext="{Binding}" />
+            <views:BoardView DataContext="{Binding Board}" />
         </Border>
 
         <!-- Transient error toast: fades in/out via Opacity transition.

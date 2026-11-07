@@ -48,15 +48,11 @@ public class SettingsViewModelMainPropertyCoverageTests
         // observable state without a MainVM facade).
         "AutoSwitch",
 
-        // Board geometry + press-style child VMs, exposed directly. BoardLayout
-        // is bound in XAML; BoardStyle changes propagate via SettingsVM's
-        // BoardStyle.PropertyChanged subscription (not a MainVM facade).
-        "BoardLayout",
-        "BoardStyle",
-
-        // The combo legend child VM (overlay toggle, tiles, label overrides),
-        // exposed directly; the main window binds it, Settings never shows it.
-        "ComboLegend",
+        // The board surface (keys, geometry, press style, combo legend, key
+        // callbacks), exposed directly. Geometry is bound in XAML; BoardStyle
+        // changes propagate via SettingsVM's Board.BoardStyle.PropertyChanged
+        // subscription (not a MainVM facade). Settings never shows the legend.
+        "Board",
 
         // The layer tab strip, exposed directly (Settings reads its tabs for the
         // Layers/Testing/rule pickers and rebuilds on its collection events).
