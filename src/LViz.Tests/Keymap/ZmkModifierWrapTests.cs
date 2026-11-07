@@ -111,4 +111,28 @@ public class ZmkModifierWrapTests
         Assert.Throws<ArgumentException>(
             () => ZmkModifierWrap.FunctionFor(ZmkModifiers.None));
     }
+
+    [Theory]
+    [InlineData("LC")]
+    [InlineData("LS")]
+    [InlineData("LA")]
+    [InlineData("LG")]
+    [InlineData("RC")]
+    [InlineData("RS")]
+    [InlineData("RA")]
+    [InlineData("RG")]
+    public void IsModifierFunction_EightFunctions_True(string token)
+    {
+        Assert.True(ZmkModifierWrap.IsModifierFunction(token));
+    }
+
+    [Theory]
+    [InlineData("LSHFT")]
+    [InlineData("ls")]
+    [InlineData("")]
+    [InlineData("A")]
+    public void IsModifierFunction_OtherTokens_False(string token)
+    {
+        Assert.False(ZmkModifierWrap.IsModifierFunction(token));
+    }
 }

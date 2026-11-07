@@ -753,6 +753,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         // keyboard as an adapter over _hid's already-open handle plus the bus's
         // other devices. Constructed eagerly; opens nothing until Start().
         _deviceBus = new RawHidDeviceBus(_hid.KeyboardMatcher, () => _hid.OpenDevicePath);
+        AttachedHidNames = () => _deviceBus.Devices.Select(d => d.DisplayName).ToList();
         _router = new CapabilityRouter(
             new KeyboardCapabilityDevice(_hid),
             _deviceBus,
@@ -825,7 +826,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             if (entries.TryGetValue(_profile.Id, out var entry) && !string.IsNullOrEmpty(entry))
             {
                 if (TryResolveEntry(entry, out var path))
-                    LoadLayoutFromPath(path, entry);
+                    LoadLayoutFromPath(path, entry, keepBoard: true);
                 PendingGitHubCheck = CheckGitHubForUpdateAsync(entry);
             }
         });
@@ -878,7 +879,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         var s = _settingsService.Load();
         if (TryGetStoredPathForProfile(s, _profile.Id, out var storedPath, out var storedEntry))
         {
-            LoadLayoutFromPath(storedPath, storedEntry);
+            // The board's own booked keymap: loading it must not move the board.
+            LoadLayoutFromPath(storedPath, storedEntry, keepBoard: true);
         }
         else
         {
@@ -898,8 +900,14 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// the entry stays the <see cref="GitHubKeymapRef"/> string, so recents
     /// and the per-profile last-used slot keep storing the reference, not a
     /// cache path the cache layer may move or wipe.
+    /// <c>keepBoard</c> is true for a board's <em>booked</em> keymap — the one
+    /// LViz loads by itself for the board that is already showing (startup,
+    /// Refresh, the background GitHub check, a board switch's auto-load). Such
+    /// a load must never switch the board: a booked keymap that doesn't fit
+    /// its board is dropped instead of jumping to the board whose key count
+    /// matches. Every explicit load the user picks keeps the auto-switch.
     /// </summary>
-    public void LoadLayoutFromPath(string path, string? entry = null)
+    public void LoadLayoutFromPath(string path, string? entry = null, bool keepBoard = false)
     {
         if (IsEditing)
         {
@@ -941,10 +949,17 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
         var bindingCount = loaded.FirstLayerBindingCount;
         var keyCountMismatch = loaded.LayerCount > 0 && bindingCount != _profile.KeyCount;
+        // A booked keymap belongs to the board that is already showing — it
+        // never gets to move the board elsewhere.
+        if (keyCountMismatch && keepBoard)
+        {
+            DropBookedKeymap(path, entry, bindingCount);
+            return;
+        }
         IKeyboardProfile? autoSwitchedTo = null;
         if (keyCountMismatch)
         {
-            var matching = KeyboardProfileRegistry.FindByKeyCount(bindingCount);
+            var matching = KeyboardProfileRegistry.FindByKeyCount(bindingCount, AttachedHidNames());
             if (matching is not null)
             {
                 _profile = matching;
@@ -997,6 +1012,74 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         // The edit button tracks the loaded file: enabled for a fresh .keymap,
         // tooltip wording per extension. HasLayoutLoaded may not have flipped,
         // so raise explicitly on every successful load.
+        OnPropertyChanged(nameof(CanStartEdit));
+        OnPropertyChanged(nameof(EditButtonTooltip));
+        StartEditCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Product names of the Raw HID keyboards plugged in, used to break a
+    /// key-count tie in the auto-switch (Sofle and GO60 both have 60 keys).
+    /// The capability bus enumerates every Raw HID device except the one the
+    /// shown board matches, and the shown board is never the auto-switch
+    /// target, so its list is enough. Empty while the HID stack is off.
+    /// Tests replace it.
+    /// </summary>
+    internal Func<IReadOnlyCollection<string>> AttachedHidNames { get; set; }
+
+    /// <summary>
+    /// Tabs, layer state and load flags back to a bare board. Shared by the
+    /// two paths that unload a keymap (<see cref="DropBookedKeymap"/> and
+    /// <see cref="SwitchBoard"/>'s unload branch); each sets its own status
+    /// message afterwards.
+    /// </summary>
+    private void ClearLoadedKeymap()
+    {
+        _keymap.Clear();
+        _loadedEntry = null;
+        Layers.Clear();
+        ActiveLayerIndex = 0;
+        HasLayoutLoaded = false;
+        HasUnmatchedKeymap = false;
+    }
+
+    /// <summary>
+    /// A booked keymap that doesn't fit its board (<see cref="LoadLayoutFromPath"/>
+    /// with <c>keepBoard</c>): the keymap is unloaded, the board stays put and
+    /// the board's booking is dropped, so neither this session nor the next
+    /// startup keeps offering a keymap that can't be shown. The board's recents
+    /// list keeps the entry — the user can still open it by hand, where the
+    /// auto-switch is allowed.
+    /// </summary>
+    private void DropBookedKeymap(string path, string entry, int bindingCount)
+    {
+        ClearLoadedKeymap();
+
+        // Only this load's own entry is unbooked; a booking that already points
+        // somewhere else belongs to another keymap. No write when there is
+        // nothing to remove.
+        if (_settingsService.Load().LayoutJsonPaths.TryGetValue(_profile.Id, out var stored)
+            && string.Equals(stored, entry, StringComparison.Ordinal))
+        {
+            PersistSetting(s =>
+            {
+                if (!s.LayoutJsonPaths.TryGetValue(_profile.Id, out var current)
+                    || !string.Equals(current, entry, StringComparison.Ordinal))
+                    return s;
+                var paths = new Dictionary<string, string>(s.LayoutJsonPaths);
+                paths.Remove(_profile.Id);
+                return s with { LayoutJsonPaths = paths };
+            });
+        }
+
+        SetLoadStatusBase(null);
+        StatusMessage = Loc.Instance.Format(
+            "Status_BookedKeymapDoesNotFitFormat",
+            Path.GetFileName(path), bindingCount, _profile.DisplayName, _profile.KeyCount);
+        DiagnosticLog.Info("MainVM",
+            $"Booked keymap '{path}' has {bindingCount} keys but {_profile.Id} has {_profile.KeyCount}: kept the board, dropped the booking");
+
+        // The board is bare now, so the edit button has to notice.
         OnPropertyChanged(nameof(CanStartEdit));
         OnPropertyChanged(nameof(EditButtonTooltip));
         StartEditCommand.NotifyCanExecuteChanged();
@@ -1204,7 +1287,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             DiagnosticLog.Info("MainVM", wasLoaded
                 ? $"'{keymap}' changed on GitHub, reloading"
                 : $"'{keymap}' fetched from GitHub (no cached copy)");
-            LoadLayoutFromPath(path, entry);
+            LoadLayoutFromPath(path, entry, keepBoard: true);
             if (wasLoaded)
                 Toast.Show(Loc.Instance.Format("Toast_GitHubUpdatedFormat", keymap.FileName));
         }
@@ -2151,7 +2234,24 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         BoardLayout.SetProfile(_profile);
     }
 
-    private void SelectKeyboard(IKeyboardProfile? profile)
+    /// <summary>
+    /// A board the user picked (toolbar flyout, Settings picker): the picked
+    /// board always wins. A keymap opened for another board is unloaded even
+    /// when its key count happens to fit the picked one — the board then
+    /// shows the keymap booked for it, or nothing.
+    /// </summary>
+    private void SelectKeyboard(IKeyboardProfile? profile) => SwitchBoard(profile, keepFittingKeymap: false);
+
+    /// <summary>
+    /// Switches the shown board to <paramref name="profile"/>: rebuilds the
+    /// keys, re-scopes the layer push, HID and the capability bus, persists
+    /// the id. The open keymap is kept only when
+    /// <paramref name="keepFittingKeymap"/> (the wizard path, which books the
+    /// open keymap for the new board right after) and it fits the new board's
+    /// key count; otherwise it is unloaded. A board left without a keymap
+    /// then loads the entry booked for it.
+    /// </summary>
+    private void SwitchBoard(IKeyboardProfile? profile, bool keepFittingKeymap)
     {
         if (IsEditing)
         {
@@ -2171,15 +2271,13 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         var layoutFits = km is not null
             && km.LayerCount > 0
             && km.Layers[0].Bindings.Count == profile.KeyCount;
+        // A picked board never wears another board's keymap just because the
+        // key counts match; only the wizard path may keep a fitting one.
+        var keepKeymap = keepFittingKeymap && layoutFits;
 
-        if (km is not null && !layoutFits)
+        if (km is not null && !keepKeymap)
         {
-            _keymap.Clear();
-            _loadedEntry = null;
-            Layers.Clear();
-            ActiveLayerIndex = 0;
-            HasLayoutLoaded = false;
-            HasUnmatchedKeymap = false;
+            ClearLoadedKeymap();
             SetLoadStatusBase(null);
             StatusMessage = Loc.Instance.Format("Status_KeyboardSwitchedUnloaded", profile.DisplayName);
         }
@@ -2196,7 +2294,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         else
         {
             SetLoadStatusBase(null);
-            StatusMessage = Loc.Instance.Format("Status_KeyboardSwitched", profile.DisplayName);
+            StatusMessage = Loc.Instance.Format("Status_KeyboardSwitchedUnloaded", profile.DisplayName);
         }
 
         PersistSetting(s => s with { Keyboard = profile.Id });
@@ -2218,11 +2316,11 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
         // Auto-load whichever entry the user last associated with this
         // keyboard (local path or GitHub reference — resolved via cache).
-        // If the previously-loaded layout already fits, leave it alone.
+        // Only a keymap kept through the wizard path skips this.
         if (!HasLayoutLoaded)
         {
             if (TryGetStoredPathForProfile(_settingsService.Load(), profile.Id, out var storedPath, out var storedEntry))
-                LoadLayoutFromPath(storedPath, storedEntry);
+                LoadLayoutFromPath(storedPath, storedEntry, keepBoard: true);
             PendingGitHubCheck = CheckGitHubForUpdateAsync(storedEntry);
         }
     }
@@ -2300,7 +2398,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     {
         if (!string.Equals(profile.Id, _profile.Id, StringComparison.OrdinalIgnoreCase))
         {
-            SelectKeyboard(profile);
+            // The wizard/editor path built the new board around the open
+            // keymap, so a fitting keymap rides along for the re-booking.
+            SwitchBoard(profile, keepFittingKeymap: true);
             return;
         }
 

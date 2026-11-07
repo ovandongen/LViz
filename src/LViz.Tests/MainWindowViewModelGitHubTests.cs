@@ -447,6 +447,44 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
     }
 
     [Fact]
+    public async Task InitializeAsync_BookedGitHubKeymapDoesNotFit_StaysOnBoard()
+    {
+        // GO60 with a 42-key keymap booked as its GitHub keymap: neither the
+        // startup load nor the background check may jump to the 42-key board.
+        var settings = StartupSettings();
+        settings.Current = settings.Current with
+        {
+            Keyboard = "GO60",
+            LayoutJsonPaths = new Dictionary<string, string> { ["GO60"] = TestRefString },
+            RecentKeymapPaths = new Dictionary<string, List<string>> { ["GO60"] = new() { TestRefString } },
+        };
+        var cached = TempKeymapFile();
+        var fake = new FakeGitHubKeymapService
+        {
+            IsSignedIn = true,
+            OnLocalPathFor = _ => cached,
+            OnFetchRepo = (_, _, _) => Task.FromResult(new GitHubCacheResult("folder", "sha", Downloaded: false)),
+        };
+        var keymapState = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "gh.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
+        var vm = new MainWindowViewModel(settings, keymapState: keymapState, gitHub: fake);
+
+        vm.InitializeAsync();
+        await vm.PendingGitHubCheck!;
+
+        // Startup loaded it once, the background check loaded it again — both
+        // refused to move the board.
+        Assert.Equal(2, keymapState.LoadCallCount);
+        Assert.Equal("GO60", vm.SelectedKeyboard.Id);
+        Assert.Equal("GO60", settings.Current.Keyboard);
+        Assert.False(vm.HasLayoutLoaded);
+        Assert.Empty(vm.Layers);
+        Assert.False(settings.Current.LayoutJsonPaths.ContainsKey("GO60"));
+        Assert.Equal(new[] { TestRefString }, settings.Current.RecentKeymapPaths["GO60"]);
+        Assert.False(vm.Toast.IsVisible);
+    }
+
+    [Fact]
     public async Task LocalLoadAfterGitHub_OnlyLocalRowIsCurrent()
     {
         var settings = new InMemorySettingsService();

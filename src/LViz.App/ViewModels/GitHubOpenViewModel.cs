@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LViz.App.Localization;
 using LViz.App.Services.GitHub;
+using LViz.Core.Diagnostics;
 using LViz.Core.GitHub;
 using LViz.Core.Keymap.Parser;
 using LViz.Core.Layout;
@@ -179,6 +180,11 @@ public partial class GitHubOpenViewModel : ObservableObject
         {
             HandleApiError(e);
         }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            ErrorText = Loc.Instance.Format("GitHub_ErrorUnexpectedFormat", e.Message);
+            DiagnosticLog.Error("GitHub", $"Repo list failed: {e}");
+        }
         finally
         {
             IsBusy = false;
@@ -209,8 +215,9 @@ public partial class GitHubOpenViewModel : ObservableObject
     /// <summary>
     /// List <paramref name="repo"/>'s branches and preselect its default
     /// branch (or the first one when the default is gone). Fire-and-forget
-    /// from the selection hook: a result that arrives after the user picked
-    /// another repo is dropped so two loads never mix lists.
+    /// from the selection hook: a result or failure that arrives after the
+    /// user picked another repo is dropped so two loads never mix lists or
+    /// error lines.
     /// </summary>
     private async Task LoadBranchesAsync(GitHubRepo? repo)
     {
@@ -241,6 +248,14 @@ public partial class GitHubOpenViewModel : ObservableObject
         catch (GitHubApiException e)
         {
             HandleApiError(e);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            DiagnosticLog.Error("GitHub", $"Branch list failed: {e}");
+            if (ReferenceEquals(SelectedRepo, repo))
+            {
+                ErrorText = Loc.Instance.Format("GitHub_ErrorUnexpectedFormat", e.Message);
+            }
         }
     }
 
@@ -364,6 +379,11 @@ public partial class GitHubOpenViewModel : ObservableObject
         catch (GitHubApiException e)
         {
             HandleApiError(e);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            ErrorText = Loc.Instance.Format("GitHub_ErrorUnexpectedFormat", e.Message);
+            DiagnosticLog.Error("GitHub", $"Open failed: {e}");
         }
         finally
         {

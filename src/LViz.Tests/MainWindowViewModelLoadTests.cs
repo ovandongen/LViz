@@ -159,6 +159,169 @@ public class MainWindowViewModelLoadTests
     }
 
     [Fact]
+    public void LoadLayoutFromPath_AutoSwitch_SameKeyCount_PrefersAttachedBoard()
+    {
+        // Sofle and GO60 both have 60 keys; with a Go60 plugged in, an
+        // explicit open from the 42-key Corne lands on GO60, not Sofle.
+        var settings = new InMemorySettingsService();
+        var vm = new MainWindowViewModel(settings, keymapState: SixtyKeymap("go60.keymap"))
+        {
+            AttachedHidNames = () => ["Go60 Left"],
+        };
+
+        vm.LoadLayoutFromPath("go60.keymap");
+
+        Assert.Equal("GO60", vm.SelectedKeyboard.Id);
+        Assert.Equal("go60.keymap", settings.Current.LayoutJsonPaths["GO60"]);
+        Assert.False(settings.Current.LayoutJsonPaths.ContainsKey("Sofle"));
+    }
+
+    [Fact]
+    public void LoadLayoutFromPath_AutoSwitch_SameKeyCount_NothingAttached_KeepsRegistryOrder()
+    {
+        var settings = new InMemorySettingsService();
+        var vm = new MainWindowViewModel(settings, keymapState: SixtyKeymap("go60.keymap"))
+        {
+            AttachedHidNames = () => [],
+        };
+
+        vm.LoadLayoutFromPath("go60.keymap");
+
+        Assert.Equal("Sofle", vm.SelectedKeyboard.Id);
+    }
+
+    // --- A board's own booked keymap loads without switching boards ---
+    // The loads LViz runs by itself (startup, Refresh, the background GitHub
+    // check, a board switch's auto-load) pass keepBoard: true, so a keymap
+    // that doesn't fit its board is dropped instead of moving the board.
+
+    // GO60 with a 42-key keymap booked under it, plus that keymap in its recents.
+    private static InMemorySettingsService BookedOnGo60(string booking) => new()
+    {
+        Current = new UserSettings
+        {
+            Keyboard = "GO60",
+            LayoutJsonPaths = new Dictionary<string, string> { ["GO60"] = booking },
+            RecentKeymapPaths = new Dictionary<string, List<string>> { ["GO60"] = new() { "slab.keymap" } },
+        },
+    };
+
+    // A 42-binding keymap — Corne's count, booked on the 60-key GO60.
+    private static FakeKeymapStateService SlabKeymap(string path) =>
+        new(new KeymapLoadResult.Success(SampleKeymap(), path, LayerCount: 2, FirstLayerBindingCount: 42));
+
+    private static string Go60DisplayName => KeyboardProfileRegistry.Resolve("GO60").DisplayName;
+
+    [Fact]
+    public void LoadLayoutFromPath_KeepBoard_Mismatch_StaysAndDropsBooking()
+    {
+        var settings = BookedOnGo60("slab.keymap");
+        var fake = SlabKeymap("slab.keymap");
+        var vm = new MainWindowViewModel(settings, keymapState: fake);
+
+        vm.LoadLayoutFromPath("slab.keymap", keepBoard: true);
+
+        // The board it was booked on is the board that stays showing.
+        Assert.Equal("GO60", vm.SelectedKeyboard.Id);
+        Assert.Equal("GO60", settings.Current.Keyboard);
+        // The keymap is not shown.
+        Assert.False(vm.HasLayoutLoaded);
+        Assert.Empty(vm.Layers);
+        Assert.Null(fake.Current);
+        Assert.False(vm.HasUnmatchedKeymap);
+        // Booking dropped, recents entry kept.
+        Assert.False(settings.Current.LayoutJsonPaths.ContainsKey("GO60"));
+        Assert.Equal(new[] { "slab.keymap" }, settings.Current.RecentKeymapPaths["GO60"]);
+        Assert.Equal(
+            Loc.Instance.Format("Status_BookedKeymapDoesNotFitFormat", "slab.keymap", 42, Go60DisplayName, 60),
+            vm.StatusMessage);
+    }
+
+    [Fact]
+    public void LoadLayoutFromPath_KeepBoard_BookingIsOtherEntry_LeavesBooking()
+    {
+        // The board points at a different keymap than the one being loaded —
+        // unbooking would drop the wrong entry.
+        var settings = BookedOnGo60("other.keymap");
+        var fake = SlabKeymap("slab.keymap");
+        var vm = new MainWindowViewModel(settings, keymapState: fake);
+
+        vm.LoadLayoutFromPath("slab.keymap", keepBoard: true);
+
+        Assert.Equal("other.keymap", settings.Current.LayoutJsonPaths["GO60"]);
+        Assert.Equal("GO60", vm.SelectedKeyboard.Id);
+        Assert.False(vm.HasLayoutLoaded);
+    }
+
+    [Fact]
+    public void LoadLayoutFromPath_KeepBoard_Fits_LoadsNormally()
+    {
+        var settings = new InMemorySettingsService
+        {
+            Current = new UserSettings { Keyboard = "Corne" },
+        };
+        var fake = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
+        var vm = new MainWindowViewModel(settings, keymapState: fake);
+
+        vm.LoadLayoutFromPath("ok.keymap", keepBoard: true);
+
+        Assert.True(vm.HasLayoutLoaded);
+        Assert.Equal("Corne", vm.SelectedKeyboard.Id);
+        Assert.Equal(2, vm.Layers.Count);
+        Assert.Equal("ok.keymap", settings.Current.LayoutJsonPaths["Corne"]);
+        Assert.Equal(new[] { "ok.keymap" }, settings.Current.RecentKeymapPaths["Corne"]);
+    }
+
+    [Fact]
+    public void LoadLayoutFromPath_KeepBoard_NoMatchingBoardEither_StillStays()
+    {
+        // 12345 keys: no board to switch to even under the old behaviour, and
+        // keepBoard means the wizard link stays unarmed too — the keymap is
+        // simply not shown.
+        var settings = new InMemorySettingsService
+        {
+            Current = new UserSettings { Keyboard = "Corne" },
+        };
+        var fake = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "huge.keymap", LayerCount: 2, FirstLayerBindingCount: 12345));
+        var vm = new MainWindowViewModel(settings, keymapState: fake);
+
+        vm.LoadLayoutFromPath("huge.keymap", keepBoard: true);
+
+        Assert.Equal("Corne", vm.SelectedKeyboard.Id);
+        Assert.Equal("Corne", settings.Current.Keyboard);
+        Assert.False(vm.HasLayoutLoaded);
+        Assert.Empty(vm.Layers);
+        Assert.False(vm.HasUnmatchedKeymap);
+    }
+
+    [Fact]
+    public void RefreshCommand_BookedKeymapDoesNotFit_StaysOnBoard()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"lviz-refresh-{Guid.NewGuid():N}.keymap");
+        File.WriteAllText(path, "/* booked keymap stand-in */");
+        try
+        {
+            var settings = BookedOnGo60(path);
+            var fake = SlabKeymap(path);
+            var vm = new MainWindowViewModel(settings, keymapState: fake);
+
+            vm.RefreshCommand.Execute(null);
+
+            Assert.Equal("GO60", vm.SelectedKeyboard.Id);
+            Assert.Equal("GO60", settings.Current.Keyboard);
+            Assert.False(vm.HasLayoutLoaded);
+            Assert.Null(fake.Current);
+            Assert.False(settings.Current.LayoutJsonPaths.ContainsKey("GO60"));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void LoadLayoutFromPath_Failure_RemovesPathFromProfileRecents()
     {
         var settings = new InMemorySettingsService
@@ -525,11 +688,13 @@ public class MainWindowViewModelLoadTests
         Assert.True(vm.Layers[0].IsShown);
     }
 
-    [Fact]
-    public void SelectKeyboard_SameKeyCountProfile_RestampsHiddenTabsFromNewProfile()
+    // --- Picking a board always shows that board ---
+    // A board the user picks never wears another board's keymap just because
+    // the key counts match: it shows its booked keymap or nothing.
+
+    // Sofle and GO60 both have 60 keys — this keymap fits either.
+    private static FakeKeymapStateService SixtyKeymap(string path)
     {
-        // Sofle and GO60 both have 60 keys, so switching keeps the keymap —
-        // the tabs must still follow the new board's hidden set.
         var bindings = string.Join(" ", Enumerable.Repeat("&kp A", 60));
         var source = $$"""
             / {
@@ -540,25 +705,132 @@ public class MainWindowViewModelLoadTests
                 };
             };
             """;
-        var settings = new InMemorySettingsService
-        {
-            Current = new UserSettings
-            {
-                HiddenLayers = new Dictionary<string, List<int>> { ["Sofle"] = new() { 1 } },
-            },
-        };
-        var ok = new FakeKeymapStateService(new KeymapLoadResult.Success(
+        return new FakeKeymapStateService(new KeymapLoadResult.Success(
             new LoadedKeymap(ZmkKeymapLoader.LoadFromText(source, "test")),
-            "sixty.keymap", LayerCount: 2, FirstLayerBindingCount: 60));
+            path, LayerCount: 2, FirstLayerBindingCount: 60));
+    }
+
+    [Fact]
+    public void SelectKeyboard_SameKeyCountProfile_RestampsHiddenTabsFromNewProfile()
+    {
+        // Sofle and GO60 both have 60 keys — the keymap is no longer kept
+        // across the switch, so GO60 is booked with the same file and shows
+        // it through the booking. The tabs must still follow the new board's
+        // hidden set.
+        var path = Path.Combine(Path.GetTempPath(), $"lviz-boardswitch-{Guid.NewGuid():N}.keymap");
+        File.WriteAllText(path, "/* booked keymap stand-in */");
+        try
+        {
+            var settings = new InMemorySettingsService
+            {
+                Current = new UserSettings
+                {
+                    HiddenLayers = new Dictionary<string, List<int>> { ["Sofle"] = new() { 1 } },
+                    LayoutJsonPaths = new Dictionary<string, string> { ["GO60"] = path },
+                },
+            };
+            var ok = SixtyKeymap(path);
+            var vm = new MainWindowViewModel(settings, keymapState: ok);
+            vm.LoadLayoutFromPath(path);
+            Assert.Equal("Sofle", vm.SelectedKeyboard.Id);
+            Assert.False(vm.Layers[1].IsShown);
+
+            vm.SelectKeyboardCommand.Execute(KeyboardProfileRegistry.All.First(p => p.Id == "GO60"));
+
+            Assert.True(vm.HasLayoutLoaded);
+            Assert.True(vm.Layers[1].IsShown);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void SelectKeyboard_NothingBooked_ShowsBareBoardEvenWhenKeymapFits()
+    {
+        // The keymap open on Sofle would fit GO60 key-for-key — irrelevant:
+        // with nothing booked for GO60 the picked board shows bare.
+        var settings = new InMemorySettingsService();
+        var ok = SixtyKeymap("sixty.keymap");
         var vm = new MainWindowViewModel(settings, keymapState: ok);
         vm.LoadLayoutFromPath("sixty.keymap");
         Assert.Equal("Sofle", vm.SelectedKeyboard.Id);
-        Assert.False(vm.Layers[1].IsShown);
 
         vm.SelectKeyboardCommand.Execute(KeyboardProfileRegistry.All.First(p => p.Id == "GO60"));
 
-        Assert.True(vm.HasLayoutLoaded);
-        Assert.True(vm.Layers[1].IsShown);
+        Assert.Equal("GO60", vm.SelectedKeyboard.Id);
+        Assert.False(vm.HasLayoutLoaded);
+        Assert.Empty(vm.Layers);
+        Assert.Equal(
+            Loc.Instance.Format("Status_KeyboardSwitchedUnloaded", Go60DisplayName),
+            vm.StatusMessage);
+    }
+
+    [Fact]
+    public void SelectKeyboard_BookedKeymapDoesNotFit_StaysOnPickedBoard()
+    {
+        // The reported bug: GO60 booked with a Corne-sized keymap. Picking
+        // GO60 must show GO60 and refuse the keymap (part 1's refusal),
+        // not jump to the board whose key count matches.
+        var path = Path.Combine(Path.GetTempPath(), $"lviz-nomatch-{Guid.NewGuid():N}.keymap");
+        File.WriteAllText(path, "/* booked keymap stand-in */");
+        try
+        {
+            var settings = new InMemorySettingsService
+            {
+                Current = new UserSettings
+                {
+                    Keyboard = "Glove80",
+                    LayoutJsonPaths = new Dictionary<string, string> { ["GO60"] = path },
+                },
+            };
+            var fake = SlabKeymap(path);
+            var vm = new MainWindowViewModel(settings, keymapState: fake);
+
+            vm.SelectKeyboardCommand.Execute(KeyboardProfileRegistry.All.First(p => p.Id == "GO60"));
+
+            Assert.Equal("GO60", vm.SelectedKeyboard.Id);
+            Assert.Equal("GO60", settings.Current.Keyboard);
+            Assert.False(vm.HasLayoutLoaded);
+            Assert.False(settings.Current.LayoutJsonPaths.ContainsKey("GO60"));
+            Assert.Equal(
+                Loc.Instance.Format(
+                    "Status_BookedKeymapDoesNotFitFormat", Path.GetFileName(path), 42, Go60DisplayName, 60),
+                vm.StatusMessage);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void SelectKeyboard_BookedKeymapFits_LoadsIt()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"lviz-bookedfit-{Guid.NewGuid():N}.keymap");
+        File.WriteAllText(path, "/* booked keymap stand-in */");
+        try
+        {
+            var settings = new InMemorySettingsService
+            {
+                Current = new UserSettings
+                {
+                    LayoutJsonPaths = new Dictionary<string, string> { ["GO60"] = path },
+                },
+            };
+            var ok = SixtyKeymap(path);
+            var vm = new MainWindowViewModel(settings, keymapState: ok);
+
+            vm.SelectKeyboardCommand.Execute(KeyboardProfileRegistry.All.First(p => p.Id == "GO60"));
+
+            Assert.True(vm.HasLayoutLoaded);
+            Assert.Equal(path, vm.LoadedLayoutPath);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [Fact]

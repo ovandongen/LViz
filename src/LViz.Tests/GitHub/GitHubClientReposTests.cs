@@ -265,6 +265,59 @@ public class GitHubClientReposTests
         Assert.Empty(destination.ToArray());
     }
 
+    [Fact]
+    public async Task DownloadTarball_BodyReadFails_IsNetwork()
+    {
+        // The announced 500 bytes fit under 2_000, so the size check passes
+        // and the read runs — where a dropped connection surfaces as an
+        // IOException from the body stream.
+        Route("/repos/o/r/tarball/cafe01", () => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new UnreadableContent(500),
+        });
+
+        using var destination = new MemoryStream();
+        var ex = await Assert.ThrowsAsync<GitHubApiException>(
+            () => _client.DownloadTarballAsync(AccessToken, "o", "r", "cafe01", destination, 2_000));
+
+        Assert.Equal(GitHubErrorKind.Network, ex.Kind);
+        Assert.Equal("GitHub GET /repos/o/r/tarball/cafe01 download was interrupted", ex.Message);
+        Assert.DoesNotContain(AccessToken, ex.Message);
+        Assert.Empty(destination.ToArray());
+    }
+
+    [Fact]
+    public async Task DownloadTarball_BodyTimesOutMidStream_IsNetwork()
+    {
+        // No caller cancellation: an OperationCanceledException from the body
+        // is HttpClient's own timeout and maps to Network like a dropped read.
+        Route("/repos/o/r/tarball/cafe01", () =>
+        {
+            var content = new StreamContent(new TimedOutReadStream());
+            content.Headers.ContentLength = 500;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = content };
+        });
+
+        using var destination = new MemoryStream();
+        var ex = await Assert.ThrowsAsync<GitHubApiException>(
+            () => _client.DownloadTarballAsync(AccessToken, "o", "r", "cafe01", destination, 2_000));
+
+        Assert.Equal(GitHubErrorKind.Network, ex.Kind);
+    }
+
+    [Fact]
+    public async Task DownloadTarball_DestinationWriteFails_IsNotNetwork()
+    {
+        var payload = Enumerable.Range(0, 1_000).Select(i => (byte)(i % 251)).ToArray();
+        Route("/repos/o/r/tarball/cafe01", () => Raw(payload, payload.Length));
+
+        // A disk failure is not a network failure: the IOException propagates
+        // unmapped, or the offline-cache fallback would paper over a full disk.
+        using var destination = new ThrowingWriteStream();
+        await Assert.ThrowsAsync<IOException>(
+            () => _client.DownloadTarballAsync(AccessToken, "o", "r", "cafe01", destination, 2_000));
+    }
+
     // ---- helpers ----
 
     /// <summary>Answers one path with a canned response.</summary>
@@ -371,5 +424,70 @@ public class GitHubClientReposTests
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 
         public override void Write(ReadOnlySpan<byte> buffer) => throw new NotSupportedException();
+    }
+
+    /// <summary>A body whose reads time out — HttpClient's own mid-body
+    /// cancellation, while nobody cancelled the caller's token.</summary>
+    private sealed class TimedOutReadStream : Stream
+    {
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new TaskCanceledException();
+
+        public override int Read(Span<byte> buffer) => throw new TaskCanceledException();
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            throw new TaskCanceledException();
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override void Write(ReadOnlySpan<byte> buffer) => throw new NotSupportedException();
+    }
+
+    /// <summary>A destination whose writes fail, like a full disk.</summary>
+    private sealed class ThrowingWriteStream : Stream
+    {
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => throw new NotSupportedException();
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new IOException("disk is full");
+
+        public override void Write(ReadOnlySpan<byte> buffer) => throw new IOException("disk is full");
+
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
+            throw new IOException("disk is full");
     }
 }

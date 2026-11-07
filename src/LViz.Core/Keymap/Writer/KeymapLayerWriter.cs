@@ -655,7 +655,7 @@ public static class KeymapLayerWriter
 
             for (int key = 0; key < want.Bindings.Count; key++)
             {
-                if (!KeymapWriter.IsSameBinding(actual.Bindings[key], want.Bindings[key]))
+                if (!actual.Bindings[key].SameAs(want.Bindings[key]))
                     throw new InvalidOperationException(
                         $"after writing, layer {layer} ('{actual.Name}') key {key} is "
                         + $"'{actual.Bindings[key].Display}', expected '{want.Bindings[key].Display}'.");
@@ -672,7 +672,7 @@ public static class KeymapLayerWriter
             var actual = config.Combos[combo];
             var want = expected.Combos[combo];
 
-            if (!KeymapWriter.IsSameBinding(actual.Binding, want.Binding))
+            if (!actual.Binding.SameAs(want.Binding))
                 throw new InvalidOperationException(
                     $"after writing, combo '{actual.Name}' fires '{actual.Binding.Display}', "
                     + $"expected '{want.Binding.Display}'.");
@@ -694,7 +694,7 @@ public static class KeymapLayerWriter
             var want = expected.Macros[macro];
 
             if (actual.Bindings.Count != want.Bindings.Count
-                || !actual.Bindings.Zip(want.Bindings).All(p => KeymapWriter.IsSameBinding(p.First, p.Second)))
+                || !actual.Bindings.Zip(want.Bindings).All(p => p.First.SameAs(p.Second)))
                 throw new InvalidOperationException(
                     $"after writing, macro '{actual.Name}' runs "
                     + $"<{string.Join(", ", actual.Bindings.Select(b => b.Display))}>, expected "

@@ -389,7 +389,11 @@ public sealed class GitHubClient
     /// <paramref name="maxBytes"/> has been read — or the response announces
     /// that much in <c>Content-Length</c> — the copy stops and
     /// <see cref="GitHubErrorKind.TooLarge"/> is thrown, so an oversized repo
-    /// cannot fill the disk.
+    /// cannot fill the disk. A connection that drops mid-body (transport
+    /// error or timeout while reading) becomes
+    /// <see cref="GitHubErrorKind.Network"/>, which is what triggers the
+    /// caller's offline-cache fallback; an error writing to
+    /// <paramref name="destination"/> propagates as is.
     /// </summary>
     public async Task DownloadTarballAsync(
         string accessToken,
@@ -413,11 +417,11 @@ public sealed class GitHubClient
             var buffer = new byte[TarballChunkBytes];
             var total = 0L;
 
-            await using (var source = await response.Content.ReadAsStreamAsync(ct))
+            await using (var source = await OpenBodyStreamAsync(response.Content, request, ct))
             {
                 while (true)
                 {
-                    var read = await source.ReadAsync(buffer, ct);
+                    var read = await ReadChunkAsync(source, buffer, request, ct);
                     if (read == 0)
                     {
                         break;
@@ -438,6 +442,56 @@ public sealed class GitHubClient
             response.Dispose();
         }
     }
+
+    /// <summary>
+    /// The response body stream. A connection drop that only surfaces once
+    /// the body is touched (<see cref="IsBodyInterrupted"/>) becomes
+    /// <see cref="GitHubErrorKind.Network"/> so the caller falls back to its
+    /// cache; a cancelled <paramref name="ct"/> is rethrown as is.
+    /// </summary>
+    private static async Task<Stream> OpenBodyStreamAsync(
+        HttpContent content, HttpRequestMessage request, CancellationToken ct)
+    {
+        try
+        {
+            return await content.ReadAsStreamAsync(ct);
+        }
+        catch (Exception ex) when (IsBodyInterrupted(ex, ct))
+        {
+            throw InterruptedDownload(request);
+        }
+    }
+
+    /// <summary>
+    /// One body read with the same mapping as
+    /// <see cref="OpenBodyStreamAsync"/>. Only reads are mapped — destination
+    /// write failures and the size limit stay the caller's to propagate.
+    /// </summary>
+    private static async Task<int> ReadChunkAsync(
+        Stream source, Memory<byte> buffer, HttpRequestMessage request, CancellationToken ct)
+    {
+        try
+        {
+            return await source.ReadAsync(buffer, ct);
+        }
+        catch (Exception ex) when (IsBodyInterrupted(ex, ct))
+        {
+            throw InterruptedDownload(request);
+        }
+    }
+
+    /// <summary>
+    /// A body read killed the download: a transport or protocol error, or an
+    /// HttpClient timeout mid-body (an <see cref="OperationCanceledException"/>
+    /// while <paramref name="ct"/> is still live). A cancellation the caller
+    /// asked for is not — that one is rethrown as is.
+    /// </summary>
+    private static bool IsBodyInterrupted(Exception ex, CancellationToken ct) =>
+        ex is IOException or HttpRequestException
+        || (ex is OperationCanceledException && !ct.IsCancellationRequested);
+
+    private static GitHubApiException InterruptedDownload(HttpRequestMessage request) =>
+        new(GitHubErrorKind.Network, $"GitHub {Describe(request)} download was interrupted");
 
     /// <summary>
     /// Commits one file straight to a branch:

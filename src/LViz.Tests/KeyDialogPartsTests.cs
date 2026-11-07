@@ -462,6 +462,8 @@ public class KeyDialogPartsTests
             new[] { new[] { "NOPE" } }, // not a listed command
             new[] { new[] { "BT_SEL" }, new[] { "x" } }, // not a number
             new[] { new[] { "BT_SEL" }, new[] { "-1" } }, // negative number
+            new[] { new[] { "BT_SEL" }, new[] { "00" } }, // not written back the same way
+            new[] { new[] { "BT_DISC" }, new[] { "01" } }, // not written back the same way
             Array.Empty<IReadOnlyList<string>>(), // no groups
             new[] { new[] { "BT_SEL" }, new[] { "1" }, new[] { "2" } }, // three groups
             new[] { new[] { "LS", "A" } }, // a group of two tokens

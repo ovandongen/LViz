@@ -18,8 +18,12 @@ namespace LViz.App.Services.Secrets;
 /// Platform failures never throw: Read reports null, Write reports false,
 /// Delete no-ops, each with a <c>DiagnosticLog.Warn("Secrets", …)</c> that
 /// never includes the stored value. Only a cancelled <c>ct</c> surfaces
-/// (as <see cref="OperationCanceledException"/>), and it is checked before
-/// any connection is attempted. Locked items and unlock prompts are
+/// (as <see cref="OperationCanceledException"/>); it is checked before any
+/// connection is attempted and honoured during every awaited call. Each
+/// awaited call is additionally bounded by <see cref="CallTimeout"/>, so a
+/// bus that accepts the connection but never answers ends as a
+/// <see cref="TimeoutException"/> failure instead of hanging forever.
+/// Locked items and unlock prompts are
 /// reported as failures too — v1 does not drive prompts.
 /// </para>
 /// </summary>
@@ -39,8 +43,19 @@ internal sealed class LinuxSecretServiceStore : ISecretStore
 
     /// <param name="busAddress">D-Bus address to use; null means the session
     /// bus address from the environment (<see cref="Address.Session"/>).</param>
-    public LinuxSecretServiceStore(string? busAddress = null)
-        => _busAddress = busAddress;
+    /// <param name="callTimeout">Time limit for each awaited call on the
+    /// connection (connect and every method call); null means 10 seconds.</param>
+    public LinuxSecretServiceStore(string? busAddress = null, TimeSpan? callTimeout = null)
+    {
+        _busAddress = busAddress;
+        CallTimeout = callTimeout ?? TimeSpan.FromSeconds(10);
+    }
+
+    /// <summary>Time limit applied to each awaited call on the connection.
+    /// A bus that accepts the connection but never answers surfaces as a
+    /// <see cref="TimeoutException"/> (a logged failure result) instead of
+    /// hanging the caller forever.</summary>
+    internal TimeSpan CallTimeout { get; }
 
     /// <summary>Item label for a key, e.g. "LViz github".</summary>
     internal static string LabelFor(string key) => $"LViz {key}";
@@ -63,10 +78,10 @@ internal sealed class LinuxSecretServiceStore : ISecretStore
                 DiagnosticLog.Warn("Secrets", "Secret Service unavailable (no session bus address)");
                 return null;
             }
-            await connection.ConnectAsync().ConfigureAwait(false);
+            await Bounded(connection.ConnectAsync().AsTask(), ct).ConfigureAwait(false);
 
-            string session = await OpenSessionAsync(connection).ConfigureAwait(false);
-            (ObjectPath[] unlocked, ObjectPath[] locked) = await SearchItemsAsync(connection, key)
+            string session = await Bounded(OpenSessionAsync(connection), ct).ConfigureAwait(false);
+            (ObjectPath[] unlocked, ObjectPath[] locked) = await Bounded(SearchItemsAsync(connection, key), ct)
                 .ConfigureAwait(false);
             if (unlocked.Length == 0)
             {
@@ -76,7 +91,8 @@ internal sealed class LinuxSecretServiceStore : ISecretStore
                 return null;
             }
 
-            return await GetSecretAsync(connection, unlocked[0].ToString(), session).ConfigureAwait(false);
+            return await Bounded(GetSecretAsync(connection, unlocked[0].ToString(), session), ct)
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -100,17 +116,17 @@ internal sealed class LinuxSecretServiceStore : ISecretStore
                 DiagnosticLog.Warn("Secrets", "Secret Service unavailable (no session bus address)");
                 return false;
             }
-            await connection.ConnectAsync().ConfigureAwait(false);
+            await Bounded(connection.ConnectAsync().AsTask(), ct).ConfigureAwait(false);
 
-            string session = await OpenSessionAsync(connection).ConfigureAwait(false);
-            string collection = await ReadAliasAsync(connection, "default").ConfigureAwait(false);
+            string session = await Bounded(OpenSessionAsync(connection), ct).ConfigureAwait(false);
+            string collection = await Bounded(ReadAliasAsync(connection, "default"), ct).ConfigureAwait(false);
             if (collection == RootPath)
             {
                 DiagnosticLog.Warn("Secrets", "Secret Service has no default collection");
                 return false;
             }
 
-            string prompt = await CreateItemAsync(connection, collection, key, value, session)
+            string prompt = await Bounded(CreateItemAsync(connection, collection, key, value, session), ct)
                 .ConfigureAwait(false);
             if (prompt != RootPath)
             {
@@ -142,10 +158,10 @@ internal sealed class LinuxSecretServiceStore : ISecretStore
                 DiagnosticLog.Warn("Secrets", "Secret Service unavailable (no session bus address)");
                 return;
             }
-            await connection.ConnectAsync().ConfigureAwait(false);
+            await Bounded(connection.ConnectAsync().AsTask(), ct).ConfigureAwait(false);
 
             // No session needed: Delete takes no secret struct.
-            (ObjectPath[] unlocked, ObjectPath[] locked) = await SearchItemsAsync(connection, key)
+            (ObjectPath[] unlocked, ObjectPath[] locked) = await Bounded(SearchItemsAsync(connection, key), ct)
                 .ConfigureAwait(false);
             if (locked.Length > 0)
             {
@@ -153,7 +169,7 @@ internal sealed class LinuxSecretServiceStore : ISecretStore
                 DiagnosticLog.Warn("Secrets", "Secret Service item is locked");
             }
             foreach (ObjectPath item in unlocked)
-                await DeleteItemAsync(connection, item.ToString()).ConfigureAwait(false);
+                await Bounded(DeleteItemAsync(connection, item.ToString()), ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -174,6 +190,18 @@ internal sealed class LinuxSecretServiceStore : ISecretStore
         string? address = _busAddress ?? Address.Session;
         return address is null ? null : new Connection(address);
     }
+
+    /// <summary>
+    /// Await <paramref name="call"/> under <see cref="CallTimeout"/> and the
+    /// caller's token: a bus that accepts the connection but never answers
+    /// throws <see cref="TimeoutException"/> (the catch in each public method
+    /// turns it into the failure result; disposing the connection then
+    /// abandons the pending call), a cancelled token throws
+    /// <see cref="OperationCanceledException"/> (rethrown).
+    /// </summary>
+    private Task<T> Bounded<T>(Task<T> call, CancellationToken ct) => call.WaitAsync(CallTimeout, ct);
+
+    private Task Bounded(Task call, CancellationToken ct) => call.WaitAsync(CallTimeout, ct);
 
     /// <summary>
     /// OpenSession("plain", "") → session path. The plain algorithm returns

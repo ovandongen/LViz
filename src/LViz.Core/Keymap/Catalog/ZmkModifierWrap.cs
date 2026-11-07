@@ -52,6 +52,14 @@ public static class ZmkModifierWrap
         SingleFlags.ToDictionary(f => f.Function, f => f.Flag, StringComparer.Ordinal);
 
     /// <summary>
+    /// True when <paramref name="token"/> is one of the eight modifier
+    /// wrapper functions <c>LC LS LA LG RC RS RA RG</c> (Ordinal). Anything
+    /// else (e.g. <c>LSHFT</c> as an &amp;mt param) is a plain identifier
+    /// token.
+    /// </summary>
+    public static bool IsModifierFunction(string token) => FlagByFunction.ContainsKey(token);
+
+    /// <summary>
     /// Flat params for <paramref name="keycode"/> wrapped in the set
     /// modifiers, outermost first in the fixed order LC LS LA LG RC RS RA RG,
     /// then the keycode — <c>("A", LeftShift | LeftCtrl)</c> →

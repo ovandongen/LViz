@@ -38,6 +38,18 @@ public sealed record KeyBinding(string Behavior, IReadOnlyList<string> Params)
     /// </summary>
     public string? DecorationIcon { get; init; }
 
+    /// <summary>True when <paramref name="other"/> has the same behavior and
+    /// the same params compared Ordinal. Decorations are ignored. Record
+    /// equality compares the <c>Params</c> list by reference, so use this
+    /// instead of <c>==</c> or <c>Equals</c> to compare bindings.</summary>
+    /// <exception cref="ArgumentNullException"><paramref name="other"/> is null.</exception>
+    public bool SameAs(KeyBinding other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        return string.Equals(Behavior, other.Behavior, StringComparison.Ordinal)
+            && Params.SequenceEqual(other.Params, StringComparer.Ordinal);
+    }
+
     /// <summary>Formatted for display: "&amp;kp A" or just "&amp;trans".</summary>
     public string Display =>
         Params.Count == 0 ? Behavior : $"{Behavior} {string.Join(' ', Params)}";

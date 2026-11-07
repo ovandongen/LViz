@@ -62,6 +62,11 @@ public sealed partial class KeymapEditViewModel : ObservableObject
     private readonly IGitHubKeymapService? _gitHub;
     private readonly KeymapBackupStore _backups;
 
+    /// <summary>The pending layer structure <see cref="Defines"/> and
+    /// <see cref="LayerDefines"/> were last computed for, so key-only changes
+    /// don't replay the writers. Empty until the first recompute.</summary>
+    private IReadOnlyList<LayerStructureEdit> _definesStructure = [];
+
     /// <exception cref="ArgumentNullException">
     /// <paramref name="source"/>, <paramref name="baseline"/> or
     /// <paramref name="backups"/> is null.
@@ -144,20 +149,24 @@ public sealed partial class KeymapEditViewModel : ObservableObject
     public LoadedKeymap Keymap { get; private set; }
 
     /// <summary>
-    /// The file's object-like <c>#define</c>s read off <see cref="Source"/>'s
-    /// baseline text — what the key dialog feeds binding formatting and the
-    /// raw-text parser so a typed <c>&amp;mo NAV</c> resolves like the file does.
+    /// The file's object-like <c>#define</c>s as the pending layer structure
+    /// leaves them — read off the text a save would write right now (the
+    /// baseline text with the session's pending layer edits replayed onto it),
+    /// so after a layer move they carry the moved values. What the key dialog
+    /// feeds binding formatting and the raw-text parser so a typed
+    /// <c>&amp;mo NAV</c> resolves like the file does.
     /// </summary>
-    public IReadOnlyList<KeyValuePair<string, string>> Defines { get; }
+    public IReadOnlyList<KeyValuePair<string, string>> Defines { get; private set; }
 
     /// <summary>
-    /// The defines this file uses as a layer reference — the only names a
+    /// The defines this file uses as a layer reference, as the pending layer
+    /// structure leaves them — the values a save would write. The only names a
     /// layer number may be shown as, so a preview writes <c>&amp;mo NAV</c>
     /// where the file does and never names a layer after an unrelated define
     /// with the same value. Passed to the key dialog as
     /// <see cref="KeyDialogRequest.LayerDefines"/>.
     /// </summary>
-    public IReadOnlyList<KeyValuePair<string, string>> LayerDefines { get; }
+    public IReadOnlyList<KeyValuePair<string, string>> LayerDefines { get; private set; }
 
     /// <summary>The one selected key, or null when nothing is selected.</summary>
     [ObservableProperty]
@@ -552,6 +561,7 @@ public sealed partial class KeymapEditViewModel : ObservableObject
     private void OnSessionChanged(object? sender, EventArgs e)
     {
         Keymap = new LoadedKeymap(Session.Current);
+        RefreshDefines();
 
         OnPropertyChanged(nameof(ChangeCount));
         OnPropertyChanged(nameof(HasChanges));
@@ -564,6 +574,42 @@ public sealed partial class KeymapEditViewModel : ObservableObject
         RedoCommand.NotifyCanExecuteChanged();
 
         Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Refresh <see cref="Defines"/> and <see cref="LayerDefines"/> when the
+    /// pending layer structure changed since the last look: replay the pending
+    /// edits onto the baseline text exactly as the save does and read the
+    /// defines off that text, so a preview spells layer numbers with the
+    /// values the saved file will carry. An empty edit list replays to the
+    /// baseline text, so undoing back to the baseline restores the original
+    /// values. Key-only changes never change the pending structure, so they
+    /// leave both lists (and their instances) alone.
+    /// </summary>
+    /// <remarks>
+    /// A writer failure (its bug guard throws) keeps the previous lists and
+    /// the previous structure, logging instead of throwing, so the next change
+    /// tries again and the session never sees an exception from this handler.
+    /// </remarks>
+    private void RefreshDefines()
+    {
+        var edits = Session.PendingStructureEdits;
+        if (edits.SequenceEqual(_definesStructure)) return;
+
+        try
+        {
+            var text = KeymapLayerWriter.ApplyAll(Source.BaselineText, edits);
+            var defines = Preprocessor.CollectDefines(text);
+            var layerDefines = KeymapWriter.LayerReferenceDefines(text, Session.Current);
+
+            Defines = defines;
+            LayerDefines = layerDefines;
+            _definesStructure = edits;
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLog.Warn("Edit", $"Defines refresh for the pending layer structure failed: {ex}");
+        }
     }
 }
 

@@ -362,7 +362,9 @@ After creating or editing a view, rebuild the App project before trusting a
 - **GitHub keymaps: one HTTP class, refs in the normal settings lists.**
   `Core/GitHub/GitHubClient` is the only code that talks HTTP; every call goes
   through its private `ApiRequest`/`SendAsync`/`SendForJsonAsync`, which own
-  the status → `GitHubErrorKind` mapping. Exception messages are
+  the status → `GitHubErrorKind` mapping; `DownloadTarballAsync`'s body reads
+  map a mid-body drop to `Network` (destination writes stay unmapped).
+  Exception messages are
   `GitHub {METHOD} {path} returned …` (path only) so a token never reaches
   the log; `GitHubTokens.ToString()` omits the tokens. `GitHubSession` owns
   the login (keychain JSON under `GitHubAppInfo.SecretKey`, refresh under 5
@@ -464,8 +466,12 @@ Carried over from the upstream Moergo build and still apply verbatim:
   `App.axaml.cs` registers them via `KeyboardProfileRegistry.SetUserProfiles`
   as `UserLayoutProfile`s with ids `user:<id>`, listed after the bundled
   boards. Key-count auto-switch must go through
-  `KeyboardProfileRegistry.FindByKeyCount` (user layouts win), never
-  `All.FirstOrDefault`. `All` is a fresh array per read: don't rely on its
+  `KeyboardProfileRegistry.FindByKeyCount`, never `All.FirstOrDefault`: a
+  board whose HID name matches a plugged-in keyboard wins a tie (pass the
+  names, `MainWindowViewModel.AttachedHidNames`), then user layouts, then
+  registry order. Only explicit opens auto-switch; a board's booked keymap
+  (`LoadLayoutFromPath(…, keepBoard: true)`) never moves the board, and a
+  picked board (`SelectKeyboard`) never keeps another board's keymap. `All` is a fresh array per read: don't rely on its
   identity.
 - **Per-key bounds must account for rotation about the explicit pivot.**
   Rotated keys (typical thumb clusters) can swing far outside the
@@ -616,8 +622,8 @@ LViz-specific (extend this list as we hit more):
   matches a settings property (e.g. `HiddenLayers`).
 
 - **`KeyBinding` record equality does not compare `Params` contents** (it
-  compares the list reference). Compare `Behavior` plus
-  `Params.SequenceEqual`, in code and in tests.
+  compares the list reference). Compare with `KeyBinding.SameAs`, in code and
+  in tests.
 
 - **A C# local named `from` can't be the receiver of a `with` expression**
   (`from with { … }` parses as a LINQ query, even in parentheses). Rename the

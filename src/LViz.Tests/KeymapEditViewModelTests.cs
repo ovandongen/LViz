@@ -146,6 +146,66 @@ public class KeymapEditViewModelTests
         Assert.Contains(new KeyValuePair<string, string>("NAV", "1"), vm.Defines);
     }
 
+    // ---- defines follow the pending layer structure -----------------------------------
+
+    /// <summary>3 layers ("Base", "Nav", "Sym"), 2 keys each; Base's key 0 names
+    /// layer 1 through the NAV define, so a move of Nav rewrites that value.</summary>
+    private const string NavKeymapText = """
+        #define NAV 1
+
+        / {
+            keymap {
+                compatible = "zmk,keymap";
+                base { display-name = "Base"; bindings = <&mo NAV &kp A>; };
+                nav  { display-name = "Nav";  bindings = <&trans &kp B>; };
+                sym  { display-name = "Sym";  bindings = <&trans &kp C>; };
+            };
+        };
+        """;
+
+    private static KeymapEditViewModel NewNavVm() => new(
+        new KeymapEditSource("d.keymap", "d.keymap", NavKeymapText, "sha", null),
+        ZmkKeymapLoader.LoadFromText(NavKeymapText, "editor"),
+        gitHub: null,
+        new KeymapBackupStore(TempBackupsRoot()));
+
+    [Fact]
+    public void MoveLayer_UpdatesLayerDefinesToTheMovedValue()
+    {
+        var vm = NewNavVm();
+        Assert.Equal(
+            new[] { new KeyValuePair<string, string>("NAV", "1") }, vm.LayerDefines);
+
+        Assert.True(vm.MoveLayer(1, 2));
+
+        Assert.Equal(
+            new[] { new KeyValuePair<string, string>("NAV", "2") }, vm.LayerDefines);
+        Assert.Contains(new KeyValuePair<string, string>("NAV", "2"), vm.Defines);
+    }
+
+    [Fact]
+    public void Undo_AfterMove_RestoresBaselineDefines()
+    {
+        var vm = NewNavVm();
+        Assert.True(vm.MoveLayer(1, 2));
+
+        vm.Session.Undo();
+
+        Assert.Equal(
+            new[] { new KeyValuePair<string, string>("NAV", "1") }, vm.LayerDefines);
+    }
+
+    [Fact]
+    public void KeyEdit_LeavesDefinesInstanceAlone()
+    {
+        var vm = NewNavVm();
+        var before = vm.LayerDefines;
+
+        Assert.True(vm.ClearKey(0, 1, toNone: false));
+
+        Assert.Same(before, vm.LayerDefines);
+    }
+
     // ---- clearing keys --------------------------------------------------------------
 
     [Fact]

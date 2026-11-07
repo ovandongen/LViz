@@ -344,7 +344,7 @@ public static class KeymapComboWriter
     {
         "key-positions" => !new HashSet<int>(current.KeyPositions).SetEquals(next.KeyPositions),
         "layers" => !SameLayerScope(current.Layers, next.Layers),
-        "bindings" => !KeymapWriter.IsSameBinding(current.Binding, next.Binding),
+        "bindings" => !current.Binding.SameAs(next.Binding),
         "timeout-ms" => current.TimeoutMs != next.TimeoutMs,
         "require-prior-idle-ms" => current.RequirePriorIdleMs != next.RequirePriorIdleMs,
         "slow-release" => current.SlowRelease != next.SlowRelease,
@@ -420,7 +420,7 @@ public static class KeymapComboWriter
 
             for (int key = 0; key < want.Bindings.Count; key++)
             {
-                if (!KeymapWriter.IsSameBinding(actual.Bindings[key], want.Bindings[key]))
+                if (!actual.Bindings[key].SameAs(want.Bindings[key]))
                     throw new ZmkKeymapParseException(
                         $"after writing combos, layer {layer} ('{actual.Name}') key {key} is "
                         + $"'{actual.Bindings[key].Display}', expected '{want.Bindings[key].Display}'.");

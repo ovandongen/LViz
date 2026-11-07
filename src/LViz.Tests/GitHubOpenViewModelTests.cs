@@ -124,6 +124,7 @@ public sealed class GitHubOpenViewModelTests : IDisposable
     {
         var fake = new FakeGitHubKeymapService { IsSignedIn = true, Login = "octocat" };
         fake.OnListRepos = () => Task.FromResult<IReadOnlyList<GitHubRepo>>(TwoRepos());
+        fake.OnListBranches = (_, _) => Task.FromResult<IReadOnlyList<string>>(["main"]); // scripted: an un-scripted throw now surfaces as ErrorText
         var vm = Wire(fake, [], []);
 
         await vm.InitializeAsync();
@@ -193,6 +194,7 @@ public sealed class GitHubOpenViewModelTests : IDisposable
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         fake.OnCompleteSignIn = _ => gate.Task;
         fake.OnListRepos = () => Task.FromResult<IReadOnlyList<GitHubRepo>>(TwoRepos());
+        fake.OnListBranches = (_, _) => Task.FromResult<IReadOnlyList<string>>(["main"]); // scripted: an un-scripted throw now surfaces as ErrorText
 
         var copied = new List<string>();
         var opened = new List<string>();
@@ -571,5 +573,105 @@ public sealed class GitHubOpenViewModelTests : IDisposable
 
         vm.IsFetching = true;
         Assert.False(vm.OpenCommand.CanExecute(null));
+    }
+
+    // --- non-API failures (anything but GitHubApiException) ---
+
+    [Fact]
+    public async Task Open_NonApiFailure_ShowsUnexpectedMessage()
+    {
+        var fake = SignedInFake();
+        fake.OnFetchRepo = (_, _, _) =>
+            Task.FromException<GitHubCacheResult>(new IOException("disk full"));
+        var vm = Wire(fake, [], []);
+
+        await vm.InitializeAsync();
+        await WaitUntil(() => vm.SelectedBranch == "main");
+        await vm.OpenCommand.ExecuteAsync(null);
+
+        Assert.Equal(Loc.Instance.Format("GitHub_ErrorUnexpectedFormat", "disk full"), vm.ErrorText);
+        Assert.DoesNotContain("[GitHub_", vm.ErrorText);
+        Assert.Contains("disk full", vm.ErrorText);
+        Assert.False(vm.IsFetching);
+        Assert.Equal(1, vm.CurrentStep); // stays on the repo step
+    }
+
+    [Fact]
+    public async Task ShowRepos_NonApiFailure_ShowsUnexpectedMessage()
+    {
+        var fake = new FakeGitHubKeymapService { IsSignedIn = true, Login = "octocat" };
+        fake.OnListRepos = () =>
+            Task.FromException<IReadOnlyList<GitHubRepo>>(new InvalidOperationException("boom"));
+        var vm = Wire(fake, [], []);
+
+        await vm.InitializeAsync();
+
+        Assert.Equal(Loc.Instance.Format("GitHub_ErrorUnexpectedFormat", "boom"), vm.ErrorText);
+        Assert.DoesNotContain("[GitHub_", vm.ErrorText);
+        Assert.Contains("boom", vm.ErrorText);
+        Assert.False(vm.IsBusy);
+        Assert.Equal(1, vm.CurrentStep); // stays on the repo list
+    }
+
+    [Fact]
+    public async Task ShowRepos_Cancelled_IsNotReportedAsFailure()
+    {
+        var fake = new FakeGitHubKeymapService { IsSignedIn = true, Login = "octocat" };
+        fake.OnListRepos = () =>
+            Task.FromException<IReadOnlyList<GitHubRepo>>(new TaskCanceledException("user left"));
+        var vm = Wire(fake, [], []);
+
+        // The filter lets cancellation through to the caller instead of showing it.
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => vm.InitializeAsync());
+
+        Assert.Null(vm.ErrorText);
+    }
+
+    [Fact]
+    public async Task Branches_NonApiFailure_ShowsUnexpectedMessage()
+    {
+        var fake = SignedInFake();
+        fake.OnListBranches = (_, _) =>
+            Task.FromException<IReadOnlyList<string>>(new IOException("io"));
+        var vm = Wire(fake, [], []);
+
+        await vm.InitializeAsync();
+        await WaitUntil(() => vm.HasError);
+
+        Assert.Equal(Loc.Instance.Format("GitHub_ErrorUnexpectedFormat", "io"), vm.ErrorText);
+        Assert.DoesNotContain("[GitHub_", vm.ErrorText);
+        Assert.Contains("io", vm.ErrorText);
+    }
+
+    [Fact]
+    public async Task Branches_FailureForRepoNoLongerSelected_IsDropped()
+    {
+        var fake = SignedInFake();
+        var gate = new TaskCompletionSource<IReadOnlyList<string>>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        fake.OnListBranches = async (_, repo) =>
+        {
+            if (repo != "zmk-config")
+            {
+                return ["beta"];
+            }
+
+            return await gate.Task; // the test decides success or failure below
+        };
+        var vm = Wire(fake, [], []);
+
+        await vm.InitializeAsync();
+        Assert.Equal("zmk-config", vm.SelectedRepo!.Name); // its branches hang on the gate
+        Assert.Null(vm.ErrorText);
+
+        vm.SelectedRepo = vm.Repos[1];
+        await WaitUntil(() => vm.SelectedBranch == "beta");
+
+        gate.SetException(new IOException("late boom")); // the first repo's load fails
+        await Task.Delay(50); // give the dropped continuation its chance to misfire
+
+        Assert.Null(vm.ErrorText);
+        Assert.Equal(["beta"], vm.Branches);
+        Assert.Equal("beta", vm.SelectedBranch);
     }
 }
