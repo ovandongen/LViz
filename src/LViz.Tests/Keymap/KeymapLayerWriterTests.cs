@@ -352,9 +352,24 @@ public class KeymapLayerWriterTests
         Assert.Contains("&lt LAYER_Symbol RET", block, StringComparison.Ordinal);  // 1 → 1
         Assert.Contains("&to LAYER_Lower", block, StringComparison.Ordinal);       // 2 → 3
         Assert.Contains("&lt LAYER_Mouse TAB", block, StringComparison.Ordinal);   // 4 → 5
-        // a hold-tap's layer is still a renumbered number: only the layer
-        // behaviors have a define-name spelling
-        Assert.Contains("&magic 4 0", block, StringComparison.Ordinal);            // 3 → 4
+        // a hold-tap's layer side is a layer reference too: 3 → 4 is spelled
+        // with the define the file itself uses after &magic
+        Assert.Contains("&magic LAYER_Magic 0", block, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Glove80_Add_A_Copy_At_The_End_Writes_The_HoldTap_Layer_As_Its_Define()
+    {
+        var source = Load("glove80.keymap");
+        var config = Parse(source);
+
+        // Appending renumbers nothing, so LAYER_Magic keeps 3 and the copied
+        // cell is spelled exactly like the two the file already has.
+        var result = KeymapLayerWriter.Apply(
+            source, new Add(config.Layers.Count, "Copy", config.Layers[0].Bindings));
+
+        Assert.Equal(3, CountOf(result, "&magic LAYER_Magic 0"));
+        Assert.DoesNotContain("&magic 3 0", result, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -10,6 +10,7 @@ using LViz.Core.Keymap.Writer;
 using LViz.Core.Models;
 using LViz.Core.Persistence;
 using LViz.Tests.GitHub;
+using LViz.Tests.Keymap;
 using Xunit;
 
 namespace LViz.Tests;
@@ -512,6 +513,87 @@ public class KeymapEditViewModelTests
 
         Assert.Null(vm.CheckDeleteLayer(-1));
         Assert.Null(vm.CheckDeleteLayer(2));
+    }
+
+    // ---- combo edits ----------------------------------------------------------------
+
+    /// <summary>Slabwing: 7 layers, 4 combos, and its <c>syslayer</c> combo
+    /// binds <c>&amp;mo 2</c>.</summary>
+    private static KeymapEditViewModel NewSlabwingVm() => NewVm(KeymapFixtures.Read("slabwing.keymap"));
+
+    private static ZmkCombo Combo(string name, string binding, params string[] parameters) =>
+        new(name, "", [10, 11], [-1], new KeyBinding(binding, parameters)) { NodeName = name };
+
+    [Fact]
+    public void AddCombo_TargetingALayer_BlocksDeletingThatLayer_AndDeleteRefuses()
+    {
+        var vm = NewSlabwingVm();
+
+        vm.AddCombo(Combo("extra", "&mo", "5"));
+
+        var check = vm.CheckDeleteLayer(5);
+        Assert.NotNull(check);
+        Assert.False(check.CanDelete);
+        var blocker = Assert.Single(check.Blockers, b => b.Kind == LayerDeleteBlockerKind.Combo);
+        Assert.Equal("extra", blocker.Name);
+        Assert.Equal(0, blocker.Line);
+
+        Assert.False(vm.DeleteLayer(5)); // refused, not thrown
+        Assert.Equal(7, vm.Session.Current.Layers.Count);
+    }
+
+    [Fact]
+    public void CheckDelete_TextAndModelSeeTheSameCombo_BlocksExactlyOnce()
+    {
+        var vm = NewSlabwingVm();
+
+        var check = vm.CheckDeleteLayer(2);
+        Assert.NotNull(check);
+        Assert.False(check.CanDelete);
+        var blocker = Assert.Single(check.Blockers, b => b.Kind == LayerDeleteBlockerKind.Combo);
+        Assert.Equal("syslayer", blocker.Name);
+    }
+
+    [Fact]
+    public void AddCombo_RaisesChanged_AndPendingFlagClearsOnUndo()
+    {
+        var vm = NewVm();
+        var raised = 0;
+        vm.Changed += (_, _) => raised++;
+
+        Assert.Equal(0, vm.AddCombo(Combo("c", "&kp", "X")));
+
+        Assert.Equal(1, raised);
+        Assert.Equal(1, vm.ChangeCount);
+        Assert.True(vm.HasPendingComboEdits);
+
+        vm.Session.Undo();
+
+        Assert.Equal(0, vm.ChangeCount);
+        Assert.False(vm.HasPendingComboEdits);
+    }
+
+    [Fact]
+    public void SetCombo_AndDeleteCombo_WrapTheSession_AndIsComboChangedTracksIt()
+    {
+        var vm = NewVm();
+        var index = vm.AddCombo(Combo("c", "&kp", "X"));
+        Assert.True(vm.IsComboChanged(index));
+
+        // The same combo: false, no second step.
+        Assert.False(vm.SetCombo(index, Combo("c", "&kp", "X")));
+        Assert.Equal(1, vm.ChangeCount);
+
+        Assert.True(vm.SetCombo(index, Combo("c", "&kp", "Y")));
+        // The count is the net diff against the baseline, not the undo steps:
+        // still the one added combo.
+        Assert.Equal(1, vm.ChangeCount);
+
+        vm.DeleteCombo(index);
+        Assert.Empty(vm.Session.Current.Combos);
+        // The add and the delete of that added combo net out.
+        Assert.Equal(0, vm.ChangeCount);
+        Assert.False(vm.HasPendingComboEdits);
     }
 
     // ---- Start on a real file -----------------------------------------------------------

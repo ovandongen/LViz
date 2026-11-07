@@ -2,7 +2,9 @@ using LViz.App.Localization;
 using LViz.App.ViewModels;
 using LViz.Core.Keymap.Catalog;
 using LViz.Core.Keymap.Parser;
+using LViz.Core.Keymap.Writer;
 using LViz.Core.Models;
+using LViz.Tests.Keymap;
 using Xunit;
 
 namespace LViz.Tests;
@@ -402,6 +404,29 @@ public class KeyRingViewModelTests
         Assert.True(raised >= 1);
     }
 
+    // --- One-pick behavior on the shipped fixture ----------------------------
+
+    /// <summary>glove80's <c>&amp;magic</c> holds a layer and taps a 0-cell
+    /// macro: hiding the Ignored cell and prefilling the layer every use
+    /// names makes picking it on the behavior ring a single click that
+    /// already offers to save.</summary>
+    [Fact]
+    public void Glove80_ChoosingMagic_IsOnePick_AndClosesWithThePinnedLayer()
+    {
+        var request = new KeyDialogRequest(GloveConfig, GloveDefines, 0, 0)   // &mt F11 F1
+        {
+            LayerDefines = GloveLayerDefines,
+        };
+        var ring = new KeyRingViewModel(new KeyDialogViewModel(request), request);
+
+        Assert.True(ring.Choose("beh:&magic"));
+
+        Assert.True(ring.CanClose);
+        Assert.Equal("&magic", ring.CloseResult!.Behavior);
+        Assert.Equal(new[] { "3", "0" }, ring.CloseResult.Params);
+        Assert.Equal(KeyRingStepKind.Behavior, ring.StepKind);
+    }
+
     // --- Crumbs and back ----------------------------------------------------
 
     [Fact]
@@ -535,6 +560,39 @@ public class KeyRingViewModelTests
         Assert.Equal(
             Loc.Instance.Format("Ring_CaptionFormat", 0, "Base"),
             Ring(0).CenterCaption);
+    }
+
+    // --- Editing a binding that isn't on a key (part 14) --------------------
+
+    [Fact]
+    public void CarriedBinding_CaptionReplacesCenter_AndChoiceWritesThrough()
+    {
+        var request = new KeyDialogRequest(Config, Defines, 0, -1)
+        {
+            Binding = new KeyBinding("&kp", ["ESC"]),
+            Caption = "Combo combo_esc",
+        };
+        var ring = new KeyRingViewModel(new KeyDialogViewModel(request), request);
+
+        Assert.Equal("Combo combo_esc", ring.CenterCaption);
+        Assert.True(ring.IsSummary);
+        Assert.Equal(KeyRingCenterState.Unchanged, ring.CenterState);
+
+        Assert.True(ring.Choose("beh:&trans"));
+
+        Assert.Equal("&trans", ring.CloseResult!.Behavior);
+        Assert.Empty(ring.CloseResult.Params);
+    }
+
+    [Fact]
+    public void CarriedNone_OpensOnTheCategoryRing()
+    {
+        var request = new KeyDialogRequest(Config, Defines, 0, -1) { Binding = KeyBinding.None };
+        var ring = new KeyRingViewModel(new KeyDialogViewModel(request), request);
+
+        Assert.False(ring.IsSummary);
+        Assert.Equal(KeyRingStepKind.Behavior, ring.StepKind);
+        Assert.True(Segment(ring.Segments, "cat:Clear").IsCurrent);
     }
 
     [Fact]
@@ -992,6 +1050,19 @@ public class KeyRingViewModelTests
 
     private static readonly IReadOnlyList<KeyValuePair<string, string>> ManyCommandDefines =
         Preprocessor.CollectDefines(ManyCommandKeymap);
+
+    // The shipped fixture: its every-define list plus the layer-reference
+    // subset the ring shows binding text with.
+    private static readonly string GloveSource = KeymapFixtures.Read("glove80.keymap");
+
+    private static readonly KeyboardConfig GloveConfig =
+        ZmkKeymapLoader.LoadFromText(GloveSource, "glove80");
+
+    private static readonly IReadOnlyList<KeyValuePair<string, string>> GloveDefines =
+        Preprocessor.CollectDefines(GloveSource);
+
+    private static readonly IReadOnlyList<KeyValuePair<string, string>> GloveLayerDefines =
+        KeymapWriter.LayerReferenceDefines(GloveSource, GloveConfig);
 
     // --- helpers ------------------------------------------------------------
 

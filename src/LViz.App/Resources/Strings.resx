@@ -2255,6 +2255,10 @@
     <value>Key {0} on layer {1}</value>
     <comment/>
   </data>
+  <data name="KeyDialog_TitleCustomFormat" xml:space="preserve">
+    <value>Binding on layer {0}</value>
+    <comment/>
+  </data>
   <data name="KeyDialog_TabBehavior" xml:space="preserve">
     <value>Behavior</value>
     <comment/>
@@ -2697,6 +2701,286 @@
   </data>
   <data name="Ring_Panel_Hint" xml:space="preserve">
     <value>↵ pick · ↑↓ move</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Group_Board" xml:space="preserve">
+    <value>Board (edit mode)</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Group_Layers" xml:space="preserve">
+    <value>Layers (edit mode)</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Group_KeyRing" xml:space="preserve">
+    <value>Key ring</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Group_KeyDialog" xml:space="preserve">
+    <value>Key dialog</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Group_Mouse" xml:space="preserve">
+    <value>Mouse</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_EditKey" xml:space="preserve">
+    <value>Edit the selected key</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_ClearTrans" xml:space="preserve">
+    <value>Make the selected key transparent (&amp;trans)</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_ClearNone" xml:space="preserve">
+    <value>Make the selected key do nothing (&amp;none)</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Deselect" xml:space="preserve">
+    <value>Deselect the key</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Undo" xml:space="preserve">
+    <value>Undo</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Redo" xml:space="preserve">
+    <value>Redo</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_NewLayer" xml:space="preserve">
+    <value>New layer</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_DuplicateLayer" xml:space="preserve">
+    <value>Duplicate the shown layer</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_MoveLayerLeft" xml:space="preserve">
+    <value>Move the shown layer left</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_MoveLayerRight" xml:space="preserve">
+    <value>Move the shown layer right</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_RingAround" xml:space="preserve">
+    <value>Move around the ring</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_RingList" xml:space="preserve">
+    <value>Move through the list</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_RingBand" xml:space="preserve">
+    <value>Move into the outer band</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_RingEnter" xml:space="preserve">
+    <value>Pick, or save when the binding is complete</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_RingBack" xml:space="preserve">
+    <value>Back one step</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Typing" xml:space="preserve">
+    <value>Type</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_RingSearch" xml:space="preserve">
+    <value>Search the list</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_DialogTabs" xml:space="preserve">
+    <value>Previous / next tab</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_DoubleClickKey" xml:space="preserve">
+    <value>Double-click a key</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_RightClickKey" xml:space="preserve">
+    <value>Right-click a key</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_RightClickRing" xml:space="preserve">
+    <value>Right-click in the ring</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_DoubleClickChoice" xml:space="preserve">
+    <value>Double-click a ring choice</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_DoubleClickCombo" xml:space="preserve">
+    <value>Double-click a combo tile</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_EditKeyMouse" xml:space="preserve">
+    <value>Edit the key (edit mode)</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_EditLabel" xml:space="preserve">
+    <value>Edit the key's label</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_PickAndSave" xml:space="preserve">
+    <value>Pick and save</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_EditCombo" xml:space="preserve">
+    <value>Edit the combo (edit mode)</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Title" xml:space="preserve">
+    <value>Keyboard shortcuts</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_MenuItem" xml:space="preserve">
+    <value>Keyboard shortcuts…</value>
+    <comment/>
+  </data>
+  <data name="Help_OnlineMenuItem" xml:space="preserve">
+    <value>Online help</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Close" xml:space="preserve">
+    <value>Close</value>
+    <comment/>
+  </data>
+  <data name="Edit_DeleteBlockedSaveCombosFirst" xml:space="preserve">
+    <value>Combo changes are written when you save. Save first, then delete the layer.</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewComboAddFormat" xml:space="preserve">
+    <value>New combo {0} ({1}): {2}</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewComboEditFormat" xml:space="preserve">
+    <value>Combo {0} ({1}): {2}</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewComboDeleteFormat" xml:space="preserve">
+    <value>Delete combo {0} ({1})</value>
+    <comment/>
+  </data>
+  <data name="Combo_TitleNew" xml:space="preserve">
+    <value>New combo</value>
+    <comment/>
+  </data>
+  <data name="Combo_TitleEditFormat" xml:space="preserve">
+    <value>Combo {0}</value>
+    <comment/>
+  </data>
+  <data name="Combo_BindingNone" xml:space="preserve">
+    <value>Choose…</value>
+    <comment/>
+  </data>
+  <data name="Combo_ErrorNoBinding" xml:space="preserve">
+    <value>Choose what the combo does.</value>
+    <comment/>
+  </data>
+  <data name="Combo_ErrorTimeout" xml:space="preserve">
+    <value>Timeout must be a whole number above 0, or empty.</value>
+    <comment/>
+  </data>
+  <data name="Combo_ErrorIdle" xml:space="preserve">
+    <value>Prior idle must be a whole number of 0 or more, or empty.</value>
+    <comment/>
+  </data>
+  <data name="Combo_ErrorNoLayers" xml:space="preserve">
+    <value>Choose at least one layer, or All layers.</value>
+    <comment/>
+  </data>
+  <data name="Combo_ErrorTooFewKeys" xml:space="preserve">
+    <value>Pick at least two keys.</value>
+    <comment/>
+  </data>
+  <data name="Combo_ErrorInvalidName" xml:space="preserve">
+    <value>The name must start with a letter and may only use letters, digits and , . _ + - (31 at most).</value>
+    <comment/>
+  </data>
+  <data name="Combo_ErrorDuplicateNameFormat" xml:space="preserve">
+    <value>Combo {0} already has this name.</value>
+    <comment/>
+  </data>
+  <data name="Combo_WarnSameKeysFormat" xml:space="preserve">
+    <value>Combo {0} uses the same keys on a shared layer.</value>
+    <comment/>
+  </data>
+  <data name="Combo_WarnTooManyKeysFormat" xml:space="preserve">
+    <value>{0} keys: MoErgo firmware and older ZMK allow 4 at most.</value>
+    <comment/>
+  </data>
+  <data name="Combo_WarnKeyInManyCombosFormat" xml:space="preserve">
+    <value>Key {0} is in {1} combos: MoErgo firmware and older ZMK allow 5 at most.</value>
+    <comment/>
+  </data>
+  <data name="Combo_LabelLayer" xml:space="preserve">
+    <value>Labels from layer</value>
+    <comment/>
+  </data>
+  <data name="Combo_KeysHint" xml:space="preserve">
+    <value>Click the keys that trigger the combo.</value>
+    <comment/>
+  </data>
+  <data name="Combo_FieldName" xml:space="preserve">
+    <value>Name</value>
+    <comment/>
+  </data>
+  <data name="Combo_FieldBinding" xml:space="preserve">
+    <value>Does</value>
+    <comment/>
+  </data>
+  <data name="Combo_FieldTimeout" xml:space="preserve">
+    <value>Timeout</value>
+    <comment/>
+  </data>
+  <data name="Combo_TimeoutWatermark" xml:space="preserve">
+    <value>50 (ZMK default)</value>
+    <comment/>
+  </data>
+  <data name="Combo_FieldLayers" xml:space="preserve">
+    <value>Layers</value>
+    <comment/>
+  </data>
+  <data name="Combo_AllLayers" xml:space="preserve">
+    <value>All layers</value>
+    <comment/>
+  </data>
+  <data name="Combo_FieldIdle" xml:space="preserve">
+    <value>Require prior idle</value>
+    <comment/>
+  </data>
+  <data name="Combo_IdleWatermark" xml:space="preserve">
+    <value>off</value>
+    <comment/>
+  </data>
+  <data name="Combo_FieldSlowRelease" xml:space="preserve">
+    <value>Slow release</value>
+    <comment/>
+  </data>
+  <data name="Combo_SlowReleaseHint" xml:space="preserve">
+    <value>Release when all keys are up</value>
+    <comment/>
+  </data>
+  <data name="Tooltip_NewCombo" xml:space="preserve">
+    <value>New combo</value>
+    <comment/>
+  </data>
+  <data name="Tooltip_ComboMenu" xml:space="preserve">
+    <value>Combo actions</value>
+    <comment/>
+  </data>
+  <data name="Edit_ComboMenuEdit" xml:space="preserve">
+    <value>Edit…</value>
+    <comment/>
+  </data>
+  <data name="Edit_ComboMenuDelete" xml:space="preserve">
+    <value>Delete</value>
     <comment/>
   </data>
 </root>

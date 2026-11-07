@@ -8,8 +8,9 @@ namespace LViz.Tests.Keymap;
 /// <summary>
 /// The pickable behavior list: fixed built-ins in picker order (the v1 set,
 /// the command behaviors, the parameter-less key/system behaviors), plus the
-/// hold-taps and macros of a loaded keymap mapped to parameter kinds, with
-/// built-in-wins de-duplication.
+/// hold-taps and macros of a loaded keymap mapped to parameter kinds (with
+/// 0-cell hold-tap sides <c>Ignored</c>), the pinned layer of a
+/// [Layer, Ignored] hold-tap, and built-in-wins de-duplication.
 /// </summary>
 public class ZmkBehaviorCatalogTests
 {
@@ -106,7 +107,7 @@ public class ZmkBehaviorCatalogTests
     }
 
     [Fact]
-    public void Find_Glove80Fixture_MagicHoldTap_IsLayerRaw()
+    public void Find_Glove80Fixture_MagicHoldTap_IsLayerIgnored()
     {
         var config = ZmkKeymapLoader.LoadFromText(
             KeymapFixtures.Read("glove80-editor.keymap"), "glove80");
@@ -115,11 +116,37 @@ public class ZmkBehaviorCatalogTests
 
         Assert.NotNull(magic);
         Assert.Equal(ZmkBehaviorGroup.Keymap, magic!.Group);
-        // Hold is &mo → Layer; tap &rgb_ug_status_macro is not a known
-        // keycode/layer behavior → Raw.
+        // Hold is &mo → Layer; tap &rgb_ug_status_macro has #binding-cells
+        // = <0> → its cell is ignored.
         Assert.Equal(
-            new[] { ZmkBehaviorParamKind.Layer, ZmkBehaviorParamKind.Raw },
+            new[] { ZmkBehaviorParamKind.Layer, ZmkBehaviorParamKind.Ignored },
             magic.Params);
+    }
+
+    [Theory]
+    [InlineData("glove80.keymap", 3)]
+    [InlineData("go60.keymap", 7)]
+    public void Fixture_MagicHoldTap_IsLayerIgnored_AndPinsItsLayer(
+        string fixture, int pinnedLayer)
+    {
+        var config = ZmkKeymapLoader.LoadFromText(
+            KeymapFixtures.Read(fixture), "fixture");
+
+        Assert.Equal(
+            new[] { ZmkBehaviorParamKind.Layer, ZmkBehaviorParamKind.Ignored },
+            ZmkBehaviorCatalog.Find(config, "&magic")!.Params);
+        Assert.Equal(pinnedLayer, ZmkBehaviorCatalog.PinnedLayer(config, "&magic"));
+    }
+
+    [Fact]
+    public void PinnedLayer_Glove80EditorFixture_MatchesTheMagicLayerByName()
+    {
+        var config = ZmkKeymapLoader.LoadFromText(
+            KeymapFixtures.Read("glove80-editor.keymap"), "glove80");
+
+        var magic = config.Layers.Single(l => l.Name == "Magic");
+
+        Assert.Equal(magic.Index, ZmkBehaviorCatalog.PinnedLayer(config, "&magic"));
     }
 
     [Fact]
@@ -198,17 +225,155 @@ public class ZmkBehaviorCatalogTests
     }
 
     [Fact]
+    public void For_ZeroArityHoldSide_IsIgnored_AndNeverPinned()
+    {
+        var config = Config(
+            holdTaps: new[] { new HoldTap("&sig", "&sig_macro", "&kp", 0, 1) });
+
+        Assert.Equal(
+            new[] { ZmkBehaviorParamKind.Ignored, ZmkBehaviorParamKind.Keycode },
+            ZmkBehaviorCatalog.Find(config, "&sig")!.Params);
+        // [Ignored, Keycode] is not [Layer, Ignored] → never pinnable.
+        Assert.Null(ZmkBehaviorCatalog.PinnedLayer(config, "&sig"));
+    }
+
+    // A hold-tap whose only visible param is the layer: pinned when every
+    // use in the layers/combos targets one and the same in-range layer.
+    private static KeyboardConfig MagConfig(
+        Layer[]? layers = null, ZmkCombo[]? combos = null) =>
+        Config(
+            holdTaps: new[] { new HoldTap("&mag", "&mo", "&m0", 1, 0) },
+            layers: layers,
+            combos: combos);
+
+    private static Layer LayerWith(int index, params KeyBinding[] bindings) =>
+        new(index, $"L{index}", bindings);
+
+    private static KeyBinding Mag(params string[] paramStrings) =>
+        new("&mag", paramStrings);
+
+    [Fact]
+    public void PinnedLayer_MagHoldTap_WithNoUse_IsNull()
+    {
+        var config = MagConfig(layers: new[]
+        {
+            LayerWith(0, KeyBinding.Transparent),
+            LayerWith(1, KeyBinding.None),
+            LayerWith(2, new KeyBinding("&mo", new[] { "1" })),
+        });
+
+        Assert.Null(ZmkBehaviorCatalog.PinnedLayer(config, "&mag"));
+    }
+
+    [Fact]
+    public void PinnedLayer_MagHoldTap_AllUsesSameLayer_ReturnsIt()
+    {
+        var config = MagConfig(layers: new[]
+        {
+            LayerWith(0, Mag("2", "0")),
+            LayerWith(1, KeyBinding.Transparent, Mag("2", "0")),
+            LayerWith(2, KeyBinding.Transparent),
+        });
+
+        Assert.Equal(2, ZmkBehaviorCatalog.PinnedLayer(config, "&mag"));
+    }
+
+    [Fact]
+    public void PinnedLayer_MagHoldTap_UsesDiffer_IsNull()
+    {
+        var config = MagConfig(layers: new[]
+        {
+            LayerWith(0, Mag("2", "0")),
+            LayerWith(1, Mag("1", "0")),
+            LayerWith(2, KeyBinding.Transparent),
+        });
+
+        Assert.Null(ZmkBehaviorCatalog.PinnedLayer(config, "&mag"));
+    }
+
+    [Fact]
+    public void PinnedLayer_MagHoldTap_UseOutsideLayerRange_IsNull()
+    {
+        var config = MagConfig(layers: new[]
+        {
+            LayerWith(0, Mag("9", "0")),
+            LayerWith(1, KeyBinding.Transparent),
+            LayerWith(2, KeyBinding.Transparent),
+        });
+
+        Assert.Null(ZmkBehaviorCatalog.PinnedLayer(config, "&mag"));
+    }
+
+    [Fact]
+    public void PinnedLayer_MagHoldTap_UsedOnlyInComboBinding_ReturnsIt()
+    {
+        var config = MagConfig(
+            layers: new[]
+            {
+                LayerWith(0, KeyBinding.Transparent),
+                LayerWith(1, KeyBinding.None),
+            },
+            combos: new[]
+            {
+                new ZmkCombo("c", "", new[] { 0, 1 }, new[] { -1 }, Mag("1", "0")),
+            });
+
+        Assert.Equal(1, ZmkBehaviorCatalog.PinnedLayer(config, "&mag"));
+    }
+
+    [Fact]
+    public void PinnedLayer_MagHoldTap_UseWithoutUsableFirstParam_IsNull()
+    {
+        var noParams = MagConfig(
+            layers: new[] { LayerWith(0, new KeyBinding("&mag", Array.Empty<string>())) });
+        var notNumeric = MagConfig(
+            layers: new[] { LayerWith(0, Mag("LAYER_Magic", "0")) });
+
+        Assert.Null(ZmkBehaviorCatalog.PinnedLayer(noParams, "&mag"));
+        Assert.Null(ZmkBehaviorCatalog.PinnedLayer(notNumeric, "&mag"));
+    }
+
+    [Fact]
+    public void PinnedLayer_MacrosInnerBindingsDoNotCount()
+    {
+        var config = Config(
+            holdTaps: new[] { new HoldTap("&mag", "&mo", "&m0", 1, 0) },
+            macros: new[]
+            {
+                new ZmkMacro("&wrap", Array.Empty<string>(), new[] { Mag("2", "0") }),
+            },
+            layers: new[]
+            {
+                LayerWith(0, KeyBinding.Transparent),
+                LayerWith(1, KeyBinding.None),
+                LayerWith(2, KeyBinding.None),
+            });
+
+        Assert.Null(ZmkBehaviorCatalog.PinnedLayer(config, "&mag"));
+    }
+
+    [Fact]
+    public void PinnedLayer_BuiltInCode_AndNullConfig_AreNull()
+    {
+        Assert.Null(ZmkBehaviorCatalog.PinnedLayer(Config(), "&lt"));
+        Assert.Null(ZmkBehaviorCatalog.PinnedLayer(null, "&magic"));
+    }
+
+    [Fact]
     public void ArityTable_KnowsStickyKey()
     {
         Assert.Equal(1, BehaviorArityTable.Arity("&sk"));
     }
 
     private static KeyboardConfig Config(
-        HoldTap[]? holdTaps = null, ZmkMacro[]? macros = null) =>
+        HoldTap[]? holdTaps = null,
+        ZmkMacro[]? macros = null,
+        Layer[]? layers = null,
+        ZmkCombo[]? combos = null) =>
         new(
             "test",
-            Array.Empty<Layer>(),
+            layers ?? Array.Empty<Layer>(),
             macros ?? Array.Empty<ZmkMacro>(),
             holdTaps ?? Array.Empty<HoldTap>(),
-            Array.Empty<ZmkCombo>());
+            combos ?? Array.Empty<ZmkCombo>());
 }

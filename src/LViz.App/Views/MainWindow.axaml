@@ -412,12 +412,22 @@
                                       Data="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" />
                         </Button>
 
-                        <!-- Help / documentation (opens the GitHub wiki) -->
-                        <Button x:Name="HelpButton" Command="{Binding OpenHelpCommand}"
+                        <!-- Help / documentation: a small menu; the first item
+                             opens the read-only shortcuts window, the second
+                             opens the GitHub wiki. -->
+                        <Button x:Name="HelpButton"
                                 Padding="8,4"
                                 ToolTip.Tip="{Binding [Tooltip_Help], Source={StaticResource Loc}}">
                             <PathIcon Width="14" Height="14"
                                       Data="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z" />
+                            <Button.Flyout>
+                                <MenuFlyout Placement="Bottom">
+                                    <MenuItem Header="{Binding [Shortcuts_MenuItem], Source={StaticResource Loc}}"
+                                              Command="{Binding OpenShortcutsCommand}" />
+                                    <MenuItem Header="{Binding [Help_OnlineMenuItem], Source={StaticResource Loc}}"
+                                              Command="{Binding OpenHelpCommand}" />
+                                </MenuFlyout>
+                            </Button.Flyout>
                         </Button>
                     </StackPanel>
                     <!-- Wizard entry point when the loaded keymap fits no known
@@ -495,109 +505,157 @@
             <!-- Combo legend: WrapPanel of numbered tiles, one per
                  active-layer combo. Docked alongside the tabs — same
                  edge as the bars panel, always closest to the keyboard.
-                 IsVisible gated on the overlay toggle, so the row
-                 collapses cleanly when off. -->
+                 IsVisible rides the overlay toggle OR an open edit, so
+                 the row also collapses cleanly when both are off. In
+                 edit mode a "+" adds a combo and each tile grows a ⋮
+                 menu; double-click opens the combo dialog. -->
             <Border x:Name="ComboLegend" Grid.Row="3"
-                    IsVisible="{Binding IsComboOverlayVisible}"
+                    IsVisible="{Binding IsComboLegendVisible}"
                     Background="{Binding TabBackground, Converter={StaticResource HexToBrush}}"
                     Padding="8,4">
-                <Grid>
-                    <TextBlock Text="{Binding [ComboLegend_Empty], Source={StaticResource Loc}}"
+                <DockPanel>
+                    <Button DockPanel.Dock="Left"
+                            Command="{Binding NewComboCommand}"
+                            IsVisible="{Binding IsEditing}"
+                            Focusable="False"
+                            Padding="8,4"
+                            Margin="0,0,2,0"
+                            VerticalAlignment="Top"
+                            ToolTip.Tip="{Binding [Tooltip_NewCombo], Source={StaticResource Loc}}">
+                        <TextBlock Text="+" FontSize="14" />
+                    </Button>
+                    <Grid>
+                        <TextBlock Text="{Binding [ComboLegend_Empty], Source={StaticResource Loc}}"
                                HorizontalAlignment="Center"
                                Opacity="0.65"
                                Margin="0,4"
                                Foreground="{StaticResource Text}">
-                        <TextBlock.IsVisible>
-                            <MultiBinding Converter="{x:Static conv:EqualityToBoolMultiConverter.Instance}">
-                                <Binding Path="Combos.Count" />
-                                <Binding>
-                                    <Binding.Source>
-                                        <sys:Int32>0</sys:Int32>
-                                    </Binding.Source>
-                                </Binding>
-                            </MultiBinding>
-                        </TextBlock.IsVisible>
-                    </TextBlock>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                            <TextBlock.IsVisible>
+                                <MultiBinding Converter="{x:Static conv:EqualityToBoolMultiConverter.Instance}">
+                                    <Binding Path="Combos.Count" />
+                                    <Binding>
+                                        <Binding.Source>
+                                            <sys:Int32>0</sys:Int32>
+                                        </Binding.Source>
+                                    </Binding>
+                                </MultiBinding>
+                            </TextBlock.IsVisible>
+                        </TextBlock>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled"
                                   MaxHeight="160">
-                        <ItemsControl ItemsSource="{Binding Combos}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel Orientation="Horizontal" />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.Styles>
-                                <!-- Background/BorderBrush are per-combo (data-bound
-                                     to ComboColorPalette via Color/DarkColor on the
-                                     VM). Default fill is the light pastel + dark
-                                     text; hover/active swap to the darkened sibling
-                                     + light text, mirroring the on-key pill. -->
-                                <Style Selector="Button.comboTile">
-                                    <Setter Property="Background" Value="{StaticResource ComboFill}" />
-                                    <Setter Property="BorderBrush" Value="{StaticResource ComboStroke}" />
-                                    <Setter Property="BorderThickness" Value="2" />
-                                    <Setter Property="CornerRadius" Value="4" />
-                                    <Setter Property="Padding" Value="10,5" />
-                                    <Setter Property="Margin" Value="0,0,6,6" />
-                                    <Setter Property="MinWidth" Value="56" />
-                                    <Setter Property="Cursor" Value="Hand" />
-                                    <Setter Property="Transitions">
-                                        <Transitions>
-                                            <BrushTransition Property="Background" Duration="0:0:0.12" />
-                                        </Transitions>
-                                    </Setter>
-                                </Style>
-                                <Style Selector="Button.comboTile TextBlock">
-                                    <Setter Property="Foreground" Value="{StaticResource BgBase}" />
-                                </Style>
-                                <Style Selector="Button.comboTile:pointerover /template/ ContentPresenter">
-                                    <Setter Property="Background" Value="{StaticResource ComboStroke}" />
-                                    <Setter Property="BorderBrush" Value="{Binding DataContext.BoardStyle.PressHighlightColor, ElementName=MainWin, Converter={StaticResource HexToBrush}}" />
-                                </Style>
-                                <Style Selector="Button.comboTile:pointerover TextBlock">
-                                    <Setter Property="Foreground" Value="{StaticResource Text}" />
-                                </Style>
-                                <Style Selector="Button.comboTile.active /template/ ContentPresenter">
-                                    <Setter Property="Background" Value="{StaticResource ComboStroke}" />
-                                    <Setter Property="BorderBrush" Value="{Binding DataContext.BoardStyle.PressHighlightColor, ElementName=MainWin, Converter={StaticResource HexToBrush}}" />
-                                </Style>
-                                <Style Selector="Button.comboTile.active TextBlock">
-                                    <Setter Property="Foreground" Value="{StaticResource Text}" />
-                                </Style>
-                            </ItemsControl.Styles>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:ComboViewModel">
-                                    <Button Classes="comboTile"
+                            <ItemsControl ItemsSource="{Binding Combos}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.Styles>
+                                    <!-- Background/BorderBrush are per-combo (data-bound
+                                         to ComboColorPalette via Color/DarkColor on the
+                                         VM). Default fill is the light pastel + dark
+                                         text; hover/active swap to the darkened sibling
+                                         + light text, mirroring the on-key pill. -->
+                                    <Style Selector="Button.comboTile">
+                                        <Setter Property="Background" Value="{StaticResource ComboFill}" />
+                                        <Setter Property="BorderBrush" Value="{StaticResource ComboStroke}" />
+                                        <Setter Property="BorderThickness" Value="2" />
+                                        <Setter Property="CornerRadius" Value="4" />
+                                        <Setter Property="Padding" Value="10,5" />
+                                        <Setter Property="Margin" Value="0,0,6,6" />
+                                        <Setter Property="MinWidth" Value="56" />
+                                        <Setter Property="Cursor" Value="Hand" />
+                                        <Setter Property="Transitions">
+                                            <Transitions>
+                                                <BrushTransition Property="Background" Duration="0:0:0.12" />
+                                            </Transitions>
+                                        </Setter>
+                                    </Style>
+                                    <Style Selector="Button.comboTile TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource BgBase}" />
+                                    </Style>
+                                    <Style Selector="Button.comboTile:pointerover /template/ ContentPresenter">
+                                        <Setter Property="Background" Value="{StaticResource ComboStroke}" />
+                                        <Setter Property="BorderBrush" Value="{Binding DataContext.BoardStyle.PressHighlightColor, ElementName=MainWin, Converter={StaticResource HexToBrush}}" />
+                                    </Style>
+                                    <Style Selector="Button.comboTile:pointerover TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource Text}" />
+                                    </Style>
+                                    <Style Selector="Button.comboTile.active /template/ ContentPresenter">
+                                        <Setter Property="Background" Value="{StaticResource ComboStroke}" />
+                                        <Setter Property="BorderBrush" Value="{Binding DataContext.BoardStyle.PressHighlightColor, ElementName=MainWin, Converter={StaticResource HexToBrush}}" />
+                                    </Style>
+                                    <Style Selector="Button.comboTile.active TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource Text}" />
+                                    </Style>
+                                    <!-- Pending-change mark (edit mode): a yellow border,
+                                         the board's changed-key colour. Declared last so
+                                         it outranks the hover/active BorderBrush — the
+                                         mark never blinks off under the pointer. -->
+                                    <Style Selector="Button.comboTile.changed /template/ ContentPresenter">
+                                        <Setter Property="BorderBrush" Value="{StaticResource AccentYellow}" />
+                                    </Style>
+                                </ItemsControl.Styles>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ComboViewModel">
+                                        <Button Classes="comboTile"
                                             Classes.active="{Binding IsHighlighted}"
+                                            Classes.changed="{Binding IsChanged}"
                                             Focusable="False"
                                             PointerEntered="OnComboTilePointerEntered"
                                             PointerExited="OnComboTilePointerExited"
                                             PointerPressed="OnComboTilePointerPressed"
+                                            DoubleTapped="OnComboTileDoubleTapped"
                                             ToolTip.Tip="{Binding ParticipatingKeysText}">
-                                        <StackPanel Orientation="Horizontal" Spacing="8"
+                                            <StackPanel Orientation="Horizontal" Spacing="8"
                                                     VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Number}"
+                                                <TextBlock Text="{Binding Number}"
                                                        FontSize="11"
                                                        FontWeight="Bold"
                                                        VerticalAlignment="Top"
                                                        Opacity="0.85" />
-                                            <TextBlock Text="{Binding Label}"
+                                                <TextBlock Text="{Binding Label}"
                                                        FontSize="15"
                                                        FontWeight="SemiBold"
                                                        VerticalAlignment="Center" />
-                                            <TextBlock Text="{Binding Subscript}"
+                                                <TextBlock Text="{Binding Subscript}"
                                                        FontSize="11"
                                                        VerticalAlignment="Bottom"
                                                        Opacity="0.85"
                                                        IsVisible="{Binding Subscript, Converter={x:Static avconv:StringConverters.IsNotNullOrEmpty}}" />
-                                        </StackPanel>
-                                    </Button>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </Grid>
+                                                <!-- Edit-mode actions: edit/delete live on
+                                                     the window VM, addressed through
+                                                     MainWin (the tile's own DataContext is
+                                                     the combo). A press here never reaches
+                                                     the tile's single/right-click paths
+                                                     with an editor side effect. -->
+                                                <Button IsVisible="{Binding IsEditable}"
+                                                    Focusable="False"
+                                                    Padding="4,0"
+                                                    Background="Transparent"
+                                                    BorderThickness="0"
+                                                    VerticalAlignment="Center"
+                                                    ToolTip.Tip="{Binding [Tooltip_ComboMenu], Source={StaticResource Loc}}">
+                                                    <TextBlock Text="⋮" FontSize="12" />
+                                                    <Button.Flyout>
+                                                        <MenuFlyout Placement="Bottom">
+                                                            <MenuItem Header="{Binding [Edit_ComboMenuEdit], Source={StaticResource Loc}}"
+                                                                  Command="{Binding DataContext.EditComboCommand, ElementName=MainWin}"
+                                                                  CommandParameter="{Binding Number}" />
+                                                            <MenuItem Header="{Binding [Edit_ComboMenuDelete], Source={StaticResource Loc}}"
+                                                                  Command="{Binding DataContext.DeleteComboCommand, ElementName=MainWin}"
+                                                                  CommandParameter="{Binding Number}" />
+                                                        </MenuFlyout>
+                                                    </Button.Flyout>
+                                                </Button>
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </DockPanel>
             </Border>
 
             <!-- Layer tabs -->
@@ -739,7 +797,7 @@
             <Border x:Name="KeyRingScrim" Background="#B811111B"
                     PointerPressed="OnKeyRingScrimPressed" />
             <Canvas>
-                <Border x:Name="KeyRingKeyOutline" BorderBrush="#E8B45A" BorderThickness="2"
+                <Border x:Name="KeyRingKeyOutline" BorderBrush="{StaticResource AccentGold}" BorderThickness="2"
                         CornerRadius="8" IsHitTestVisible="False" />
             </Canvas>
         </Panel>

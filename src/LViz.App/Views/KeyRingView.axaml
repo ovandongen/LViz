@@ -4,6 +4,7 @@
         xmlns:views="using:LViz.App.Views"
         xmlns:loc="using:LViz.App.Localization"
         xmlns:i="https://github.com/projektanker/icons.avalonia"
+        xmlns:svc="using:LViz.App.Services"
         x:Class="LViz.App.Views.KeyRingView"
         x:DataType="vm:KeyRingViewModel"
         Focusable="True"
@@ -24,11 +25,11 @@
         <!-- The centre box keeps its gold frame through hover and focus. -->
         <Style Selector="TextBox#CenterText:pointerover /template/ Border#PART_BorderElement">
             <Setter Property="Background" Value="#181825" />
-            <Setter Property="BorderBrush" Value="#E8B45A" />
+            <Setter Property="BorderBrush" Value="{x:Static svc:AppTheme.AccentGoldBrush}" />
         </Style>
         <Style Selector="TextBox#CenterText:focus /template/ Border#PART_BorderElement">
             <Setter Property="Background" Value="#181825" />
-            <Setter Property="BorderBrush" Value="#E8B45A" />
+            <Setter Property="BorderBrush" Value="{x:Static svc:AppTheme.AccentGoldBrush}" />
             <Setter Property="BorderThickness" Value="1" />
         </Style>
 
@@ -42,7 +43,7 @@
         </Style>
         <Style Selector="TextBox#SearchBox:focus /template/ Border#PART_BorderElement">
             <Setter Property="Background" Value="#181825" />
-            <Setter Property="BorderBrush" Value="#E8B45A" />
+            <Setter Property="BorderBrush" Value="{x:Static svc:AppTheme.AccentGoldBrush}" />
             <Setter Property="BorderThickness" Value="1" />
         </Style>
 
@@ -65,7 +66,7 @@
         <TextBox x:Name="CenterText" Canvas.Left="170" Canvas.Top="246"
                  Width="108" Height="28" MinHeight="28"
                  FontFamily="Menlo, Consolas, monospace" FontSize="12"
-                 Background="#181825" BorderBrush="#E8B45A" BorderThickness="1" CornerRadius="6"
+                 Background="#181825" BorderBrush="{x:Static svc:AppTheme.AccentGoldBrush}" BorderThickness="1" CornerRadius="6"
                  Foreground="#CDD6F4" Padding="4,0"
                  Text="{Binding Text, Mode=TwoWay}" IsVisible="False" />
 
@@ -109,13 +110,13 @@
                                 <Setter Property="Background" Value="#45475A" />
                             </Style>
                             <Style Selector="Border.row.selected">
-                                <Setter Property="Background" Value="#29E8B45A" />
+                                <Setter Property="Background" Value="{x:Static svc:AppTheme.AccentGoldSoftBrush}" />
                             </Style>
                             <Style Selector="TextBlock.label">
                                 <Setter Property="Foreground" Value="#CDD6F4" />
                             </Style>
                             <Style Selector="Border.row.selected TextBlock.label">
-                                <Setter Property="Foreground" Value="#E8B45A" />
+                                <Setter Property="Foreground" Value="{x:Static svc:AppTheme.AccentGoldBrush}" />
                             </Style>
                             <Style Selector="TextBlock.code">
                                 <Setter Property="FontFamily" Value="Menlo, Consolas, monospace" />

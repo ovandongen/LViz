@@ -1,5 +1,6 @@
 using LViz.Core.Keymap.Editing;
 using LViz.Core.Keymap.Writer;
+using LViz.Core.Layout;
 using LViz.Core.Models;
 
 namespace LViz.App.ViewModels;
@@ -62,7 +63,21 @@ public sealed record KeyDialogRequest(
     KeyboardConfig Config,
     IReadOnlyList<KeyValuePair<string, string>> Defines,
     int LayerIndex,
-    int KeyIndex);
+    int KeyIndex)
+{
+    /// <summary>The defines a layer number may be written as, for display;
+    /// null = use <see cref="Defines"/>. Formatting with every define names
+    /// a layer after the first define with that value, which in files like
+    /// a go60 export is a key-position name rather than a layer name.</summary>
+    public IReadOnlyList<KeyValuePair<string, string>>? LayerDefines { get; init; }
+
+    /// <summary>The binding to edit instead of the layer key's (e.g. a combo's);
+    /// LayerIndex stays the layer context and KeyIndex is then ignored.</summary>
+    public KeyBinding? Binding { get; init; }
+
+    /// <summary>Caption for dialog title and ring centre instead of "Key N on layer X".</summary>
+    public string? Caption { get; init; }
+}
 
 /// <summary>
 /// What the rename-layer dialog is shown (part 7): which layer is being
@@ -83,4 +98,34 @@ public sealed record RenameLayerRequest(int LayerIndex, string CurrentName);
 /// <see cref="LayerDeleteCheck.Blockers"/> reports them.</param>
 public sealed record LayerDeleteBlockedRequest(
     string LayerName,
-    IReadOnlyList<LayerDeleteBlocker> Blockers);
+    IReadOnlyList<LayerDeleteBlocker> Blockers)
+{
+    /// <summary>True while the open edit still holds unsaved combo changes: a
+    /// combo blocker may then already be fixed in the editor, but the fix only
+    /// reaches the file when the edit is saved — the dialog then adds a line
+    /// saying so.</summary>
+    public bool ComboEditsPending { get; init; }
+}
+
+/// <summary>What the combo dialog edits: the board it draws, the edited
+/// keymap, the file's defines (parsing) and layer defines (display), which
+/// combo (null = a new one) and the layer the board shows, for the dialog's
+/// key labels.</summary>
+/// <param name="Profile">The board the dialog draws its key picker on.</param>
+/// <param name="Config">The edited keymap the dialog reads its combos from.</param>
+/// <param name="Defines">The file's #defines, for binding formatting and raw
+/// text.</param>
+/// <param name="LayerDefines">The defines usable as layer references, for
+/// display.</param>
+/// <param name="ComboIndex">Which combo to edit (index into
+/// <see cref="KeyboardConfig.Combos"/>), or <see langword="null"/> when the
+/// dialog opens for a new combo.</param>
+/// <param name="ShownLayerIndex">The layer the main window shows — the dialog
+/// labels the combo's keys with that layer's bindings.</param>
+public sealed record ComboDialogRequest(
+    IKeyboardProfile Profile,
+    KeyboardConfig Config,
+    IReadOnlyList<KeyValuePair<string, string>> Defines,
+    IReadOnlyList<KeyValuePair<string, string>> LayerDefines,
+    int? ComboIndex,
+    int ShownLayerIndex);

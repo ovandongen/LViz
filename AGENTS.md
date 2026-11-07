@@ -251,6 +251,39 @@ After creating or editing a view, rebuild the App project before trusting a
   panel's padding reaches the window's "press on `Host` cancels" check
   (`KeyRingWindowTests` pins it). Ring snapshots for review are written by
   `KeyRingSnapshotTests` to the gitignored `docs/ideas/ring-snapshots/`.
+  `KeyEditorHost` (App/Views) opens the user's editor from any window:
+  `EditAsync(owner, anchor, request, useRing)` anchors the ring on a control.
+  A `KeyDialogRequest` with `Binding` set edits that binding instead of a key
+  (`KeyIndex` is then ignored; `Caption` replaces the title). `MainWindow`
+  keeps its scrim and outline and cancels its ring through one
+  `CancellationTokenSource` (resize and scrim press).
+- **Hold-tap params: `Ignored` and a pinned layer.** A hold-tap side whose
+  behavior takes 0 cells is `ZmkBehaviorParamKind.Ignored`: the key dialog
+  shows no editor for it and keeps the cell's value (`0` on a fresh pick).
+  `ZmkBehaviorCatalog.PinnedLayer` prefills a `[Layer, Ignored]` hold-tap whose
+  every use targets one layer (MoErgo's `&magic`). Format with the 3-arg
+  `ZmkBindingFormatter.Format(binding, defines, holdTaps)` whenever the config
+  is at hand, and show layer numbers with
+  `KeymapWriter.LayerReferenceDefines`, never with every define (go60 defines
+  `POS_RH_C2R1 7` before `LAYER_Magic 7`).
+- **Combo editing: identity is the node name.** `ComboEdit`
+  (`Add`/`Change`/`Delete`) addresses a combo by `ZmkCombo.NodeName`; `Name`
+  is the label when the node has one, else the node name, and a rename moves
+  `Name` only for an unlabelled node. A combo without `layers` parses as
+  `[-1]`. `KeymapComboWriter` touches only properties that differ (a default
+  value removes its line), spells positions as defines only when the file's
+  combos already do, and re-parses as a guard. `KeymapEditSession` tracks
+  combos by never-reused ids like layers; `PendingComboEdits` is the net list
+  (deletes, changes, adds), named by *baseline* node name. `KeymapSavePlan`
+  drops a change a structure step already renumbered, and sends renamed combos
+  through temporary node names when a target name is still taken (a swap).
+  Rule checks (`ComboRules`) are the dialog's job; the session accepts any
+  combo. `LayerChoice(Index, Text)` (`KeyDialogParts.cs`) is shared by the key
+  and combo dialogs: bind `Text`.
+- **`ShortcutCatalog` is the Help → Keyboard shortcuts list.** Its edit-mode
+  rows are tested against `EditShortcuts.Resolve`; the ring, key-dialog and
+  mouse rows are not, so update them by hand when `KeyRingView` or
+  `KeyDialog` key handling changes.
 - **Three layout importers, one result.** `Core/Layout/Import/` turns board
   files into `ImportedLayout`s (keys as `DtsiKeyPhysical` in ZMK units, in
   keymap binding order, plus warnings): `PhysicalLayoutImporter`
@@ -739,8 +772,10 @@ LViz-specific (extend this list as we hit more):
   new rects.
 
 - **Headless view tests** (`[AvaloniaFact]`): `HeadlessTestApp` loads the
-  Fluent theme (dark) but not the app's resources, so a view under test uses
-  literal colours and `{Binding [Key], Source={x:Static loc:Loc.Instance}}`.
+  Fluent theme (dark) but not the app's resources, so a view under test reads
+  colours as `{x:Static svc:AppTheme.<Name>Brush}` (add the brush to
+  `AppTheme` next to its hex; the key ring does this) and strings as
+  `{Binding [Key], Source={x:Static loc:Loc.Instance}}`.
   `window.MouseDown`/`MouseUp` route real input, and two quick clicks give
   `ClickCount == 2`. An animated state settles only after a few
   `Thread.Sleep(25)` + `AvaloniaHeadlessPlatform.ForceRenderTimerTick()` +

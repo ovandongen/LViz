@@ -8,10 +8,10 @@ namespace LViz.Tests.Keymap;
 /// <summary>
 /// <see cref="KeymapCommitMessage.Build"/> over hand-built plans: the
 /// <c>LViz: …</c> summary counts each change kind in a fixed order with
-/// correct singular/plural, the detail lines run structure → renames → keys,
-/// and a long list is cut at <see cref="KeymapCommitMessage.MaxDetailLines"/>
-/// with an "… and N more" tail. English only, by decision — these strings are
-/// asserted verbatim.
+/// correct singular/plural, the detail lines run structure → renames →
+/// combos → keys, and a long list is cut at
+/// <see cref="KeymapCommitMessage.MaxDetailLines"/> with an "… and N more"
+/// tail. English only, by decision — these strings are asserted verbatim.
 /// </summary>
 public class KeymapCommitMessageTests
 {
@@ -21,6 +21,10 @@ public class KeymapCommitMessageTests
     private static readonly KeyBinding KpQ = new("&kp", ["Q"]);
     private static readonly KeyBinding KpW = new("&kp", ["W"]);
     private static readonly KeyBinding KpEscape = new("&kp", ["ESCAPE"]);
+    private static readonly KeyBinding KpEsc = new("&kp", ["ESC"]);
+    private static readonly KeyBinding KpF12 = new("&kp", ["F12"]);
+    private static readonly KeyBinding KpF11 = new("&kp", ["F11"]);
+    private static readonly KeyBinding Mclk = new("&mkp", ["MCLK"]);
 
     private static KeymapSavePlan Plan(
         IReadOnlyList<LayerStructureEdit>? structure = null,
@@ -30,6 +34,18 @@ public class KeymapCommitMessageTests
 
     private static KeymapBindingChange Change(int key, KeyBinding oldBinding, KeyBinding newBinding) =>
         new(0, "Base", key, oldBinding, newBinding);
+
+    private static ZmkCombo ComboNode(string? node, KeyBinding binding, params int[] keys) =>
+        new("Combo", "", keys, [-1], binding) { NodeName = node };
+
+    private static KeymapComboChange ComboAdded(ZmkCombo combo) =>
+        new(new ComboEdit.Add(combo), null, combo);
+
+    private static KeymapComboChange ComboChanged(ZmkCombo oldCombo, ZmkCombo newCombo) =>
+        new(new ComboEdit.Change(oldCombo.NodeName!, newCombo), oldCombo, newCombo);
+
+    private static KeymapComboChange ComboDeleted(ZmkCombo combo) =>
+        new(new ComboEdit.Delete(combo.NodeName!), combo, null);
 
     [Fact]
     public void Build_EmptyPlan_SaysNoChanges()
@@ -96,6 +112,86 @@ public class KeymapCommitMessageTests
         Assert.Equal("", lines[1]);
         Assert.Equal($"Base key 0: &kp Q {Arrow} &trans", lines[2]);
         Assert.Equal($"Base key 19: &kp Q {Arrow} &trans", lines[^2]);
+        Assert.Equal($"{Ellipsis} and 5 more", lines[^1]);
+    }
+
+    [Fact]
+    public void Build_ComboAdd_CountsAndDetailsIt()
+    {
+        var plan = Plan() with { ComboChanges = [ComboAdded(ComboNode("combo_esc", KpEsc, 10, 11))] };
+
+        Assert.Equal(
+            "LViz: add 1 combo\n\nAdd combo combo_esc (10+11): &kp ESC",
+            KeymapCommitMessage.Build(plan));
+    }
+
+    [Fact]
+    public void Build_KeyEditAndComboDeletes_ComboLinesComeBeforeKeyLines()
+    {
+        var plan = Plan(bindings: [Change(11, KpQ, KeyBinding.Transparent)]) with
+        {
+            ComboChanges =
+            [
+                ComboDeleted(ComboNode("f12", KpF12, 0, 1)),
+                ComboDeleted(ComboNode("mouse-mid", Mclk, 46, 47)),
+            ],
+        };
+
+        Assert.Equal(
+            "LViz: edit 1 key, delete 2 combos\n\n"
+            + "Delete combo f12 (0+1)\n"
+            + "Delete combo mouse-mid (46+47)\n"
+            + $"Base key 11: &kp Q {Arrow} &trans",
+            KeymapCommitMessage.Build(plan));
+    }
+
+    [Fact]
+    public void Build_ComboBindingChange_DetailsBothBindings()
+    {
+        var oldCombo = ComboNode("f12", KpF12, 0, 1);
+        var plan = Plan() with
+        {
+            ComboChanges = [ComboChanged(oldCombo, oldCombo with { Binding = KpF11 })],
+        };
+
+        Assert.Equal(
+            $"LViz: edit 1 combo\n\nEdit combo f12 (0+1): &kp F12 {Arrow} &kp F11",
+            KeymapCommitMessage.Build(plan));
+    }
+
+    [Fact]
+    public void Build_ComboRenameOnly_DetailsBothNamesAndOneBinding()
+    {
+        var oldCombo = ComboNode("f12", KpF12, 0, 1);
+        var plan = Plan() with
+        {
+            ComboChanges = [ComboChanged(oldCombo, oldCombo with { NodeName = "combo_f12" })],
+        };
+
+        Assert.Equal(
+            $"LViz: edit 1 combo\n\nEdit combo f12 {Arrow} combo_f12 (0+1): &kp F12",
+            KeymapCommitMessage.Build(plan));
+    }
+
+    [Fact]
+    public void Build_LongListWithComboLines_StillCutsAtTheLimit()
+    {
+        var combos = Enumerable.Range(0, 15)
+            .Select(i => ComboAdded(ComboNode($"combo_{i}", KpEsc, i, i + 1)))
+            .ToList();
+        var bindings = Enumerable.Range(0, 10)
+            .Select(key => Change(key, KpQ, KeyBinding.Transparent))
+            .ToList();
+
+        var lines = KeymapCommitMessage.Build(
+            Plan(bindings: bindings) with { ComboChanges = combos }).Split('\n');
+
+        Assert.Equal(23, lines.Length); // summary + blank + 20 details + tail
+        Assert.Equal("LViz: edit 10 keys, add 15 combos", lines[0]);
+        Assert.Equal("Add combo combo_0 (0+1): &kp ESC", lines[2]);
+        Assert.Equal("Add combo combo_14 (14+15): &kp ESC", lines[16]);
+        Assert.Equal($"Base key 0: &kp Q {Arrow} &trans", lines[17]);
+        Assert.Equal($"Base key 4: &kp Q {Arrow} &trans", lines[^2]);
         Assert.Equal($"{Ellipsis} and 5 more", lines[^1]);
     }
 

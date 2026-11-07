@@ -2,7 +2,9 @@ using LViz.App.Localization;
 using LViz.App.ViewModels;
 using LViz.Core.Keymap.Catalog;
 using LViz.Core.Keymap.Parser;
+using LViz.Core.Keymap.Writer;
 using LViz.Core.Models;
+using LViz.Tests.Keymap;
 using Xunit;
 
 namespace LViz.Tests;
@@ -137,6 +139,48 @@ public class KeyDialogViewModelTests
     public void TitleText_NamesKeyAndLayer()
     {
         Assert.Equal("Key 3 on layer Base", Dialog(3).TitleText);
+    }
+
+    // --- Opening on a carried binding (a combo's, part 14) -------------------
+
+    [Fact]
+    public void CarriedKpBinding_EditsIt_AndCaptionIsTheTitle()
+    {
+        var vm = CarriedDialog(new KeyBinding("&kp", ["ESC"]), "Combo combo_esc");
+
+        Assert.Equal("&kp", vm.SelectedBehavior.Code);
+        // "ESC" is the alias of the catalog's ESCAPE entry — the picker
+        // resolves, and Result keeps the binding's own spelling.
+        Assert.Same(ZmkKeycodeCatalog.Find("ESC"), Picker(vm, 0).SelectedKeycode);
+        Assert.Equal("&kp", vm.Result!.Behavior);
+        Assert.Equal(new[] { "ESC" }, vm.Result.Params);
+        Assert.Equal("Combo combo_esc", vm.TitleText);
+    }
+
+    [Fact]
+    public void CarriedNone_WithoutCaption_ResultsNone_WithLayerTitle()
+    {
+        var vm = CarriedDialog(KeyBinding.None);
+
+        Assert.Equal("&none", vm.Result!.Behavior);
+        Assert.Empty(vm.Result.Params);
+        Assert.Equal(Loc.Instance.Format("KeyDialog_TitleCustomFormat", "Base"), vm.TitleText);
+    }
+
+    [Fact]
+    public void CarriedMoBinding_SeedsTheLayerEditorOnLayerOne()
+    {
+        var vm = CarriedDialog(new KeyBinding("&mo", ["1"]));
+
+        var layer = Assert.IsType<LayerParamViewModel>(vm.Params[0]);
+        Assert.Equal(1, layer.SelectedLayer!.Index);
+    }
+
+    [Fact]
+    public void CarriedBinding_StillRejectsOutOfRangeLayer()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new KeyDialogViewModel(
+            new KeyDialogRequest(Config, Defines, 2, -1) { Binding = KeyBinding.None }));
     }
 
     // --- Opening on a command binding ---------------------------------------
@@ -443,6 +487,175 @@ public class KeyDialogViewModelTests
         Assert.Equal("&mo", vm.SelectedBehavior.Code);
     }
 
+    // --- Ignored params and the pinned layer (glove80 / go60 fixtures) ------
+
+    [Fact]
+    public void MagicKey_OpensWithOneLayerEditor_AndPreviewsThroughTheLayerDefine()
+    {
+        var vm = GloveDialog(64);   // &magic LAYER_Magic 0
+
+        Assert.Equal("&magic", vm.SelectedBehavior.Code);
+        var layer = Assert.IsType<LayerParamViewModel>(Assert.Single(vm.Params));
+        Assert.Equal(ZmkBehaviorParamKind.Layer, layer.Kind);
+        // The editor of original position 0 carries that position's label.
+        Assert.Equal(Loc.Instance["KeyDialog_ParamHold"], layer.Label);
+        Assert.Equal(3, layer.SelectedLayer!.Index);
+
+        Assert.Equal("&magic", vm.Result!.Behavior);
+        Assert.Equal(new[] { "3", "0" }, vm.Result.Params);
+        Assert.Equal("&magic LAYER_Magic 0", vm.PreviewText);
+    }
+
+    [Fact]
+    public void MagicKey_ConfirmedUnchanged_GivesBackExactlyTheOldBinding()
+    {
+        var original = GloveConfig.Layers[0].Bindings[64];
+        var vm = GloveDialog(64);
+
+        Assert.Equal(original.Behavior, vm.Result!.Behavior);
+        Assert.Equal(original.Params, vm.Result.Params);
+    }
+
+    [Fact]
+    public void PickingMagic_LandsOnTheBehaviorTab_WithThePinnedLayerFilledIn()
+    {
+        var vm = GloveDialog(0);    // &mt F11 F1
+
+        // Pick a layer on another behavior first: the switch carries it over,
+        // and the pinned layer still has to win.
+        vm.SelectedBehavior = Choice(vm, "&lt");
+        var carry = Assert.IsType<LayerParamViewModel>(vm.Params[0]);
+        carry.SelectedLayer = carry.Layers.First(choice => choice.Index == 2);
+
+        vm.SelectedBehavior = Choice(vm, "&magic");
+
+        Assert.Single(vm.Params);
+        Assert.Equal(0, vm.SelectedTabIndex);
+        Assert.True(vm.CanConfirm);
+        Assert.Equal("&magic", vm.Result!.Behavior);
+        Assert.Equal(new[] { "3", "0" }, vm.Result.Params);
+    }
+
+    [Fact]
+    public void PickingMagic_ThenAnotherLayer_WritesThatLayer_AndTheZeroCell()
+    {
+        var vm = GloveDialog(0);
+        vm.SelectedBehavior = Choice(vm, "&magic");
+        var layer = Assert.IsType<LayerParamViewModel>(vm.Params[0]);
+
+        layer.SelectedLayer = layer.Layers.First(choice => choice.Index == 1);
+
+        Assert.Equal("&magic", vm.Result!.Behavior);
+        Assert.Equal(new[] { "1", "0" }, vm.Result.Params);
+    }
+
+    [Fact]
+    public void Go60_MagicKey_PreviewsThroughTheLayerDefine_AndAMoKeyNeverNamesAPosition()
+    {
+        var vm = Go60Dialog(47);    // &magic LAYER_Magic 0
+        Assert.Equal("&magic LAYER_Magic 0", vm.PreviewText);
+
+        // Layer 7 carries over to a plain &mo. Formatting with every define
+        // would name it POS_RH_C2R1 (same value, defined earlier); a layer
+        // number may only be spelled with a define the file uses as a layer
+        // reference, which for 7 is LAYER_Magic.
+        vm.SelectedBehavior = Choice(vm, "&mo");
+        Assert.Equal(7, Assert.IsType<LayerParamViewModel>(Assert.Single(vm.Params)).SelectedLayer!.Index);
+        Assert.Equal("&mo LAYER_Magic", vm.PreviewText);
+        Assert.DoesNotContain("POS_", vm.PreviewText);
+    }
+
+    // An inline &magic: hold &mo (a layer param), tap a 0-cell macro (an
+    // Ignored cell). Four layers so "&magic 3 5" addresses an existing one.
+    private const string MagicKeymap = """
+        / {
+            macros {
+                m0: m0 {
+                    compatible = "zmk,behavior-macro";
+                    #binding-cells = <0>;
+                    bindings = <&kp A>;
+                };
+            };
+
+            behaviors {
+                magic: magic {
+                    compatible = "zmk,behavior-hold-tap";
+                    #binding-cells = <2>;
+                    bindings = <&mo>, <&m0>;
+                };
+            };
+
+            keymap {
+                compatible = "zmk,keymap";
+
+                Base { bindings = < &magic 3 5 >; } ;
+                L1 { bindings = < &trans >; } ;
+                L2 { bindings = < &trans >; } ;
+                L3 { bindings = < &trans >; } ;
+            };
+        };
+        """;
+
+    [Fact]
+    public void MagicBinding_Unchanged_IgnoredCellKeepsTheBindingsValue()
+    {
+        var config = ZmkKeymapLoader.LoadFromText(MagicKeymap, "test");
+        var vm = new KeyDialogViewModel(
+            new KeyDialogRequest(config, Preprocessor.CollectDefines(MagicKeymap), 0, 0));
+
+        Assert.Equal("&magic", vm.SelectedBehavior.Code);
+        var layer = Assert.IsType<LayerParamViewModel>(Assert.Single(vm.Params));
+        Assert.Equal(3, layer.SelectedLayer!.Index);
+        Assert.Equal(new[] { "3", "5" }, vm.Result!.Params);
+    }
+
+    // A [Ignored, Keycode] hold-tap: a 0-cell macro holds, &kp taps — the
+    // hold cell has no editor and a fresh pick writes 0 into it.
+    private const string TapOnlyKeymap = """
+        / {
+            macros {
+                m0: m0 {
+                    compatible = "zmk,behavior-macro";
+                    #binding-cells = <0>;
+                    bindings = <&kp A>;
+                };
+            };
+
+            behaviors {
+                hm: hm {
+                    compatible = "zmk,behavior-hold-tap";
+                    #binding-cells = <2>;
+                    bindings = <&m0>, <&kp>;
+                };
+            };
+
+            keymap {
+                compatible = "zmk,keymap";
+
+                Base { bindings = < &trans >; } ;
+            };
+        };
+        """;
+
+    [Fact]
+    public void IgnoredHoldSide_EditsOnlyTheTap_AndFreshPickWritesZero()
+    {
+        var config = ZmkKeymapLoader.LoadFromText(TapOnlyKeymap, "test");
+        var vm = new KeyDialogViewModel(
+            new KeyDialogRequest(config, Preprocessor.CollectDefines(TapOnlyKeymap), 0, 0));
+
+        vm.SelectedBehavior = Choice(vm, "&hm");
+
+        var tap = Assert.IsType<KeycodeParamViewModel>(Assert.Single(vm.Params));
+        Assert.Equal(Loc.Instance["KeyDialog_ParamTap"], tap.Label);
+        Assert.Equal(1, vm.SelectedTabIndex);  // the tap still needs a value
+
+        tap.Picker.SelectedKeycode = ZmkKeycodeCatalog.Find("A")!;
+
+        Assert.Equal("&hm", vm.Result!.Behavior);
+        Assert.Equal(new[] { "0", "A" }, vm.Result.Params);
+    }
+
     // --- Ctor validation ------------------------------------------------------------
 
     [Fact]
@@ -457,11 +670,56 @@ public class KeyDialogViewModelTests
 
     // --- helpers ----------------------------------------------------------------------
 
+    // The shipped fixtures, with both define lists the dialog takes: every
+    // define for parsing, and the file's layer-reference defines for display.
+    private static readonly string GloveSource = KeymapFixtures.Read("glove80.keymap");
+
+    private static readonly KeyboardConfig GloveConfig =
+        ZmkKeymapLoader.LoadFromText(GloveSource, "glove80");
+
+    private static readonly IReadOnlyList<KeyValuePair<string, string>> GloveDefines =
+        Preprocessor.CollectDefines(GloveSource);
+
+    private static readonly IReadOnlyList<KeyValuePair<string, string>> GloveLayerDefines =
+        KeymapWriter.LayerReferenceDefines(GloveSource, GloveConfig);
+
+    private static readonly string Go60Source = KeymapFixtures.Read("go60.keymap");
+
+    private static readonly KeyboardConfig Go60Config =
+        ZmkKeymapLoader.LoadFromText(Go60Source, "go60");
+
+    private static readonly IReadOnlyList<KeyValuePair<string, string>> Go60Defines =
+        Preprocessor.CollectDefines(Go60Source);
+
+    private static readonly IReadOnlyList<KeyValuePair<string, string>> Go60LayerDefines =
+        KeymapWriter.LayerReferenceDefines(Go60Source, Go60Config);
+
+    private static KeyDialogViewModel GloveDialog(int keyIndex, int layerIndex = 0) =>
+        new(new KeyDialogRequest(GloveConfig, GloveDefines, layerIndex, keyIndex)
+        {
+            LayerDefines = GloveLayerDefines,
+        });
+
+    private static KeyDialogViewModel Go60Dialog(int keyIndex, int layerIndex = 0) =>
+        new(new KeyDialogRequest(Go60Config, Go60Defines, layerIndex, keyIndex)
+        {
+            LayerDefines = Go60LayerDefines,
+        });
+
     private static KeyDialogViewModel Dialog(int keyIndex, int layerIndex = 0) =>
         new(new KeyDialogRequest(Config, Defines, layerIndex, keyIndex));
 
     private static KeyDialogViewModel CommandDialog(int keyIndex) =>
         new(new KeyDialogRequest(CommandConfig, CommandDefines, 0, keyIndex));
+
+    // A carried binding on layer 0: KeyIndex -1 must be accepted once a
+    // binding rides along.
+    private static KeyDialogViewModel CarriedDialog(KeyBinding binding, string? caption = null) =>
+        new(new KeyDialogRequest(Config, Defines, 0, -1)
+        {
+            Binding = binding,
+            Caption = caption,
+        });
 
     private static KeyBehaviorChoice Choice(KeyDialogViewModel vm, string code) =>
         vm.QuickBehaviors.Concat(vm.AllOtherBehaviors).First(choice => choice.Code == code);

@@ -40,6 +40,15 @@ public class KeymapEditSessionTests
     private static Layer Added(string name, string keyPrefix = "N") =>
         new(0, name, Enumerable.Range(0, 4).Select(k => Bind("&kp", $"{keyPrefix}{k}")).ToArray());
 
+    /// <summary>The slabwing fixture: 4 combos — combo_bootloader, mouse-mid,
+    /// f12, syslayer — the base for the combo-edit tests.</summary>
+    private static KeyboardConfig Slabwing() =>
+        ZmkKeymapLoader.LoadFromText(KeymapFixtures.Read("slabwing.keymap"), "fixture");
+
+    /// <summary>A combo that fits no baseline fixture list: node combo_esc, ESC at 0+1.</summary>
+    private static ZmkCombo EscCombo() =>
+        new("esc", "", [0, 1], [-1], Bind("&kp", "ESCAPE")) { NodeName = "combo_esc" };
+
     // ---- a fresh session --------------------------------------------------------
 
     [Fact]
@@ -1092,6 +1101,298 @@ public class KeymapEditSessionTests
         Assert.True(session.IsLayerAdded(1));
         Assert.Equal("&kp A", session.Current.Layers[0].Bindings[0].Display);
         Assert.Equal("&kp B", session.Current.Layers[3].Bindings[1].Display);
+    }
+
+    // ---- combo edits ------------------------------------------------------------
+
+    [Fact]
+    public void AddCombo_Slabwing_AppendsAsOneStep_UndoAndRedoWalkIt()
+    {
+        var config = Slabwing();
+        Assert.Equal(4, config.Combos.Count);
+        var session = new KeymapEditSession(config);
+        var esc = EscCombo();
+        var raised = 0;
+        session.Changed += (_, _) => raised++;
+
+        var index = session.AddCombo(esc);
+
+        Assert.Equal(4, index);
+        Assert.Equal(5, session.Current.Combos.Count);
+        Assert.Same(esc, session.Current.Combos[4]);
+        Assert.Equal(1, session.ChangeCount);
+        Assert.True(session.HasPendingChanges);
+        Assert.True(session.IsComboChanged(4));
+        for (int i = 0; i < 4; i++) Assert.False(session.IsComboChanged(i));
+        var add = Assert.IsType<ComboEdit.Add>(Assert.Single(session.PendingComboEdits));
+        Assert.Same(esc, add.Combo);
+        Assert.Equal(1, raised);
+        Assert.True(session.CanUndo);
+        Assert.False(session.CanRedo);
+
+        Assert.True(session.Undo());
+        Assert.Equal(4, session.Current.Combos.Count);
+        Assert.Equal(0, session.ChangeCount);
+        Assert.False(session.HasPendingChanges);
+        Assert.Empty(session.PendingComboEdits);
+        Assert.False(session.IsComboChanged(4)); // outside the list now
+
+        Assert.True(session.Redo());
+        Assert.Equal(5, session.Current.Combos.Count);
+        Assert.Same(esc, session.Current.Combos[4]);
+        Assert.Equal(1, session.ChangeCount);
+        Assert.Equal(3, raised);
+    }
+
+    [Fact]
+    public void AddCombo_ThenDeleteThatAddedComboAgain_LeavesNothingPending()
+    {
+        var session = new KeymapEditSession(Slabwing());
+        var index = session.AddCombo(EscCombo());
+        Assert.Equal(1, session.ChangeCount);
+
+        session.DeleteCombo(index);
+
+        Assert.Equal(4, session.Current.Combos.Count);
+        Assert.Equal(0, session.ChangeCount);
+        Assert.False(session.HasPendingChanges);
+        Assert.Empty(session.PendingComboEdits);
+        Assert.True(session.CanUndo); // the steps are still there to walk back
+    }
+
+    [Fact]
+    public void SetCombo_ChangesTheBinding_SettingItBackReadsClean()
+    {
+        var config = Slabwing();
+        var session = new KeymapEditSession(config);
+        var original = config.Combos[2];
+        Assert.Equal("f12", original.NodeName);
+
+        var f11 = original with { Binding = Bind("&kp", "F11") };
+        Assert.True(session.SetCombo(2, f11));
+
+        Assert.Same(f11, session.Current.Combos[2]);
+        Assert.True(session.IsComboChanged(2));
+        Assert.Equal(1, session.ChangeCount);
+        var change = Assert.IsType<ComboEdit.Change>(Assert.Single(session.PendingComboEdits));
+        Assert.Equal("f12", change.NodeName);
+        Assert.Same(f11, change.Combo);
+
+        // editing back to the baseline value reads clean, the step stays undoable
+        Assert.True(session.SetCombo(2, original));
+        Assert.Equal(0, session.ChangeCount);
+        Assert.False(session.IsComboChanged(2));
+        Assert.Empty(session.PendingComboEdits);
+        Assert.True(session.CanUndo);
+    }
+
+    [Fact]
+    public void SetCombo_Renames_PendingChangeKeepsTheBaselineName()
+    {
+        var session = new KeymapEditSession(Slabwing());
+        var current = session.Current.Combos[2];
+
+        Assert.True(session.SetCombo(2, current with { NodeName = "combo_f12" }));
+
+        // the writer addresses the node by the name the file still has
+        var change = Assert.IsType<ComboEdit.Change>(Assert.Single(session.PendingComboEdits));
+        Assert.Equal("f12", change.NodeName);
+        Assert.Equal("combo_f12", change.Combo.NodeName);
+        Assert.Equal(1, session.ChangeCount);
+    }
+
+    [Fact]
+    public void SetCombo_WithAnIsSameAsCombo_RecordsNothing()
+    {
+        var session = new KeymapEditSession(Slabwing());
+        var before = session.Current;
+        var raised = 0;
+        session.Changed += (_, _) => raised++;
+
+        // positions reordered, description rewritten — IsSameAs ignores both
+        var sameButFresh = session.Current.Combos[2] with
+        {
+            KeyPositions = [1, 0],
+            Description = "still the same combo",
+        };
+
+        Assert.False(session.SetCombo(2, sameButFresh));
+
+        Assert.Same(before, session.Current);
+        Assert.Equal(0, session.ChangeCount);
+        Assert.False(session.CanUndo);
+        Assert.Equal(0, raised);
+    }
+
+    [Fact]
+    public void DeleteCombo_Slabwing_CountsTheMissingCombo_UndoRestoresItInPlace()
+    {
+        var config = Slabwing();
+        var session = new KeymapEditSession(config);
+
+        session.DeleteCombo(1); // mouse-mid
+
+        Assert.Equal(3, session.Current.Combos.Count);
+        Assert.Same(config.Combos[0], session.Current.Combos[0]);
+        Assert.Same(config.Combos[2], session.Current.Combos[1]); // f12 shifted, unchanged
+        Assert.False(session.IsComboChanged(1));
+        Assert.Equal(1, session.ChangeCount);
+        var delete = Assert.IsType<ComboEdit.Delete>(Assert.Single(session.PendingComboEdits));
+        Assert.Equal("mouse-mid", delete.NodeName);
+
+        Assert.True(session.Undo());
+        Assert.Equal(4, session.Current.Combos.Count);
+        Assert.Same(config.Combos[1], session.Current.Combos[1]); // back at index 1
+        Assert.Equal(0, session.ChangeCount);
+        Assert.Empty(session.PendingComboEdits);
+    }
+
+    [Fact]
+    public void DeleteCombo_WithoutANodeName_DeletesByName()
+    {
+        var session = new KeymapEditSession(Config()); // its combo carries no NodeName
+
+        session.DeleteCombo(0);
+
+        var delete = Assert.IsType<ComboEdit.Delete>(Assert.Single(session.PendingComboEdits));
+        Assert.Equal("F12", delete.NodeName); // the fallback is the combo's Name
+        Assert.Equal(1, session.ChangeCount);
+    }
+
+    [Fact]
+    public void PendingComboEdits_DeletesFirst_ThenChanges_ThenAdds()
+    {
+        var session = new KeymapEditSession(Slabwing());
+
+        session.DeleteCombo(1); // mouse-mid
+        var f12 = session.Current.Combos[1]; // shifted down, still the baseline f12
+        var f11 = f12 with { Binding = Bind("&kp", "F11") };
+        Assert.True(session.SetCombo(1, f11));
+        var esc = EscCombo();
+        session.AddCombo(esc);
+
+        Assert.Equal(3, session.ChangeCount);
+        var edits = session.PendingComboEdits;
+        Assert.Equal(3, edits.Count);
+        Assert.Equal(new ComboEdit.Delete("mouse-mid"), edits[0]);
+        var change = Assert.IsType<ComboEdit.Change>(edits[1]);
+        Assert.Equal("f12", change.NodeName);
+        Assert.Same(f11, change.Combo);
+        var add = Assert.IsType<ComboEdit.Add>(edits[2]);
+        Assert.Same(esc, add.Combo);
+    }
+
+    [Fact]
+    public void ComboSteps_KeepLayersMacrosAndHoldTapsTheSameInstances()
+    {
+        var config = Config();
+        var session = new KeymapEditSession(config);
+
+        session.AddCombo(EscCombo());
+        Assert.NotSame(config, session.Current);
+        Assert.Same(config.Layers, session.Current.Layers);
+        Assert.Same(config.Macros, session.Current.Macros);
+        Assert.Same(config.HoldTaps, session.Current.HoldTaps);
+
+        Assert.True(session.SetCombo(0, config.Combos[0] with { Binding = Bind("&kp", "F13") }));
+        Assert.Same(config.Layers, session.Current.Layers);
+
+        session.DeleteCombo(1); // the added one
+        Assert.Same(config.Layers, session.Current.Layers);
+        Assert.Same(config.Macros, session.Current.Macros);
+    }
+
+    [Fact]
+    public void ApplyStructure_AfterWithADifferentComboCount_Throws()
+    {
+        var config = Config();
+        var session = new KeymapEditSession(config);
+        var added = Added("extra");
+
+        // fresh session: one baseline combo, the after drops it
+        var noCombos = WithLayers(config, config.Layers[0], added, config.Layers[1], config.Layers[2])
+            with { Combos = [] };
+        Assert.Throws<ArgumentException>(() => session.ApplyStructure(
+            new LayerStructureEdit.Add(1, "extra", added.Bindings), noCombos));
+
+        // after an add the check runs against Current, not the baseline
+        session.AddCombo(EscCombo());
+        var c = session.Current;
+        var oneOfTwo = WithLayers(c, c.Layers[0], Added("extra"), c.Layers[1], c.Layers[2])
+            with { Combos = [c.Combos[0]] };
+        Assert.Throws<ArgumentException>(() => session.ApplyStructure(
+            new LayerStructureEdit.Add(1, "extra", Added("extra").Bindings), oneOfTwo));
+
+        Assert.Same(c, session.Current); // the second rejection left the added combo in
+        // only the AddCombo step exists: the rejections recorded nothing
+        Assert.True(session.Undo());
+        Assert.False(session.CanUndo);
+    }
+
+    [Fact]
+    public void ComboEdits_AroundAStructureStep_UndoBackToTheBaselineCombos()
+    {
+        var config = Config();
+        var session = new KeymapEditSession(config);
+        Assert.Equal(1, session.AddCombo(EscCombo()));
+
+        var c = session.Current;
+        Assert.True(session.ApplyStructure(
+            new LayerStructureEdit.Move(0, 2),
+            WithLayers(c, c.Layers[1], c.Layers[2], c.Layers[0])));
+
+        // the added combo rides through the structure step and still reads as changed
+        Assert.Equal(2, session.Current.Combos.Count);
+        Assert.True(session.IsComboChanged(1));
+        Assert.Equal(2, session.ChangeCount); // the layer order + the added combo
+
+        Assert.True(session.Undo()); // the move
+        Assert.True(session.Undo()); // the add
+
+        Assert.Equal(config.Combos.Count, session.Current.Combos.Count);
+        for (int i = 0; i < config.Combos.Count; i++)
+            Assert.True(session.Current.Combos[i].IsSameAs(config.Combos[i]));
+        Assert.Equal(0, session.ChangeCount);
+        Assert.Empty(session.PendingComboEdits);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(4)] // slabwing has 4 combos
+    public void ComboEdit_IndexOutOfRange_Throws(int index)
+    {
+        var session = new KeymapEditSession(Slabwing());
+        var before = session.Current;
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => session.SetCombo(index, EscCombo()));
+        Assert.Throws<ArgumentOutOfRangeException>(() => session.DeleteCombo(index));
+
+        Assert.Same(before, session.Current);
+        Assert.False(session.CanUndo);
+    }
+
+    [Fact]
+    public void ComboEdits_NullCombo_Throws()
+    {
+        var session = new KeymapEditSession(Slabwing());
+        var before = session.Current;
+
+        Assert.Throws<ArgumentNullException>(() => session.AddCombo(null!));
+        Assert.Throws<ArgumentNullException>(() => session.SetCombo(0, null!));
+
+        Assert.Same(before, session.Current);
+        Assert.False(session.CanUndo);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(4)] // one combo was deleted, 3 are left
+    public void IsComboChanged_IndexOutOfRange_ReadsAsUnchanged(int index)
+    {
+        var session = new KeymapEditSession(Slabwing());
+        session.DeleteCombo(0); // a deletion is pending, but these indices are outside
+
+        Assert.False(session.IsComboChanged(index));
     }
 
     // ---- on the real corne keymap ------------------------------------------------

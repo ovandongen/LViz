@@ -76,7 +76,13 @@ public static class ZmkKeymapInterpreter
                 var bindings = SliceBindings(GetProperty(comboNode, "bindings"), userArities);
                 var binding = bindings.Count > 0 ? bindings[0] : KeyBinding.None;
                 var name = comboNode.Label ?? comboNode.Name;
-                combos.Add(new ZmkCombo(name, "", keyPositions, layerScope, binding));
+                combos.Add(new ZmkCombo(name, "", keyPositions, layerScope, binding)
+                {
+                    NodeName = comboNode.Name,
+                    TimeoutMs = TryGetInt(comboNode, "timeout-ms", out var timeoutMs) ? timeoutMs : null,
+                    RequirePriorIdleMs = TryGetInt(comboNode, "require-prior-idle-ms", out var idleMs) ? idleMs : null,
+                    SlowRelease = GetProperty(comboNode, "slow-release") is not null,
+                });
             }
         }
 

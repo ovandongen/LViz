@@ -10,8 +10,26 @@ public class ZmkBindingFormatterTests
     private static IReadOnlyList<KeyValuePair<string, string>> NoDefines =>
         Array.Empty<KeyValuePair<string, string>>();
 
+    /// <summary>A layer define for 3 and one for 1, file order.</summary>
+    private static readonly List<KeyValuePair<string, string>> LayerDefines =
+    [
+        new("LAYER_Magic", "3"),
+        new("LAYER_Sym", "1"),
+    ];
+
+    /// <summary><c>&amp;magic</c> holds a layer and taps a 0-cell macro;
+    /// <c>&amp;tl</c> taps a layer, so its layer param is the second cell.</summary>
+    private static readonly List<HoldTap> HoldTaps =
+    [
+        new("&magic", "&mo", "&m0", 1, 0),
+        new("&tl", "&kp", "&mo", 1, 1),
+    ];
+
     private static string Format(string behavior, params string[] parameters) =>
         ZmkBindingFormatter.Format(new KeyBinding(behavior, parameters), NoDefines);
+
+    private static string FormatWithHoldTaps(string behavior, params string[] parameters) =>
+        ZmkBindingFormatter.Format(new KeyBinding(behavior, parameters), LayerDefines, HoldTaps);
 
     [Theory]
     [InlineData("&kp", new[] { "LS", "N7" }, "&kp LS(N7)")]
@@ -67,6 +85,76 @@ public class ZmkBindingFormatterTests
         var formatted = ZmkBindingFormatter.Format(
             new KeyBinding("&kp", new[] { "1" }), defines);
         Assert.Equal("&kp 1", formatted);
+    }
+
+    // ---- hold-tap layer params --------------------------------------------------
+
+    [Fact]
+    public void Format_ReplacesHoldTapHoldSideLayerParamWithDefineName()
+    {
+        // &magic holds &mo (arity 1) and taps a 0-cell macro: only the first
+        // param is a layer reference, the trailing 0 stays.
+        Assert.Equal("&magic LAYER_Magic 0", FormatWithHoldTaps("&magic", "3", "0"));
+    }
+
+    [Fact]
+    public void Format_ReplacesHoldTapTapSideLayerParamWithDefineName()
+    {
+        // &tl taps &mo, so its layer number stands at index HoldArity (1).
+        Assert.Equal("&tl A LAYER_Sym", FormatWithHoldTaps("&tl", "A", "1"));
+    }
+
+    [Fact]
+    public void Format_KeepsHoldTapLayerIndexWhenNoDefineMatches()
+    {
+        Assert.Equal("&magic 5 0", FormatWithHoldTaps("&magic", "5", "0"));
+    }
+
+    [Fact]
+    public void Format_WithoutHoldTaps_KeepsHoldTapLayerIndex()
+    {
+        // The overload without hold-taps knows only the built-in layer
+        // behaviors, so a hold-tap keeps its number.
+        Assert.Equal(
+            "&magic 3 0",
+            ZmkBindingFormatter.Format(new KeyBinding("&magic", new[] { "3", "0" }), LayerDefines));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Format_ReplacesLayerBehaviorParamWithEitherOverload(bool withHoldTaps)
+    {
+        var binding = new KeyBinding("&mo", new[] { "1" });
+        var formatted = withHoldTaps
+            ? ZmkBindingFormatter.Format(binding, LayerDefines, HoldTaps)
+            : ZmkBindingFormatter.Format(binding, LayerDefines);
+        Assert.Equal("&mo LAYER_Sym", formatted);
+    }
+
+    [Fact]
+    public void Format_WithHoldTaps_StillReNestsModifiers()
+    {
+        Assert.Equal("&kp LS(A)", FormatWithHoldTaps("&kp", "LS", "A"));
+    }
+
+    [Fact]
+    public void Format_BuiltInLayerBehaviorWinsOverSameNamedHoldTap()
+    {
+        // A hold-tap named like a built-in never takes over the cell: the
+        // built-in's rule (param 0 only) applies.
+        var holdTaps = new List<HoldTap> { new("&lt", "&mo", "&mo", 1, 1) };
+        var formatted = ZmkBindingFormatter.Format(
+            new KeyBinding("&lt", new[] { "1", "SPACE" }), LayerDefines, holdTaps);
+        Assert.Equal("&lt LAYER_Sym SPACE", formatted);
+    }
+
+    [Fact]
+    public void Format_HoldTapIgnoresLayerParamIndexPastTheCells()
+    {
+        // &tl's tap side would be param 1; this use has one cell, so nothing
+        // is replaced and nothing throws.
+        Assert.Equal("&tl A", FormatWithHoldTaps("&tl", "A"));
     }
 
     [Theory]

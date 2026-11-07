@@ -410,6 +410,21 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Double-click on a combo legend tile opens the combo dialog on that tile
+    /// while a keymap edit is open; outside edit mode it does nothing. A single
+    /// click never opens an editor, and right-click stays the label editor.
+    /// </summary>
+    private void OnComboTileDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is not Control c) return;
+        if (c.DataContext is not ComboViewModel combo) return;
+        if (DataContext is not MainWindowViewModel { IsEditing: true } vm) return;
+
+        vm.EditComboCommand.Execute(combo.Number);
+        e.Handled = true;
+    }
+
     private WindowEdge? GetResizeEdge(Point pos)
     {
         // `<` on the near edge and `>=` on the far edge keeps both hot zones
@@ -438,9 +453,9 @@ public partial class MainWindow : Window
     /// ignored.</summary>
     private bool _keyRingOpen;
 
-    /// <summary>Completes the currently open ring with how it ended; a scrim
-    /// press writes a cancel through it.</summary>
-    private TaskCompletionSource<KeyRingClosedEventArgs>? _keyRingCloseTcs;
+    /// <summary>Cancels the currently open ring: a scrim press and a resize
+    /// both close it as a cancel through this.</summary>
+    private CancellationTokenSource? _keyRingCancel;
 
     /// <summary>A click on the dimmed board cancels the ring. The ring's window
     /// normally covers the board and catches that click itself; this covers a
@@ -448,7 +463,7 @@ public partial class MainWindow : Window
     private void OnKeyRingScrimPressed(object? sender, PointerPressedEventArgs e)
     {
         if (!_keyRingOpen) return;
-        _keyRingCloseTcs?.TrySetResult(new KeyRingClosedEventArgs(null, openInDialog: false));
+        _keyRingCancel?.Cancel();
         e.Handled = true;
     }
 
@@ -481,7 +496,6 @@ public partial class MainWindow : Window
         }
         finally
         {
-            _keyRingCloseTcs = null;
             KeyRingLayer.IsVisible = false;
             _keyRingOpen = false;
         }
@@ -499,61 +513,43 @@ public partial class MainWindow : Window
         var key = FindKeyRect(request.KeyIndex, KeyRingLayer.Bounds.Size);
 
         // The ring's window covers the working area of the key's screen;
-        // screen positions are pixels, the window's own coordinates DIPs.
+        // the host turns these screen-pixel corners into DIPs inside it.
         var keyTopLeft = KeyRingLayer.PointToScreen(key.TopLeft);
         var keyBottomRight = KeyRingLayer.PointToScreen(key.BottomRight);
-        var screen = Screens.ScreenFromPoint(KeyRingLayer.PointToScreen(key.Center))
-                     ?? Screens.ScreenFromWindow(this)
-                     ?? Screens.Primary;
-        if (screen is null) return await ShowKeyDialogAsync(dialogVm);
-
-        var work = screen.WorkingArea;
-        var scaling = screen.Scaling;
-        var area = new Size(work.Width / scaling, work.Height / scaling);
-        var keyInWindow = new Rect(
-            new Point((keyTopLeft.X - work.X) / scaling, (keyTopLeft.Y - work.Y) / scaling),
-            new Point((keyBottomRight.X - work.X) / scaling, (keyBottomRight.Y - work.Y) / scaling));
-
-        var placement = RingGeometry.Place(new Rect(area), keyInWindow.Center);
-        if (!placement.Fits) return await ShowKeyDialogAsync(dialogVm);
 
         // The board stays dimmed behind the ring, its key outlined in gold.
+        // The host's placement never moves the key, so the outline is set
+        // from the key rect before the ring opens.
         var outline = key.Inflate(3);
         Canvas.SetLeft(KeyRingKeyOutline, outline.X);
         Canvas.SetTop(KeyRingKeyOutline, outline.Y);
         KeyRingKeyOutline.Width = outline.Width;
         KeyRingKeyOutline.Height = outline.Height;
 
-        var tcs = new TaskCompletionSource<KeyRingClosedEventArgs>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        _keyRingCloseTcs = tcs;
-
-        var ringWindow = new KeyRingWindow
-        {
-            Position = work.Position,
-            Width = area.Width,
-            Height = area.Height,
-        };
-        ringWindow.Present(ringVm, area, keyInWindow, placement);
-        ringWindow.Finished += (_, closed) => tcs.TrySetResult(closed);
-
-        // A resize moves the board under the outline: cancel.
-        EventHandler<SizeChangedEventArgs> sizeCancel =
-            (_, _) => tcs.TrySetResult(new KeyRingClosedEventArgs(null, openInDialog: false));
+        // A resize moves the board under the outline: cancel. A press on the
+        // dimmed board cancels through the same source (OnKeyRingScrimPressed).
+        var cts = new CancellationTokenSource();
+        _keyRingCancel = cts;
+        EventHandler<SizeChangedEventArgs> sizeCancel = (_, _) => cts.Cancel();
         SizeChanged += sizeCancel;
 
-        KeyRingClosedEventArgs closed;
+        KeyRingClosedEventArgs? closed;
         try
         {
-            ringWindow.Show(this);
-            closed = await tcs.Task;
+            // The host shows the ring over the key's screen and owns the
+            // ring window; a null answer means no screen or no room there.
+            closed = await KeyEditorHost.ShowRingAsync(
+                this, ringVm, keyTopLeft, keyBottomRight, cts.Token);
         }
         finally
         {
             SizeChanged -= sizeCancel;
-            ringWindow.Close();
-            KeyRingLayer.IsVisible = false;
+            _keyRingCancel = null;
+            cts.Dispose();
         }
+
+        // No screen, or the screen is too small for the ring: the dialog.
+        if (closed is null) return await ShowKeyDialogAsync(dialogVm);
 
         // The same dialog VM, so a half-made edit carries over.
         if (closed.OpenInDialog) return await ShowKeyDialogAsync(dialogVm);
@@ -568,14 +564,7 @@ public partial class MainWindow : Window
     private async Task<ZmkKeyBinding?> ShowKeyDialogAsync(KeyDialogViewModel dialogVm)
     {
         KeyRingLayer.IsVisible = false;
-        try
-        {
-            return await new KeyDialog { DataContext = dialogVm }.ShowDialog<ZmkKeyBinding?>(this);
-        }
-        finally
-        {
-            Activate();
-        }
+        return await KeyEditorHost.ShowDialogAsync(this, dialogVm);
     }
 
     /// <summary>

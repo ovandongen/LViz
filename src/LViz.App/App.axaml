@@ -197,6 +197,9 @@
         <SolidColorBrush x:Key="AccentTeal" Color="#94E2D5" />
         <SolidColorBrush x:Key="AccentYellow" Color="#F9E2AF" />
         <SolidColorBrush x:Key="AccentRed" Color="#F38BA8" />
+        <SolidColorBrush x:Key="AccentGold" Color="#E8B45A" />
+        <SolidColorBrush x:Key="AccentGoldSoft" Color="#29E8B45A" />
+        <SolidColorBrush x:Key="AccentGoldTether" Color="#99E8B45A" />
 
         <!-- Tab chrome -->
         <SolidColorBrush x:Key="TabBg" Color="#363649" />

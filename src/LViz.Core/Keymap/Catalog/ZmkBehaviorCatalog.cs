@@ -1,3 +1,4 @@
+using System.Globalization;
 using LViz.Core.Models;
 
 namespace LViz.Core.Keymap.Catalog;
@@ -18,6 +19,11 @@ public enum ZmkBehaviorParamKind
     /// optionally followed by a profile number. One logical parameter that can
     /// produce 1 or 2 flat binding params (<c>&amp;bt BT_SEL 2</c>).</summary>
     Command,
+
+    /// <summary>A hold-tap side whose behavior takes no parameter: the cell
+    /// must be written but its value does nothing. Editors don't show it;
+    /// they keep the value already there, or write <c>0</c> for a new pick.</summary>
+    Ignored,
 }
 
 /// <summary>
@@ -94,9 +100,11 @@ public static class ZmkBehaviorCatalog
     /// <summary>
     /// <see cref="BuiltIn"/>, then one entry per hold-tap in
     /// <c>config.HoldTaps</c> order, then one per macro in <c>config.Macros</c>
-    /// order. A user-defined code that collides with a built-in or with an
-    /// earlier user entry is skipped (built-in / earlier wins). Null config →
-    /// <see cref="BuiltIn"/>.
+    /// order. A hold-tap side whose bound behavior consumes no binding cell
+    /// gets <see cref="ZmkBehaviorParamKind.Ignored"/> instead of a
+    /// <see cref="KindOf"/> kind. A user-defined code that collides with a
+    /// built-in or with an earlier user entry is skipped (built-in / earlier
+    /// wins). Null config → <see cref="BuiltIn"/>.
     /// </summary>
     public static IReadOnlyList<ZmkBehavior> For(KeyboardConfig? config)
     {
@@ -112,7 +120,15 @@ public static class ZmkBehaviorCatalog
             result.Add(new ZmkBehavior(
                 holdTap.Name,
                 ZmkBehaviorGroup.Keymap,
-                new[] { KindOf(holdTap.HoldBinding), KindOf(holdTap.TapBinding) }));
+                new[]
+                {
+                    holdTap.HoldArity == 0
+                        ? ZmkBehaviorParamKind.Ignored
+                        : KindOf(holdTap.HoldBinding),
+                    holdTap.TapArity == 0
+                        ? ZmkBehaviorParamKind.Ignored
+                        : KindOf(holdTap.TapBinding),
+                }));
         }
 
         foreach (var macro in config.Macros)
@@ -143,11 +159,67 @@ public static class ZmkBehaviorCatalog
     }
 
     /// <summary>
-    /// Parameter kind for a hold-tap's hold/tap binding: layer behaviors are
+    /// The layer every use of hold-tap <paramref name="code"/>
+    /// targets, when there is exactly one: the hold-tap is in
+    /// <c>config.HoldTaps</c>, its catalog params are <c>[Layer, Ignored]</c>,
+    /// it is used at least once in the layer bindings or combo bindings of
+    /// <paramref name="config"/>, and every use has a first param that parses
+    /// (invariant, no sign) to the same index inside <c>config.Layers</c>.
+    /// Otherwise null (also for a null config or an unknown code).
+    /// </summary>
+    public static int? PinnedLayer(KeyboardConfig? config, string code)
+    {
+        if (config is null) return null;
+        if (!config.HoldTaps.Any(h => string.Equals(h.Name, code, StringComparison.Ordinal)))
+            return null;
+        if (Find(config, code) is not { } behavior) return null;
+        if (behavior.Params is not [ZmkBehaviorParamKind.Layer, ZmkBehaviorParamKind.Ignored])
+            return null;
+
+        int? pinned = null;
+        foreach (var layer in config.Layers)
+        {
+            foreach (var binding in layer.Bindings)
+            {
+                if (!TryUse(binding, code, config.Layers.Count, ref pinned)) return null;
+            }
+        }
+        foreach (var combo in config.Combos)
+        {
+            if (!TryUse(combo.Binding, code, config.Layers.Count, ref pinned)) return null;
+        }
+        return pinned;
+    }
+
+    /// <summary>
+    /// Folds one binding into the pinned-layer scan: non-matching bindings
+    /// pass through; a matching one must carry a first param that parses to
+    /// an in-range layer index equal to any index seen before.
+    /// </summary>
+    private static bool TryUse(
+        KeyBinding binding, string code, int layerCount, ref int? pinned)
+    {
+        if (!string.Equals(binding.Behavior, code, StringComparison.Ordinal)) return true;
+        if (binding.Params.Count == 0) return false;
+        if (!int.TryParse(
+                binding.Params[0], NumberStyles.None, CultureInfo.InvariantCulture,
+                out var layerIndex))
+            return false;
+        if (layerIndex >= layerCount) return false;
+        if (pinned is int seen && seen != layerIndex) return false;
+        pinned = layerIndex;
+        return true;
+    }
+
+    /// <summary>
+    /// Parameter kind for a non-zero-arity side of a hold-tap's hold/tap
+    /// binding: layer behaviors are
     /// <see cref="ZmkBehaviorParamKind.Layer"/>, <c>&amp;kp</c> is
     /// <see cref="ZmkBehaviorParamKind.Keycode"/>, everything else
     /// (including the user's own behaviors) is
-    /// <see cref="ZmkBehaviorParamKind.Raw"/>.
+    /// <see cref="ZmkBehaviorParamKind.Raw"/>. A side whose bound behavior
+    /// consumes no binding cell is <see cref="ZmkBehaviorParamKind.Ignored"/>
+    /// and never reaches this method.
     /// </summary>
     private static ZmkBehaviorParamKind KindOf(string binding) =>
         LayerBindings.Contains(binding) ? ZmkBehaviorParamKind.Layer

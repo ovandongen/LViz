@@ -133,6 +133,42 @@ public class ChoiceDialogViewModelTests
     }
 
     [Fact]
+    public void LayerDeleteBlocked_ComboEditsPending_AppendsUnbulletedSaveFirstLine()
+    {
+        var vm = ChoiceDialogViewModel.LayerDeleteBlocked(new LayerDeleteBlockedRequest(
+            "Raise",
+            [new LayerDeleteBlocker(LayerDeleteBlockerKind.Combo, "combo_raise", 0)])
+        {
+            ComboEditsPending = true,
+        });
+
+        Assert.EndsWith(Loc.Instance["Edit_DeleteBlockedSaveCombosFirst"], vm.Message);
+        Assert.DoesNotContain("• " + Loc.Instance["Edit_DeleteBlockedSaveCombosFirst"], vm.Message);
+
+        // An unresolved key would make the EndsWith above trivially true.
+        Assert.DoesNotContain("[Edit_DeleteBlockedSaveCombosFirst]", vm.Message);
+    }
+
+    [Fact]
+    public void LayerDeleteBlocked_WithoutPendingEdits_OrWithoutComboBlocker_OmitsTheLine()
+    {
+        var noPending = ChoiceDialogViewModel.LayerDeleteBlocked(new LayerDeleteBlockedRequest(
+            "Raise",
+            [new LayerDeleteBlocker(LayerDeleteBlockerKind.Combo, "combo_raise", 0)]));
+        Assert.DoesNotContain(
+            Loc.Instance["Edit_DeleteBlockedSaveCombosFirst"], noPending.Message);
+
+        var lastLayerOnly = ChoiceDialogViewModel.LayerDeleteBlocked(new LayerDeleteBlockedRequest(
+            "Def",
+            [new LayerDeleteBlocker(LayerDeleteBlockerKind.LastLayer, "Base", 0)])
+        {
+            ComboEditsPending = true,
+        });
+        Assert.DoesNotContain(
+            Loc.Instance["Edit_DeleteBlockedSaveCombosFirst"], lastLayerOnly.Message);
+    }
+
+    [Fact]
     public void LayerSettingsNotice_JoinsLines_AsBullets_WithSingleOk()
     {
         var vm = ChoiceDialogViewModel.LayerSettingsNotice(["a", "b"]);

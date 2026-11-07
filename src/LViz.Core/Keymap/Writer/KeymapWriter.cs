@@ -129,14 +129,15 @@ public static class KeymapWriter
         // ---- plan the text changes --------------------------------------------
 
         var maps = KeymapSourceMap.Build(source, config);
-        var defines = LayerReferenceDefines(source);
+        var defines = LayerReferenceDefines(source, config);
 
         var changes = new List<(int Offset, string Replacement, int ReplacedLength)>();
 
         foreach (var edit in realEdits)
         {
             var span = maps[edit.LayerIndex].Bindings[edit.KeyIndex];
-            var plan = PlanBindingReplacement(source, span, ZmkBindingFormatter.Format(edit.Binding, defines));
+            var plan = PlanBindingReplacement(
+                source, span, ZmkBindingFormatter.Format(edit.Binding, defines, config.HoldTaps));
             changes.Add((span.Start, plan.Replacement, plan.Length));
         }
 
@@ -165,26 +166,46 @@ public static class KeymapWriter
 
     // ---- layer names -------------------------------------------------------------
 
-    private static readonly Regex LayerReferenceRegex = new(
-        @"&(?:" + string.Join("|", ZmkBindingFormatter.LayerBehaviors.Select(b => b[1..]))
-        + @")\s+([A-Za-z_]\w*)",
-        RegexOptions.Compiled);
-
     /// <summary>
     /// The file's defines that it already uses as a layer reference
-    /// (<c>&amp;mo NAME</c>, <c>&amp;lt NAME …</c>, anywhere in the file).
-    /// Only these may name a layer number: MoErgo exports define e.g.
-    /// <c>KB_TYPE_GLOVE_80 1</c> ahead of <c>LAYER_Symbol 1</c>, and the
-    /// first-match rule would otherwise write <c>&amp;mo KB_TYPE_GLOVE_80</c>.
+    /// (after a layer behavior or a layer hold-tap, anywhere in the file), in
+    /// file order — the only names a layer number may be written as.
+    /// MoErgo exports define e.g. <c>KB_TYPE_GLOVE_80 1</c> ahead of
+    /// <c>LAYER_Symbol 1</c>, and the first-match rule would otherwise write
+    /// <c>&amp;mo KB_TYPE_GLOVE_80</c>.
     /// </summary>
-    private static List<KeyValuePair<string, string>> LayerReferenceDefines(string source)
+    public static IReadOnlyList<KeyValuePair<string, string>> LayerReferenceDefines(
+        string source, KeyboardConfig config)
     {
-        var used = LayerReferenceRegex.Matches(source)
+        var used = LayerReferenceRegex(config).Matches(source)
             .Select(m => m.Groups[1].Value)
             .ToHashSet(StringComparer.Ordinal);
         return Preprocessor.CollectDefines(source)
             .Where(d => used.Contains(d.Key))
             .ToList();
+    }
+
+    /// <summary>
+    /// Matches a name standing where a layer number may stand: after
+    /// <c>&amp;mo</c> and friends, and after a hold-tap whose hold side is a
+    /// layer behavior (<c>&amp;magic LAYER_Magic 0</c> holds Magic). The
+    /// hold-tap names come from the parsed config, so the pattern is built per
+    /// call — and not compiled, which for a once-per-call regex costs more JIT
+    /// time than the scan it saves. The same rule
+    /// <see cref="KeymapLayerText"/> follows in <c>HoldTapLayerNames</c>.
+    /// </summary>
+    private static Regex LayerReferenceRegex(KeyboardConfig config)
+    {
+        var names = ZmkBindingFormatter.LayerBehaviors.Select(b => b[1..])
+            .Concat(config.HoldTaps
+                .Where(h => ZmkBindingFormatter.LayerBehaviors.Contains(h.HoldBinding))
+                .Select(h => h.Name.StartsWith('&') ? h.Name[1..] : h.Name))
+            .Where(n => n.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .Select(Regex.Escape);
+
+        return new Regex(@"&(?:" + string.Join("|", names) + @")\s+([A-Za-z_]\w*)");
     }
 
     // ---- binding replacement ---------------------------------------------------

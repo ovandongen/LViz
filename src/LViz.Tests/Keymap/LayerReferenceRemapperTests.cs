@@ -240,6 +240,36 @@ public class LayerReferenceRemapperTests
     }
 
     [Fact]
+    public void CombosUsingLayer_Slabwing_SeesSyslayerOnLayer2_AndNothingOn1()
+    {
+        var config = Load("slabwing.keymap", "slabwing");
+
+        Assert.Equal(new[] { "syslayer" }, LayerReferenceRemapper.CombosUsingLayer(config, 2));
+        Assert.Empty(LayerReferenceRemapper.CombosUsingLayer(config, 1));
+    }
+
+    [Fact]
+    public void CombosUsingLayer_LayersList_HeldLayerListsTheCombo()
+    {
+        var combo = new ZmkCombo("scoped", "", [0, 1], [1, 3], B("&kp", "ESC"));
+        var config = FourLayers(combos: [combo]);
+
+        Assert.Equal(new[] { "scoped" }, LayerReferenceRemapper.CombosUsingLayer(config, 1));
+        Assert.Equal(new[] { "scoped" }, LayerReferenceRemapper.CombosUsingLayer(config, 3));
+        Assert.Empty(LayerReferenceRemapper.CombosUsingLayer(config, 2));
+    }
+
+    [Fact]
+    public void CombosUsingLayer_ConfigOrder_TargetAndListBothCount()
+    {
+        var bindTwo = new ZmkCombo("binds", "", [0, 1], [-1], B("&mo", "2"));
+        var scopedTwo = new ZmkCombo("scopes", "", [2, 3], [2], B("&kp", "ESC"));
+        var config = FourLayers(combos: [bindTwo, scopedTwo]);
+
+        Assert.Equal(new[] { "binds", "scopes" }, LayerReferenceRemapper.CombosUsingLayer(config, 2));
+    }
+
+    [Fact]
     public void Delete_MacroBindingTargetingDeletedLayer_ThrowsNamingMacro()
     {
         var macro = new ZmkMacro("&weird", ["x"], [B("&mo", "1")]);

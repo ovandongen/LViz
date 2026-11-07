@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
 using LViz.App.Ring;
+using LViz.App.Services;
 using LViz.App.ViewModels;
 using LViz.Core.Diagnostics;
 using Projektanker.Icons.Avalonia;
@@ -41,8 +42,8 @@ public sealed class KeyRingControl : Control
     private static readonly SolidColorBrush CenterBrush = Tint("#1E1E2E");
     private static readonly SolidColorBrush CenterStrokeBrush = Tint("#45475A");
     private static readonly SolidColorBrush CenterChangedBrush = Tint("#2C2822");
-    private static readonly SolidColorBrush GoldBrush = Tint("#E8B45A");
-    private static readonly SolidColorBrush GoldSoftBrush = Tint("#29E8B45A");
+    private static readonly SolidColorBrush GoldBrush = Tint(AppTheme.AccentGoldHex);
+    private static readonly SolidColorBrush GoldSoftBrush = Tint(AppTheme.AccentGoldSoftHex);
     private static readonly SolidColorBrush TextBrush = Tint("#CDD6F4");
     private static readonly SolidColorBrush SubBrush = Tint("#A6ADC8");
     private static readonly SolidColorBrush MutedBrush = Tint("#6C7086");

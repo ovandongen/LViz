@@ -475,20 +475,30 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// visible beneath the keyboard. Persisted across launches.
     /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsComboLegendVisible))]
     private bool _isComboOverlayVisible;
 
     partial void OnIsComboOverlayVisibleChanged(bool value) =>
         PersistSetting(s => s with { ComboOverlayVisible = value });
 
+    /// <summary>
+    /// Whether the combo legend renders: the persisted overlay toggle, or always
+    /// while a keymap edit is open — in edit mode the legend is the combo
+    /// editor's tile strip. Raised whenever either source changes.
+    /// </summary>
+    public bool IsComboLegendVisible => IsComboOverlayVisible || IsEditing;
+
     [RelayCommand]
     private void ToggleComboOverlay() => IsComboOverlayVisible = !IsComboOverlayVisible;
 
     /// <summary>
-    /// Every combo declared in the loaded keymap, numbered sequentially
+    /// Every combo in the shown keymap, numbered sequentially
     /// in source-file order starting at 1. Not layer-scoped — combos
     /// surface on every layer view so the user can see what chords exist
     /// even when sitting on a layer where the combo doesn't fire.
-    /// Repopulated by <see cref="ApplyActiveLayer"/> on layout reload.
+    /// While a keymap edit is open these are the <em>edited</em> combos,
+    /// every tile editable. Repopulated by <see cref="BuildCombosForConfig"/>
+    /// on layout reload and on every edit-mode repaint.
     /// </summary>
     public ObservableCollection<ComboViewModel> Combos { get; } = new();
 
@@ -565,6 +575,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public Func<Task>? LoadLayoutRequested { get; set; }
     public Func<Task>? CopyDiagnosticsRequested { get; set; }
     public Action? OpenSettingsRequested { get; set; }
+    /// <summary>Set by <c>App.axaml.cs</c>: opens the read-only "Keyboard
+    /// shortcuts" window from the Help menu.</summary>
+    public Func<Task>? ShortcutsRequested { get; set; }
     /// <summary>Set by <c>App.axaml.cs</c>: opens the layout-wizard window.</summary>
     public Action? AddOwnBoardRequested { get; set; }
     /// <summary>Set by <c>App.axaml.cs</c>: opens the "Edit layout…" window.</summary>
@@ -652,6 +665,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public IRelayCommand OpenLogFolderCommand { get; }
     public IRelayCommand CopyDiagnosticsCommand { get; }
     public IRelayCommand OpenHelpCommand { get; }
+    public IAsyncRelayCommand OpenShortcutsCommand { get; }
     public IRelayCommand<IKeyboardProfile> SelectKeyboardCommand { get; }
     public IRelayCommand OpenSettingsCommand { get; }
     public IRelayCommand RefreshRecentKeymapsCommand { get; }
@@ -844,6 +858,10 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         SelectKeyboardCommand = new RelayCommand<IKeyboardProfile>(SelectKeyboard);
         OpenSettingsCommand = new RelayCommand(() => OpenSettingsRequested?.Invoke());
         OpenHelpCommand = new RelayCommand(() => _hostActionExecutor.Launch(UpdateService.WikiUrl));
+        OpenShortcutsCommand = new AsyncRelayCommand(async () =>
+        {
+            if (ShortcutsRequested is not null) await ShortcutsRequested();
+        });
         RefreshRecentKeymapsCommand = new RelayCommand(RaiseRecentKeymapsChanged);
         OpenRecentKeymapCommand = new RelayCommand<RecentKeymapItem>(OpenRecentKeymap);
         ClearRecentKeymapsCommand = new RelayCommand(ClearRecentKeymaps);
@@ -1304,6 +1322,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(UnsavedEditCount));
         OnPropertyChanged(nameof(CanStartEdit));
+        OnPropertyChanged(nameof(IsComboLegendVisible));
         StartEditCommand.NotifyCanExecuteChanged();
         NotifyEditCommandState();
     }
@@ -1317,6 +1336,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     {
         SaveEditCommand.NotifyCanExecuteChanged();
         DiscardEditCommand.NotifyCanExecuteChanged();
+        NewComboCommand.NotifyCanExecuteChanged();
         NotifyLayerCommandState();
     }
 
@@ -1352,6 +1372,10 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         RebuildLayers();
 
         ApplyActiveLayer(ActiveLayerIndex);
+
+        // The legend follows the edit too: it shows the edited combos, and
+        // every tile becomes editable with its pending-change mark.
+        BuildCombosForConfig();
     }
 
     /// <summary>One edit change: repaint the board off the edited keymap and
@@ -1379,6 +1403,10 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         // with it the NotifyPropertyChangedFor above) stays put.
         OnPropertyChanged(nameof(ActiveLayerTintColor));
         NotifyEditCommandState();
+
+        // The legend re-reads the edited combos — a key edit can retake a
+        // tile's labels, an undo can add or drop tiles entirely.
+        BuildCombosForConfig();
     }
 
     /// <summary>True while <see cref="Layers"/> still mirrors the open edit —
@@ -1412,6 +1440,10 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         Edit = null;
         RebuildLayers();
         ApplyActiveLayer(NearestShownLayer(ActiveLayerIndex));
+
+        // Back to the loaded keymap's combos, and the tiles lose their
+        // edit-mode flags with it.
+        BuildCombosForConfig();
     }
 
     /// <summary>
@@ -1539,7 +1571,10 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         try
         {
             var result = await open(
-                new KeyDialogRequest(edit.Session.Current, edit.Defines, layer, key));
+                new KeyDialogRequest(edit.Session.Current, edit.Defines, layer, key)
+                {
+                    LayerDefines = edit.LayerDefines,
+                });
 
             if (result is not null && ReferenceEquals(Edit, edit))
                 edit.SetKey(layer, key, result);
@@ -1548,6 +1583,112 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         {
             _keyDialogOpen = false;
         }
+    }
+
+    // ---- the combo dialog ----------------------------------------------------------
+
+    /// <summary>
+    /// Invoked when the user asks to add or edit a combo (double-click on a
+    /// tile, or the tile's ⋮ menu — never a single click): the callback (set
+    /// by <c>App.axaml.cs</c>, part 15) owns the combo dialog's lifecycle and
+    /// answers the new combo, or <see langword="null"/> when the dialog was
+    /// cancelled. Null means the dialog isn't wired up — opening it does
+    /// nothing.
+    /// </summary>
+    public Func<ComboDialogRequest, Task<ZmkCombo?>>? ComboDialogRequested { get; set; }
+
+    /// <summary>True while a combo-dialog callback is still open; a second
+    /// new/edit request is ignored until it closes.</summary>
+    private bool _comboDialogOpen;
+
+    /// <summary>
+    /// Open the combo dialog for a new combo and append what it answers as one
+    /// undo step. Does nothing when not editing, while a save is in flight,
+    /// when no callback is wired up, or while a combo dialog is already open.
+    /// A cancelled dialog (null) changes nothing; so does a result once the
+    /// edit it was opened on has been replaced underneath the await.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanEditLayers))]
+    private async Task NewComboAsync()
+    {
+        if (Edit is not { } edit) return;
+        if (IsSavingEdit) return;
+        if (ComboDialogRequested is not { } open) return;
+        if (_comboDialogOpen) return;
+
+        _comboDialogOpen = true;
+        try
+        {
+            var result = await open(new ComboDialogRequest(
+                _profile,
+                edit.Session.Current,
+                edit.Defines,
+                edit.LayerDefines,
+                null,
+                ActiveLayerIndex));
+
+            if (result is not null && ReferenceEquals(Edit, edit))
+                edit.AddCombo(result);
+        }
+        finally
+        {
+            _comboDialogOpen = false;
+        }
+    }
+
+    /// <summary>
+    /// Open the combo dialog on tile <paramref name="number"/> (the 1-based
+    /// tile number) and replace that combo with what it answers, as one undo
+    /// step. An out-of-range number, no edit, no callback, a save in flight,
+    /// or an already-open dialog do nothing; so does a cancelled dialog (null)
+    /// or a result once the edit has been replaced underneath the await — or
+    /// once the tile it was opened on no longer exists.
+    /// </summary>
+    [RelayCommand]
+    private async Task EditComboAsync(int number)
+    {
+        var index = number - 1;
+        if (!CanEditLayers || Edit is not { } edit) return;
+        if (ComboDialogRequested is not { } open) return;
+        if (_comboDialogOpen) return;
+        if (index < 0 || index >= edit.Session.Current.Combos.Count) return;
+
+        _comboDialogOpen = true;
+        try
+        {
+            var result = await open(new ComboDialogRequest(
+                _profile,
+                edit.Session.Current,
+                edit.Defines,
+                edit.LayerDefines,
+                index,
+                ActiveLayerIndex));
+
+            if (result is not null && ReferenceEquals(Edit, edit)
+                && index < edit.Session.Current.Combos.Count)
+                edit.SetCombo(index, result);
+        }
+        finally
+        {
+            _comboDialogOpen = false;
+        }
+    }
+
+    /// <summary>
+    /// Remove the combo on tile <paramref name="number"/> (the 1-based tile
+    /// number) as one undo step — no confirmation, like deleting a layer. An
+    /// out-of-range number, a closed edit or a save in flight does nothing.
+    /// </summary>
+    [RelayCommand]
+    private void DeleteCombo(int number)
+    {
+        var index = number - 1;
+        // Not while a save is in flight: the plan is already built, so the
+        // delete would be lost when the save closes the edit.
+        if (!CanEditLayers || Edit is not { } edit) return;
+        if (index < 0 || index >= edit.Session.Current.Combos.Count) return;
+
+        edit.DeleteCombo(index);
     }
 
     // ---- layer operations --------------------------------------------------------
@@ -1671,7 +1812,10 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                     _layerDialogOpen = true;
                     try
                     {
-                        await blocked(new LayerDeleteBlockedRequest(name, check.Blockers));
+                        await blocked(new LayerDeleteBlockedRequest(name, check.Blockers)
+                        {
+                            ComboEditsPending = edit.HasPendingComboEdits,
+                        });
                     }
                     finally
                     {
@@ -1847,6 +1991,10 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                         ? MoveLayerSettings(edit.Session.BaselineLayerMap())
                         : Array.Empty<LayerSettingsNotice>();
 
+                    // Combo labels follow their combo the same way layer
+                    // settings follow their layers — before the edit closes.
+                    MoveComboLabelOverrides(plan.ComboChanges);
+
                     LeaveEdit();
                     LoadLayoutFromPath(saved.ReloadPath, edit.Source.Entry);
                     ApplyActiveLayer(NearestShownLayer(layer));
@@ -1922,6 +2070,53 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             MouseLayer?.ApplySettings(mouse);
 
         return remapped.Notices;
+    }
+
+    /// <summary>
+    /// Carries this keyboard's combo label overrides across a save that moved
+    /// or removed combos: a rewritten combo takes its label to its new
+    /// key-position key (when nothing already lives there), and a deleted
+    /// combo's label goes with it. Overrides of combos the save only renamed
+    /// or retargeted (same positions) stay put, and adds have no label yet.
+    /// Persists once, and only when something actually moved.
+    /// </summary>
+    private void MoveComboLabelOverrides(IReadOnlyList<KeymapComboChange> changes)
+    {
+        var moved = false;
+        foreach (var change in changes)
+        {
+            switch (change.Edit)
+            {
+                case ComboEdit.Change:
+                {
+                    if (change.Old is not { } old || change.New is not { } combo) continue;
+                    var oldKey = ComboLabelOverrides.KeyPositionsToKey(old.KeyPositions);
+                    var newKey = ComboLabelOverrides.KeyPositionsToKey(combo.KeyPositions);
+                    if (oldKey == newKey) continue;
+
+                    var existing = ComboLabelOverrides.Get(_profile.Id, oldKey);
+                    if (existing is null) continue; // nothing to carry, and clearing an absent key is a no-op
+                    if (ComboLabelOverrides.Get(_profile.Id, newKey) is null)
+                        ComboLabelOverrides.Set(_profile.Id, newKey, existing);
+                    ComboLabelOverrides.Set(_profile.Id, oldKey, null);
+                    moved = true;
+                    break;
+                }
+                case ComboEdit.Delete:
+                {
+                    if (change.Old is not { } old) continue;
+                    var oldKey = ComboLabelOverrides.KeyPositionsToKey(old.KeyPositions);
+                    if (ComboLabelOverrides.Get(_profile.Id, oldKey) is null) continue;
+
+                    ComboLabelOverrides.Set(_profile.Id, oldKey, null);
+                    moved = true;
+                    break;
+                }
+            }
+        }
+
+        if (moved)
+            PersistSetting(s => s with { ComboLabelOverrides = ComboLabelOverrides.Snapshot() });
     }
 
     /// <summary>One remap notice as its translated report line.</summary>
@@ -2406,21 +2601,25 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     }
 
     /// <summary>
-    /// Walks the loaded keymap's combos once and populates the legend
-    /// collection plus each key's <see cref="KeyViewModel.SetCombos"/>.
-    /// Called once per keymap load from <see cref="LoadLayoutFromPath"/>
-    /// after the initial <see cref="ApplyActiveLayer"/> — combos aren't
-    /// layer-scoped, so this work doesn't repeat on layer switch. The
-    /// participating-key labels in the legend's
-    /// <c>ParticipatingKeysText</c> reflect whatever layer was active at
-    /// load time (layer 0 in practice) and stay stable from there.
+    /// Walks the shown keymap's combos once and populates the legend
+    /// collection plus each key's <see cref="KeyViewModel.SetCombos"/>. While
+    /// a keymap edit is open the <em>edited</em> config paints, and every tile
+    /// is editable and carries its pending-change mark. Called once per keymap
+    /// load from <see cref="LoadLayoutFromPath"/> and from every edit-mode
+    /// repaint (<see cref="StartEdit"/>, <see cref="OnEditChanged(object?,
+    /// EventArgs)"/>, <see cref="LeaveEdit"/>) — combos aren't layer-scoped, so
+    /// nothing here repeats on a plain layer switch. The participating-key
+    /// labels in the legend's <c>ParticipatingKeysText</c> reflect whatever
+    /// layer was active when the legend was rebuilt.
     /// </summary>
     private void BuildCombosForConfig()
     {
         SetHighlightedCombos(Array.Empty<int>());
         Combos.Clear();
 
-        var km = _keymap.Current;
+        // While editing, the legend shows the edit — combo badges follow too.
+        var edit = Edit;
+        var km = edit?.Keymap ?? _keymap.Current;
         if (km is null)
         {
             for (var i = 0; i < Keys.Count; i++)
@@ -2461,7 +2660,13 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             var combo = allCombos[i];
             var key = ComboLabelOverrides.KeyPositionsToKey(combo.KeyPositions);
             var ov = ComboLabelOverrides.Get(_profile.Id, key);
-            Combos.Add(new ComboViewModel(i + 1, combo, LabelLookup, km.MacrosByName, ov));
+            var tile = new ComboViewModel(i + 1, combo, LabelLookup, km.MacrosByName, ov);
+            if (edit is not null)
+            {
+                tile.IsEditable = true;
+                tile.IsChanged = edit.IsComboChanged(i);
+            }
+            Combos.Add(tile);
         }
     }
 

@@ -2255,6 +2255,10 @@
     <value>Toets {0} op laag {1}</value>
     <comment/>
   </data>
+  <data name="KeyDialog_TitleCustomFormat" xml:space="preserve">
+    <value>Binding op laag {0}</value>
+    <comment/>
+  </data>
   <data name="KeyDialog_TabBehavior" xml:space="preserve">
     <value>Gedrag</value>
     <comment/>
@@ -2697,6 +2701,286 @@
   </data>
   <data name="Ring_Panel_Hint" xml:space="preserve">
     <value>↵ kiezen · ↑↓ verplaatsen</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Group_Board" xml:space="preserve">
+    <value>Toetsenbord (bewerkmodus)</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Group_Layers" xml:space="preserve">
+    <value>Lagen (bewerkmodus)</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Group_KeyRing" xml:space="preserve">
+    <value>Toetsring</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Group_KeyDialog" xml:space="preserve">
+    <value>Toetsvenster</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Group_Mouse" xml:space="preserve">
+    <value>Muis</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_EditKey" xml:space="preserve">
+    <value>Geselecteerde toets bewerken</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_ClearTrans" xml:space="preserve">
+    <value>Geselecteerde toets transparant maken (&amp;trans)</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_ClearNone" xml:space="preserve">
+    <value>Geselecteerde toets uitschakelen (&amp;none)</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Deselect" xml:space="preserve">
+    <value>Selectie opheffen</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Undo" xml:space="preserve">
+    <value>Ongedaan maken</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Redo" xml:space="preserve">
+    <value>Opnieuw</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_NewLayer" xml:space="preserve">
+    <value>Nieuwe laag</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_DuplicateLayer" xml:space="preserve">
+    <value>Getoonde laag dupliceren</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_MoveLayerLeft" xml:space="preserve">
+    <value>Getoonde laag naar links</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_MoveLayerRight" xml:space="preserve">
+    <value>Getoonde laag naar rechts</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_RingAround" xml:space="preserve">
+    <value>Rond de ring bewegen</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_RingList" xml:space="preserve">
+    <value>Door de lijst bewegen</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_RingBand" xml:space="preserve">
+    <value>Naar de buitenste band</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_RingEnter" xml:space="preserve">
+    <value>Kiezen, of opslaan als de binding compleet is</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_RingBack" xml:space="preserve">
+    <value>Eén stap terug</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Typing" xml:space="preserve">
+    <value>Typen</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_RingSearch" xml:space="preserve">
+    <value>In de lijst zoeken</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Cancel" xml:space="preserve">
+    <value>Annuleren</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_DialogTabs" xml:space="preserve">
+    <value>Vorige / volgende tab</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_DoubleClickKey" xml:space="preserve">
+    <value>Dubbelklik op een toets</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_RightClickKey" xml:space="preserve">
+    <value>Rechtsklik op een toets</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_RightClickRing" xml:space="preserve">
+    <value>Rechtsklik in de ring</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_DoubleClickChoice" xml:space="preserve">
+    <value>Dubbelklik op een keuze in de ring</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_DoubleClickCombo" xml:space="preserve">
+    <value>Dubbelklik op een combotegel</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_EditKeyMouse" xml:space="preserve">
+    <value>Toets bewerken (bewerkmodus)</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_EditLabel" xml:space="preserve">
+    <value>Label van de toets aanpassen</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_PickAndSave" xml:space="preserve">
+    <value>Kiezen en opslaan</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_EditCombo" xml:space="preserve">
+    <value>Combo bewerken (bewerkmodus)</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Title" xml:space="preserve">
+    <value>Sneltoetsen</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_MenuItem" xml:space="preserve">
+    <value>Sneltoetsen…</value>
+    <comment/>
+  </data>
+  <data name="Help_OnlineMenuItem" xml:space="preserve">
+    <value>Online hulp</value>
+    <comment/>
+  </data>
+  <data name="Shortcuts_Close" xml:space="preserve">
+    <value>Sluiten</value>
+    <comment/>
+  </data>
+  <data name="Edit_DeleteBlockedSaveCombosFirst" xml:space="preserve">
+    <value>Combowijzigingen worden pas bij opslaan geschreven. Sla eerst op en verwijder daarna de laag.</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewComboAddFormat" xml:space="preserve">
+    <value>Nieuwe combo {0} ({1}): {2}</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewComboEditFormat" xml:space="preserve">
+    <value>Combo {0} ({1}): {2}</value>
+    <comment/>
+  </data>
+  <data name="Edit_ReviewComboDeleteFormat" xml:space="preserve">
+    <value>Combo {0} verwijderen ({1})</value>
+    <comment/>
+  </data>
+  <data name="Combo_TitleNew" xml:space="preserve">
+    <value>Nieuwe combo</value>
+    <comment/>
+  </data>
+  <data name="Combo_TitleEditFormat" xml:space="preserve">
+    <value>Combo {0}</value>
+    <comment/>
+  </data>
+  <data name="Combo_BindingNone" xml:space="preserve">
+    <value>Kiezen…</value>
+    <comment/>
+  </data>
+  <data name="Combo_ErrorNoBinding" xml:space="preserve">
+    <value>Kies wat de combo doet.</value>
+    <comment/>
+  </data>
+  <data name="Combo_ErrorTimeout" xml:space="preserve">
+    <value>Time-out moet een geheel getal boven 0 zijn, of leeg.</value>
+    <comment/>
+  </data>
+  <data name="Combo_ErrorIdle" xml:space="preserve">
+    <value>Voorafgaande rust moet een geheel getal van 0 of meer zijn, of leeg.</value>
+    <comment/>
+  </data>
+  <data name="Combo_ErrorNoLayers" xml:space="preserve">
+    <value>Kies minstens één laag, of Alle lagen.</value>
+    <comment/>
+  </data>
+  <data name="Combo_ErrorTooFewKeys" xml:space="preserve">
+    <value>Kies minstens twee toetsen.</value>
+    <comment/>
+  </data>
+  <data name="Combo_ErrorInvalidName" xml:space="preserve">
+    <value>De naam moet met een letter beginnen en mag alleen letters, cijfers en , . _ + - bevatten (maximaal 31).</value>
+    <comment/>
+  </data>
+  <data name="Combo_ErrorDuplicateNameFormat" xml:space="preserve">
+    <value>Combo {0} heeft deze naam al.</value>
+    <comment/>
+  </data>
+  <data name="Combo_WarnSameKeysFormat" xml:space="preserve">
+    <value>Combo {0} gebruikt dezelfde toetsen op een gedeelde laag.</value>
+    <comment/>
+  </data>
+  <data name="Combo_WarnTooManyKeysFormat" xml:space="preserve">
+    <value>{0} toetsen: MoErgo-firmware en oudere ZMK staan er maximaal 4 toe.</value>
+    <comment/>
+  </data>
+  <data name="Combo_WarnKeyInManyCombosFormat" xml:space="preserve">
+    <value>Toets {0} zit in {1} combo's: MoErgo-firmware en oudere ZMK staan er maximaal 5 toe.</value>
+    <comment/>
+  </data>
+  <data name="Combo_LabelLayer" xml:space="preserve">
+    <value>Labels van laag</value>
+    <comment/>
+  </data>
+  <data name="Combo_KeysHint" xml:space="preserve">
+    <value>Klik de toetsen die de combo activeren.</value>
+    <comment/>
+  </data>
+  <data name="Combo_FieldName" xml:space="preserve">
+    <value>Naam</value>
+    <comment/>
+  </data>
+  <data name="Combo_FieldBinding" xml:space="preserve">
+    <value>Doet</value>
+    <comment/>
+  </data>
+  <data name="Combo_FieldTimeout" xml:space="preserve">
+    <value>Time-out</value>
+    <comment/>
+  </data>
+  <data name="Combo_TimeoutWatermark" xml:space="preserve">
+    <value>50 (ZMK-standaard)</value>
+    <comment/>
+  </data>
+  <data name="Combo_FieldLayers" xml:space="preserve">
+    <value>Lagen</value>
+    <comment/>
+  </data>
+  <data name="Combo_AllLayers" xml:space="preserve">
+    <value>Alle lagen</value>
+    <comment/>
+  </data>
+  <data name="Combo_FieldIdle" xml:space="preserve">
+    <value>Voorafgaande rust vereist</value>
+    <comment/>
+  </data>
+  <data name="Combo_IdleWatermark" xml:space="preserve">
+    <value>uit</value>
+    <comment/>
+  </data>
+  <data name="Combo_FieldSlowRelease" xml:space="preserve">
+    <value>Langzaam loslaten</value>
+    <comment/>
+  </data>
+  <data name="Combo_SlowReleaseHint" xml:space="preserve">
+    <value>Loslaten als alle toetsen los zijn</value>
+    <comment/>
+  </data>
+  <data name="Tooltip_NewCombo" xml:space="preserve">
+    <value>Nieuwe combo</value>
+    <comment/>
+  </data>
+  <data name="Tooltip_ComboMenu" xml:space="preserve">
+    <value>Combo-acties</value>
+    <comment/>
+  </data>
+  <data name="Edit_ComboMenuEdit" xml:space="preserve">
+    <value>Bewerken…</value>
+    <comment/>
+  </data>
+  <data name="Edit_ComboMenuDelete" xml:space="preserve">
+    <value>Verwijderen</value>
     <comment/>
   </data>
 </root>

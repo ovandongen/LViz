@@ -289,8 +289,10 @@ public sealed partial class KeyRingViewModel : ObservableObject
 
         Dialog = dialog;
         _request = request;
-        _original = _request.Config.Layers[_request.LayerIndex].Bindings[_request.KeyIndex];
-        _originalText = ZmkBindingFormatter.Format(_original, _request.Defines);
+        _original = request.Binding
+            ?? _request.Config.Layers[_request.LayerIndex].Bindings[_request.KeyIndex];
+        _originalText = ZmkBindingFormatter.Format(
+            _original, _request.LayerDefines ?? _request.Defines, _request.Config.HoldTaps);
         _openedShorts = [.. dialog.Params.Select(ValueShortOf)];
 
         // A key that opened on Custom goes straight to its text; one that
@@ -866,8 +868,9 @@ public sealed partial class KeyRingViewModel : ObservableObject
         }
     }
 
-    /// <summary>Which key on which layer (the view upper-cases it).</summary>
-    public string CenterCaption => Loc.Instance.Format(
+    /// <summary>Which key on which layer, or the request's caption when it
+    /// carries one (the view upper-cases it).</summary>
+    public string CenterCaption => _request.Caption ?? Loc.Instance.Format(
         "Ring_CaptionFormat", _request.KeyIndex, _request.Config.Layers[_request.LayerIndex].Name);
 
     /// <summary>The binding text the key opened with — what a write would

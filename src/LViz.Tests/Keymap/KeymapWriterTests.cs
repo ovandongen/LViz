@@ -20,6 +20,18 @@ public class KeymapWriterTests
     private static KeyBinding Bind(string behavior, params string[] parameters) =>
         new(behavior, parameters);
 
+    private static int CountOf(string text, string needle)
+    {
+        int count = 0;
+        int at = 0;
+        while ((at = text.IndexOf(needle, at, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            at += needle.Length;
+        }
+        return count;
+    }
+
     // ---- no-op handling ---------------------------------------------------------
 
     [Theory]
@@ -234,7 +246,7 @@ public class KeymapWriterTests
     [Theory]
     [InlineData("1", "&mo LAYER_Symbol")] // not KB_TYPE_GLOVE_80, defined earlier with value 1
     [InlineData("2", "&mo LAYER_Lower")]  // not KB_TYPE_GO_60
-    [InlineData("3", "&mo 3")]            // LAYER_Magic is never used as a layer reference
+    [InlineData("3", "&mo LAYER_Magic")]  // LAYER_Magic is used after &magic, a layer hold-tap
     public void Apply_LayerParamUsesOnlyDefinesTheFileUsesAsLayerReferences(string layer, string expected)
     {
         var source = Read("glove80-editor.keymap");
@@ -244,6 +256,52 @@ public class KeymapWriterTests
         var result = Apply(source, [new BindingEdit(0, 0, Bind("&mo", layer))]);
 
         Assert.Equal(expected, result.Substring(span.Start, expected.Length));
+    }
+
+    [Fact]
+    public void Apply_HoldTapLayerParamWrittenAsFileDefine()
+    {
+        var source = Read("glove80.keymap");
+
+        // Layer 0 key 0 is `&mt F11 F1`. &magic holds &mo, and the file spells
+        // that layer LAYER_Magic (#define LAYER_Magic 3, already used that way
+        // twice) — so the picked binding is written with the file's own name.
+        var result = Apply(source, [new BindingEdit(0, 0, Bind("&magic", "3", "0"))]);
+
+        Assert.Equal(3, CountOf(result, "&magic LAYER_Magic 0"));
+        Assert.DoesNotContain("&magic 3 0", result, StringComparison.Ordinal);
+
+        var written = ZmkKeymapLoader.LoadFromText(result, "writer-test").Layers[0].Bindings[0];
+        Assert.Equal("&magic", written.Behavior);
+        Assert.Equal(new[] { "3", "0" }, written.Params);
+    }
+
+    // ---- the defines a layer number may be written as ------------------------------
+
+    private static IReadOnlyList<KeyValuePair<string, string>> LayerRefs(string fixture)
+    {
+        var source = Read(fixture);
+        return KeymapWriter.LayerReferenceDefines(
+            source, ZmkKeymapLoader.LoadFromText(source, "writer-test"));
+    }
+
+    [Theory]
+    [InlineData("glove80.keymap", "3")]
+    [InlineData("go60.keymap", "7")]
+    public void LayerReferenceDefines_IncludeTheDefineUsedAfterALayerHoldTap(
+        string fixture, string value)
+    {
+        // The only spelling of LAYER_Magic in these files is after &magic; it
+        // counts as a layer reference all the same.
+        Assert.Contains(LayerRefs(fixture), d => d.Key == "LAYER_Magic" && d.Value == value);
+    }
+
+    [Fact]
+    public void LayerReferenceDefines_ExcludeDefinesNoLayerReferenceUses()
+    {
+        // #define POS_RH_C2R1 7 comes before #define LAYER_Magic 7, and a key
+        // position never stands where a layer number may.
+        Assert.DoesNotContain(LayerRefs("go60.keymap"), d => d.Key.StartsWith("POS_", StringComparison.Ordinal));
     }
 
     [Fact]
