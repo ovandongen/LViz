@@ -221,62 +221,6 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Gives a tab's <see cref="ContextMenu"/> its owner's data context. A
-    /// closed ContextMenu is not a visual child of its owner, so DataContext
-    /// inheritance (which follows the visual tree) never reaches it or its
-    /// items; without this the tab menu's command bindings would resolve to
-    /// nothing. Tag records the menu that was already wired to this button so
-    /// a re-firing Loaded never double-subscribes; the DataContext observer
-    /// re-syncs whenever a recycled container gets a new layer.
-    /// </summary>
-    private void OnLayerTabLoaded(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not Button tab) return;
-        if (tab.ContextMenu is not { } menu || ReferenceEquals(tab.Tag, menu)) return;
-        tab.Tag = menu;
-
-        menu.DataContext = tab.DataContext;
-        tab.GetObservable(DataContextProperty).Subscribe(new MenuDataContextSync(menu));
-    }
-
-    /// <summary>Keeps one tab's ContextMenu DataContext in sync with its
-    /// button (a closed ContextMenu is no visual child of the button, so it
-    /// gets no inheritance; see <see cref="OnLayerTabLoaded"/>).</summary>
-    private sealed class MenuDataContextSync(ContextMenu menu) : IObserver<object?>
-    {
-        public void OnCompleted() { }
-        public void OnError(Exception error) { }
-        public void OnNext(object? value) => menu.DataContext = value;
-    }
-
-    /// <summary>
-    /// Right-click on a layer tab only opens its menu while a keymap edit is
-    /// open: Avalonia raises <c>Opening</c> just before the menu appears, and
-    /// anything but an editable tab's menu is cancelled, so outside edit mode
-    /// a right-click does nothing at all.
-    /// </summary>
-    private void OnLayerTabMenuOpening(object? sender, CancelEventArgs e)
-    {
-        e.Cancel = (sender as ContextMenu)?.DataContext
-            is not LayerViewModel { IsEditable: true };
-    }
-
-    /// <summary>
-    /// Double-click on a layer tab opens the rename dialog while a keymap edit
-    /// is open. The first click of the double-click has already selected the
-    /// layer through the tab's own SelectCommand, which is the intent.
-    /// </summary>
-    private void OnLayerTabDoubleTapped(object? sender, TappedEventArgs e)
-    {
-        if (sender is not Control tab) return;
-        if (tab.DataContext is not LayerViewModel { IsEditable: true } layer) return;
-        if (!layer.RenameCommand.CanExecute(null)) return;
-
-        layer.RenameCommand.Execute(null);
-        e.Handled = true;
-    }
-
-    /// <summary>
     /// Handles window drag (bars area) and resize (edges).
     /// SystemDecorations="None" removes OS title bar and resize handles — we replace both here.
     /// </summary>
@@ -336,25 +280,6 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Pointer enters a combo legend tile → ask the main VM to highlight
-    /// just that combo's number. Symmetric with the board-side handler in
-    /// <see cref="BoardView"/>.
-    /// </summary>
-    private void OnComboTilePointerEntered(object? sender, PointerEventArgs e)
-    {
-        if (sender is not Control c) return;
-        if (c.DataContext is not ComboViewModel combo) return;
-        if (DataContext is not MainWindowViewModel vm) return;
-        vm.SetHighlightedCombos(new[] { combo.Number });
-    }
-
-    private void OnComboTilePointerExited(object? sender, PointerEventArgs e)
-    {
-        if (DataContext is not MainWindowViewModel vm) return;
-        vm.SetHighlightedCombos(Array.Empty<int>());
-    }
-
-    /// <summary>
     /// The recents flyout opens → re-run the Exists check on the stored paths
     /// so a file deleted/renamed since the last open greys out immediately.
     /// (A binding alone can't turn the Flyout.Opened event into a command.)
@@ -362,7 +287,7 @@ public partial class MainWindow : Window
     private void OnRecentKeymapsFlyoutOpened(object? sender, EventArgs e)
     {
         if (DataContext is not MainWindowViewModel vm) return;
-        vm.RefreshRecentKeymapsCommand.Execute(null);
+        vm.Recents.RefreshCommand.Execute(null);
     }
 
     /// <summary>
@@ -393,36 +318,6 @@ public partial class MainWindow : Window
     private void OnEditLayoutClick(object? sender, RoutedEventArgs e)
     {
         Dispatcher.UIThread.Post(() => KeyboardPickerButton.Flyout?.Hide());
-    }
-
-    /// <summary>
-    /// Right-click on a combo legend tile opens the combo-label editor. Editing
-    /// is intentionally scoped to the legend only — on-key combo pills are
-    /// already crowded with the number badge.
-    /// </summary>
-    private void OnComboTilePointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (sender is not Control c) return;
-        if (c.DataContext is not ComboViewModel combo) return;
-        if (DataContext is not MainWindowViewModel vm) return;
-        if (!e.GetCurrentPoint(c).Properties.IsRightButtonPressed) return;
-        vm.RequestEditCombo(combo.KeyPositionsKey);
-        e.Handled = true;
-    }
-
-    /// <summary>
-    /// Double-click on a combo legend tile opens the combo dialog on that tile
-    /// while a keymap edit is open; outside edit mode it does nothing. A single
-    /// click never opens an editor, and right-click stays the label editor.
-    /// </summary>
-    private void OnComboTileDoubleTapped(object? sender, TappedEventArgs e)
-    {
-        if (sender is not Control c) return;
-        if (c.DataContext is not ComboViewModel combo) return;
-        if (DataContext is not MainWindowViewModel { IsEditing: true } vm) return;
-
-        vm.Edit!.EditComboCommand.Execute(combo.Number);
-        e.Handled = true;
     }
 
     private WindowEdge? GetResizeEdge(Point pos)

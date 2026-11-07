@@ -1,0 +1,196 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:LViz.App.ViewModels"
+             xmlns:conv="using:LViz.App.Converters"
+             xmlns:i="https://github.com/projektanker/icons.avalonia"
+             x:Class="LViz.App.Views.SettingsTabs.GeneralTab"
+             x:DataType="vm:SettingsViewModel">
+    <UserControl.Resources>
+        <conv:HexColorToBrushConverter x:Key="HexToBrush" />
+    </UserControl.Resources>
+
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="20" Spacing="8">
+
+            <StackPanel Spacing="4">
+                <TextBlock Text="{Binding [Settings_KeyboardProfile], Source={StaticResource Loc}}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                <TextBlock Text="{Binding [Settings_KeyboardProfileHint], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+                <ComboBox MinWidth="200" Margin="0,4,0,0"
+                          HorizontalAlignment="Left"
+                          IsEnabled="{Binding CanPickKeyboard}"
+                          ItemsSource="{Binding KeyboardChoices}"
+                          SelectedItem="{Binding SelectedKeyboardProfile, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding DisplayName}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBlock Text="{Binding [Settings_KeyboardLockedWhileEditing], Source={StaticResource Loc}}"
+                           IsVisible="{Binding !CanPickKeyboard}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+            <!-- Background opacity -->
+            <StackPanel Spacing="4">
+                <TextBlock Text="{Binding [Settings_BackgroundOpacity], Source={StaticResource Loc}}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                <TextBlock Text="{Binding [Settings_BackgroundOpacityHint], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+                <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                    <Slider Grid.Column="0"
+                            Minimum="0" Maximum="1"
+                            TickFrequency="0.05"
+                            IsSnapToTickEnabled="True"
+                            Value="{Binding MainViewModel.BackgroundOpacity, Mode=TwoWay}"
+                            VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding BackgroundOpacityPercent}"
+                               Foreground="{StaticResource Text}"
+                               MinWidth="44"
+                               TextAlignment="Right"
+                               VerticalAlignment="Center"
+                               Margin="8,0,0,0" />
+                </Grid>
+            </StackPanel>
+
+            <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+            <!-- Press-highlight color -->
+            <StackPanel Spacing="4">
+                <TextBlock Text="{Binding [Settings_PressHighlight], Source={StaticResource Loc}}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                <TextBlock Text="{Binding [Settings_PressHighlightHint], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+                <Button Padding="2" Margin="0,4,0,0"
+                        HorizontalAlignment="Left"
+                        Background="Transparent" BorderThickness="0">
+                    <Border Width="56" Height="22" CornerRadius="3"
+                            Background="{Binding PressHighlightColorHex, Converter={StaticResource HexToBrush}}"
+                            BorderBrush="{StaticResource BgSurface1}" BorderThickness="1" />
+                    <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedLeft">
+                            <ColorView Color="{Binding PressHighlightColor, Mode=TwoWay}"
+                                       IsAlphaVisible="False" />
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+            </StackPanel>
+
+            <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+            <!-- Global show/hide hotkey. Single key only (no modifier UI today);
+                 the chosen key is auto-excluded from the layer-key picker on the
+                 Layers tab so the two can't collide. Hidden on Linux —
+                 Wayland blocks global hooks from unfocused windows. -->
+            <StackPanel Spacing="4" IsVisible="{Binding IsGlobalHotkeySupported}">
+                <TextBlock Text="{Binding [Settings_GlobalHotkey], Source={StaticResource Loc}}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                <TextBlock Text="{Binding [Settings_GlobalHotkeyHint], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+                <ComboBox MinWidth="120" Margin="0,4,0,0"
+                          HorizontalAlignment="Left"
+                          ItemsSource="{Binding HotkeyKeyChoices}"
+                          SelectedItem="{Binding MainViewModel.HotkeyKey, Mode=TwoWay}" />
+            </StackPanel>
+
+            <Border Height="1" Background="{StaticResource BgSurface0}" IsVisible="{Binding IsGlobalHotkeySupported}" />
+
+            <!-- Tray icon active-layer tint -->
+            <StackPanel Spacing="4">
+                <CheckBox Content="{Binding [Settings_ColorTrayIcon], Source={StaticResource Loc}}"
+                          IsChecked="{Binding MainViewModel.ColorTrayIconByActiveLayer, Mode=TwoWay}" />
+                <TextBlock Text="{Binding [Settings_ColorTrayIconHint], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+            <!-- Ring key editor -->
+            <StackPanel Spacing="4">
+                <CheckBox Content="{Binding [Settings_RingKeyEditor], Source={StaticResource Loc}}"
+                          IsChecked="{Binding MainViewModel.UseRingKeyEditor, Mode=TwoWay}" />
+                <TextBlock Text="{Binding [Settings_RingKeyEditorHint], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+            <!-- Layout: top-hand picker for stacked mode. Greyed out
+                 until the user enables stacked layout via the toolbar. -->
+            <StackPanel Spacing="4">
+                <TextBlock Text="{Binding [Settings_Layout], Source={StaticResource Loc}}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0"
+                            IsEnabled="{Binding MainViewModel.BoardLayout.IsStackedLayout}">
+                    <TextBlock Text="{Binding [Settings_TopHand], Source={StaticResource Loc}}"
+                               VerticalAlignment="Center" Foreground="{StaticResource TextSubtle}" FontSize="12" />
+                    <ComboBox MinWidth="100"
+                              ItemsSource="{Binding AvailableTopHands}"
+                              SelectedItem="{Binding MainViewModel.BoardLayout.StackedTopHand, Mode=TwoWay}" />
+                </StackPanel>
+            </StackPanel>
+
+            <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+            <!-- Updates: auto-check toggle, manual "Check now", status
+                 readout, restart-to-install button when staged. -->
+            <StackPanel Spacing="4">
+                <TextBlock Text="{Binding [Settings_Updates], Source={StaticResource Loc}}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                <CheckBox Content="{Binding [Settings_AutoCheckForUpdates], Source={StaticResource Loc}}"
+                          IsChecked="{Binding About.AutoCheckForUpdates, Mode=TwoWay}" />
+                <TextBlock Text="{Binding [Settings_AutoCheckHint], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                    <Button Content="{Binding [Settings_CheckNow], Source={StaticResource Loc}}"
+                            Command="{Binding About.CheckForUpdatesCommand}"
+                            IsEnabled="{Binding !About.IsCheckingForUpdates}" />
+                    <Button Content="{Binding [Settings_RestartToInstall], Source={StaticResource Loc}}"
+                            Command="{Binding About.RestartToInstallCommand}"
+                            IsVisible="{Binding About.CanRestartToInstall}" />
+                </StackPanel>
+                <TextBlock Text="{Binding About.UpdateStatusMessage}"
+                           Foreground="{StaticResource AccentGreen}" FontSize="12"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding About.HasUpdateStatus}" />
+                <TextBlock Text="{Binding About.LastCheckedDisplay}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12"
+                           IsVisible="{Binding About.LastCheckedDisplay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+
+            <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+            <!-- Command-line tool: symlinks `lviz` onto PATH so scripts can
+                 drive the running app. Buttons appear only on builds where
+                 the app can install it (installed build, macOS/Linux); the
+                 detail line always explains the current state. -->
+            <StackPanel Spacing="4">
+                <TextBlock Text="{Binding [Settings_CliTool], Source={StaticResource Loc}}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                <TextBlock Text="{Binding [Settings_CliTool_Hint], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0"
+                            IsVisible="{Binding About.IsCliToolActionAvailable}">
+                    <Button Content="{Binding [Settings_CliTool_Install], Source={StaticResource Loc}}"
+                            Command="{Binding About.InstallCliToolCommand}"
+                            IsVisible="{Binding !About.IsCliToolInstalled}" />
+                    <Button Content="{Binding [Settings_CliTool_Remove], Source={StaticResource Loc}}"
+                            Command="{Binding About.UninstallCliToolCommand}"
+                            IsVisible="{Binding About.IsCliToolInstalled}" />
+                </StackPanel>
+                <TextBlock Text="{Binding About.CliToolDetail}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding About.CliToolDetail, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+
+</UserControl>

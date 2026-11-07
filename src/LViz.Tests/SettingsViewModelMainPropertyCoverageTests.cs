@@ -39,7 +39,6 @@ public class SettingsViewModelMainPropertyCoverageTests
         // Bound directly in SettingsWindow.axaml — no SettingsVM transform needed.
         "HotkeyKey",
         "HotkeyModifiers",
-        "IsComboOverlayVisible",
         "IsWindowsModifierStyle",
         "ColorTrayIconByActiveLayer",
         "IsLiveHighlightingEnabled",
@@ -56,6 +55,14 @@ public class SettingsViewModelMainPropertyCoverageTests
         // BoardStyle.PropertyChanged subscription (not a MainVM facade).
         "BoardLayout",
         "BoardStyle",
+
+        // The combo legend child VM (overlay toggle, tiles, label overrides),
+        // exposed directly; the main window binds it, Settings never shows it.
+        "ComboLegend",
+
+        // The layer tab strip, exposed directly (Settings reads its tabs for the
+        // Layers/Testing/rule pickers and rebuilds on its collection events).
+        "LayerTabs",
 
         // The mouse-layer engine, exposed directly (SettingsVM reads/writes it
         // without a MainVM facade); not surfaced as a derived SettingsVM prop.
@@ -89,9 +96,9 @@ public class SettingsViewModelMainPropertyCoverageTests
         // Picker item visibility, main window only ("Edit layout…" flyout item).
         "CanEditLayout",
 
-        // Recents-menu emptiness flag, bound directly in the main window's
-        // recents flyout; settings never renders recents.
-        "HasRecentKeymaps",
+        // Recents flyout child view-model, bound directly in the main window's
+        // load menu; settings never renders recents.
+        "Recents",
 
         // Keymap edit mode: main-window-only state. (IsEditing is not here —
         // it propagates to SettingsViewModel.CanPickKeyboard, the picker lock.)
@@ -99,9 +106,6 @@ public class SettingsViewModelMainPropertyCoverageTests
         "CanStartEdit",
         "EditButtonTooltip",
 
-        // Legend visibility, main window only — the persisted toggle
-        // (IsComboOverlayVisible, bound directly) or forced on while editing.
-        "IsComboLegendVisible",
     };
 
     [Fact]

@@ -22,9 +22,6 @@ using LViz.Core.Settings;
 using ZmkHidProtocol.ActiveWindow;
 using ZmkHidProtocol.Protocol;
 using ZmkHidProtocol.Transport;
-// The RecentKeymaps property below shadows the Core helper type of the same
-// name inside this class; the bookkeeping stays reachable through this alias.
-using RecentKeymapHistory = LViz.Core.Settings.RecentKeymaps;
 
 namespace LViz.App.ViewModels;
 
@@ -52,35 +49,21 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public Action<int>? OnKeyDoubleTapped => IsEditing ? OnEditKeyDoubleTapped : null;
 
     /// <summary>
-    /// Right-click on a key opens the per-key label-override editor — inert
-    /// while editing a keymap, where the label dialog doesn't apply. Wired
-    /// up so the View can stay binding-only; the actual dialog launch is a
-    /// callback into <c>App.axaml.cs</c> (see <see cref="EditKeyLabelRequested"/>)
-    /// because the View can't construct a window directly without leaking
-    /// Avalonia.Controls into the VM.
+    /// Right-click on a key opens the per-key label-override editor, inert
+    /// while editing a keymap, where the label dialog doesn't apply. The dialog
+    /// itself is the <see cref="IMainWindowShell"/>'s; the answer is applied here.
     /// </summary>
     public Action<int>? OnKeyRightTapped => IsEditing ? null : OnKeyRightTappedInternal;
 
-    private void OnKeyRightTappedInternal(int keyIndex) =>
-        EditKeyLabelRequested?.Invoke(keyIndex, ActiveLayerIndex);
-
-    /// <summary>
-    /// Invoked when the user right-clicks a key. The callback (set by
-    /// <c>App.axaml.cs</c>) owns the modal dialog lifecycle and calls
-    /// <see cref="SetKeyLabelOverride"/> on completion. Parameters:
-    /// (keyIndex, activeLayerIndex).
-    /// </summary>
-    public Action<int, int>? EditKeyLabelRequested { get; set; }
-
-    /// <summary>
-    /// Invoked when the user right-clicks a combo legend tile. Callback (set
-    /// by <c>App.axaml.cs</c>) owns the modal-dialog lifecycle and calls
-    /// <see cref="SetComboLabelOverride"/> on save.
-    /// </summary>
-    public Action<string>? EditComboLabelRequested { get; set; }
-
-    public void RequestEditCombo(string keyPositionsKey) =>
-        EditComboLabelRequested?.Invoke(keyPositionsKey);
+    private async void OnKeyRightTappedInternal(int keyIndex)
+    {
+        var layerIndex = ActiveLayerIndex;
+        var ctx = GetKeyLabelEditContext(layerIndex, keyIndex);
+        if (ctx is null) return;
+        var answer = await _shell.EditKeyLabelAsync(layerIndex, keyIndex, ctx.Value.DefaultHint, ctx.Value.Existing);
+        if (answer is not null)
+            SetKeyLabelOverride(layerIndex, keyIndex, answer.Value);
+    }
 
     private readonly ISettingsService _settingsService;
 
@@ -93,6 +76,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     // click on one toasts "GitHub is not available".
     private readonly IGitHubKeymapService? _gitHub;
     private readonly IKeymapEditDialogs _editDialogs;
+    private readonly IMainWindowShell _shell;
 
     // Backup store the keymap editor's local save snapshots into. App injects
     // the shared one; tests point it at a temp folder. Only ever written by a
@@ -110,34 +94,13 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     // Drives RecentKeymapItem.IsCurrent; card 11 reads this field by name.
     private string? _loadedEntry;
 
-    private readonly IHidPipeline _hid;
-    private readonly ILayerPushCoordinator _push;
-
-    // Cross-device capability bus + router. The bus owns the *other* raw-HID
-    // devices (the keyboard is never opened twice — the router gets it as an
-    // adapter over _hid); the router brokers capability traffic between them.
-    // Started/stopped/disposed alongside HID, re-scanned on profile change.
-    private readonly RawHidDeviceBus _deviceBus;
-    private readonly ICapabilityRouter _router;
+    /// <summary>
+    /// The device stack (HID pipeline, capability bus + router, action pipelines,
+    /// layer-push coordinator, IPC); <see cref="DeviceStack"/> owns how it is
+    /// assembled and torn down. Bind to its parts directly.
+    /// </summary>
+    internal DeviceStack Devices { get; }
     private readonly IHostActionExecutor _hostActionExecutor;
-
-    // Signal.fire → action-pipeline plumbing. The dispatcher listens for inbound
-    // signal reports across every router device and runs the bound pipeline; the
-    // runner executes a pipeline's steps (layer push, RGB/pointing to a bus
-    // device, launch/shell, delay). Both ride the same live-tracking lifecycle as
-    // the router/bus (Start/Stop in StartKeyEventTracking).
-    private readonly IPipelineRunner _pipelineRunner;
-    private readonly ISignalDispatcher _signalDispatcher;
-    private readonly AppLayerPipelineDispatcher _appLayerDispatcher;
-
-    // Local IPC surface for the CLI / host scripts (lviz-host-agent-cli-spec.md).
-    // The command service resolves an inbound string event id to a pipeline (the
-    // string-keyed sibling of the signal dispatcher) and reports device status; the
-    // server runs the named-pipe accept loop. Unlike the signal dispatcher it rides
-    // the *app* lifetime, not the live-tracking toggle — the CLI must reach a
-    // running LViz whether or not highlighting is on (Start in the ctor, Stop in
-    // Shutdown). Device-step pipelines still need the router started, same as signals.
-    private readonly LvizIpcServer _ipcServer;
 
     // Press-highlight pipeline: per-layer (mod-set + keycode) → KeyViewModel
     // lookup, held-modifier set, modifier-grace deferral, per-key pulse.
@@ -192,10 +155,10 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// Settings UI binds to directly (no MainVM pass-through). Lives as long as
     /// the VM; active only while HID tracking is on.
     /// </summary>
-    public ICapabilityRouter CapabilityRouter => _router;
+    public ICapabilityRouter CapabilityRouter => Devices.Router;
 
     /// <summary>True when ≥2 protocol-capable devices expose a routable trigger→handler pair.</summary>
-    public bool IsDeviceRoutingAvailable => _router.IsRoutingAvailable;
+    public bool IsDeviceRoutingAvailable => Devices.Router.IsRoutingAvailable;
 
     [ObservableProperty] private bool _isAlwaysOnTop;
     [ObservableProperty] private bool _colorTrayIconByActiveLayer;
@@ -229,26 +192,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     private int _activeLayerIndex;
 
     /// <summary>Palette color for the active layer — used as the press-highlight pulse fill.</summary>
-    public string ActiveLayerTintColor => LayerColorFor(ActiveLayerIndex);
+    public string ActiveLayerTintColor => LayerTabs.ColorFor(ActiveLayerIndex);
 
-    /// <summary>
-    /// Tab color for the layer at <paramref name="index"/>. While a keymap edit
-    /// is open the color follows the <em>layer</em> rather than the position: a
-    /// layer that came from the baseline keeps the color its baseline index
-    /// owns (surviving a move), and a layer the edit added gets the palette
-    /// default for its position. Outside an edit this is the plain
-    /// per-profile palette lookup.
-    /// </summary>
-    private string LayerColorFor(int index)
-    {
-        if (Edit is { } edit)
-        {
-            return edit.Session.BaselineIndexOf(index) is int baseline
-                ? LayerColorPalette.GetColor(_profile.Id, baseline)
-                : LayerColorPalette.GetDefaultColor(index);
-        }
-        return LayerColorPalette.GetColor(_profile.Id, index);
-    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(BoardBackground))]
@@ -291,6 +236,12 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// extracted into its own VM. Owns the persisted highlight color.</summary>
     public BoardStyleViewModel BoardStyle { get; }
 
+    /// <summary>The layer tab strip: tabs, colours, hidden layers, edit-mode tab actions.</summary>
+    public LayerTabsViewModel LayerTabs { get; }
+
+    /// <summary>The combo legend: tiles, overlay toggle, label overrides, hover highlight.</summary>
+    public ComboLegendViewModel ComboLegend { get; }
+
     /// <summary>
     /// Global show/hide hotkey key name (e.g. "F12"). Modifier handling
     /// lives in <see cref="UserSettings.HotkeyModifiers"/> and isn't
@@ -313,59 +264,11 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public string HotkeyModifiers => _settingsService.Load().HotkeyModifiers;
 
     /// <summary>
-    /// Sets or clears a per-layer color override for the currently active
-    /// keyboard profile. Persists to <see cref="UserSettings.LayerColors"/>,
-    /// updates the static palette, and refreshes both the layer-tab swatches
-    /// (in place) and every key fill on the board.
-    /// </summary>
-    public void SetLayerColorOverride(int layerIndex, string? hex)
-    {
-        var profileId = _profile.Id;
-        LayerColorPalette.SetOverride(profileId, layerIndex, hex);
-
-        PersistSetting(s => string.IsNullOrWhiteSpace(hex)
-            ? s with { LayerColors = PerProfile.RemoveInner(s.LayerColors, profileId, layerIndex) }
-            : s with { LayerColors = PerProfile.SetInner(s.LayerColors, profileId, layerIndex, hex!) });
-
-        // Repaint tab swatches in place (re-creating Layers would steal selection focus).
-        foreach (var layer in Layers)
-            layer.TabColor = LayerColorFor(layer.Index);
-        // Re-resolve every key's fill — &lt / &mo keys reference arbitrary
-        // layer colors, so changing layer 2's tint repaints layer 0's view too.
-        if (_keymap.HasLayout)
-            ApplyActiveLayer(ActiveLayerIndex);
-        OnPropertyChanged(nameof(ActiveLayerTintColor));
-    }
-
-    /// <summary>
-    /// Shows or hides one layer's tab button on the main form for the
-    /// currently active keyboard profile. Persists the choice to
-    /// <see cref="UserSettings.HiddenLayers"/> and updates the matching
-    /// <see cref="Layers"/> item in place (no rebuild — that would steal
-    /// selection focus). Layer 0 is always shown, so requests for it are
-    /// ignored. The layer itself stays fully live: auto-follow, Settings
-    /// pickers and keyboard pushes are untouched.
-    /// </summary>
-    public void SetLayerShown(int layerIndex, bool isShown)
-    {
-        if (layerIndex <= 0) return;
-
-        PersistSetting(s => s with
-        {
-            HiddenLayers = HiddenLayers.With(s.HiddenLayers, _profile.Id, layerIndex, hidden: !isShown),
-        });
-
-        foreach (var layer in Layers)
-            if (layer.Index == layerIndex)
-                layer.IsShown = isShown;
-    }
-
-    /// <summary>
     /// Sets or clears a per-(layer, key) label override for the currently
     /// active keyboard profile. Persists to
     /// <see cref="UserSettings.KeyLabelOverrides"/> through the same
     /// PersistSetting → SettingsService.Save → AtomicFile chain
-    /// <see cref="SetLayerColorOverride"/> uses, then re-applies the active
+    /// the layer colour override uses, then re-applies the active
     /// layer so the affected key repaints. <c>null</c> or
     /// <see cref="KeyLabelOverride.IsEmpty"/> removes the entry.
     /// </summary>
@@ -376,32 +279,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
         if (_keymap.HasLayout && layerIndex == ActiveLayerIndex)
             ApplyActiveLayer(ActiveLayerIndex);
-    }
-
-    /// <summary>
-    /// Sets or clears a combo-pill label override for the active profile, then
-    /// rebuilds the combo VM list so the affected pill repaints.
-    /// </summary>
-    public void SetComboLabelOverride(string keyPositionsKey, ComboLabelOverride? value)
-    {
-        ComboLabelOverrides.Set(_profile.Id, keyPositionsKey, value);
-        PersistSetting(s => s with { ComboLabelOverrides = ComboLabelOverrides.Snapshot() });
-        BuildCombosForConfig();
-    }
-
-    /// <summary>
-    /// Snapshot of the default-computed label + current override (if any) for
-    /// the combo identified by <paramref name="keyPositionsKey"/>. Returns null
-    /// when no combo matches the key (defensive — the View only invokes this
-    /// for an existing ComboViewModel).
-    /// </summary>
-    public (int Number, string DefaultLabel, string ParticipatingKeys, ComboLabelOverride? Existing)?
-        GetComboLabelEditContext(string keyPositionsKey)
-    {
-        var combo = Combos.FirstOrDefault(c => c.KeyPositionsKey == keyPositionsKey);
-        if (combo is null) return null;
-        var existing = ComboLabelOverrides.Get(_profile.Id, keyPositionsKey);
-        return (combo.Number, combo.DefaultLabel, combo.ParticipatingKeysText, existing);
     }
 
     /// <summary>
@@ -435,7 +312,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public ObservableCollection<KeyViewModel> LeftKeys { get; } = new();
     /// <summary>Right-hand subset of <see cref="Keys"/>. Bound separately so the stacked-layout renderer can translate the half independently.</summary>
     public ObservableCollection<KeyViewModel> RightKeys { get; } = new();
-    public ObservableCollection<LayerViewModel> Layers { get; } = new();
 
     /// <summary>
     /// True when the board renders Windows-style modifier glyphs (⊞ Alt Ctrl ⇧)
@@ -462,83 +338,13 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     {
         ZmkKeycodeLabel.CurrentModifierStyle = value ? ModifierStyle.Windows : ModifierStyle.Mac;
         PersistSetting(s => s with { ModifierStyle = value ? "Windows" : "Mac" });
-        // Same redraw hook SetLayerColorOverride uses: rebuilds every key's
+        // Rebuilds every key's
         // labels against the freshly-set static.
         if (_keymap.HasLayout) ApplyActiveLayer(ActiveLayerIndex);
     }
 
     [RelayCommand]
     private void ToggleWindowsModifierStyle() => IsWindowsModifierStyle = !IsWindowsModifierStyle;
-
-    /// <summary>
-    /// When true, combo keys show numbered indicators (e.g. <c>"1"</c>,
-    /// <c>"1,3"</c>) instead of the static earmark, and the combo legend is
-    /// visible beneath the keyboard. Persisted across launches.
-    /// </summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsComboLegendVisible))]
-    private bool _isComboOverlayVisible;
-
-    partial void OnIsComboOverlayVisibleChanged(bool value) =>
-        PersistSetting(s => s with { ComboOverlayVisible = value });
-
-    /// <summary>
-    /// Whether the combo legend renders: the persisted overlay toggle, or always
-    /// while a keymap edit is open — in edit mode the legend is the combo
-    /// editor's tile strip. Raised whenever either source changes.
-    /// </summary>
-    public bool IsComboLegendVisible => IsComboOverlayVisible || IsEditing;
-
-    [RelayCommand]
-    private void ToggleComboOverlay() => IsComboOverlayVisible = !IsComboOverlayVisible;
-
-    /// <summary>
-    /// Every combo in the shown keymap, numbered sequentially
-    /// in source-file order starting at 1. Not layer-scoped — combos
-    /// surface on every layer view so the user can see what chords exist
-    /// even when sitting on a layer where the combo doesn't fire.
-    /// While a keymap edit is open these are the <em>edited</em> combos,
-    /// every tile editable. Repopulated by <see cref="BuildCombosForConfig"/>
-    /// on layout reload and on every edit-mode repaint.
-    /// </summary>
-    public ObservableCollection<ComboViewModel> Combos { get; } = new();
-
-    /// <summary>
-    /// Sets the currently-highlighted combo numbers. Pass empty to clear.
-    /// Idempotent and cheap to call from PointerEntered / PointerExited.
-    ///
-    /// Drives three pieces of state in lockstep: the legend tile's
-    /// <c>IsHighlighted</c>, each on-key pill's <c>IsHighlighted</c>, and —
-    /// for every participating key (including ones whose pill was capped
-    /// out by <c>MaxComboBadges</c>) — the per-key
-    /// <c>IsComboKeyHighlighted</c> flag that re-uses the existing
-    /// press-dot visual via <c>IsAnyHighlight</c>. That way hovering a
-    /// combo lights the same dot a live HID press would, no extra
-    /// indicator.
-    /// </summary>
-    public void SetHighlightedCombos(IReadOnlyCollection<int> numbers)
-    {
-        numbers ??= Array.Empty<int>();
-        var numberSet = numbers as ISet<int> ?? new HashSet<int>(numbers);
-
-        for (var i = 0; i < Combos.Count; i++)
-            Combos[i].IsHighlighted = numberSet.Contains(Combos[i].Number);
-
-        foreach (var key in Keys)
-        {
-            key.IsComboKeyHighlighted = false;
-            foreach (var badge in key.ComboBadges)
-                badge.IsHighlighted = numberSet.Contains(badge.Number);
-        }
-
-        foreach (var n in numberSet)
-        {
-            if (n < 1 || n > Combos.Count) continue;
-            foreach (var idx in Combos[n - 1].KeyIndices)
-                if (idx >= 0 && idx < Keys.Count)
-                    Keys[idx].IsComboKeyHighlighted = true;
-        }
-    }
 
     /// <summary>All keyboard profiles the user can switch between, for the picker flyout.</summary>
     public IReadOnlyList<IKeyboardProfile> AvailableKeyboards => KeyboardProfileRegistry.All;
@@ -569,92 +375,17 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         }
     }
 
-    // --- Callbacks set by App.axaml.cs to bridge to the Window ---
-    public Action? QuitRequested { get; set; }
-    public Action? ShowWindowRequested { get; set; }
-    public Action? ToggleWindowRequested { get; set; }
-    public Func<Task>? LoadLayoutRequested { get; set; }
-    public Func<Task>? CopyDiagnosticsRequested { get; set; }
-    public Action? OpenSettingsRequested { get; set; }
-    /// <summary>Set by <c>App.axaml.cs</c>: opens the read-only "Keyboard
-    /// shortcuts" window from the Help menu.</summary>
-    public Func<Task>? ShortcutsRequested { get; set; }
-    /// <summary>Set by <c>App.axaml.cs</c>: opens the layout-wizard window.</summary>
-    public Action? AddOwnBoardRequested { get; set; }
-    /// <summary>Set by <c>App.axaml.cs</c>: opens the "Edit layout…" window.</summary>
-    public Action? EditLayoutRequested { get; set; }
-    /// <summary>Set by <c>App.axaml.cs</c> (card 12+): opens the GitHub keymap picker window.</summary>
-    public Action? OpenFromGitHubRequested { get; set; }
-
     /// <summary>Path of the layout JSON the user currently has loaded, or null if none.</summary>
     public string? LoadedLayoutPath => _keymap.LoadedPath;
 
     /// <summary>
-    /// Recent keymap paths for the active profile, most-recent-first (empty
-    /// when none). Backs the future recents menu — no UI is wired to it yet.
-    /// Raises <c>PropertyChanged</c> after every load (success or failure)
-    /// and after a keyboard-profile switch. Each read re-loads settings, so
-    /// the list is a snapshot, not a live view; treat it as read-only.
+    /// Where keymaps come from (booking, recents, entry resolution, the GitHub
+    /// check); this view-model only applies a load to the screen.
     /// </summary>
-    public IReadOnlyList<string> RecentKeymaps =>
-        _settingsService.Load().RecentKeymapPaths.TryGetValue(_profile.Id, out var paths)
-            ? paths
-            : Array.Empty<string>();
+    internal KeymapLibrary Library { get; }
 
-    /// <summary>
-    /// File-existence seam for the recents surface — tests fake the disk
-    /// here; production is <see cref="File.Exists"/>. The startup stored-path
-    /// prune (<see cref="TryGetStoredPathForProfile"/>) deliberately keeps
-    /// checking the disk directly.
-    /// </summary>
-    internal Func<string, bool> FileExists { get; set; } = File.Exists;
-
-    /// <summary>
-    /// <see cref="RecentKeymaps"/> in flyout-ready shape: one item per entry
-    /// in the same order. A <see cref="GitHubKeymapRef"/> entry renders as a
-    /// GitHub row — repo · branch as the folder line, never greyed out.
-    /// Local entries are stamped at read time with whether the file is still
-    /// on disk. Each row's IsCurrent compares the entry with the loaded
-    /// keymap's settings entry (a GitHub keymap's <em>file</em> lives in the
-    /// cache, so <see cref="LoadedLayoutPath"/> can't answer that).
-    /// Snapshot, like the raw list — rebuilt on every read.
-    /// </summary>
-    public IReadOnlyList<RecentKeymapItem> RecentKeymapItems
-    {
-        get
-        {
-            var current = _loadedEntry;
-            var entries = RecentKeymaps;
-            var items = new List<RecentKeymapItem>(entries.Count);
-            foreach (var entry in entries)
-            {
-                if (GitHubKeymapRef.TryParse(entry, out var keymap))
-                {
-                    // A GitHub row is never greyed out: "missing" has no
-                    // meaning for a repo path, and the cache may be cold.
-                    items.Add(new RecentKeymapItem(
-                        entry,
-                        keymap.FileName,
-                        $"{keymap.RepoFullName} · {keymap.Branch}",
-                        Exists: true,
-                        IsCurrent: entry == current,
-                        IsGitHub: true));
-                    continue;
-                }
-
-                items.Add(new RecentKeymapItem(
-                    entry,
-                    Path.GetFileName(entry),
-                    Path.GetDirectoryName(entry) ?? "",
-                    FileExists(entry),
-                    string.Equals(entry, current, StringComparison.Ordinal)));
-            }
-            return items;
-        }
-    }
-
-    /// <summary>True when the active profile has at least one recent keymap.</summary>
-    public bool HasRecentKeymaps => RecentKeymaps.Count > 0;
+    /// <summary>The recents flyout of the load menu; bind to its parts directly.</summary>
+    public RecentKeymapsViewModel Recents { get; }
 
     // --- Commands ---
     public IRelayCommand QuitCommand { get; }
@@ -669,9 +400,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public IAsyncRelayCommand OpenShortcutsCommand { get; }
     public IRelayCommand<IKeyboardProfile> SelectKeyboardCommand { get; }
     public IRelayCommand OpenSettingsCommand { get; }
-    public IRelayCommand RefreshRecentKeymapsCommand { get; }
-    public IRelayCommand<RecentKeymapItem> OpenRecentKeymapCommand { get; }
-    public IRelayCommand ClearRecentKeymapsCommand { get; }
 
     /// <summary>
     /// The app→layer auto-switch engine, exposed directly. The settings VM and
@@ -680,7 +408,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// pass-through facade (and the PropertyChanged relay that fed it) bought
     /// nothing but a redundant hop.
     /// </summary>
-    public AutoSwitchEngine AutoSwitch => _push.AutoSwitch;
+    public AutoSwitchEngine AutoSwitch => Devices.Push.AutoSwitch;
 
     /// <summary>
     /// The mouse-movement → layer push engine, exposed directly (mirrors
@@ -690,7 +418,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// pass-through facade. Null when no mouse-idle monitor is wired up (tests);
     /// callers fall back to the persisted per-profile settings in that case.
     /// </summary>
-    public IMouseLayerEngine? MouseLayer => _push.MouseLayer;
+    public IMouseLayerEngine? MouseLayer => Devices.Push.MouseLayer;
 
     public MainWindowViewModel(
         ISettingsService settingsService,
@@ -701,15 +429,29 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         IHostActionExecutor? hostActionExecutor = null,
         IGitHubKeymapService? gitHub = null,
         KeymapBackupStore? keymapBackups = null,
-        IKeymapEditDialogs? editDialogs = null)
+        IKeymapEditDialogs? editDialogs = null,
+        IMainWindowShell? shell = null)
     {
         _settingsService = settingsService;
+        Library = new KeymapLibrary(settingsService, gitHub);
         _editDialogs = editDialogs ?? new UnavailableKeymapEditDialogs();
+        _shell = shell ?? new UnavailableMainWindowShell();
         _keymap = keymapState ?? new KeymapStateService();
         _gitHub = gitHub;
         _keymapBackups = keymapBackups ?? new KeymapBackupStore(KeymapBackupStore.DefaultRoot);
         var s = settingsService.Load();
         _profile = KeyboardProfileRegistry.TryResolve(s.Keyboard, out var p) ? p : new CorneProfile();
+        Recents = new RecentKeymapsViewModel(
+            Library,
+            () => _profile.Id,
+            () => _loadedEntry,
+            keymap => _ = OpenGitHubKeymapAsync(keymap),
+            path => LoadLayoutFromPath(path),
+            fileName =>
+            {
+                SetLoadStatusBase(null);
+                StatusMessage = Loc.Instance.Format("Status_RecentKeymapRemovedFormat", fileName);
+            });
         _selectedKeyboard = _profile;
         _isAlwaysOnTop = s.AlwaysOnTop;
         _colorTrayIconByActiveLayer = s.ColorTrayIconByActiveLayer;
@@ -719,7 +461,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         _backgroundOpacity = Math.Clamp(s.BackgroundOpacity, 0.0, 1.0);
         if (!string.IsNullOrWhiteSpace(s.HotkeyKey))
             _hotkeyKey = s.HotkeyKey;
-        _isComboOverlayVisible = s.ComboOverlayVisible;
 
         // Board geometry + press-style live in their own VMs now; seed them from
         // the same settings load. Each owns its own persistence (StackedLayout /
@@ -732,6 +473,11 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                 ? AppTheme.PressHighlightDefaultHex
                 : s.PressHighlightColor,
             settingsService);
+        ComboLegend = new ComboLegendViewModel(
+            Keys, BoardStyle, s.ComboOverlayVisible, () => _profile.Id, settingsService, _shell);
+        LayerTabs = new LayerTabsViewModel(() => _profile.Id, settingsService);
+        LayerTabs.LayerPicked += OnLayerPicked;
+        LayerTabs.ColorsChanged += OnLayerColorsChanged;
         _isWindowsModifierStyle = string.Equals(s.ModifierStyle, "Windows", StringComparison.OrdinalIgnoreCase);
         // Seed the static *before* the first ApplyActiveLayer so initial render
         // already uses the persisted glyph set (the partial change handler is
@@ -743,76 +489,25 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         KeyLabelOverrides.SetOverrides(s.KeyLabelOverrides);
         ComboLabelOverrides.SetOverrides(s.ComboLabelOverrides);
 
-        // HID stack owns the layer source, command sender, and state tracker.
-        // Constructed eagerly so push surfaces are available before Start();
-        // the underlying RawHidLayerSource doesn't open the device until
-        // Start() runs (triggered by ToggleLiveHighlighting).
-        _hid = new HidPipeline(_profile);
-        _hid.ActiveLayerChanged += OnActiveLayerChanged;
-        _hid.ConnectionChanged += OnActiveSourceChanged;
-
-        // Capability bus excludes the keyboard via its live profile matcher (the
-        // open-path is a defensive secondary exclusion); the router consumes the
-        // keyboard as an adapter over _hid's already-open handle plus the bus's
-        // other devices. Constructed eagerly; opens nothing until Start().
-        _deviceBus = new RawHidDeviceBus(_hid.KeyboardMatcher, () => _hid.OpenDevicePath);
-        AttachedHidNames = () => _deviceBus.Devices.Select(d => d.DisplayName).ToList();
-        _router = new CapabilityRouter(
-            new KeyboardCapabilityDevice(_hid),
-            _deviceBus,
-            settingsService);
-        _router.RoutesChanged += OnCapabilityRoutesChanged;
-
-        // signal.fire → action-pipeline. The runner drives bus devices through
-        // capability control + the keyboard through the HID layer-push path; the
-        // dispatcher resolves inbound signal ids to pipelines and runs them off
-        // the read thread. CapabilityControl is stateless (own ConfirmTracker per
-        // instance), so a private one here doesn't conflict with the DI singleton.
         _hostActionExecutor = hostActionExecutor ?? new HostActionExecutor();
-        _pipelineRunner = new PipelineRunner(
-            _router,
-            capabilityControl ?? new CapabilityControl(),
-            _hostActionExecutor,
-            _hid.PushLayer,
-            () => settingsService.Load().ActionPipelines);
-        _signalDispatcher = new SignalDispatcher(_router, settingsService, _pipelineRunner);
-
-        // Host IPC: the CLI ('lviz event …', 'status', 'devices') forwards a line to
-        // this app over a named pipe. Started here so it's live for the app's whole
-        // lifetime, independent of the live-tracking toggle.
-        var ipcCommands = new IpcCommandService(settingsService, _router, _pipelineRunner);
-        _ipcServer = new LvizIpcServer(ipcCommands.Handle);
-        _ipcServer.Start();
-
-        // Push coordinator owns AutoSwitch + MouseLayer and the handoff between
-        // them. Routes both engines' pushes through _hid; redirects AutoSwitch
-        // pushes into MouseLayer's revert target while a mouse push is in
-        // flight. Forwards HID key-position events into AutoSwitch's exit-tap
-        // detector and re-raises them for the highlight tracker below.
-        _push = new LayerPushCoordinator(
-            _hid,
-            getRenderedLayer: () => ActiveLayerIndex,
-            _profile,
-            settingsService,
-            activeWindowMonitor,
-            mouseIdleMonitor);
-        // App-focus auto-switch lifecycle → action-pipeline. Sibling of
-        // _signalDispatcher / the IPC event path: the engine raises a moment as it
-        // pushes/reverts layers, this runs the bound pipeline alongside it. No
-        // Start/Stop — the engine only raises while auto-switch is enabled.
-        _appLayerDispatcher = new AppLayerPipelineDispatcher(_push.AutoSwitch, settingsService, _pipelineRunner);
-        _push.KeyPositionForUi += OnKeyPositionForHighlight;
+        Devices = DeviceStack.Create(
+            _profile, settingsService, () => ActiveLayerIndex,
+            activeWindowMonitor, mouseIdleMonitor, capabilityControl, _hostActionExecutor);
+        Devices.Hid.ActiveLayerChanged += OnActiveLayerChanged;
+        Devices.Hid.ConnectionChanged += OnActiveSourceChanged;
+        Devices.Router.RoutesChanged += OnCapabilityRoutesChanged;
+        Devices.Push.KeyPositionForUi += OnKeyPositionForHighlight;
         // Transparent-key exit predicate reads the currently-loaded config at
         // call time, so swapping layouts or profiles needs no re-binding.
-        _push.SetTransparencyPredicate(_keymap.ClassifyBinding);
-        // The settings VM subscribes to _push.AutoSwitch.PropertyChanged
-        // directly (via the AutoSwitch property), so no relay is needed here.
+        Devices.Push.SetTransparencyPredicate(_keymap.ClassifyBinding);
 
-        QuitCommand = new RelayCommand(() => QuitRequested?.Invoke());
-        ShowCommand = new RelayCommand(() => ShowWindowRequested?.Invoke());
+        QuitCommand = new RelayCommand(() => _shell.Quit());
+        ShowCommand = new RelayCommand(() => _shell.ShowWindow());
         LoadLayoutCommand = new AsyncRelayCommand(async () =>
         {
-            if (LoadLayoutRequested is not null) await LoadLayoutRequested();
+            var path = await _shell.PickKeymapFileAsync();
+            if (path is not null)
+                LoadLayoutFromPath(path);
         });
         RefreshCommand = new RelayCommand(() =>
         {
@@ -825,10 +520,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             // from the cache, then check GitHub in the background, which also
             // fetches a cold cache). A local entry that resolves to nothing
             // does nothing, as an empty path did before.
-            var entries = _settingsService.Load().LayoutJsonPaths;
-            if (entries.TryGetValue(_profile.Id, out var entry) && !string.IsNullOrEmpty(entry))
+            if (Library.BookedEntry(_profile.Id) is { } entry)
             {
-                if (TryResolveEntry(entry, out var path))
+                if (Library.TryResolveEntry(entry, out var path))
                     LoadLayoutFromPath(path, entry, keepBoard: true);
                 PendingGitHubCheck = CheckGitHubForUpdateAsync(entry);
             }
@@ -855,20 +549,11 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                 StatusMessage = $"Could not open log folder: {ex.Message}";
             }
         });
-        CopyDiagnosticsCommand = new AsyncRelayCommand(async () =>
-        {
-            if (CopyDiagnosticsRequested is not null) await CopyDiagnosticsRequested();
-        });
+        CopyDiagnosticsCommand = new AsyncRelayCommand(CopyDiagnosticsAsync);
         SelectKeyboardCommand = new RelayCommand<IKeyboardProfile>(SelectKeyboard);
-        OpenSettingsCommand = new RelayCommand(() => OpenSettingsRequested?.Invoke());
+        OpenSettingsCommand = new RelayCommand(() => _shell.OpenSettings());
         OpenHelpCommand = new RelayCommand(() => _hostActionExecutor.Launch(UpdateService.WikiUrl));
-        OpenShortcutsCommand = new AsyncRelayCommand(async () =>
-        {
-            if (ShortcutsRequested is not null) await ShortcutsRequested();
-        });
-        RefreshRecentKeymapsCommand = new RelayCommand(RaiseRecentKeymapsChanged);
-        OpenRecentKeymapCommand = new RelayCommand<RecentKeymapItem>(OpenRecentKeymap);
-        ClearRecentKeymapsCommand = new RelayCommand(ClearRecentKeymaps);
+        OpenShortcutsCommand = new AsyncRelayCommand(_shell.ShowShortcutsAsync);
 
         BuildKeysFromProfile();
     }
@@ -879,8 +564,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// </summary>
     public void InitializeAsync()
     {
-        var s = _settingsService.Load();
-        if (TryGetStoredPathForProfile(s, _profile.Id, out var storedPath, out var storedEntry))
+        if (Library.TryGetBooked(_profile.Id, out var storedPath, out var storedEntry))
         {
             // The board's own booked keymap: loading it must not move the board.
             LoadLayoutFromPath(storedPath, storedEntry, keepBoard: true);
@@ -933,20 +617,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             // A keymap that no longer loads shouldn't linger in "recent" —
             // the *entry* is what recents store, so that's what gets pruned.
             // Skip the write entirely when the entry isn't listed.
-            if (RecentKeymaps.Contains(entry, StringComparer.Ordinal))
-            {
-                PersistSetting(s =>
-                {
-                    if (!s.RecentKeymapPaths.TryGetValue(_profile.Id, out var recents))
-                        return s;
-                    var recentPaths = new Dictionary<string, List<string>>(s.RecentKeymapPaths)
-                    {
-                        [_profile.Id] = RecentKeymapHistory.Remove(recents, entry),
-                    };
-                    return s with { RecentKeymapPaths = recentPaths };
-                });
-            }
-            RaiseRecentKeymapsChanged();
+            Library.RemoveRecent(_profile.Id, entry);
+            Recents.Refresh();
             return;
         }
 
@@ -962,7 +634,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         IKeyboardProfile? autoSwitchedTo = null;
         if (keyCountMismatch)
         {
-            var matching = KeyboardProfileRegistry.FindByKeyCount(bindingCount, AttachedHidNames());
+            var matching = KeyboardProfileRegistry.FindByKeyCount(bindingCount, Devices.AttachedHidNames());
             if (matching is not null)
             {
                 _profile = matching;
@@ -970,7 +642,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                 BuildKeysFromProfile();
                 PersistSetting(s => s with { Keyboard = matching.Id });
                 // Re-scope HID discovery — see SelectKeyboard for context.
-                _hid.SetActiveProfile(matching);
+                Devices.Hid.SetActiveProfile(matching);
                 autoSwitchedTo = matching;
                 DiagnosticLog.Info("MainVM",
                     $"Auto-switched profile to {matching.Id} ({bindingCount} keys) on load");
@@ -985,16 +657,17 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         // status-bar wizard link; every other successful load disarms it.
         HasUnmatchedKeymap = keyCountMismatch && autoSwitchedTo is null;
 
-        RebuildLayers();
+        LayerTabs.Rebuild(_keymap.Current);
         ApplyActiveLayer(0);
-        BuildCombosForConfig();
+        ComboLegend.Rebuild(_keymap.Current);
         HasLayoutLoaded = true;
 
         // Booked for the profile the keymap ended up on (_profile is already
         // the auto-switch target when one ran). The *entry*, not the loaded
         // path — see the method doc.
         _loadedEntry = entry;
-        BookEntryForProfile(entry);
+        Library.Book(_profile.Id, entry);
+        Recents.Refresh();
 
         var baseMsg = Loc.Instance.Format("Status_Loaded",
             Path.GetFileName(path), loaded.LayerCount);
@@ -1021,16 +694,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     }
 
     /// <summary>
-    /// Product names of the Raw HID keyboards plugged in, used to break a
-    /// key-count tie in the auto-switch (Sofle and GO60 both have 60 keys).
-    /// The capability bus enumerates every Raw HID device except the one the
-    /// shown board matches, and the shown board is never the auto-switch
-    /// target, so its list is enough. Empty while the HID stack is off.
-    /// Tests replace it.
-    /// </summary>
-    internal Func<IReadOnlyCollection<string>> AttachedHidNames { get; set; }
-
-    /// <summary>
     /// Tabs, layer state and load flags back to a bare board. Shared by the
     /// two paths that unload a keymap (<see cref="DropBookedKeymap"/> and
     /// <see cref="SwitchBoard"/>'s unload branch); each sets its own status
@@ -1040,7 +703,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     {
         _keymap.Clear();
         _loadedEntry = null;
-        Layers.Clear();
+        LayerTabs.Clear();
         ActiveLayerIndex = 0;
         HasLayoutLoaded = false;
         HasUnmatchedKeymap = false;
@@ -1059,21 +722,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         ClearLoadedKeymap();
 
         // Only this load's own entry is unbooked; a booking that already points
-        // somewhere else belongs to another keymap. No write when there is
-        // nothing to remove.
-        if (_settingsService.Load().LayoutJsonPaths.TryGetValue(_profile.Id, out var stored)
-            && string.Equals(stored, entry, StringComparison.Ordinal))
-        {
-            PersistSetting(s =>
-            {
-                if (!s.LayoutJsonPaths.TryGetValue(_profile.Id, out var current)
-                    || !string.Equals(current, entry, StringComparison.Ordinal))
-                    return s;
-                var paths = new Dictionary<string, string>(s.LayoutJsonPaths);
-                paths.Remove(_profile.Id);
-                return s with { LayoutJsonPaths = paths };
-            });
-        }
+        // somewhere else belongs to another keymap.
+        Library.Unbook(_profile.Id, entry);
 
         SetLoadStatusBase(null);
         StatusMessage = Loc.Instance.Format(
@@ -1088,65 +738,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         StartEditCommand.NotifyCanExecuteChanged();
     }
 
-    // The recents flyout binds RecentKeymaps + the two derived members;
-    // every mutation site raises all three so an open flyout refreshes in
-    // one step.
-    private void RaiseRecentKeymapsChanged()
-    {
-        OnPropertyChanged(nameof(RecentKeymaps));
-        OnPropertyChanged(nameof(RecentKeymapItems));
-        OnPropertyChanged(nameof(HasRecentKeymaps));
-    }
-
-    /// <summary>
-    /// Recents flyout row click: a GitHub row re-opens through the network
-    /// (cache fallback offline); a local row loads a still-present keymap
-    /// through the normal path, or — when its file has gone missing — prunes
-    /// it from the active profile's list instead. The disk is re-checked at
-    /// click time because the row's <see cref="RecentKeymapItem.Exists"/> is
-    /// only a snapshot from when the flyout built its list.
-    /// </summary>
-    private void OpenRecentKeymap(RecentKeymapItem? item)
-    {
-        if (item is null) return;
-
-        if (GitHubKeymapRef.TryParse(item.Path, out var keymap))
-        {
-            // Fire-and-forget: the row's click completes; status/toasts report
-            // the outcome. Unlike a stale local row, a failing GitHub entry is
-            // NOT pruned — the repo may be temporarily unreachable.
-            _ = OpenGitHubKeymapAsync(keymap);
-            return;
-        }
-
-        if (FileExists(item.Path))
-        {
-            // Success bookkeeping (recents move-to-front, status, recents
-            // notifications) lives in the load path itself.
-            LoadLayoutFromPath(item.Path);
-            return;
-        }
-
-        // Stale entry — drop it from the list; skip the write entirely when
-        // settings no longer list the path (mirrors the load-failure prune).
-        if (RecentKeymaps.Contains(item.Path, StringComparer.Ordinal))
-        {
-            PersistSetting(s =>
-            {
-                if (!s.RecentKeymapPaths.TryGetValue(_profile.Id, out var recents))
-                    return s;
-                var recentPaths = new Dictionary<string, List<string>>(s.RecentKeymapPaths)
-                {
-                    [_profile.Id] = RecentKeymapHistory.Remove(recents, item.Path),
-                };
-                return s with { RecentKeymapPaths = recentPaths };
-            });
-        }
-        RaiseRecentKeymapsChanged();
-        SetLoadStatusBase(null);
-        StatusMessage = Loc.Instance.Format("Status_RecentKeymapRemovedFormat", item.FileName);
-    }
-
     /// <summary>
     /// Opens a GitHub keymap: refreshes its repo through
     /// <see cref="IGitHubKeymapService"/> and loads the resulting local file
@@ -1154,7 +745,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// too, with a toast). Failures only toast — the entry stays in recents
     /// because the repo may just be temporarily unreachable. An
     /// <see cref="GitHubErrorKind.Unauthorized"/> additionally raises
-    /// <see cref="OpenFromGitHubRequested"/> so the sign-in window can open.
+    /// the shell's GitHub picker so the sign-in window can open.
     /// </summary>
     public async Task OpenGitHubKeymapAsync(GitHubKeymapRef keymap)
     {
@@ -1195,7 +786,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                 {
                     case GitHubErrorKind.Unauthorized:
                         Toast.Show(Loc.Instance.Format("Toast_GitHubSignInNeededFormat", keymap.FileName));
-                        OpenFromGitHubRequested?.Invoke();
+                        _ = OpenFromGitHubAsync();
                         break;
                     case GitHubErrorKind.NotFound:
                         Toast.Show(Loc.Instance.Format("Toast_GitHubNotFoundFormat", keymap.FileName));
@@ -1211,35 +802,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         }
     }
 
-    /// <summary>
-    /// One write for both dicts: <paramref name="entry"/> becomes the active
-    /// profile's last-used keymap and moves to the front of its recents.
-    /// <paramref name="takeFromProfileId"/>, when given, loses its last-used
-    /// slot if that slot held the same entry (the keymap didn't fit there).
-    /// </summary>
-    private void BookEntryForProfile(string entry, string? takeFromProfileId = null)
-    {
-        PersistSetting(s =>
-        {
-            var paths = new Dictionary<string, string>(s.LayoutJsonPaths) { [_profile.Id] = entry };
-            if (takeFromProfileId is not null
-                && !string.Equals(takeFromProfileId, _profile.Id, StringComparison.OrdinalIgnoreCase)
-                && paths.TryGetValue(takeFromProfileId, out var old)
-                && string.Equals(old, entry, StringComparison.Ordinal))
-                paths.Remove(takeFromProfileId);
-            var recentPaths = new Dictionary<string, List<string>>(s.RecentKeymapPaths)
-            {
-                [_profile.Id] = RecentKeymapHistory.Push(
-                    s.RecentKeymapPaths.TryGetValue(_profile.Id, out var recents)
-                        ? recents
-                        : Array.Empty<string>(),
-                    entry),
-            };
-            return s with { LayoutJsonPaths = paths, RecentKeymapPaths = recentPaths };
-        });
-        RaiseRecentKeymapsChanged();
-    }
-
     /// <summary>The last background GitHub check started at startup or Refresh; tests await it.</summary>
     internal Task? PendingGitHubCheck { get; private set; }
 
@@ -1253,30 +815,10 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// </summary>
     private async Task CheckGitHubForUpdateAsync(string entry)
     {
-        if (_gitHub is null || !GitHubKeymapRef.TryParse(entry, out var keymap))
-            return;
-
-        var profileId = _profile.Id;
         try
         {
-            await _gitHub.EnsureRestoredAsync();
-            if (!_gitHub.IsSignedIn)
-                return;
-
-            var result = await _gitHub.FetchRepoAsync(keymap.Owner, keymap.Repo, keymap.Branch);
-
-            // The user switched board or opened something else meanwhile.
-            var wasLoaded = _loadedEntry == entry;
-            if (_profile.Id != profileId || !(wasLoaded || _loadedEntry is null))
-                return;
-            if (wasLoaded && !result.Downloaded)
-                return;
-
-            if (_gitHub.LocalPathFor(keymap) is not string path)
-            {
-                DiagnosticLog.Warn("MainVM", $"'{keymap}' is gone from the newest GitHub copy; keeping the loaded one");
-                return;
-            }
+            var update = await Library.CheckGitHubAsync(entry, _profile.Id, () => (_profile.Id, _loadedEntry));
+            if (update is null) return;
 
             // An open edit holds the bytes the cache copy was parsed from;
             // reloading underneath it is what the explicit load lock refuses —
@@ -1287,37 +829,14 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                 return;
             }
 
-            DiagnosticLog.Info("MainVM", wasLoaded
-                ? $"'{keymap}' changed on GitHub, reloading"
-                : $"'{keymap}' fetched from GitHub (no cached copy)");
-            LoadLayoutFromPath(path, entry, keepBoard: true);
-            if (wasLoaded)
+            LoadLayoutFromPath(update.LocalPath, entry, keepBoard: true);
+            if (update.ReplacesLoaded && GitHubKeymapRef.TryParse(entry, out var keymap))
                 Toast.Show(Loc.Instance.Format("Toast_GitHubUpdatedFormat", keymap.FileName));
         }
         catch (Exception ex)
         {
-            DiagnosticLog.Info("MainVM", $"Background GitHub check for '{keymap}' skipped: {ex.Message}");
+            DiagnosticLog.Info("MainVM", $"Background GitHub check for '{entry}' skipped: {ex.Message}");
         }
-    }
-
-    /// <summary>
-    /// "Clear list" in the recents flyout: drops the active profile's entry
-    /// from the per-profile dict wholesale — sibling profiles keep their own
-    /// history. No write when the list is already empty.
-    /// </summary>
-    private void ClearRecentKeymaps()
-    {
-        if (RecentKeymaps.Count == 0) return;
-
-        PersistSetting(s =>
-        {
-            if (!s.RecentKeymapPaths.ContainsKey(_profile.Id))
-                return s;
-            var recentPaths = new Dictionary<string, List<string>>(s.RecentKeymapPaths);
-            recentPaths.Remove(_profile.Id);
-            return s with { RecentKeymapPaths = recentPaths };
-        });
-        RaiseRecentKeymapsChanged();
     }
 
     /// <summary>
@@ -1325,6 +844,20 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// last load error) for inclusion in
     /// <see cref="DiagnosticLog.CollectDiagnosticReport"/>.
     /// </summary>
+    private async Task CopyDiagnosticsAsync()
+    {
+        try
+        {
+            var report = DiagnosticLog.CollectDiagnosticReport(BuildDiagnosticsSnapshot());
+            if (await _shell.CopyTextAsync(report))
+                StatusMessage = Loc.Instance["Status_DiagnosticsCopied"];
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Could not copy diagnostics: {ex.Message}";
+        }
+    }
+
     public string BuildDiagnosticsSnapshot()
     {
         var sb = new StringBuilder();
@@ -1353,21 +886,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public void Shutdown()
     {
         StopKeyEventTracking(isAppExit: true);
-        // Stop accepting CLI connections before tearing down the router it queries.
-        _ipcServer.Dispose();
-        // Dispatcher before the push coordinator: it holds a subscription on the
-        // coordinator's AutoSwitch engine.
-        _appLayerDispatcher.Dispose();
-        _push.Shutdown();
-        _push.Dispose();
-        // Dispatcher before the router: it holds per-device report subscriptions
-        // sourced from the router's inventory.
-        _signalDispatcher.Dispose();
-        // Router before the bus and _hid: it unsubscribes from the keyboard
-        // adapter (which rides _hid's report stream) and the bus devices.
-        _router.Dispose();
-        _deviceBus.Dispose();
-        _hid.Dispose();
+        Devices.Dispose();
     }
 
     // --- Keymap edit mode (starting, leaving and the follow-up to a save; the
@@ -1406,7 +925,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     {
         OnPropertyChanged(nameof(IsEditing));
         OnPropertyChanged(nameof(CanStartEdit));
-        OnPropertyChanged(nameof(IsComboLegendVisible));
+        ComboLegend.SetEditing(value);
+        LayerTabs.SetEditing(value);
         StartEditCommand.NotifyCanExecuteChanged();
         DiscardEditCommand.NotifyCanExecuteChanged();
     }
@@ -1445,13 +965,13 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         // included, purely in memory) and each tab carries the per-layer
         // actions; LeaveEdit rebuilds them from the loaded keymap and the
         // persisted setting.
-        RebuildLayers();
+        LayerTabs.Rebuild(_keymap.Current);
 
         ApplyActiveLayer(edit.ShownLayerIndex);
 
         // The legend follows the edit too: it shows the edited combos, and
         // every tile becomes editable with its pending-change mark.
-        BuildCombosForConfig();
+        ComboLegend.Rebuild(_keymap.Current);
     }
 
     /// <summary>One edit change: repaint the board off the edited keymap. The
@@ -1463,7 +983,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     {
         if (Edit is not { } edit) return;
 
-        if (!TabsMatchEdit()) RebuildLayers();
+        if (!LayerTabs.MatchesEdit()) LayerTabs.Rebuild(_keymap.Current);
         ApplyActiveLayer(edit.ShownLayerIndex);
         // A tab color can move to another position while the shown index (and
         // with it the NotifyPropertyChangedFor above) stays put.
@@ -1471,7 +991,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
         // The legend re-reads the edited combos — a key edit can retake a
         // tile's labels, an undo can add or drop tiles entirely.
-        BuildCombosForConfig();
+        ComboLegend.Rebuild(_keymap.Current);
     }
 
     /// <summary>The edit showed another layer on purpose (an added or moved
@@ -1533,11 +1053,11 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
                 // Combo labels follow their combo the same way layer
                 // settings follow their layers — before the edit closes.
-                MoveComboLabelOverrides(saved.Plan.ComboChanges);
+                ComboLegend.MoveLabelOverrides(saved.Plan.ComboChanges);
 
                 LeaveEdit();
                 LoadLayoutFromPath(saved.ReloadPath, edit.Source.Entry);
-                ApplyActiveLayer(NearestShownLayer(layer));
+                ApplyActiveLayer(LayerTabs.NearestShownLayer(layer));
                 StatusMessage = Loc.Instance.Format(
                     "Status_EditSavedFormat", Path.GetFileName(saved.ReloadPath));
 
@@ -1554,24 +1074,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                     LoadLayoutFromPath(edit.Source.LocalPath, edit.Source.Entry);
                 break;
         }
-    }
-
-    /// <summary>True while <see cref="Layers"/> still mirrors the open edit —
-    /// same count, and every tab's caption and color equal what a rebuild from
-    /// the edit would produce at its position. False (rebuild) only after a
-    /// structural change; a plain key edit never moves either.</summary>
-    private bool TabsMatchEdit()
-    {
-        if (Edit is not { } edit) return true;
-        var layers = edit.Keymap.Layers;
-        if (Layers.Count != layers.Count) return false;
-        for (var i = 0; i < layers.Count; i++)
-        {
-            var tab = Layers[i];
-            if (tab.DisplayName != $"{i} : {layers[i].Name}") return false;
-            if (tab.TabColor != LayerColorFor(i)) return false;
-        }
-        return true;
     }
 
     /// <summary>
@@ -1592,30 +1094,12 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             edit.Close();
         }
         Edit = null;
-        RebuildLayers();
-        ApplyActiveLayer(NearestShownLayer(ActiveLayerIndex));
+        LayerTabs.Rebuild(_keymap.Current);
+        ApplyActiveLayer(LayerTabs.NearestShownLayer(ActiveLayerIndex));
 
         // Back to the loaded keymap's combos, and the tiles lose their
         // edit-mode flags with it.
-        BuildCombosForConfig();
-    }
-
-    /// <summary>
-    /// Maps a layer index to the closest layer whose tab is shown, so leaving
-    /// edit mode never displays a layer the user hid: the index itself while
-    /// its tab is in <see cref="Layers"/> and shown, otherwise the nearest
-    /// shown layer (a tie goes to the lower index). With no layers, or none
-    /// shown, there is nothing to map to and the index is returned unchanged.
-    /// </summary>
-    private int NearestShownLayer(int index)
-    {
-        if (Layers.Any(l => l.Index == index && l.IsShown)) return index;
-        var shown = Layers.Where(l => l.IsShown).ToList();
-        if (shown.Count == 0) return index;
-        return shown
-            .OrderBy(l => Math.Abs(l.Index - index))
-            .ThenBy(l => l.Index)
-            .First().Index;
+        ComboLegend.Rebuild(_keymap.Current);
     }
 
     /// <summary>Drop the edit and its changes.</summary>
@@ -1676,53 +1160,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             MouseLayer?.ApplySettings(mouse);
 
         return remapped.Notices;
-    }
-
-    /// <summary>
-    /// Carries this keyboard's combo label overrides across a save that moved
-    /// or removed combos: a rewritten combo takes its label to its new
-    /// key-position key (when nothing already lives there), and a deleted
-    /// combo's label goes with it. Overrides of combos the save only renamed
-    /// or retargeted (same positions) stay put, and adds have no label yet.
-    /// Persists once, and only when something actually moved.
-    /// </summary>
-    private void MoveComboLabelOverrides(IReadOnlyList<KeymapComboChange> changes)
-    {
-        var moved = false;
-        foreach (var change in changes)
-        {
-            switch (change.Edit)
-            {
-                case ComboEdit.Change:
-                {
-                    if (change.Old is not { } old || change.New is not { } combo) continue;
-                    var oldKey = ComboLabelOverrides.KeyPositionsToKey(old.KeyPositions);
-                    var newKey = ComboLabelOverrides.KeyPositionsToKey(combo.KeyPositions);
-                    if (oldKey == newKey) continue;
-
-                    var existing = ComboLabelOverrides.Get(_profile.Id, oldKey);
-                    if (existing is null) continue; // nothing to carry, and clearing an absent key is a no-op
-                    if (ComboLabelOverrides.Get(_profile.Id, newKey) is null)
-                        ComboLabelOverrides.Set(_profile.Id, newKey, existing);
-                    ComboLabelOverrides.Set(_profile.Id, oldKey, null);
-                    moved = true;
-                    break;
-                }
-                case ComboEdit.Delete:
-                {
-                    if (change.Old is not { } old) continue;
-                    var oldKey = ComboLabelOverrides.KeyPositionsToKey(old.KeyPositions);
-                    if (ComboLabelOverrides.Get(_profile.Id, oldKey) is null) continue;
-
-                    ComboLabelOverrides.Set(_profile.Id, oldKey, null);
-                    moved = true;
-                    break;
-                }
-            }
-        }
-
-        if (moved)
-            PersistSetting(s => s with { ComboLabelOverrides = ComboLabelOverrides.Snapshot() });
     }
 
     /// <summary>One remap notice as its translated report line.</summary>
@@ -1788,7 +1225,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         _profile = profile;
         SelectedKeyboard = profile;
         BuildKeysFromProfile();
-        _push.SetActiveProfile(profile);
+        Devices.Push.SetActiveProfile(profile);
 
         var km = _keymap.Current;
         var layoutFits = km is not null
@@ -1808,7 +1245,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         {
             // Same keymap, different board: tab colors and hidden buttons are
             // per profile, so the tabs must be rebuilt from the new profile.
-            RebuildLayers();
+            LayerTabs.Rebuild(_keymap.Current);
             ApplyActiveLayer(ActiveLayerIndex);
             HasUnmatchedKeymap = false;
             SetLoadStatusBase(null);
@@ -1822,27 +1259,18 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
         PersistSetting(s => s with { Keyboard = profile.Id });
         // Recents are per-profile; the surfaced list changed with the profile.
-        RaiseRecentKeymapsChanged();
+        Recents.Refresh();
         DiagnosticLog.Info("MainVM", $"Keyboard profile switched to {profile.Id}");
 
-        // Re-scope HID discovery to the new profile so a Go60 stops feeding
-        // reports into a Glove80 layout (or vice versa). No-op when HID is
-        // disabled or the source isn't running.
-        _hid.SetActiveProfile(profile);
-
-        // The keyboard's manifest/handlers change with the profile, and the new
-        // profile excludes a different keyboard from the bus — update the matcher
-        // and rebuild the routing table. Fire-and-forget; the router serializes
-        // and self-logs scan failures.
-        _deviceBus.SetKeyboardMatcher(_hid.KeyboardMatcher);
-        _ = _router.RescanAsync();
+        // Re-scope HID discovery (and the bus exclusion) to the new profile.
+        Devices.SwitchProfile(profile);
 
         // Auto-load whichever entry the user last associated with this
         // keyboard (local path or GitHub reference — resolved via cache).
         // Only a keymap kept through the wizard path skips this.
         if (!HasLayoutLoaded)
         {
-            if (TryGetStoredPathForProfile(_settingsService.Load(), profile.Id, out var storedPath, out var storedEntry))
+            if (Library.TryGetBooked(profile.Id, out var storedPath, out var storedEntry))
                 LoadLayoutFromPath(storedPath, storedEntry, keepBoard: true);
             PendingGitHubCheck = CheckGitHubForUpdateAsync(storedEntry);
         }
@@ -1865,8 +1293,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             .OfType<UserLayoutProfile>()
             .Select(p => p.Source.Id)
             .ToList();
-        var deviceNames = _deviceBus.Devices
-            .Select(d => d.DisplayName)
+        var deviceNames = Devices.BusDeviceNames
             .Distinct(StringComparer.Ordinal)
             .Where(name => !profiles.Any(p => p.NameMatches(name)))
             .OrderBy(name => name, StringComparer.Ordinal)
@@ -1930,14 +1357,14 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         _profile = profile;
         SelectedKeyboard = profile;
         BuildKeysFromProfile();
-        _push.SetActiveProfile(profile);
+        Devices.Push.SetActiveProfile(profile);
 
         var km = _keymap.Current;
         if (km is not null && km.LayerCount > 0 && km.Layers[0].Bindings.Count == profile.KeyCount)
         {
             // Same keymap, edited board: repaint so the rebuilt keys carry
             // their labels again, exactly like the switch path does.
-            RebuildLayers();
+            LayerTabs.Rebuild(_keymap.Current);
             ApplyActiveLayer(ActiveLayerIndex);
         }
     }
@@ -1965,7 +1392,10 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             // The wizard built this board around the keymap already open (it
             // fits, so the switch kept it loaded): remember it for the new
             // board, and drop it from the board it was opened on unmatched.
-            BookEntryForProfile(openEntry, takeFromProfileId: previousProfileId);
+            {
+                Library.Book(_profile.Id, openEntry, takeFromProfileId: previousProfileId);
+                Recents.Refresh();
+            }
         HasUnmatchedKeymap = false;
 
         DiagnosticLog.Info("MainVM", $"Added user layout {profile.Id} ({profile.KeyCount} keys)");
@@ -1989,132 +1419,65 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         DiagnosticLog.Info("MainVM", $"Edited user layout user:{layout.Id} ({layout.Keys.Count} keys)");
     }
 
-    /// <summary>Starts the layout wizard via the window callback.</summary>
+    /// <summary>Runs the layout wizard and applies the layout it saved.</summary>
     [RelayCommand]
-    private void AddOwnBoard()
+    private async Task AddOwnBoardAsync()
     {
         if (IsEditing)
         {
             DiagnosticLog.Info("MainVM", "AddOwnBoard ignored while editing");
             return;
         }
-        AddOwnBoardRequested?.Invoke();
+        var result = await _shell.RunLayoutWizardAsync(GetLayoutWizardContext());
+        if (result is not null)
+            ApplyLayoutWizardResult(result);
     }
 
-    /// <summary>Opens the "Edit layout…" window via the window callback.</summary>
+    /// <summary>Opens the "Edit layout…" window and applies the file it saved.</summary>
     [RelayCommand]
-    private void EditLayout()
+    private async Task EditLayoutAsync()
     {
         if (IsEditing)
         {
             DiagnosticLog.Info("MainVM", "EditLayout ignored while editing");
             return;
         }
-        EditLayoutRequested?.Invoke();
+        var ctx = GetLayoutEditContext();
+        if (ctx is null) return;
+        var result = await _shell.EditLayoutAsync(ctx);
+        if (result is not null)
+            ApplyEditedLayout(result);
     }
 
-    /// <summary>Opens the GitHub keymap picker window via the window callback.</summary>
+    /// <summary>Opens the GitHub keymap picker and loads the chosen keymap.</summary>
     [RelayCommand]
-    private void OpenFromGitHub() => OpenFromGitHubRequested?.Invoke();
-
-    /// <summary>
-    /// Turns a stored settings entry into a file to load. A GitHub reference
-    /// resolves through the service's local cache only — never the network
-    /// (a cold cache simply doesn't resolve); a local path resolves when the
-    /// file is on disk.
-    /// </summary>
-    private bool TryResolveEntry(string entry, out string path)
+    private async Task OpenFromGitHubAsync()
     {
-        if (GitHubKeymapRef.TryParse(entry, out var keymap))
-        {
-            var cached = _gitHub?.LocalPathFor(keymap);
-            path = cached ?? "";
-            return cached is not null;
-        }
-
-        path = entry;
-        return File.Exists(entry);
-    }
-
-    /// <summary>
-    /// Returns the persisted entry for the given profile plus the file it
-    /// resolves to (see <see cref="TryResolveEntry"/>). If the entry points
-    /// at a file that has gone missing — or a GitHub keymap whose cache copy
-    /// is gone — logs a warning and removes the stale entry from settings so
-    /// startup doesn't keep complaining about it.
-    /// </summary>
-    private bool TryGetStoredPathForProfile(UserSettings s, string profileId, out string path, out string entry)
-    {
-        path = "";
-        entry = "";
-        if (!s.LayoutJsonPaths.TryGetValue(profileId, out var stored) || string.IsNullOrWhiteSpace(stored))
-            return false;
-        entry = stored;
-        if (TryResolveEntry(stored, out path))
-            return true;
-
-        // A GitHub reference without a cache copy (signed out, cache wiped)
-        // is still valid: keep it, the background check fetches it.
-        if (GitHubKeymapRef.IsGitHubEntry(stored))
-        {
-            DiagnosticLog.Info("MainVM", $"Stored layout for {profileId} has no cached copy yet: {stored}");
-            return false;
-        }
-
-        DiagnosticLog.Warn("MainVM", $"Stored layout for {profileId} is missing on disk: {stored}");
-        PersistSetting(curr =>
-        {
-            var paths = new Dictionary<string, string>(curr.LayoutJsonPaths);
-            paths.Remove(profileId);
-            return curr with { LayoutJsonPaths = paths };
-        });
-        return false;
-    }
-
-    private void RebuildLayers()
-    {
-        Layers.Clear();
-        // While editing, the tabs show the edited keymap, hidden layers
-        // included, and carry the per-layer actions; outside an edit they
-        // show the loaded keymap with the persisted hidden flags.
-        var edit = Edit;
-        var km = edit?.Keymap ?? _keymap.Current;
-        if (km is null) return;
-        var editing = edit is not null;
-        var layerCount = km.Layers.Count;
-        var hiddenLayers = editing ? null : _settingsService.Load().HiddenLayers;
-        foreach (var layer in km.Layers)
-        {
-            var layerVm = new LayerViewModel(
-                layer.Index,
-                $"{layer.Index} : {layer.Name}",
-                LayerColorFor(layer.Index),
-                SelectLayer,
-                edit is { } e
-                    ? new LayerTabActions(
-                        i => _ = e.RenameLayerAsync(i),
-                        i => e.DuplicateLayer(i),
-                        (i, delta) => e.MoveLayer(i, i + delta),
-                        i => _ = e.DeleteLayerAsync(i),
-                        layerCount)
-                    : null);
-            if (hiddenLayers is { } hidden)
-                layerVm.IsShown = !HiddenLayers.IsHidden(hidden, _profile.Id, layer.Index);
-            Layers.Add(layerVm);
-        }
+        var result = await _shell.PickGitHubKeymapAsync(Devices.AttachedHidNames);
+        if (result is not null)
+            LoadLayoutFromPath(result.LocalPath, result.Keymap.ToString());
     }
 
     /// <summary>A tab click. While editing the edit owns the shown layer and
     /// the repaint follows its event, so the board never paints a layer the edit
     /// does not know about.</summary>
-    private void SelectLayer(int index)
+    private void OnLayerPicked(int index)
     {
         if (Edit is { } edit) edit.ShowLayer(index);
         else ApplyActiveLayer(index);
     }
 
+    /// <summary>A layer colour changed: re-resolve every key's fill (&amp;lt; / &amp;mo
+    /// keys reference arbitrary layer colours, so recolouring layer 2 repaints
+    /// layer 0's view too) and the press-pulse tint.</summary>
+    private void OnLayerColorsChanged()
+    {
+        if (_keymap.HasLayout) ApplyActiveLayer(ActiveLayerIndex);
+        OnPropertyChanged(nameof(ActiveLayerTintColor));
+    }
+
     /// <summary>Routes a layer push through the HID pipeline. Test-tab plumbing for SettingsViewModel.</summary>
-    public void PushLayerToKeyboard(int index) => _hid.PushLayer(index);
+    public void PushLayerToKeyboard(int index) => Devices.Hid.PushLayer(index);
 
     /// <summary>
     /// Runs an action pipeline off the UI thread (steps await I/O + delays).
@@ -2126,7 +1489,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     {
         _ = Task.Run(async () =>
         {
-            try { await _pipelineRunner.RunAsync(pipeline).ConfigureAwait(false); }
+            try { await Devices.Pipelines.RunAsync(pipeline).ConfigureAwait(false); }
             catch (Exception ex) { DiagnosticLog.Warn("Pipeline", $"test run '{pipeline.Name}' failed: {ex.Message}"); }
         });
     }
@@ -2137,7 +1500,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// failure. Test-tab plumbing only.
     /// </summary>
     public Task<DeviceInfo?> QueryDeviceInfoAsync(TimeSpan timeout, CancellationToken ct) =>
-        _hid.QueryDeviceInfoAsync(timeout, ct);
+        Devices.Hid.QueryDeviceInfoAsync(timeout, ct);
 
     /// <summary>
     /// Sends a 0xFB GetConfigId request and awaits the 0xFA reply.
@@ -2146,7 +1509,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// CONFIG_HID_VIZ_CONFIG_ID set. Test-tab plumbing only.
     /// </summary>
     public Task<string?> QueryConfigIdAsync(TimeSpan timeout, CancellationToken ct) =>
-        _hid.QueryConfigIdAsync(timeout, ct);
+        Devices.Hid.QueryConfigIdAsync(timeout, ct);
 
     private void ApplyActiveLayer(int index)
     {
@@ -2210,78 +1573,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             Keys[i].IsEditSelected = edit.SelectedKeyIndex == i;
         }
 
-        for (int i = 0; i < Layers.Count; i++)
-            Layers[i].IsSelected = Layers[i].Index == index;
-    }
-
-    /// <summary>
-    /// Walks the shown keymap's combos once and populates the legend
-    /// collection plus each key's <see cref="KeyViewModel.SetCombos"/>. While
-    /// a keymap edit is open the <em>edited</em> config paints, and every tile
-    /// is editable and carries its pending-change mark. Called once per keymap
-    /// load from <see cref="LoadLayoutFromPath"/> and from every edit-mode
-    /// repaint (<see cref="StartEdit"/>, <see cref="OnEditChanged(object?,
-    /// EventArgs)"/>, <see cref="LeaveEdit"/>) — combos aren't layer-scoped, so
-    /// nothing here repeats on a plain layer switch. The participating-key
-    /// labels in the legend's <c>ParticipatingKeysText</c> reflect whatever
-    /// layer was active when the legend was rebuilt.
-    /// </summary>
-    private void BuildCombosForConfig()
-    {
-        SetHighlightedCombos(Array.Empty<int>());
-        Combos.Clear();
-
-        // While editing, the legend shows the edit — combo badges follow too.
-        var edit = Edit;
-        var km = edit?.Keymap ?? _keymap.Current;
-        if (km is null)
-        {
-            for (var i = 0; i < Keys.Count; i++)
-                Keys[i].SetCombos(Array.Empty<ZmkCombo>(), Array.Empty<int>(), _ => "");
-            return;
-        }
-
-        var allCombos = km.Combos;
-        var combosByKey = new Dictionary<int, List<ZmkCombo>>();
-        var numbersByKey = new Dictionary<int, List<int>>();
-        for (var i = 0; i < allCombos.Count; i++)
-        {
-            var combo = allCombos[i];
-            var number = i + 1;
-            foreach (var keyIdx in combo.KeyPositions)
-            {
-                if (!combosByKey.TryGetValue(keyIdx, out var list))
-                    combosByKey[keyIdx] = list = new List<ZmkCombo>();
-                list.Add(combo);
-                if (!numbersByKey.TryGetValue(keyIdx, out var nums))
-                    numbersByKey[keyIdx] = nums = new List<int>();
-                nums.Add(number);
-            }
-        }
-
-        string LabelLookup(int idx) => idx >= 0 && idx < Keys.Count ? Keys[idx].Label : "";
-
-        for (var i = 0; i < Keys.Count; i++)
-        {
-            if (combosByKey.TryGetValue(i, out var keyCombos))
-                Keys[i].SetCombos(keyCombos, numbersByKey[i], LabelLookup);
-            else
-                Keys[i].SetCombos(Array.Empty<ZmkCombo>(), Array.Empty<int>(), LabelLookup);
-        }
-
-        for (var i = 0; i < allCombos.Count; i++)
-        {
-            var combo = allCombos[i];
-            var key = ComboLabelOverrides.KeyPositionsToKey(combo.KeyPositions);
-            var ov = ComboLabelOverrides.Get(_profile.Id, key);
-            var tile = new ComboViewModel(i + 1, combo, LabelLookup, km.MacrosByName, ov);
-            if (edit is not null)
-            {
-                tile.IsEditable = true;
-                tile.IsChanged = edit.Session.IsComboChanged(i);
-            }
-            Combos.Add(tile);
-        }
+        LayerTabs.SetActive(index);
     }
 
     /// <summary>
@@ -2321,17 +1613,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     private void StartKeyEventTracking()
     {
-        _hid.Start();
-        // Cross-device discovery rides the same live-tracking lifecycle as HID.
-        // The bus discovers (and the router builds the inventory) regardless of
-        // the master routing toggle — the toggle only gates forwarding — so the
-        // Settings UI can surface availability with routing still off.
-        _deviceBus.Start();
-        _router.Start();
-        // Signal listening rides the same lifecycle: it attaches per-device
-        // handlers off the router's inventory (reconciled on RoutesChanged) and
-        // runs the bound pipeline on an inbound signal.fire.
-        _signalDispatcher.Start();
+        Devices.Start();
         // Initial label sync — the source may already have settled the
         // active state before our subscription was attached above.
         OnActiveSourceChanged();
@@ -2339,25 +1621,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     private void StopKeyEventTracking(bool isAppExit = false)
     {
-        // On app exit, always return the keyboard to the base layer — once LViz
-        // is gone the board has no way to leave an app-pushed layer, so it would
-        // otherwise stay stuck on a non-base layer. This is an absolute rule and
-        // supersedes the mouse-layer revert. On a plain live-tracking toggle-off
-        // (re-enable possible) we instead revert any in-flight mouse-layer push
-        // *before* tearing down HID — otherwise the engine's _preMoveLayer stays
-        // set across the stop and the next enable captures the (still-held) mouse
-        // layer as the new pre-move layer, getting stuck pushing/reverting onto it.
-        if (isAppExit)
-            _push.ForceBaseLayerOnExit(TimeSpan.FromMilliseconds(500));
-        else
-            _push.RevertMouseLayerForShutdown(TimeSpan.FromMilliseconds(500));
-        // Stop signal listening first (it holds per-device subscriptions), then
-        // the router before the bus so forwarding/subscriptions are torn down
-        // before the underlying handles close.
-        _signalDispatcher.Stop();
-        _router.Stop();
-        _deviceBus.Stop();
-        _hid.Stop();
+        Devices.Stop(isAppExit);
         IsHidSourceActive = false;
         LayerSourceHint = "";
     }
@@ -2379,8 +1643,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     private void OnActiveSourceChanged()
     {
-        var hidActive = _hid.IsConnected;
-        var label = _hid.SourceLabel;
+        var hidActive = Devices.Hid.IsConnected;
+        var label = Devices.Hid.SourceLabel;
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             IsHidSourceActive = hidActive;
@@ -2389,7 +1653,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                 : Loc.Instance.Format("Status_LayerSourceHintFormat", label);
             // Mouse-layer engine only fires when HID is connected; toggling
             // it stops the OS-level mouse tap while disconnected.
-            _push.OnHidConnectionChanged();
+            Devices.Push.OnHidConnectionChanged();
         });
     }
 

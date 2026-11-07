@@ -110,6 +110,14 @@ internal static class AppServices
 
         services.AddSingleton<IKeymapEditDialogs, AvaloniaKeymapEditDialogs>();
 
+        // Window lifecycle + the shell the view-model opens windows through;
+        // both look the main window and view-model up at call time.
+        services.AddSingleton(sp => new MainWindowLifecycle(
+            sp.GetRequiredService<ISettingsService>(),
+            () => sp.GetRequiredService<MainWindowViewModel>()));
+        services.AddSingleton<IMainWindowShell>(sp => new AvaloniaMainWindowShell(
+            sp, sp.GetRequiredService<MainWindowLifecycle>()));
+
         services.AddSingleton<MainWindowViewModel>(sp =>
             new MainWindowViewModel(
                 sp.GetRequiredService<ISettingsService>(),
@@ -119,7 +127,8 @@ internal static class AppServices
                 capabilityControl: sp.GetRequiredService<ICapabilityControl>(),
                 hostActionExecutor: sp.GetRequiredService<IHostActionExecutor>(),
                 gitHub: sp.GetRequiredService<IGitHubKeymapService>(),
-                editDialogs: sp.GetRequiredService<IKeymapEditDialogs>()));
+                editDialogs: sp.GetRequiredService<IKeymapEditDialogs>(),
+                shell: sp.GetRequiredService<IMainWindowShell>()));
 
         services.AddTransient<SettingsViewModel>(sp =>
             new SettingsViewModel(

@@ -34,6 +34,7 @@ public partial class ExitKeyPickerViewModel : ObservableObject, IBoardSurface
         BoardStyle = new BoardStyleViewModel(
             AppTheme.PressHighlightDefaultHex,
             strokeOverride: AppTheme.PickerPressStrokeHex);
+        ComboLegend = new ComboLegendViewModel(Keys, BoardStyle, overlayVisible: false, profileId: () => "");
 
         foreach (var pos in _profile.Keys)
         {
@@ -80,9 +81,9 @@ public partial class ExitKeyPickerViewModel : ObservableObject, IBoardSurface
     public BoardLayoutViewModel BoardLayout { get; }
     public BoardStyleViewModel BoardStyle { get; }
 
-    // Picker has no combos — overlay always off so the indicator stays
-    // hidden (no combo earmarks here) and pointer events don't bind.
-    public bool IsComboOverlayVisible => false;
+    // Picker has no combos — an inert legend with the overlay always off, so
+    // the indicator stays hidden (no combo earmarks here).
+    public ComboLegendViewModel ComboLegend { get; }
 
     public Action<int>? OnKeyTapped => ToggleKey;
     public Action<int>? OnKeyDoubleTapped => null;

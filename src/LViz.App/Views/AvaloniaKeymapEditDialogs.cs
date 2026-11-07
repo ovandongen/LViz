@@ -1,5 +1,3 @@
-using Avalonia;
-using Avalonia.Controls.ApplicationLifetimes;
 using LViz.App.Services;
 using LViz.App.ViewModels;
 using LViz.Core.Settings;
@@ -22,10 +20,7 @@ internal sealed class AvaloniaKeymapEditDialogs : IKeymapEditDialogs
 
     public AvaloniaKeymapEditDialogs(ISettingsService settings) => _settings = settings;
 
-    private static MainWindow Owner =>
-        (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)
-            ?.MainWindow as MainWindow
-        ?? throw new InvalidOperationException("The main window is not available to own a dialog.");
+    private static MainWindow Owner => MainWindowOwner.Current;
 
     private bool UseRing => _settings.Load().RingKeyEditor;
 

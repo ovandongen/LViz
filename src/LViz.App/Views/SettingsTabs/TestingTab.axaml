@@ -1,0 +1,70 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:LViz.App.ViewModels"
+             xmlns:conv="using:LViz.App.Converters"
+             xmlns:i="https://github.com/projektanker/icons.avalonia"
+             x:Class="LViz.App.Views.SettingsTabs.TestingTab"
+             x:DataType="vm:SettingsViewModel">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="20" Spacing="12">
+            <TextBlock Text="Push layer to keyboard"
+                       FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+            <TextBlock Text="Selecting a layer fires SetLayerStateAsync immediately. See log for app push acknowledged / external change events."
+                       Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+            <ComboBox MinWidth="220"
+                      HorizontalAlignment="Left"
+                      ItemsSource="{Binding MainViewModel.LayerTabs.Layers}"
+                      SelectedItem="{Binding SelectedTestLayer, Mode=TwoWay}">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:LayerViewModel">
+                        <TextBlock Text="{Binding DisplayName}" />
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <Separator Margin="0,8" />
+
+            <TextBlock Text="HID queries (shared module)"
+                       FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+            <TextBlock Text="Sends 0xFD GetDeviceInfo / 0xFB GetConfigId and waits up to 1s for the matching reply."
+                       Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+            <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto" Margin="0,4,0,0" ColumnSpacing="8" RowSpacing="6">
+                <Button Grid.Row="0" Grid.Column="0"
+                        Content="Query device info"
+                        HorizontalAlignment="Stretch"
+                        Command="{Binding QueryDeviceInfoCommand}" />
+                <TextBlock Grid.Row="0" Grid.Column="1"
+                           Text="{Binding DeviceInfoResult}"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource Text}"
+                           TextWrapping="Wrap" />
+                <Button Grid.Row="1" Grid.Column="0"
+                        Content="Query config ID"
+                        HorizontalAlignment="Stretch"
+                        Command="{Binding QueryConfigIdCommand}" />
+                <TextBlock Grid.Row="1" Grid.Column="1"
+                           Text="{Binding ConfigIdResult}"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource Text}"
+                           TextWrapping="Wrap" />
+            </Grid>
+
+            <Separator Margin="0,8" />
+
+            <TextBlock Text="Active window (focus follows OS)"
+                       FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+            <TextBlock Text="Updates within ~500 ms of focus change. WindowTitle is null on macOS by design (no Accessibility entitlement)."
+                       Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+            <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto" Margin="0,4,0,0">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="ProcessName" Foreground="{StaticResource TextMuted}" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding MainViewModel.AutoSwitch.ActiveWindow.ProcessName, FallbackValue='(none)', TargetNullValue='(none)'}" Foreground="{StaticResource Text}" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="BundleId" Foreground="{StaticResource TextMuted}" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding MainViewModel.AutoSwitch.ActiveWindow.BundleId, FallbackValue='(none)', TargetNullValue='(none)'}" Foreground="{StaticResource Text}" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="WindowTitle" Foreground="{StaticResource TextMuted}" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding MainViewModel.AutoSwitch.ActiveWindow.WindowTitle, FallbackValue='(none)', TargetNullValue='(none)'}" Foreground="{StaticResource Text}" TextWrapping="Wrap" />
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+
+</UserControl>

@@ -148,7 +148,8 @@ After creating or editing a view, rebuild the App project before trusting a
   per platform. The commit message
   (`KeymapCommitMessage`) is English by decision, not resx text.
   The shown layer while editing is `Edit.ShownLayerIndex`, followed by layer
-  id through undo/redo and moves; a tab click calls `Edit.ShowLayer`, and the
+  id through undo/redo and moves; a tab click (`LayerTabs.LayerPicked`) is
+  routed to `Edit.ShowLayer`, and the
   main VM only mirrors it into `ApplyActiveLayer`. The selection belongs to
   the layer it was made on: the edit VM clears it when the shown layer *id*
   changes, so a layer switch drops it and undo/redo or the repaint after a
@@ -174,6 +175,10 @@ After creating or editing a view, rebuild the App project before trusting a
   differ). A layer number is written as a define name only when the file
   already uses that define as a layer reference (`&mo NAME`, `&lt NAME …`):
   MoErgo exports define `KB_TYPE_GLOVE_80 1` ahead of `LAYER_Symbol 1`.
+  Each writer has an internal text reader: `KeymapLayerText` for layers,
+  `KeymapComboText` for combos (combos node, children, define tables, and
+  the combo text format: compatibles, property order, `NewNode`). The writer
+  depends on its reader, never the other way round.
 - **`Core/Keymap/Editing/KeymapEditSession` tracks layers by id, not
   position.** Baseline layer `i` is id `i`; an add takes a fresh id that is
   never reused. Each id has an origin (its baseline name and bindings, or what
@@ -188,7 +193,10 @@ After creating or editing a view, rebuild the App project before trusting a
   then moves that leave the longest in-order run in place, then adds at their
   final position (current name, origin bindings; key edits on them come from
   the diff). It is empty whenever the ids are back to the baseline list. The
-  review dialog, the delete check and the save all replay it. A shown layer is
+  review dialog, the delete check and the save all replay it. Those rules
+  (and `BaselineLayerMap`) live in the pure `LayerIdDiff` (baseline count +
+  current id list; an add's name and bindings come from a callback): change
+  and test them there with plain id arrays. A shown layer is
   followed through undo/redo by id (`LayerIdAt`/`IndexOfLayerId`).
 - **Layer add/delete/move: model in `LayerReferenceRemapper`, text in
   `KeymapLayerWriter`.** The remapper (Core/Keymap/Editing) is the expected
@@ -294,6 +302,32 @@ After creating or editing a view, rebuild the App project before trusting a
   is at hand, and show layer numbers with
   `KeymapWriter.LayerReferenceDefines`, never with every define (go60 defines
   `POS_RH_C2R1 7` before `LAYER_Magic 7`).
+- **Layer tabs: `LayerTabsViewModel` on `MainWindowViewModel.LayerTabs`.** It
+  owns the tabs (`Layers`), tab colours (`ColorFor`, `SetColorOverride`), the
+  per-profile hidden flags (`SetShown`) and `NearestShownLayer`. The main VM
+  feeds it only through `SetEditing(edit)`, `Rebuild(loadedKeymap)` and
+  `SetActive(index)`; the profile id comes in as a `Func<string>`. It raises
+  `LayerPicked(i)`, which the main VM routes to `Edit.ShowLayer` while
+  editing, else `ApplyActiveLayer`; `SetActive` never raises it (no loop).
+  `ColorsChanged` makes the main VM repaint the keys and the tint.
+  `ActiveLayerIndex` and `ApplyActiveLayer` stay on the main VM (HID push,
+  `DeviceStack`, key rendering and the tray read them). The strip is
+  `LayerTabsView`; `MainWindow.axaml` keeps only the `LayerTabs` border row.
+  Settings pickers bind `MainViewModel.LayerTabs.Layers`. Keep the tab items
+  stable: update `TabColor`/`IsShown` in place, only `Rebuild` replaces them.
+- **Combo legend: `ComboLegendViewModel` on `MainWindowViewModel.ComboLegend`.**
+  It owns the tiles (`Combos`), the persisted overlay toggle
+  (`IsOverlayVisible`), `IsLegendVisible` (overlay OR editing), the tile/key
+  hover highlight (`SetHighlighted`) and the combo label overrides
+  (`RequestEdit`, `SetLabelOverride`, `MoveLabelOverrides` after a save). The
+  main VM feeds it only through `SetEditing(edit)` and `Rebuild(loadedKeymap)`;
+  the active board comes in as a `Func<string>`. `IBoardSurface.ComboLegend`
+  replaces the old bool: the exit-key picker and the combo dialog build an
+  inert legend (no settings, no shell), like their `BoardLayout`/`BoardStyle`.
+  The tiles are `ComboLegendView` (DataContext = the legend VM); `MainWindow.axaml`
+  keeps only the `ComboLegend` border (row 3, visibility, background). An
+  `ElementName` can't reach into a UserControl's namescope, so bindings inside
+  the view use its root `x:Name="Legend"` and the legend VM's `Edit`/`BoardStyle`.
 - **Combo editing: identity is the node name.** `ComboEdit`
   (`Add`/`Change`/`Delete`) addresses a combo by `ZmkCombo.NodeName`; `Name`
   is the label when the node has one, else the node name, and a rename moves
@@ -416,7 +450,14 @@ After creating or editing a view, rebuild the App project before trusting a
   `LoadedLayoutPath`. Startup, board switch and Refresh load the cache copy
   and then run a silent background check that reloads a newer commit or
   fetches a cold cache. A GitHub entry without a cache copy is kept, never
-  pruned like a missing file (sign-out deletes the whole cache). The wizard
+  pruned like a missing file (sign-out deletes the whole cache). Where
+  keymaps come from is `App/Services/KeymapLibrary` (booking in
+  `LayoutJsonPaths`, per-profile recents, `TryResolveEntry`/`TryGetBooked`
+  with these prune rules, `CheckGitHubAsync`; tested in `KeymapLibraryTests`,
+  tests fake the disk check with `Library = { FileExists = … }`);
+  `MainWindowViewModel` only applies a load (`LoadLayoutFromPath`,
+  `_loadedEntry`, board switch, status). The recents flyout binds the child
+  VM `MainWindowViewModel.Recents` (`RecentKeymapsViewModel`) directly. The wizard
   books the already-open keymap for the board it saves.
 - **Saving keymaps: conflict-checked on both sides.** A GitHub save
   (`IGitHubKeymapService.SaveAsync`) commits straight to the branch against
@@ -567,7 +608,9 @@ LViz-specific (extend this list as we hit more):
   USB devices and must NOT also open the keyboard, or two handles race the one
   interface. The bus excludes it two ways: the injected `IDeviceMatcher` (the
   live keyboard profile's matcher) drops matching rows, and
-  `HidPipeline.OpenDevicePath` is passed as an explicit exclude-path. Any
+  `HidPipeline.OpenDevicePath` is passed as an explicit exclude-path. Both are
+  wired in `DeviceStack.Create`, and `DeviceStack.SwitchProfile` re-points the
+  matcher on a board switch. Any
   change to bus enumeration MUST preserve both. (Verified on hardware: a
   Glove80 resolved as the keyboard while a Ploopy Bean was the lone bus
   device — no double-open.)
@@ -609,16 +652,26 @@ LViz-specific (extend this list as we hit more):
   **not** address this — it pins capability *ids*, not device-identity keys. The
   backed-off rescan is the actual fix; there's no registry change coming for it.)
 
+- **The device stack is assembled and torn down in `DeviceStack`
+  (App/Services).** `DeviceStack.Create` builds the HID pipeline, capability
+  bus and router, pipeline runner, signal and app-layer dispatchers, IPC
+  server and push coordinator; `Start`, `Stop(isAppExit)`, `SwitchProfile` and
+  `Dispose` own the order. `MainWindowViewModel.Devices` exposes it, so reach
+  `Devices.Hid`, `Devices.Push`, … instead of adding VM pass-throughs.
+  `DeviceStackTests` pins the order with recording doubles (the bus slot is
+  unrecorded: `RawHidDeviceBus` is sealed).
+
 - **App exit unconditionally forces the keyboard to base layer 0 — don't
   weaken it back to a conditional revert.** The board can't tell LViz has quit,
   so any layer an engine (auto-switch / mouse) or the action UI pushed would
   stay pinned after exit, leaving it stuck on a non-base layer with no overlay
   to explain it. `MainWindowViewModel.Shutdown` calls
-  `StopKeyEventTracking(isAppExit: true)` →
+  `StopKeyEventTracking(isAppExit: true)` → `DeviceStack.Stop(isAppExit: true)` →
   `LayerPushCoordinator.ForceBaseLayerOnExit` → `PushLayerSync(0, 500ms)` *before*
-  `_hid.Stop()`, unconditionally (no `IsLastChangeAppControlled` gate), no-op only
+  `Hid.Stop()`, unconditionally (no `IsLastChangeAppControlled` gate), no-op only
   when no keyboard is connected. The *live-tracking toggle-off* path
-  (`StopKeyEventTracking()` with no arg, from `ToggleLiveHighlighting`)
+  (`StopKeyEventTracking()` with no arg, from `ToggleLiveHighlighting`, →
+  `DeviceStack.Stop(false)`)
   deliberately keeps the old `RevertMouseLayerForShutdown` instead — it can be
   re-enabled (needs the mouse engine's pre-move state reset cleanly) and must not
   override a layer the user physically toggled while just hiding the overlay.
@@ -646,17 +699,41 @@ LViz-specific (extend this list as we hit more):
   callbacks and collections are skipped; any other new public property needs
   either an entry in `SettingsViewModel._mainPropagators` or its name in
   `IgnoredMainProperties` in that test, with a one-line reason. Main-window-only state (e.g.
-  `HasRecentKeymaps`) belongs on the ignore list. Plan for this edit when a
+  a child VM such as `Recents` or `LayerTabs`) belongs on the ignore list. Plan for this edit when a
   change adds a VM property; it is the one expected change to an existing test.
 
+- **Main-window actions go through `IMainWindowShell`, never a nullable
+  callback on the VM.** Quit, show, file picker, clipboard, Settings,
+  shortcuts, layout wizard, GitHub picker, edit layout and the label dialogs
+  are shell methods (App/Services); a dialog method returns its result (null =
+  backed out) and the VM command applies it, so the flow is testable with
+  `FakeMainWindowShell`. `AvaloniaMainWindowShell` is the real one; it and
+  `AvaloniaKeymapEditDialogs` find the owner at call time via
+  `MainWindowOwner.Current`. `MainWindowLifecycle` owns window-state
+  restore/save, the close guard and the quit-in-progress flag;
+  `TrayIconController` owns the tray. `App.axaml.cs` is only the composition
+  step: keep it that way.
+
+- **The Settings window is a shell over per-tab view-models.**
+  `SettingsViewModel` keeps General/Layers state and the Testing tab and
+  composes `AutoSwitch` (`AutoSwitchSettingsViewModel`, incl. the process
+  picker), `MouseLayer`, `About` (version, updates, CLI tool), `DeviceRouting`
+  and `ActionPipelines`. Each tab body is a UserControl in
+  `Views/SettingsTabs/` that inherits `SettingsViewModel` as DataContext and
+  binds through the prefixed path (`AutoSwitch.X`). Window resources are not
+  visible inside a UserControl, so each tab declares the converters it uses;
+  tab code-behind finds its owner with `TopLevel.GetTopLevel(this)`.
+  `SettingsWindow.OnClosing` commits the edit buffers. Only
+  `_mainPropagators` is covered by the coverage test; a keyboard switch is
+  fanned out from `SettingsViewModel` to the tab VMs.
+
 - **A member named like a Core static helper hides that helper inside the
-  class.** `MainWindowViewModel.RecentKeymaps` (a property) shadows the Core
-  type `LViz.Core.Settings.RecentKeymaps`, so calls to the helper inside the
-  view-model fail to compile or bind to the wrong thing. Reach the helper
-  through a `using` alias instead
-  (`using RecentKeymapHistory = LViz.Core.Settings.RecentKeymaps;`, top of
-  `MainWindowViewModel.cs`). Same applies to any new Core helper whose name
-  matches a settings property (e.g. `HiddenLayers`).
+  class.** A property named `RecentKeymaps` would shadow the Core type
+  `LViz.Core.Settings.RecentKeymaps`, so calls to the helper inside that
+  class fail to compile or bind to the wrong thing (it bit the main VM before
+  recents moved to `KeymapLibrary`). Reach the helper through a `using` alias
+  in such a class. Same applies to any new Core helper whose name matches a
+  settings property (e.g. `HiddenLayers`).
 
 - **`KeyBinding` record equality does not compare `Params` contents** (it
   compares the list reference). Compare with `KeyBinding.SameAs`, in code and
@@ -669,7 +746,7 @@ LViz-specific (extend this list as we hit more):
 - **A closed Avalonia `ContextMenu` doesn't inherit its owner's DataContext**
   (it isn't in the owner's visual tree until it opens), so an `Opening` handler
   that reads it sees null. The layer tabs pin it from the button
-  (`MainWindow.OnLayerTabLoaded`). `ContextMenu.Opening` is a plain
+  (`LayerTabsView.OnLayerTabLoaded`). `ContextMenu.Opening` is a plain
   `CancelEventHandler`, set from XAML like any event.
 
 - **An Avalonia `ListBox` whose `ItemsSource` is replaced drops its

@@ -62,7 +62,7 @@ public partial class GitHubOpenViewModel : ObservableObject
     /// Product names of the plugged-in keyboards, so a keymap's "fits
     /// &lt;board&gt;" hint names the board opening it lands on (see
     /// <see cref="KeyboardProfileRegistry.FindByKeyCount"/>). Set by the app
-    /// from <c>MainWindowViewModel.AttachedHidNames</c>; none by default.
+    /// from <c>DeviceStack.AttachedHidNames</c>; none by default.
     /// </summary>
     public Func<IReadOnlyCollection<string>> AttachedHidNames { get; set; } = () => [];
 

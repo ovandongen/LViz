@@ -26,12 +26,13 @@ public interface IBoardSurface
     BoardStyleViewModel BoardStyle { get; }
 
     /// <summary>
-    /// When true, combo keys render a numbered badge instead of the static
-    /// earmark, and the indicator becomes hit-testable so hover handlers
-    /// can drive bidirectional highlight against the legend. Main VM toggles
-    /// this from the toolbar; the picker VM always returns false.
+    /// The combo legend. Its <see cref="ComboLegendViewModel.IsOverlayVisible"/>
+    /// makes combo keys render a numbered badge instead of the static earmark
+    /// and the badges hit-testable, so hover drives bidirectional highlight
+    /// against the legend tiles. Only the main VM's is live (toolbar toggle);
+    /// the picker's is always off, the combo dialog's always on.
     /// </summary>
-    bool IsComboOverlayVisible { get; }
+    ComboLegendViewModel ComboLegend { get; }
 
     /// <summary>
     /// Optional per-cap click handler. When non-null, <c>BoardView</c>'s

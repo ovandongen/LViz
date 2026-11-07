@@ -87,7 +87,7 @@
                     <Path.IsVisible>
                         <MultiBinding Converter="{x:Static conv:BoolConverters.And}">
                             <Binding Path="IsInCombo" />
-                            <Binding Path="DataContext.IsComboOverlayVisible"
+                            <Binding Path="DataContext.ComboLegend.IsOverlayVisible"
                                      ElementName="Board"
                                      Converter="{x:Static conv:BoolConverters.Not}" />
                         </MultiBinding>
@@ -109,7 +109,7 @@
                     <ItemsControl.IsVisible>
                         <MultiBinding Converter="{x:Static conv:BoolConverters.And}">
                             <Binding Path="IsInCombo" />
-                            <Binding Path="DataContext.IsComboOverlayVisible" ElementName="Board" />
+                            <Binding Path="DataContext.ComboLegend.IsOverlayVisible" ElementName="Board" />
                         </MultiBinding>
                     </ItemsControl.IsVisible>
                     <ItemsControl.ItemsPanel>

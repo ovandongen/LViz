@@ -113,16 +113,17 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
             .Select(i => new UserLayoutKey(i == 0 ? key0X : i * 100, 0, 100, 100, 0, 0, 0, Hand.Left))]);
 
     [Fact]
-    public void AddOwnBoardCommand_InvokesCallback()
+    public void AddOwnBoardCommand_RunsWizardThroughShell_CancelAppliesNothing()
     {
+        var shell = new FakeMainWindowShell();
         var vm = new MainWindowViewModel(
-            new InMemorySettingsService(), keymapState: new FakeKeymapStateService());
+            new InMemorySettingsService(), keymapState: new FakeKeymapStateService(), shell: shell);
+        var profileBefore = vm.SelectedKeyboard;
 
-        var invoked = false;
-        vm.AddOwnBoardRequested = () => invoked = true;
         vm.AddOwnBoardCommand.Execute(null);
 
-        Assert.True(invoked);
+        Assert.Single(shell.WizardContexts);
+        Assert.Same(profileBefore, vm.SelectedKeyboard);
     }
 
     [Fact]
@@ -444,15 +445,60 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
     }
 
     [Fact]
-    public void EditLayoutCommand_InvokesCallback()
+    public void AddOwnBoardCommand_WizardAnswer_IsAppliedByTheViewModel()
     {
+        var shell = new FakeMainWindowShell
+        {
+            WizardAnswer = new LayoutWizardResult(Layout("myboard", 7), KeymapPathToLoad: null),
+        };
         var vm = new MainWindowViewModel(
-            new InMemorySettingsService(), keymapState: new FakeKeymapStateService());
+            new InMemorySettingsService(), keymapState: new FakeKeymapStateService(), shell: shell);
+        KeyboardProfileRegistry.SetUserProfiles([]);
+        try
+        {
+            vm.AddOwnBoardCommand.Execute(null);
 
-        var invoked = false;
-        vm.EditLayoutRequested = () => invoked = true;
+            Assert.Equal("user:myboard", vm.SelectedKeyboard.Id);
+        }
+        finally
+        {
+            KeyboardProfileRegistry.SetUserProfiles([]);
+        }
+    }
+
+    [Fact]
+    public void EditLayoutCommand_UserBoardActive_AppliesTheEditedFile()
+    {
+        var shell = new FakeMainWindowShell { EditLayoutAnswer = EditedLayout(500) };
+        var vm = new MainWindowViewModel(
+            new InMemorySettingsService(), keymapState: new FakeKeymapStateService(), shell: shell);
+        KeyboardProfileRegistry.SetUserProfiles([]);
+        try
+        {
+            vm.ApplyLayoutWizardResult(new LayoutWizardResult(Layout("myboard", 7), KeymapPathToLoad: null));
+            var key0X = vm.Keys[0].Position.X;
+
+            vm.EditLayoutCommand.Execute(null);
+
+            Assert.Single(shell.EditLayoutContexts);
+            Assert.NotEqual(key0X, vm.Keys[0].Position.X);
+        }
+        finally
+        {
+            KeyboardProfileRegistry.SetUserProfiles([]);
+        }
+    }
+
+    [Fact]
+    public void EditLayoutCommand_BundledBoardActive_OpensNothing()
+    {
+        var shell = new FakeMainWindowShell();
+        var vm = new MainWindowViewModel(
+            new InMemorySettingsService(), keymapState: new FakeKeymapStateService(), shell: shell);
+
         vm.EditLayoutCommand.Execute(null);
 
-        Assert.True(invoked);
+        // A bundled board has nothing to edit: the shell is never asked.
+        Assert.Empty(shell.EditLayoutContexts);
     }
 }

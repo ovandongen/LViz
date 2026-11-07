@@ -1,0 +1,202 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:LViz.App.ViewModels"
+             xmlns:conv="using:LViz.App.Converters"
+             xmlns:i="https://github.com/projektanker/icons.avalonia"
+             x:Class="LViz.App.Views.SettingsTabs.AutoSwitchTab"
+             x:DataType="vm:SettingsViewModel" Name="TabRoot">
+    <UserControl.Resources>
+        <conv:AppLayerRuleLabelConverter x:Key="AppLayerRuleLabel" />
+    </UserControl.Resources>
+
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="20" Spacing="16">
+
+            <!-- Engine section: master enable + fallback policy. -->
+            <StackPanel Spacing="6">
+                <TextBlock Text="{Binding [Settings_AutoSwitch_SectionEngine], Source={StaticResource Loc}}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                <TextBlock Text="{Binding [Settings_AutoSwitch_Hint], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+
+                <CheckBox Content="{Binding [Settings_AutoSwitch_Enable], Source={StaticResource Loc}}"
+                          IsChecked="{Binding MainViewModel.AutoSwitch.IsEnabled, Mode=TwoWay}"
+                          Foreground="{StaticResource Text}"
+                          Margin="0,4,0,0" />
+
+                <StackPanel Spacing="4" Margin="0,4,0,0">
+                    <TextBlock Text="{Binding [Settings_AutoSwitch_FallbackLabel], Source={StaticResource Loc}}"
+                               Foreground="{StaticResource Text}" FontSize="12" />
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <RadioButton GroupName="AutoSwitchFallback"
+                                     Content="{Binding [Settings_AutoSwitch_FallbackBase], Source={StaticResource Loc}}"
+                                     IsChecked="{Binding AutoSwitch.IsFallbackBase, Mode=TwoWay}"
+                                     Foreground="{StaticResource Text}" />
+                        <RadioButton GroupName="AutoSwitchFallback"
+                                     Content="{Binding [Settings_AutoSwitch_FallbackPrevious], Source={StaticResource Loc}}"
+                                     IsChecked="{Binding AutoSwitch.IsFallbackPrevious, Mode=TwoWay}"
+                                     Foreground="{StaticResource Text}" />
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+
+            <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+            <!-- Exit-tap key: a single firmware key position that
+                 toggles the engine between the rule-driven layer
+                 and the fallback target when double-tapped. Pressed
+                 on the physical keyboard; we consume the firmware
+                 key events (regardless of OS keypress permission)
+                 via the submodule's MultiTapDetector. -->
+            <StackPanel Spacing="6">
+                <TextBlock Text="{Binding [Settings_AutoSwitch_SectionExitKey], Source={StaticResource Loc}}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                <TextBlock Text="{Binding [Settings_AutoSwitch_ExitKeysHint], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                    <TextBlock Text="{Binding AutoSwitch.ExitTapSummary}"
+                               Foreground="{StaticResource AccentGreen}" FontSize="12" FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               MinWidth="160" />
+                    <Button Content="{Binding [Settings_AutoSwitch_PickExitKeys], Source={StaticResource Loc}}"
+                            Click="OnPickExitKeysClick" />
+                    <Button Content="{Binding [Settings_AutoSwitch_ClearExitKeys], Source={StaticResource Loc}}"
+                            Command="{Binding AutoSwitch.ClearExitTapCommand}"
+                            IsEnabled="{Binding AutoSwitch.HasExitTap}" />
+                </StackPanel>
+
+                <CheckBox Content="{Binding [Settings_AutoSwitch_ExitOnTransparent], Source={StaticResource Loc}}"
+                          IsChecked="{Binding AutoSwitch.IsExitOnTransparentKey, Mode=TwoWay}"
+                          Foreground="{StaticResource Text}"
+                          Margin="0,6,0,0" />
+                <CheckBox Content="{Binding [Settings_AutoSwitch_ExitOnEmpty], Source={StaticResource Loc}}"
+                          IsChecked="{Binding AutoSwitch.IsExitOnEmptyKey, Mode=TwoWay}"
+                          Foreground="{StaticResource Text}" />
+                <TextBlock Text="{Binding [Settings_AutoSwitch_ExitOnTransparent_Hint], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+            <!-- Rules section: new-rule editor + existing rule list + live status. -->
+            <StackPanel Spacing="6">
+                <TextBlock Text="{Binding [Settings_AutoSwitch_SectionRules], Source={StaticResource Loc}}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+
+                <!-- New-rule editor. MaxLength caps the textbox so a
+                     paste-bomb can't bloat settings.json. The Pick…
+                     button opens a flyout listing running processes
+                     (refreshed on each open via code-behind). -->
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,4,0,0">
+                <TextBox Grid.Column="0"
+                         Watermark="{Binding [Settings_AutoSwitch_ProcessMatch], Source={StaticResource Loc}}"
+                         Text="{Binding AutoSwitch.NewRuleProcessMatch, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         MaxLength="200"
+                         VerticalAlignment="Center" />
+                <Button x:Name="PickProcessButton" Grid.Column="1" Margin="8,0,0,0"
+                        Content="{Binding [Settings_AutoSwitch_PickProcess], Source={StaticResource Loc}}">
+                    <Button.Flyout>
+                        <Flyout Placement="Bottom" Opening="OnPickProcessFlyoutOpening">
+                            <Grid Width="260" Height="320" RowDefinitions="Auto,*">
+                                <TextBox Grid.Row="0" Margin="0,0,0,4"
+                                         Watermark="{Binding [Settings_AutoSwitch_PickProcessFilter], Source={StaticResource Loc}}"
+                                         Text="{Binding AutoSwitch.ProcessFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <ListBox Grid.Row="1"
+                                         x:Name="ProcessPickerList"
+                                         ItemsSource="{Binding AutoSwitch.RunningProcessNames}"
+                                         IsVisible="{Binding AutoSwitch.HasRunningProcesses}"
+                                         SelectionChanged="OnProcessPickerSelectionChanged">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" Padding="4,2" />
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <TextBlock Grid.Row="1"
+                                           Text="{Binding [Settings_AutoSwitch_PickProcessEmpty], Source={StaticResource Loc}}"
+                                           Foreground="{StaticResource TextMuted}" FontStyle="Italic"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           IsVisible="{Binding !AutoSwitch.HasRunningProcesses}" />
+                            </Grid>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+                <ComboBox Grid.Column="2" Margin="8,0,0,0" MinWidth="160"
+                          ItemsSource="{Binding MainViewModel.LayerTabs.Layers}"
+                          SelectedItem="{Binding AutoSwitch.NewRuleLayer, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LayerViewModel">
+                            <TextBlock Text="{Binding DisplayName}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <Button Grid.Column="3" Margin="8,0,0,0"
+                        Content="{Binding [Settings_AutoSwitch_Add], Source={StaticResource Loc}}"
+                        Command="{Binding AutoSwitch.AddAppLayerRuleCommand}" />
+            </Grid>
+
+            <Border Height="1" Background="{StaticResource BgSurface0}" Margin="0,4" />
+
+            <!-- Empty-state hint -->
+            <TextBlock Text="{Binding [Settings_AutoSwitch_Empty], Source={StaticResource Loc}}"
+                       Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic"
+                       IsVisible="{Binding AutoSwitch.HasNoEditingRules}" />
+
+            <!-- Existing rules. Each row's DataContext is the underlying
+                 AppLayerRule record; the layer label is computed via a
+                 multi-converter against MainViewModel.LayerTabs.Layers (with Count
+                 as a re-evaluation trigger on keymap reload). Commands
+                 live on the SettingsViewModel (the window's DataContext)
+                 so we reach them via ElementName binding — the
+                 (vm:T)DataContext cast pattern is unreliable inside
+                 deferred templates (see CLAUDE.md). -->
+            <ItemsControl ItemsSource="{Binding AutoSwitch.EditingRules}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid ColumnDefinitions="*,200,Auto,Auto,Auto" Margin="0,3,0,3">
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding ProcessMatch}"
+                                       Foreground="{StaticResource Text}"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="1"
+                                       Foreground="{StaticResource TextSubtle}"
+                                       VerticalAlignment="Center">
+                                <TextBlock.Text>
+                                    <MultiBinding Converter="{StaticResource AppLayerRuleLabel}">
+                                        <Binding Path="LayerIndex" />
+                                        <Binding Path="DataContext.MainViewModel.LayerTabs.Layers" ElementName="TabRoot" />
+                                        <Binding Path="DataContext.MainViewModel.LayerTabs.Layers.Count" ElementName="TabRoot" />
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                            <Button Grid.Column="2" Content="▲" Padding="6,2" MinWidth="0"
+                                    ToolTip.Tip="{Binding [Settings_AutoSwitch_MoveUp], Source={StaticResource Loc}}"
+                                    Command="{Binding DataContext.AutoSwitch.MoveAppLayerRuleUpCommand, ElementName=TabRoot}"
+                                    CommandParameter="{Binding}" />
+                            <Button Grid.Column="3" Content="▼" Padding="6,2" MinWidth="0" Margin="2,0,0,0"
+                                    ToolTip.Tip="{Binding [Settings_AutoSwitch_MoveDown], Source={StaticResource Loc}}"
+                                    Command="{Binding DataContext.AutoSwitch.MoveAppLayerRuleDownCommand, ElementName=TabRoot}"
+                                    CommandParameter="{Binding}" />
+                            <Button Grid.Column="4" Margin="8,0,0,0"
+                                    ToolTip.Tip="{Binding [Settings_AutoSwitch_Remove], Source={StaticResource Loc}}"
+                                    Command="{Binding DataContext.AutoSwitch.RemoveAppLayerRuleCommand, ElementName=TabRoot}"
+                                    CommandParameter="{Binding}">
+                                <i:Icon Value="fa-solid fa-trash-can" />
+                            </Button>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+                <Border Height="1" Background="{StaticResource BgSurface0}" Margin="0,4" />
+
+                <TextBlock Text="{Binding AutoSwitch.WouldFireText}"
+                           Foreground="{StaticResource AccentGreen}" FontSize="12" />
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+
+</UserControl>

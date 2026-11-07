@@ -122,6 +122,7 @@ public partial class ComboDialogViewModel : ObservableObject, IBoardSurface
         BoardStyle = new BoardStyleViewModel(
             AppTheme.PressHighlightDefaultHex,
             strokeOverride: AppTheme.PickerPressStrokeHex);
+        ComboLegend = new ComboLegendViewModel(Keys, BoardStyle, overlayVisible: true, profileId: () => "");
 
         foreach (var pos in request.Profile.Keys)
         {
@@ -191,7 +192,7 @@ public partial class ComboDialogViewModel : ObservableObject, IBoardSurface
 
     /// <summary>Always on — the picked keys' badges are the point of showing
     /// the board here.</summary>
-    public bool IsComboOverlayVisible => true;
+    public ComboLegendViewModel ComboLegend { get; }
 
     public Action<int>? OnKeyTapped => ToggleKey;
     public Action<int>? OnKeyDoubleTapped => null;

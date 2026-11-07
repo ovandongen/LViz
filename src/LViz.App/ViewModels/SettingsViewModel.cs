@@ -1,32 +1,26 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
-using System.Reflection;
 using Avalonia.Media;
-using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LViz.App.Localization;
 using LViz.App.Services;
-using LViz.Core.Diagnostics;
 using LViz.Core.Settings;
-using Velopack;
 
 namespace LViz.App.ViewModels;
 
 /// <summary>
-/// View model for the Settings window. Thin shell that forwards property
-/// changes to <see cref="MainWindowViewModel"/> — the main VM owns the
-/// state and persistence. Bindings here are TwoWay so live tweaks update
-/// the board immediately.
+/// View model for the Settings window: the General and Layers tabs, the hidden
+/// Testing tab, and the composition point for the per-tab view-models
+/// (<see cref="AutoSwitch"/>, <see cref="MouseLayer"/>, <see cref="About"/>,
+/// <see cref="DeviceRouting"/>, <see cref="ActionPipelines"/>), which the tab
+/// views bind to directly. The main VM owns the state and persistence; bindings
+/// here are TwoWay so live tweaks update the board immediately.
 /// </summary>
 public partial class SettingsViewModel : ObservableObject, IDisposable
 {
-    private readonly ISettingsService _settingsService;
     private readonly MainWindowViewModel _mainViewModel;
-    private readonly UpdateService _updateService;
-    private readonly ICliToolInstaller _cliToolInstaller;
-    private UpdateInfo? _pendingUpdate;
     private bool _disposed;
 
     /// <summary>
@@ -37,6 +31,15 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     /// localized labels, layer entries) still live here.
     /// </summary>
     public MainWindowViewModel MainViewModel => _mainViewModel;
+
+    /// <summary>Auto-switch tab VM: engine options, rules edit buffer, process picker. Disposed with this VM.</summary>
+    public AutoSwitchSettingsViewModel AutoSwitch { get; }
+
+    /// <summary>Mouse Layer tab VM: per-keyboard mouse-layer settings.</summary>
+    public MouseLayerSettingsViewModel MouseLayer { get; }
+
+    /// <summary>Version, updates and command-line tool sections. Disposed with this VM.</summary>
+    public AboutSettingsViewModel About { get; }
 
     /// <summary>
     /// Device Routing tab VM: observes the long-lived
@@ -49,7 +52,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     /// <summary>
     /// Action Pipelines tab VM: edits the named pipeline library + signal
     /// bindings, observing the same <see cref="MainWindowViewModel.CapabilityRouter"/>
-    /// for device-step targets. Commit-on-close via <see cref="CommitActionPipelines"/>;
+    /// for device-step targets. Committed by <see cref="Views.SettingsWindow"/> on close;
     /// disposed with this VM.
     /// </summary>
     public ActionPipelinesViewModel ActionPipelines { get; }
@@ -61,10 +64,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         ICapabilityControl? capabilityControl = null,
         ICliToolInstaller? cliToolInstaller = null)
     {
-        _settingsService = settingsService;
         _mainViewModel = mainViewModel;
-        _updateService = updateService;
-        _cliToolInstaller = cliToolInstaller ?? new CliToolInstaller();
         DeviceRouting = new DeviceRoutingViewModel(
             mainViewModel.CapabilityRouter,
             capabilityControl ?? new CapabilityControl(),
@@ -73,33 +73,16 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
             mainViewModel.CapabilityRouter,
             settingsService,
             mainViewModel);
+        AutoSwitch = new AutoSwitchSettingsViewModel(mainViewModel);
+        MouseLayer = new MouseLayerSettingsViewModel(settingsService, mainViewModel);
+        About = new AboutSettingsViewModel(
+            settingsService, updateService, cliToolInstaller ?? new CliToolInstaller());
         HotkeyKeyChoices = PlatformCapabilities.GetAvailableFKeys(mainViewModel.HotkeyKey);
         _mainViewModel.PropertyChanged += OnMainPropertyChanged;
-        _mainViewModel.AutoSwitch.PropertyChanged += OnAutoSwitchPropertyChanged;
         _mainViewModel.BoardStyle.PropertyChanged += OnBoardStylePropertyChanged;
-        _mainViewModel.Layers.CollectionChanged += OnLayersCollectionChanged;
+        _mainViewModel.LayerTabs.Layers.CollectionChanged += OnLayersCollectionChanged;
 
-        // Seed the auto-check toggle from disk so the UI reflects the persisted
-        // value on each Settings open. Setter persists via _settingsService below.
-        var loaded = _settingsService.Load();
-        _autoCheckForUpdates = loaded.AutoCheckForUpdates;
-        _lastUpdateCheckUtc = loaded.LastUpdateCheckUtc;
-
-        _updateService.UpdateAvailable += OnUpdateAvailable;
-        _updateService.DownloadProgress += OnDownloadProgress;
-        _updateService.UpdateReadyToRestart += OnUpdateReadyToRestart;
-
-        // Seed the edit buffer from the committed list. The engine owns
-        // AutoSwitch.AppLayerRules; this VM reads/writes EditingRules.
-        // CommitAppLayerRules() pushes the buffer back on window close.
-        foreach (var r in _mainViewModel.AutoSwitch.AppLayerRules)
-            EditingRules.Add(r);
-        EditingRules.CollectionChanged += OnEditingRulesChanged;
-
-        ReloadMouseLayerSnapshot();
         RebuildLayerEntries();
-        RefreshRunningProcesses();
-        RefreshCliToolStatus();
     }
 
     /// <summary>HID source label ("Raw HID (Go60 Left)" or "Raw HID (Go60 Left) (searching)"). Updated live as the coordinator's connection changes.</summary>
@@ -144,109 +127,6 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
             ? "(no reply)"
             : id.Length == 0 ? "(empty)" : id;
     }
-
-    // --- Auto-switch (Phase 2: author + persist rules, preview match;
-    //                   Phase 3 Slice A: master toggle drives firing + monitor gating) ---
-
-    // Fallback mode — bound to two radio buttons. Avalonia ToggleButton's
-    // IsChecked binds bidirectionally to a bool per radio; both radios share
-    // the GroupName so only one is ever true. Each property routes
-    // through MainWindowViewModel.AutoSwitchFallbackMode (persisted per-keyboard).
-
-    public bool IsFallbackPrevious
-    {
-        get => _mainViewModel.AutoSwitch.FallbackMode == AutoSwitchFallbackMode.Previous;
-        set
-        {
-            if (!value || IsFallbackPrevious) return;
-            _mainViewModel.AutoSwitch.FallbackMode = AutoSwitchFallbackMode.Previous;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(IsFallbackBase));
-        }
-    }
-
-    public bool IsFallbackBase
-    {
-        get => _mainViewModel.AutoSwitch.FallbackMode == AutoSwitchFallbackMode.Base;
-        set
-        {
-            if (!value || IsFallbackBase) return;
-            _mainViewModel.AutoSwitch.FallbackMode = AutoSwitchFallbackMode.Base;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(IsFallbackPrevious));
-        }
-    }
-
-    /// <summary>
-    /// Per-keyboard opt-in: a keypress on a literal <c>&amp;trans</c> binding
-    /// of the active layer exits an in-flight managed-app push (to the
-    /// configured fallback). Independent of <see cref="IsAutoSwitchExitOnEmptyKey"/>
-    /// and of the double-tap exit-key — any enabled gesture triggers the exit.
-    /// </summary>
-    public bool IsAutoSwitchExitOnTransparentKey
-    {
-        get => _mainViewModel.AutoSwitch.ExitOnTransparentKey;
-        set
-        {
-            if (_mainViewModel.AutoSwitch.ExitOnTransparentKey == value) return;
-            _mainViewModel.AutoSwitch.ExitOnTransparentKey = value;
-            OnPropertyChanged();
-        }
-    }
-
-    /// <summary>
-    /// Per-keyboard opt-in: a keypress on a literal <c>&amp;none</c> binding
-    /// of the active layer exits an in-flight managed-app push. See
-    /// <see cref="IsAutoSwitchExitOnTransparentKey"/> for sibling semantics.
-    /// </summary>
-    public bool IsAutoSwitchExitOnEmptyKey
-    {
-        get => _mainViewModel.AutoSwitch.ExitOnEmptyKey;
-        set
-        {
-            if (_mainViewModel.AutoSwitch.ExitOnEmptyKey == value) return;
-            _mainViewModel.AutoSwitch.ExitOnEmptyKey = value;
-            OnPropertyChanged();
-        }
-    }
-
-    /// <summary>Human-readable summary of the active keyboard's exit-tap
-    /// key (e.g. "#42") or a localized "(none)" when unset. Drives the
-    /// label next to the "Pick…" button.</summary>
-    public string ExitTapSummary
-    {
-        get
-        {
-            var key = _mainViewModel.AutoSwitch.ExitTapKey;
-            if (key is null) return Loc.Instance["Settings_AutoSwitch_ExitKeysNone"];
-            return $"#{key.Value}";
-        }
-    }
-
-    /// <summary>True when an exit-tap key is configured for the active
-    /// keyboard. Drives the IsEnabled state of the Clear button.</summary>
-    public bool HasExitTap => _mainViewModel.AutoSwitch.ExitTapKey is not null;
-
-    /// <summary>Snapshot of the currently-configured exit-tap key, used by
-    /// the SettingsWindow code-behind to seed the picker dialog.</summary>
-    public int? ExitTapKey => _mainViewModel.AutoSwitch.ExitTapKey;
-
-    /// <summary>Applies a freshly-picked exit-tap key. Called by the
-    /// SettingsWindow code-behind after the picker dialog closes with an
-    /// OK result.</summary>
-    public void ApplyExitTapKey(int? index)
-    {
-        _mainViewModel.AutoSwitch.SetExitTapKey(index);
-    }
-
-    [RelayCommand]
-    private void ClearExitTap() => _mainViewModel.AutoSwitch.SetExitTapKey(null);
-
-    /// <summary>Active keyboard profile. The SettingsWindow code-behind reads
-    /// this when building an <see cref="ExitKeyPickerViewModel"/> so the
-    /// picker renders the keyboard the user is configuring.</summary>
-    public Core.Layout.IKeyboardProfile ActiveKeyboardProfile => _mainViewModel.SelectedKeyboard;
-
     /// <summary>All registered keyboard profiles, surfaced for the Settings
     /// dropdown. Order matches <see cref="Core.Layout.KeyboardProfileRegistry.All"/>.</summary>
     public IReadOnlyList<Core.Layout.IKeyboardProfile> KeyboardChoices =>
@@ -281,206 +161,6 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         }
     }
 
-
-    /// <summary>
-    /// In-progress edit buffer for app→layer rules. All add/remove/move
-    /// commands mutate this collection; the engine only sees the changes
-    /// after <see cref="CommitAppLayerRules"/> runs on window close.
-    /// </summary>
-    public ObservableCollection<AppLayerRule> EditingRules { get; } = new();
-
-    /// <summary>True when the rules list is empty. Drives the empty-state
-    /// hint visibility on the Auto-switch tab.</summary>
-    public bool HasNoEditingRules => EditingRules.Count == 0;
-
-    private void OnEditingRulesChanged(object? sender, NotifyCollectionChangedEventArgs e)
-    {
-        OnPropertyChanged(nameof(HasNoEditingRules));
-        OnPropertyChanged(nameof(WouldFireText));
-    }
-
-    /// <summary>
-    /// Pushes the edit buffer back to <see cref="MainWindowViewModel"/> so the
-    /// engine sees the new ruleset and the change is persisted. Called by
-    /// <see cref="Views.SettingsWindow"/> on close; same auto-commit UX as the
-    /// pre-refactor live writes, just batched.
-    /// </summary>
-    public void CommitAppLayerRules()
-    {
-        _mainViewModel.AutoSwitch.ApplyAppLayerRules(EditingRules);
-    }
-
-    /// <summary>Persists the Action Pipelines tab's edits. Called by
-    /// <see cref="Views.SettingsWindow"/> on close alongside
-    /// <see cref="CommitAppLayerRules"/>.</summary>
-    public void CommitActionPipelines() => ActionPipelines.Commit();
-
-    /// <summary>Text typed into the "new rule" process-name field. Capped at
-    /// 200 chars in the XAML; keeps the settings file from ballooning on
-    /// malformed input.</summary>
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddAppLayerRuleCommand))]
-    private string _newRuleProcessMatch = "";
-
-    /// <summary>Layer selected in the "new rule" dropdown.</summary>
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddAppLayerRuleCommand))]
-    private LayerViewModel? _newRuleLayer;
-
-    private bool CanAddAppLayerRule() =>
-        !string.IsNullOrWhiteSpace(NewRuleProcessMatch) && NewRuleLayer is not null;
-
-    [RelayCommand(CanExecute = nameof(CanAddAppLayerRule))]
-    private void AddAppLayerRule()
-    {
-        if (NewRuleLayer is null) return;
-        var trimmed = NewRuleProcessMatch.Trim();
-        if (string.IsNullOrWhiteSpace(trimmed)) return;
-        // Upsert by process name (case-insensitive) so re-adding the same app
-        // with a different layer updates in place instead of appending a
-        // duplicate-shadowed entry.
-        for (var i = 0; i < EditingRules.Count; i++)
-        {
-            if (string.Equals(EditingRules[i].ProcessMatch, trimmed, StringComparison.OrdinalIgnoreCase))
-            {
-                if (EditingRules[i].LayerIndex != NewRuleLayer.Index)
-                    EditingRules[i] = new AppLayerRule(EditingRules[i].ProcessMatch, NewRuleLayer.Index);
-                NewRuleProcessMatch = "";
-                return;
-            }
-        }
-        EditingRules.Add(new AppLayerRule(trimmed, NewRuleLayer.Index));
-        NewRuleProcessMatch = "";
-    }
-
-    [RelayCommand]
-    private void RemoveAppLayerRule(AppLayerRule? rule)
-    {
-        if (rule is null) return;
-        EditingRules.Remove(rule);
-    }
-
-    [RelayCommand]
-    private void MoveAppLayerRuleUp(AppLayerRule? rule) => MoveRuleBy(rule, -1);
-
-    [RelayCommand]
-    private void MoveAppLayerRuleDown(AppLayerRule? rule) => MoveRuleBy(rule, +1);
-
-    private void MoveRuleBy(AppLayerRule? rule, int delta)
-    {
-        if (rule is null) return;
-        var i = EditingRules.IndexOf(rule);
-        if (i < 0) return;
-        var j = i + delta;
-        if (j < 0 || j >= EditingRules.Count) return;
-        EditingRules.Move(i, j);
-    }
-
-    /// <summary>
-    /// Localized "Would fire: layer N" readout for the currently focused app.
-    /// Resolved against <see cref="EditingRules"/> (not the engine's committed
-    /// list) so the preview reflects in-progress edits before they're
-    /// committed on close.
-    /// </summary>
-    public string WouldFireText
-    {
-        get
-        {
-            var match = AppLayerRuleMatcher.Match(_mainViewModel.AutoSwitch.ActiveWindow, EditingRules);
-            if (match is null) return Loc.Instance["Settings_AutoSwitch_WouldFireNone"];
-            return Loc.Instance.Format("Settings_AutoSwitch_WouldFireFormat", FormatLayerLabel(match.LayerIndex));
-        }
-    }
-
-    /// <summary>"Symbol (L:1)" for a known layer, or "(invalid layer)" if the
-    /// rule points at an index no longer present in the active keymap. Shared
-    /// by the rules-list rows and the WouldFire readout.</summary>
-    private string FormatLayerLabel(int layerIndex)
-    {
-        var layer = _mainViewModel.Layers.FirstOrDefault(l => l.Index == layerIndex);
-        if (layer is null) return Loc.Instance["Settings_AutoSwitch_LayerInvalid"];
-        return Loc.Instance.Format("Settings_AutoSwitch_LayerFormat", layer.DisplayName, layer.Index);
-    }
-
-    // --- Process picker -------------------------------------------------
-
-    /// <summary>Full snapshot of running-process names, dedup'd + sorted. Source
-    /// of truth for the visible <see cref="RunningProcessNames"/> after the
-    /// filter is applied.</summary>
-    private readonly List<string> _allRunningProcessNames = new();
-
-    /// <summary>Filtered, visible picker list. Case-insensitive substring match
-    /// against <see cref="ProcessFilter"/>; equals the full snapshot when the
-    /// filter is empty.</summary>
-    public ObservableCollection<string> RunningProcessNames { get; } = new();
-
-    /// <summary>True when the filtered list is empty. XAML swaps the picker
-    /// list for the localized empty-state hint when this is false.</summary>
-    public bool HasRunningProcesses => RunningProcessNames.Count > 0;
-
-    /// <summary>Filter text typed into the picker. Live-applied to the visible
-    /// list on every keystroke.</summary>
-    [ObservableProperty]
-    private string _processFilter = "";
-
-    partial void OnProcessFilterChanged(string value) => ApplyProcessFilter();
-
-    /// <summary>Invoked by the SettingsWindow code-behind right before the
-    /// picker flyout opens. Cross-OS via <see cref="System.Diagnostics.Process.GetProcesses"/>
-    /// — same source as <c>IActiveWindowMonitor.ProcessName</c>, so what the
-    /// user picks here matches what the monitor will report later. Clears the
-    /// active filter so each open starts fresh.</summary>
-    public void RefreshRunningProcesses()
-    {
-        var names = new List<string>();
-        foreach (var p in System.Diagnostics.Process.GetProcesses())
-        {
-            try
-            {
-                var name = p.ProcessName;
-                if (!string.IsNullOrWhiteSpace(name)) names.Add(name);
-            }
-            catch
-            {
-                // Access denied on protected processes is normal — skip.
-            }
-            finally
-            {
-                p.Dispose();
-            }
-        }
-        _allRunningProcessNames.Clear();
-        _allRunningProcessNames.AddRange(names
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase));
-        ProcessFilter = "";
-        ApplyProcessFilter();
-    }
-
-    private void ApplyProcessFilter()
-    {
-        var filter = ProcessFilter?.Trim() ?? "";
-        RunningProcessNames.Clear();
-        foreach (var n in _allRunningProcessNames)
-        {
-            if (filter.Length == 0 ||
-                n.Contains(filter, StringComparison.OrdinalIgnoreCase))
-            {
-                RunningProcessNames.Add(n);
-            }
-        }
-        OnPropertyChanged(nameof(HasRunningProcesses));
-    }
-
-    /// <summary>Picker item selected → drop the name into the textbox. The
-    /// flyout closes itself on selection (Avalonia default).</summary>
-    [RelayCommand]
-    private void PickProcess(string? name)
-    {
-        if (string.IsNullOrWhiteSpace(name)) return;
-        NewRuleProcessMatch = name!;
-    }
-
     /// <summary>
     /// Detaches the long-lived <see cref="MainWindowViewModel"/> event hooks
     /// so this VM (and its window's whole DataContext graph) becomes
@@ -493,15 +173,12 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         if (_disposed) return;
         _disposed = true;
         _mainViewModel.PropertyChanged -= OnMainPropertyChanged;
-        _mainViewModel.AutoSwitch.PropertyChanged -= OnAutoSwitchPropertyChanged;
         _mainViewModel.BoardStyle.PropertyChanged -= OnBoardStylePropertyChanged;
-        _mainViewModel.Layers.CollectionChanged -= OnLayersCollectionChanged;
-        EditingRules.CollectionChanged -= OnEditingRulesChanged;
+        _mainViewModel.LayerTabs.Layers.CollectionChanged -= OnLayersCollectionChanged;
+        AutoSwitch.Dispose();
+        About.Dispose();
         DeviceRouting.Dispose();
         ActionPipelines.Dispose();
-        _updateService.UpdateAvailable -= OnUpdateAvailable;
-        _updateService.DownloadProgress -= OnDownloadProgress;
-        _updateService.UpdateReadyToRestart -= OnUpdateReadyToRestart;
     }
 
     /// <summary>Formatted percentage label next to the opacity slider. Reads
@@ -555,70 +232,33 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     /// <summary>Inverse of <see cref="HasLayoutForLayers"/> for XAML visibility (Avalonia's compiled-binding `!` is finicky in non-trivial templates).</summary>
     public bool ShowsLayersHint => !HasLayoutForLayers;
 
+
     // Dispatch table for re-raising derived/transforming SettingsVM
     // properties when their underlying MainWindowViewModel properties
     // change. Pass-through properties (BackgroundOpacity, HotkeyKey,
     // IsStackedLayout, StackedTopHand, Layers) are bound straight to
-    // MainViewModel in XAML and need no entry here; auto-switch engine state
-    // is handled by _autoSwitchPropagators below. Only properties this VM
-    // still owns — formatted labels, radio booleans over an enum, per-profile
-    // rebuilds — appear here.
+    // MainViewModel in XAML and need no entry here; the tab VMs observe the
+    // engines they serve themselves. Only properties this VM still owns —
+    // formatted labels, radio booleans over an enum, per-profile rebuilds —
+    // appear here, plus the keyboard-switch fan-out to the tab VMs.
     private static readonly Dictionary<string, Action<SettingsViewModel>> _mainPropagators = new()
     {
         [nameof(MainWindowViewModel.BackgroundOpacity)] = s => s.OnPropertyChanged(nameof(BackgroundOpacityPercent)),
         [nameof(MainWindowViewModel.SelectedKeyboard)] = s =>
         {
             s.RebuildLayerEntries();
-            s.OnPropertyChanged(nameof(ActiveKeyboardProfile));
             s.OnPropertyChanged(nameof(SelectedKeyboardProfile));
-            s.OnPropertyChanged(nameof(ExitTapKey));
-            s.OnPropertyChanged(nameof(ExitTapSummary));
-            s.OnPropertyChanged(nameof(HasExitTap));
-            s.OnPropertyChanged(nameof(IsAutoSwitchExitOnTransparentKey));
-            s.OnPropertyChanged(nameof(IsAutoSwitchExitOnEmptyKey));
-            s.ReloadMouseLayerSnapshot();
+            s.AutoSwitch.OnActiveKeyboardChanged();
+            s.MouseLayer.Reload();
         },
         [nameof(MainWindowViewModel.LayerSourceHint)] = s => s.OnPropertyChanged(nameof(LayerSourceStatus)),
         // The keyboard picker locks while an edit is open (CanPickKeyboard).
         [nameof(MainWindowViewModel.IsEditing)] = s => s.OnPropertyChanged(nameof(CanPickKeyboard)),
     };
 
-    // Re-raises derived SettingsVM properties off the auto-switch engine's own
-    // PropertyChanged. SettingsVM binds the engine directly now (no MainVM
-    // pass-through facade), so it subscribes to AutoSwitch.PropertyChanged and
-    // translates here exactly as _mainPropagators does for MainVM properties.
-    private static readonly Dictionary<string, Action<SettingsViewModel>> _autoSwitchPropagators = new()
-    {
-        // ActiveWindow (not MatchedAppLayerRule) drives the WouldFire preview —
-        // the preview is computed locally against the edit buffer, so the
-        // engine's cached match is the wrong signal.
-        [nameof(AutoSwitchEngine.ActiveWindow)] = s => s.OnPropertyChanged(nameof(WouldFireText)),
-        [nameof(AutoSwitchEngine.FallbackMode)] = s =>
-        {
-            s.OnPropertyChanged(nameof(IsFallbackPrevious));
-            s.OnPropertyChanged(nameof(IsFallbackBase));
-        },
-        [nameof(AutoSwitchEngine.ExitOnTransparentKey)] = s =>
-            s.OnPropertyChanged(nameof(IsAutoSwitchExitOnTransparentKey)),
-        [nameof(AutoSwitchEngine.ExitOnEmptyKey)] = s =>
-            s.OnPropertyChanged(nameof(IsAutoSwitchExitOnEmptyKey)),
-        [nameof(AutoSwitchEngine.ExitTapKey)] = s =>
-        {
-            s.OnPropertyChanged(nameof(ExitTapKey));
-            s.OnPropertyChanged(nameof(ExitTapSummary));
-            s.OnPropertyChanged(nameof(HasExitTap));
-        },
-    };
-
     private void OnMainPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is { } name && _mainPropagators.TryGetValue(name, out var propagate))
-            propagate(this);
-    }
-
-    private void OnAutoSwitchPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName is { } name && _autoSwitchPropagators.TryGetValue(name, out var propagate))
             propagate(this);
     }
 
@@ -666,10 +306,10 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         var profile = _mainViewModel.SelectedKeyboard;
         var profileName = profile?.DisplayName ?? "";
         LayersHeader = string.Format(Loc.Instance["Settings_LayersFormat"], profileName);
-        HasLayoutForLayers = _mainViewModel.Layers.Count > 0;
+        HasLayoutForLayers = _mainViewModel.LayerTabs.Layers.Count > 0;
         if (!HasLayoutForLayers || profile is null) return;
 
-        foreach (var layer in _mainViewModel.Layers)
+        foreach (var layer in _mainViewModel.LayerTabs.Layers)
         {
             var hex = LayerColorPalette.GetColor(profile.Id, layer.Index);
             var color = Color.TryParse(hex, out var c) ? c : Colors.Gray;
@@ -677,345 +317,10 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
                 layer.Index,
                 layer.DisplayName,
                 color,
-                _mainViewModel.SetLayerColorOverride,
+                _mainViewModel.LayerTabs.SetColorOverride,
                 LayerColorPalette.GetDefaultColor);
 
-            LayerEntries.Add(new LayerSettingsEntry(colorEntry, layer.IsShown, _mainViewModel.SetLayerShown));
+            LayerEntries.Add(new LayerSettingsEntry(colorEntry, layer.IsShown, _mainViewModel.LayerTabs.SetShown));
         }
-    }
-
-    // ── Mouse-layer (per-profile) ─────────────────────────────────────────
-    // Reads/writes MainViewModel.MouseLayer (the engine) directly — no MainVM
-    // facade. Setters apply immediately (no commit-on-close) — same UX pattern
-    // the auto-switch fallback uses, since the underlying state is a small,
-    // self-contained record. When the engine is absent (tests), the snapshot
-    // falls back to the persisted per-profile settings.
-
-    private MouseLayerSettings _mouseLayerSnapshot = new();
-
-    private void ReloadMouseLayerSnapshot()
-    {
-        _mouseLayerSnapshot = _mainViewModel.MouseLayer?.CurrentSettings ?? LoadPersistedMouseLayerSettings();
-        OnPropertyChanged(nameof(IsMouseLayerEnabled));
-        OnPropertyChanged(nameof(SelectedMouseLayer));
-        OnPropertyChanged(nameof(MouseLayerIdleTimeoutMs));
-        OnPropertyChanged(nameof(IsMouseLayerEndlessTimeout));
-        OnPropertyChanged(nameof(IsMouseLayerIdleTimeoutEnabled));
-        OnPropertyChanged(nameof(IsMouseLayerExitOnTransparentKey));
-        OnPropertyChanged(nameof(IsMouseLayerExitOnEmptyKey));
-    }
-
-    private void UpdateMouseLayerSnapshot(MouseLayerSettings next)
-    {
-        _mouseLayerSnapshot = next;
-        _mainViewModel.MouseLayer?.ApplySettings(next);
-    }
-
-    /// <summary>Per-profile mouse-layer settings straight from disk — the
-    /// fallback used when no engine is wired up (tests). Mirrors the load the
-    /// engine itself does on construction.</summary>
-    private MouseLayerSettings LoadPersistedMouseLayerSettings() =>
-        _settingsService.Load().MouseLayer
-            .GetForProfile(_mainViewModel.SelectedKeyboard.Id, new MouseLayerSettings());
-
-    public bool IsMouseLayerEnabled
-    {
-        get => _mouseLayerSnapshot.Enabled;
-        set
-        {
-            if (_mouseLayerSnapshot.Enabled == value) return;
-            UpdateMouseLayerSnapshot(_mouseLayerSnapshot with { Enabled = value });
-            OnPropertyChanged();
-        }
-    }
-
-    public LayerViewModel? SelectedMouseLayer
-    {
-        get
-        {
-            var idx = _mouseLayerSnapshot.MouseLayerIndex;
-            if (idx is null) return null;
-            return _mainViewModel.Layers.FirstOrDefault(l => l.Index == idx.Value);
-        }
-        set
-        {
-            var newIdx = value?.Index;
-            if (_mouseLayerSnapshot.MouseLayerIndex == newIdx) return;
-            UpdateMouseLayerSnapshot(_mouseLayerSnapshot with { MouseLayerIndex = newIdx });
-            OnPropertyChanged();
-        }
-    }
-
-    /// <summary>
-    /// Idle-timeout in ms. Slider clamps to 200–2000 in XAML; we clamp here
-    /// too as belt-and-braces for keyboard nudges that bypass the slider.
-    /// </summary>
-    public int MouseLayerIdleTimeoutMs
-    {
-        get => _mouseLayerSnapshot.IdleTimeoutMs;
-        set
-        {
-            var clamped = Math.Clamp(value, 200, 2000);
-            if (_mouseLayerSnapshot.IdleTimeoutMs == clamped) return;
-            UpdateMouseLayerSnapshot(_mouseLayerSnapshot with { IdleTimeoutMs = clamped });
-            OnPropertyChanged();
-        }
-    }
-
-    /// <summary>
-    /// When true, mouse-layer push has no idle-driven revert: the push stays
-    /// in flight until an external exit gesture (transparent / empty-key tap,
-    /// profile switch, shutdown) tears it down. Disables the idle-timeout
-    /// slider in the UI but doesn't otherwise modify
-    /// <see cref="MouseLayerIdleTimeoutMs"/> so the value is preserved if the
-    /// user toggles back.
-    ///
-    /// <para>Endless mode requires at least one of
-    /// <see cref="IsMouseLayerExitOnTransparentKey"/> /
-    /// <see cref="IsMouseLayerExitOnEmptyKey"/> to be enabled (otherwise the
-    /// push could never be released). Turning endless on with neither set
-    /// auto-enables transparent-key exit; the per-flag setters refuse to
-    /// disable the last enabled flag while endless is on.</para>
-    /// </summary>
-    public bool IsMouseLayerEndlessTimeout
-    {
-        get => _mouseLayerSnapshot.EndlessTimeout;
-        set
-        {
-            if (_mouseLayerSnapshot.EndlessTimeout == value) return;
-            var next = _mouseLayerSnapshot with { EndlessTimeout = value };
-            bool autoEnabledTrans = false;
-            if (value && !next.ExitOnTransparentKey && !next.ExitOnEmptyKey)
-            {
-                next = next with { ExitOnTransparentKey = true };
-                autoEnabledTrans = true;
-            }
-            UpdateMouseLayerSnapshot(next);
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(IsMouseLayerIdleTimeoutEnabled));
-            if (autoEnabledTrans) OnPropertyChanged(nameof(IsMouseLayerExitOnTransparentKey));
-        }
-    }
-
-    /// <summary>Inverse of <see cref="IsMouseLayerEndlessTimeout"/>, for XAML
-    /// IsEnabled bindings on the idle-timeout slider/textbox.</summary>
-    public bool IsMouseLayerIdleTimeoutEnabled => !_mouseLayerSnapshot.EndlessTimeout;
-
-    /// <summary>
-    /// When true, a keypress on a literal <c>&amp;trans</c> binding of the
-    /// active layer reverts the mouse-layer push immediately (early exit
-    /// before idle). Independent of <see cref="IsMouseLayerExitOnEmptyKey"/>
-    /// and <see cref="IsMouseLayerEndlessTimeout"/>; works with any timeout.
-    /// Cannot be unset while endless is on if it's the last enabled flag.
-    /// </summary>
-    public bool IsMouseLayerExitOnTransparentKey
-    {
-        get => _mouseLayerSnapshot.ExitOnTransparentKey;
-        set
-        {
-            if (_mouseLayerSnapshot.ExitOnTransparentKey == value) return;
-            if (!value
-                && _mouseLayerSnapshot.EndlessTimeout
-                && !_mouseLayerSnapshot.ExitOnEmptyKey)
-            {
-                // Endless requires ≥1 exit gesture; bounce the UI back.
-                OnPropertyChanged();
-                return;
-            }
-            UpdateMouseLayerSnapshot(_mouseLayerSnapshot with { ExitOnTransparentKey = value });
-            OnPropertyChanged();
-        }
-    }
-
-    /// <summary>
-    /// When true, a keypress on a literal <c>&amp;none</c> binding of the
-    /// active layer reverts the mouse-layer push immediately. See
-    /// <see cref="IsMouseLayerExitOnTransparentKey"/> for sibling semantics
-    /// and the endless-mode "≥1 gesture required" rule.
-    /// </summary>
-    public bool IsMouseLayerExitOnEmptyKey
-    {
-        get => _mouseLayerSnapshot.ExitOnEmptyKey;
-        set
-        {
-            if (_mouseLayerSnapshot.ExitOnEmptyKey == value) return;
-            if (!value
-                && _mouseLayerSnapshot.EndlessTimeout
-                && !_mouseLayerSnapshot.ExitOnTransparentKey)
-            {
-                OnPropertyChanged();
-                return;
-            }
-            UpdateMouseLayerSnapshot(_mouseLayerSnapshot with { ExitOnEmptyKey = value });
-            OnPropertyChanged();
-        }
-    }
-
-    // ── Command-line tool (lviz) ─────────────────────────────────────────
-    // Surfaces ICliToolInstaller: a button that symlinks `lviz` onto PATH so
-    // scripts can drive the running app (see lviz-host-agent-cli-spec.md §8).
-    // Hidden in dev / on Windows where the installer or the shim owns PATH.
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsCliToolInstalled))]
-    [NotifyPropertyChangedFor(nameof(IsCliToolActionAvailable))]
-    private CliToolState _cliToolState = CliToolState.Unsupported;
-
-    [ObservableProperty]
-    private string _cliToolDetail = "";
-
-    /// <summary>Whether the CLI install/remove controls apply on this build (false in dev / on Windows).</summary>
-    public bool IsCliToolActionAvailable => CliToolState != CliToolState.Unsupported;
-
-    public bool IsCliToolInstalled => CliToolState == CliToolState.Installed;
-
-    private void RefreshCliToolStatus()
-    {
-        var status = _cliToolInstaller.GetStatus();
-        CliToolState = status.State;
-        CliToolDetail = status.Detail;
-    }
-
-    [RelayCommand]
-    private void InstallCliTool()
-    {
-        var result = _cliToolInstaller.Install();
-        RefreshCliToolStatus();
-        // On success show the fresh status ("Installed: …"); on failure keep the
-        // error (with its sudo hint) over the re-read status line.
-        if (!result.Success) CliToolDetail = result.Message;
-    }
-
-    [RelayCommand]
-    private void UninstallCliTool()
-    {
-        var result = _cliToolInstaller.Uninstall();
-        RefreshCliToolStatus();
-        if (!result.Success) CliToolDetail = result.Message;
-    }
-
-    // ── Version & Updates ────────────────────────────────────────────────
-    // Velopack handles the actual check/download/apply; this VM is the
-    // status surface for the Settings UI. The auto-check toggle persists
-    // through the load→mutate→save chain on every flip.
-
-    /// <summary>"vX.Y.Z" derived from the assembly's
-    /// <see cref="AssemblyInformationalVersionAttribute"/>. Strips the
-    /// <c>+commitHash</c> suffix .NET source-link adds, so a CI build
-    /// stamped <c>0.1.0+abc1234</c> renders as <c>v0.1.0</c>.</summary>
-    public string AppVersion { get; } = ComputeAppVersion();
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasUpdateStatus))]
-    private string _updateStatusMessage = "";
-
-    [ObservableProperty]
-    private bool _isCheckingForUpdates;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(LastCheckedDisplay))]
-    private DateTime? _lastUpdateCheckUtc;
-
-    [ObservableProperty]
-    private bool _canRestartToInstall;
-
-    public bool HasUpdateStatus => !string.IsNullOrEmpty(UpdateStatusMessage);
-
-    /// <summary>"Last checked: 2026-05-26 14:32" or empty when never. Bound
-    /// directly on the Updates row.</summary>
-    public string LastCheckedDisplay =>
-        LastUpdateCheckUtc is { } utc
-            ? Loc.Instance.Format("Settings_LastChecked", utc.ToLocalTime().ToString("g"))
-            : "";
-
-    [ObservableProperty]
-    private bool _autoCheckForUpdates;
-
-    partial void OnAutoCheckForUpdatesChanged(bool value)
-    {
-        try
-        {
-            var s = _settingsService.Load();
-            _settingsService.Save(s with { AutoCheckForUpdates = value });
-        }
-        catch (Exception ex)
-        {
-            DiagnosticLog.Warn("Settings", $"Persist AutoCheckForUpdates failed: {ex.Message}");
-        }
-    }
-
-    [RelayCommand]
-    private async Task CheckForUpdatesAsync()
-    {
-        IsCheckingForUpdates = true;
-        UpdateStatusMessage = Loc.Instance["Settings_Checking"];
-        try
-        {
-            var info = await _updateService.CheckForUpdatesAsync();
-            LastUpdateCheckUtc = DateTime.UtcNow;
-            if (info is null)
-            {
-                UpdateStatusMessage = Loc.Instance["Settings_UpToDate"];
-            }
-            // If info is non-null, OnUpdateAvailable already set the status
-            // and started the download.
-        }
-        finally
-        {
-            IsCheckingForUpdates = false;
-        }
-    }
-
-    [RelayCommand(CanExecute = nameof(CanRestartToInstall))]
-    private void RestartToInstall()
-    {
-        if (_pendingUpdate is null) return;
-        _updateService.ApplyAndRestart(_pendingUpdate);
-    }
-
-    private void OnUpdateAvailable(UpdateInfo info)
-    {
-        Dispatcher.UIThread.Post(() =>
-        {
-            _pendingUpdate = info;
-            UpdateStatusMessage = Loc.Instance.Format(
-                "Settings_UpdateAvailable", info.TargetFullRelease.Version.ToString());
-            LastUpdateCheckUtc = DateTime.UtcNow;
-            // Kick off the download immediately; user sees progress and a
-            // "restart to install" affordance once it's staged.
-            _ = _updateService.DownloadAndApplyAsync(info);
-        });
-    }
-
-    private void OnDownloadProgress(int percent)
-    {
-        Dispatcher.UIThread.Post(() =>
-        {
-            UpdateStatusMessage = Loc.Instance.Format("Settings_Downloading", percent);
-        });
-    }
-
-    private void OnUpdateReadyToRestart(UpdateInfo info)
-    {
-        Dispatcher.UIThread.Post(() =>
-        {
-            _pendingUpdate = info;
-            CanRestartToInstall = true;
-            UpdateStatusMessage = Loc.Instance.Format(
-                "Settings_UpdateReady", info.TargetFullRelease.Version.ToString());
-            RestartToInstallCommand.NotifyCanExecuteChanged();
-        });
-    }
-
-    private static string ComputeAppVersion()
-    {
-        var info = Assembly.GetExecutingAssembly()
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-        if (info is not null)
-        {
-            var plus = info.IndexOf('+');
-            return "v" + (plus >= 0 ? info[..plus] : info);
-        }
-        return "v" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "?");
     }
 }

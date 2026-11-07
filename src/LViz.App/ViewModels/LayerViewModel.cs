@@ -8,7 +8,7 @@ namespace LViz.App.ViewModels;
 /// actions take the tab's layer index (<see cref="Move"/> also a delta of
 /// −1 / +1); <see cref="LayerCount"/> is the edit's layer count as of
 /// construction, which is what bounds the two moves. Built by
-/// <see cref="MainWindowViewModel.RebuildLayers"/>; null outside edit mode.
+/// <see cref="LayerTabsViewModel.Rebuild"/>; null outside edit mode.
 /// </summary>
 public sealed record LayerTabActions(
     Action<int> Rename,
@@ -18,7 +18,7 @@ public sealed record LayerTabActions(
     int LayerCount);
 
 /// <summary>
-/// One tab in the layer-selector bar. The parent <see cref="MainWindowViewModel"/>
+/// One tab in the layer-selector bar. The parent <see cref="LayerTabsViewModel"/>
 /// passes a <c>selectAction</c> so the VM doesn't need to know its owner, and —
 /// while a keymap edit is open — a <see cref="LayerTabActions"/> bundle that
 /// makes the tab editable: rename, duplicate, move and delete commands for its

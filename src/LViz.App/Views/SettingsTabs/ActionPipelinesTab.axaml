@@ -1,0 +1,215 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:LViz.App.ViewModels"
+             xmlns:conv="using:LViz.App.Converters"
+             xmlns:i="https://github.com/projektanker/icons.avalonia"
+             x:Class="LViz.App.Views.SettingsTabs.ActionPipelinesTab"
+             x:DataType="vm:SettingsViewModel" Name="TabRoot">
+
+    <!-- Three sub-tabs: the pipeline library, plus the two trigger-binding
+         tables (signal id / host event id) that reference it. Same VM
+         (ActionPipelines); split only for navigation. -->
+    <TabControl>
+
+        <!-- Pipeline library: compact click-to-edit cards. Creating and
+             editing a pipeline happens in the EditPipelineDialog popup
+             (launched from code-behind via OnNewPipelineClick /
+             OnEditPipelineClick), keeping the tab a lightweight overview. -->
+        <TabItem Header="{Binding [Settings_Pipeline_SectionLibrary], Source={StaticResource Loc}}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="20" Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                                   Text="{Binding [Settings_Pipeline_Hint], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+                        <Button Grid.Column="1" VerticalAlignment="Top"
+                                Content="{Binding [Settings_Pipeline_New], Source={StaticResource Loc}}"
+                                Click="OnNewPipelineClick" />
+                    </Grid>
+
+                    <TextBlock Text="{Binding [Settings_Pipeline_Empty], Source={StaticResource Loc}}"
+                               Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic"
+                               IsVisible="{Binding ActionPipelines.HasNoPipelines}" />
+
+                    <ItemsControl ItemsSource="{Binding ActionPipelines.Pipelines}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PipelineEditRow">
+                                <!-- Compact one-line card: name only. The step
+                                     summary moves to the tooltip to save vertical
+                                     space; the body text was the EditHint. -->
+                                <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                        Margin="0,2,0,2" Padding="10,5"
+                                        Background="{StaticResource BgSurface0}"
+                                        Tag="{Binding}" Click="OnEditPipelineClick"
+                                        ToolTip.Tip="{Binding Summary}">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                               Foreground="{StaticResource Text}" FontSize="13" />
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- Signal bindings: id → pipeline. -->
+        <TabItem Header="{Binding [Settings_Pipeline_SectionBindings], Source={StaticResource Loc}}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="20" Spacing="6">
+                    <TextBlock Text="{Binding [Settings_Pipeline_BindingsHint], Source={StaticResource Loc}}"
+                               Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+
+                    <Grid ColumnDefinitions="Auto,120,Auto" ColumnSpacing="8" Margin="0,4,0,0">
+                        <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                                   Text="{Binding [Settings_Pipeline_SignalId], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource Text}" FontSize="12" />
+                        <NumericUpDown Grid.Column="1" Minimum="0" Maximum="255" Increment="1" FormatString="0"
+                                       Value="{Binding ActionPipelines.NewBindingSignalId, Mode=TwoWay}" />
+                        <Button Grid.Column="2"
+                                Content="{Binding [Settings_Pipeline_AddBinding], Source={StaticResource Loc}}"
+                                Command="{Binding ActionPipelines.AddBindingCommand}" />
+                    </Grid>
+
+                    <TextBlock Text="{Binding [Settings_Pipeline_NoBindings], Source={StaticResource Loc}}"
+                               Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic"
+                               IsVisible="{Binding ActionPipelines.HasNoBindings}" />
+
+                    <ItemsControl ItemsSource="{Binding ActionPipelines.SignalBindings}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SignalBindingRow">
+                                <Grid ColumnDefinitions="Auto,170,Auto,120,*,Auto" ColumnSpacing="8" Margin="0,3,0,3">
+                                    <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                                               Text="{Binding [Settings_Pipeline_SourceDevice], Source={StaticResource Loc}}"
+                                               Foreground="{StaticResource TextMuted}" FontSize="12" />
+                                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                                              ItemsSource="{Binding DeviceOptions}"
+                                              SelectedItem="{Binding SelectedSourceDevice, Mode=TwoWay}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:PipelineTargetOption">
+                                                <TextBlock Text="{Binding DisplayName}" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <TextBlock Grid.Column="2" VerticalAlignment="Center"
+                                               Text="{Binding [Settings_Pipeline_SignalId], Source={StaticResource Loc}}"
+                                               Foreground="{StaticResource TextMuted}" FontSize="12" />
+                                    <NumericUpDown Grid.Column="3" Minimum="0" Maximum="255" Increment="1" FormatString="0"
+                                                   Value="{Binding SignalId, Mode=TwoWay}" />
+                                    <ComboBox Grid.Column="4" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                                              ItemsSource="{Binding PipelineNames}"
+                                              SelectedItem="{Binding PipelineName, Mode=TwoWay}" />
+                                    <Button Grid.Column="5"
+                                            ToolTip.Tip="{Binding [Settings_Pipeline_Remove], Source={StaticResource Loc}}"
+                                            Command="{Binding DataContext.ActionPipelines.RemoveBindingCommand, ElementName=TabRoot}"
+                                            CommandParameter="{Binding}">
+                                        <i:Icon Value="fa-solid fa-trash-can" />
+                                    </Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- Event bindings: host event id (string) → pipeline. The CLI
+             ('lviz event <id>') fires these over IPC; same pipeline
+             library as the signal bindings, keyed by string. -->
+        <TabItem Header="{Binding [Settings_Pipeline_SectionEventBindings], Source={StaticResource Loc}}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="20" Spacing="6">
+                    <TextBlock Text="{Binding [Settings_Pipeline_EventBindingsHint], Source={StaticResource Loc}}"
+                               Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+
+                    <Grid ColumnDefinitions="Auto,160,Auto" ColumnSpacing="8" Margin="0,4,0,0">
+                        <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                                   Text="{Binding [Settings_Pipeline_EventId], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource Text}" FontSize="12" />
+                        <TextBox Grid.Column="1" Watermark="ci:ok"
+                                 Text="{Binding ActionPipelines.NewBindingEventId, Mode=TwoWay}" />
+                        <Button Grid.Column="2"
+                                Content="{Binding [Settings_Pipeline_AddBinding], Source={StaticResource Loc}}"
+                                Command="{Binding ActionPipelines.AddEventBindingCommand}" />
+                    </Grid>
+
+                    <TextBlock Text="{Binding [Settings_Pipeline_NoEventBindings], Source={StaticResource Loc}}"
+                               Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic"
+                               IsVisible="{Binding ActionPipelines.HasNoEventBindings}" />
+
+                    <ItemsControl ItemsSource="{Binding ActionPipelines.EventBindings}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:EventBindingRow">
+                                <Grid ColumnDefinitions="Auto,140,*,Auto" ColumnSpacing="8" Margin="0,3,0,3">
+                                    <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                                               Text="{Binding [Settings_Pipeline_EventId], Source={StaticResource Loc}}"
+                                               Foreground="{StaticResource TextMuted}" FontSize="12" />
+                                    <TextBox Grid.Column="1" Watermark="ci:ok"
+                                             Text="{Binding EventId, Mode=TwoWay}" />
+                                    <ComboBox Grid.Column="2" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                                              ItemsSource="{Binding PipelineNames}"
+                                              SelectedItem="{Binding PipelineName, Mode=TwoWay}" />
+                                    <Button Grid.Column="3"
+                                            ToolTip.Tip="{Binding [Settings_Pipeline_Remove], Source={StaticResource Loc}}"
+                                            Command="{Binding DataContext.ActionPipelines.RemoveEventBindingCommand, ElementName=TabRoot}"
+                                            CommandParameter="{Binding}">
+                                        <i:Icon Value="fa-solid fa-trash-can" />
+                                    </Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- App-layer bindings: an app-focus auto-switch lifecycle moment
+             (enter/leave/exit/re-enter) → pipeline. Runs alongside the
+             layer push the auto-switch engine already performs; an empty
+             process filter fires for any rule-matched app. -->
+        <TabItem Header="{Binding [Settings_Pipeline_SectionAppLayerBindings], Source={StaticResource Loc}}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="20" Spacing="6">
+                    <TextBlock Text="{Binding [Settings_Pipeline_AppLayerBindingsHint], Source={StaticResource Loc}}"
+                               Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+
+                    <Button HorizontalAlignment="Left" Margin="0,4,0,0"
+                            Content="{Binding [Settings_Pipeline_AddBinding], Source={StaticResource Loc}}"
+                            Command="{Binding ActionPipelines.AddAppLayerBindingCommand}" />
+
+                    <TextBlock Text="{Binding [Settings_Pipeline_NoAppLayerBindings], Source={StaticResource Loc}}"
+                               Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic"
+                               IsVisible="{Binding ActionPipelines.HasNoAppLayerBindings}" />
+
+                    <ItemsControl ItemsSource="{Binding ActionPipelines.AppLayerBindings}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:AppLayerBindingRow">
+                                <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="8" Margin="0,3,0,3">
+                                    <ComboBox Grid.Column="0" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                                              ItemsSource="{Binding AvailableTriggers}"
+                                              SelectedItem="{Binding SelectedTrigger, Mode=TwoWay}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:AppLayerTriggerOption">
+                                                <TextBlock Text="{Binding Label}" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                                              ItemsSource="{Binding PipelineNames}"
+                                              SelectedItem="{Binding PipelineName, Mode=TwoWay}" />
+                                    <Button Grid.Column="2"
+                                            ToolTip.Tip="{Binding [Settings_Pipeline_Remove], Source={StaticResource Loc}}"
+                                            Command="{Binding DataContext.ActionPipelines.RemoveAppLayerBindingCommand, ElementName=TabRoot}"
+                                            CommandParameter="{Binding}">
+                                        <i:Icon Value="fa-solid fa-trash-can" />
+                                    </Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+    </TabControl>
+
+</UserControl>

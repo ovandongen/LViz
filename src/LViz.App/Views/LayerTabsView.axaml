@@ -1,0 +1,120 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:LViz.App.ViewModels"
+             xmlns:conv="using:LViz.App.Converters"
+             x:Class="LViz.App.Views.LayerTabsView"
+             x:DataType="vm:LayerTabsViewModel">
+
+    <UserControl.Resources>
+        <conv:HexColorToBrushConverter x:Key="HexToBrush" />
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- Layer-tab override: text labels on #2A2A3D need more contrast than icons
+             in the status bar. Inactive stays readable (0.65); active gets a
+             distinct raised-chip look via background + brighter border. -->
+        <Style Selector="Button.toggle.layerTab">
+            <Setter Property="Opacity" Value="0.65" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+        <Style Selector="Button.toggle.layerTab:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TabBg}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TabBorder}" />
+        </Style>
+        <Style Selector="Button.toggle.layerTab.active">
+            <Setter Property="Opacity" Value="1.0" />
+        </Style>
+        <Style Selector="Button.toggle.layerTab.active /template/ ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TabHoverBg}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TabHoverBorder}" />
+        </Style>
+        <Style Selector="Button.toggle.layerTab.active:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TabSelectedBg}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TabSelectedBorder}" />
+        </Style>
+    </UserControl.Styles>
+
+    <DockPanel>
+        <!-- Layer actions: edit mode only, right-aligned, styled like
+             the edit banner's buttons. The tab strip fills the rest
+             of the row. The "⋮" menu rides the shown-layer commands,
+             so its items grey out exactly like the shortcuts. -->
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4"
+                    IsVisible="{Binding IsEditing}">
+            <Button Command="{Binding Edit.NewLayerCommand}"
+                    Focusable="False"
+                    Padding="8,4"
+                    ToolTip.Tip="{Binding [Tooltip_EditAddLayer], Source={StaticResource Loc}}">
+                <TextBlock Text="+" FontSize="14" />
+            </Button>
+            <Button Focusable="False"
+                    Padding="8,4"
+                    ToolTip.Tip="{Binding [Tooltip_EditLayerMenu], Source={StaticResource Loc}}">
+                <TextBlock Text="⋮" FontSize="16" />
+                <Button.Flyout>
+                    <MenuFlyout Placement="Bottom">
+                        <MenuItem Header="{Binding [Edit_LayerMenuRename], Source={StaticResource Loc}}"
+                                  Command="{Binding Edit.RenameShownLayerCommand}" />
+                        <MenuItem Header="{Binding [Edit_LayerMenuDuplicate], Source={StaticResource Loc}}"
+                                  Command="{Binding Edit.DuplicateShownLayerCommand}" />
+                        <MenuItem Header="{Binding [Edit_LayerMenuMoveLeft], Source={StaticResource Loc}}"
+                                  Command="{Binding Edit.MoveShownLayerLeftCommand}" />
+                        <MenuItem Header="{Binding [Edit_LayerMenuMoveRight], Source={StaticResource Loc}}"
+                                  Command="{Binding Edit.MoveShownLayerRightCommand}" />
+                        <Separator />
+                        <MenuItem Header="{Binding [Edit_LayerMenuDelete], Source={StaticResource Loc}}"
+                                  Command="{Binding Edit.DeleteShownLayerCommand}" />
+                    </MenuFlyout>
+                </Button.Flyout>
+            </Button>
+        </StackPanel>
+        <ItemsControl ItemsSource="{Binding Layers}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:LayerViewModel">
+                    <!-- Right-click menu and double-click rename act on
+                         this tab's own commands; the Opening handler
+                         cancels the menu outside edit mode. -->
+                    <Button Command="{Binding SelectCommand}"
+                            MinWidth="48"
+                            Classes="toggle layerTab"
+                            Classes.active="{Binding IsSelected}"
+                            IsVisible="{Binding IsShown}"
+                            HorizontalContentAlignment="Center"
+                            Padding="8,4"
+                            Loaded="OnLayerTabLoaded"
+                            DoubleTapped="OnLayerTabDoubleTapped">
+                        <Button.ContextMenu>
+                            <ContextMenu Opening="OnLayerTabMenuOpening">
+                                <MenuItem Header="{Binding [Edit_LayerMenuRename], Source={StaticResource Loc}}"
+                                          Command="{Binding RenameCommand}" />
+                                <MenuItem Header="{Binding [Edit_LayerMenuDuplicate], Source={StaticResource Loc}}"
+                                          Command="{Binding DuplicateCommand}" />
+                                <MenuItem Header="{Binding [Edit_LayerMenuMoveLeft], Source={StaticResource Loc}}"
+                                          Command="{Binding MoveLeftCommand}" />
+                                <MenuItem Header="{Binding [Edit_LayerMenuMoveRight], Source={StaticResource Loc}}"
+                                          Command="{Binding MoveRightCommand}" />
+                                <Separator />
+                                <MenuItem Header="{Binding [Edit_LayerMenuDelete], Source={StaticResource Loc}}"
+                                          Command="{Binding DeleteCommand}" />
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Border Width="10" Height="10" CornerRadius="5"
+                                    Background="{Binding TabColor, Converter={StaticResource HexToBrush}}" />
+                            <TextBlock Text="{Binding DisplayName}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </DockPanel>
+</UserControl>

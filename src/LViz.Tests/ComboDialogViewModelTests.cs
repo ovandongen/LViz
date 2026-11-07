@@ -399,7 +399,7 @@ public class ComboDialogViewModelTests
 
         // Key 0 sits in f12 alone — the third combo of the keymap.
         Assert.Equal(new[] { 3 }, vm.Keys[0].ComboBadges.Select(badge => badge.Number).ToArray());
-        Assert.True(vm.IsComboOverlayVisible);
+        Assert.True(vm.ComboLegend.IsOverlayVisible);
     }
 
     [Fact]

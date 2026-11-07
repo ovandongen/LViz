@@ -362,74 +362,11 @@ public sealed class KeymapEditSession
     /// the bindings it was added with; key edits on it come out of the binding
     /// diff. Empty whenever the layer ids are back to the baseline list.
     /// </remarks>
-    public IReadOnlyList<LayerStructureEdit> PendingStructureEdits
-    {
-        get
-        {
-            if (IdsMatchBaseline()) return [];
-
-            var edits = new List<LayerStructureEdit>();
-            var work = Enumerable.Range(0, _baselineLayerCount).ToList();
-            var kept = _layerIds.Where(id => id < _baselineLayerCount).ToList();
-            var keptSet = kept.ToHashSet();
-
-            for (int i = work.Count - 1; i >= 0; i--)
-            {
-                if (keptSet.Contains(work[i])) continue;
-                edits.Add(new LayerStructureEdit.Delete(i));
-                work.RemoveAt(i);
-            }
-
-            // Each moved layer lands right after its predecessor in the current
-            // order. Processing them in that order keeps everything placed so far,
-            // plus the run that stays, in current order.
-            var stays = LongestIncreasingRun(kept);
-            for (int p = 0; p < kept.Count; p++)
-            {
-                var id = kept[p];
-                if (stays.Contains(id)) continue;
-                var from = work.IndexOf(id);
-                work.RemoveAt(from);
-                var to = p == 0 ? 0 : work.IndexOf(kept[p - 1]) + 1;
-                work.Insert(to, id);
-                if (from != to) edits.Add(new LayerStructureEdit.Move(from, to));
-            }
-
-            for (int p = 0; p < _layerIds.Count; p++)
-            {
-                var id = _layerIds[p];
-                if (id < _baselineLayerCount) continue;
-                edits.Add(new LayerStructureEdit.Add(p, Current.Layers[p].Name, _origins[id].Bindings));
-            }
-
-            return edits;
-        }
-    }
-
-    /// <summary>The ids on one longest strictly increasing subsequence of
-    /// <paramref name="ids"/>: the layers a reorder can leave where they are.</summary>
-    private static HashSet<int> LongestIncreasingRun(IReadOnlyList<int> ids)
-    {
-        var length = new int[ids.Count];
-        var previous = new int[ids.Count];
-        var best = -1;
-        for (int i = 0; i < ids.Count; i++)
-        {
-            length[i] = 1;
-            previous[i] = -1;
-            for (int j = 0; j < i; j++)
-                if (ids[j] < ids[i] && length[j] + 1 > length[i])
-                {
-                    length[i] = length[j] + 1;
-                    previous[i] = j;
-                }
-            if (best < 0 || length[i] > length[best]) best = i;
-        }
-
-        var run = new HashSet<int>();
-        for (var i = best; i >= 0; i = previous[i]) run.Add(ids[i]);
-        return run;
-    }
+    public IReadOnlyList<LayerStructureEdit> PendingStructureEdits =>
+        LayerIdDiff.NetEdits(
+            _baselineLayerCount,
+            _layerIds,
+            (position, id) => new LayerStructureEdit.Add(position, Current.Layers[position].Name, _origins[id].Bindings));
 
     private static string Describe(LayerStructureEdit edit) => edit switch
     {
@@ -447,15 +384,6 @@ public sealed class KeymapEditSession
             throw new ArgumentException("layer name is empty.", paramName);
         if (name.Any(char.IsControl))
             throw new ArgumentException("layer name contains a control character.", paramName);
-    }
-
-    /// <summary>Are the layer ids still the baseline's, in the baseline's order?</summary>
-    private bool IdsMatchBaseline()
-    {
-        if (_layerIds.Count != _baselineLayerCount) return false;
-        for (int i = 0; i < _layerIds.Count; i++)
-            if (_layerIds[i] != i) return false;
-        return true;
     }
 
     // ---- combo edits ------------------------------------------------------------
@@ -702,13 +630,7 @@ public sealed class KeymapEditSession
     /// </remarks>
     public IReadOnlyList<int?> BaselineLayerMap()
     {
-        var map = new int?[_baselineLayerCount];
-        for (int position = 0; position < _layerIds.Count; position++)
-        {
-            var id = _layerIds[position];
-            if (id < _baselineLayerCount) map[id] = position;
-        }
-        return map;
+        return LayerIdDiff.BaselineMap(_baselineLayerCount, _layerIds);
     }
 
     /// <summary>

@@ -32,31 +32,6 @@
         <Style Selector="Button.toggle.active">
             <Setter Property="Opacity" Value="1.0" />
         </Style>
-        <!-- Layer-tab override: text labels on #2A2A3D need more contrast than icons
-             in the status bar. Inactive stays readable (0.65); active gets a
-             distinct raised-chip look via background + brighter border. -->
-        <Style Selector="Button.toggle.layerTab">
-            <Setter Property="Opacity" Value="0.65" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="4" />
-        </Style>
-        <Style Selector="Button.toggle.layerTab:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{StaticResource TabBg}" />
-            <Setter Property="BorderBrush" Value="{StaticResource TabBorder}" />
-        </Style>
-        <Style Selector="Button.toggle.layerTab.active">
-            <Setter Property="Opacity" Value="1.0" />
-        </Style>
-        <Style Selector="Button.toggle.layerTab.active /template/ ContentPresenter">
-            <Setter Property="Background" Value="{StaticResource TabHoverBg}" />
-            <Setter Property="BorderBrush" Value="{StaticResource TabHoverBorder}" />
-        </Style>
-        <Style Selector="Button.toggle.layerTab.active:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{StaticResource TabSelectedBg}" />
-            <Setter Property="BorderBrush" Value="{StaticResource TabSelectedBorder}" />
-        </Style>
     </Window.Styles>
 
     <Grid RowDefinitions="Auto,*,Auto">
@@ -221,8 +196,8 @@
                                                  button. Stale rows (Exists=false) grey out and swap
                                                  the folder line for "File not found"; clicking one
                                                  prunes it (command decides load vs prune). -->
-                                            <ItemsControl ItemsSource="{Binding RecentKeymapItems}"
-                                                          IsVisible="{Binding HasRecentKeymaps}">
+                                            <ItemsControl ItemsSource="{Binding Recents.Items}"
+                                                          IsVisible="{Binding Recents.HasAny}">
                                                 <ItemsControl.Styles>
                                                     <Style Selector="Button.missing">
                                                         <Setter Property="Opacity" Value="0.45" />
@@ -231,7 +206,7 @@
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Button Classes.missing="{Binding !Exists}"
-                                                                Command="{Binding DataContext.OpenRecentKeymapCommand, ElementName=MainWin}"
+                                                                Command="{Binding DataContext.Recents.OpenCommand, ElementName=MainWin}"
                                                                 CommandParameter="{Binding}"
                                                                 Click="OnKeymapMenuItemClick"
                                                                 Padding="10,6"
@@ -273,15 +248,15 @@
 
                                             <!-- Emptiness line: a label, not a row — nothing to click. -->
                                             <TextBlock Text="{Binding [RecentKeymaps_Empty], Source={StaticResource Loc}}"
-                                                       IsVisible="{Binding !HasRecentKeymaps}"
+                                                       IsVisible="{Binding !Recents.HasAny}"
                                                        Padding="10,6"
                                                        Foreground="{StaticResource TextStatusBar}" />
 
                                             <Separator Margin="4,2"
-                                                       IsVisible="{Binding HasRecentKeymaps}" />
-                                            <Button Command="{Binding ClearRecentKeymapsCommand}"
+                                                       IsVisible="{Binding Recents.HasAny}" />
+                                            <Button Command="{Binding Recents.ClearCommand}"
                                                     Click="OnKeymapMenuItemClick"
-                                                    IsVisible="{Binding HasRecentKeymaps}"
+                                                    IsVisible="{Binding Recents.HasAny}"
                                                     Padding="10,6"
                                                     HorizontalAlignment="Stretch"
                                                     HorizontalContentAlignment="Left"
@@ -348,9 +323,9 @@
                         <!-- Combo overlay toggle — numbered badges on combo
                              keys + legend tiles below the keyboard. -->
                         <Button x:Name="ComboOverlayButton"
-                                Command="{Binding ToggleComboOverlayCommand}"
+                                Command="{Binding ComboLegend.ToggleOverlayCommand}"
                                 Classes="toggle"
-                                Classes.active="{Binding IsComboOverlayVisible}"
+                                Classes.active="{Binding ComboLegend.IsOverlayVisible}"
                                 Padding="8,4"
                                 ToolTip.Tip="{Binding [Tooltip_ComboOverlay], Source={StaticResource Loc}}">
                             <PathIcon Width="14" Height="14"
@@ -509,239 +484,23 @@
                  the row also collapses cleanly when both are off. In
                  edit mode a "+" adds a combo and each tile grows a ⋮
                  menu; double-click opens the combo dialog. -->
+            <!-- Combo legend: the tile strip lives in ComboLegendView, docked
+                 alongside the tabs — same edge as the bars panel, always
+                 closest to the keyboard. IsVisible rides the overlay toggle
+                 OR an open edit, so the row also collapses cleanly when both
+                 are off. Row placement and background stay here. -->
             <Border x:Name="ComboLegend" Grid.Row="3"
-                    IsVisible="{Binding IsComboLegendVisible}"
+                    IsVisible="{Binding ComboLegend.IsLegendVisible}"
                     Background="{Binding TabBackground, Converter={StaticResource HexToBrush}}"
                     Padding="8,4">
-                <DockPanel>
-                    <Button DockPanel.Dock="Left"
-                            Command="{Binding Edit.NewComboCommand}"
-                            IsVisible="{Binding IsEditing}"
-                            Focusable="False"
-                            Padding="8,4"
-                            Margin="0,0,2,0"
-                            VerticalAlignment="Top"
-                            ToolTip.Tip="{Binding [Tooltip_NewCombo], Source={StaticResource Loc}}">
-                        <TextBlock Text="+" FontSize="14" />
-                    </Button>
-                    <Grid>
-                        <TextBlock Text="{Binding [ComboLegend_Empty], Source={StaticResource Loc}}"
-                               HorizontalAlignment="Center"
-                               Opacity="0.65"
-                               Margin="0,4"
-                               Foreground="{StaticResource Text}">
-                            <TextBlock.IsVisible>
-                                <MultiBinding Converter="{x:Static conv:EqualityToBoolMultiConverter.Instance}">
-                                    <Binding Path="Combos.Count" />
-                                    <Binding>
-                                        <Binding.Source>
-                                            <sys:Int32>0</sys:Int32>
-                                        </Binding.Source>
-                                    </Binding>
-                                </MultiBinding>
-                            </TextBlock.IsVisible>
-                        </TextBlock>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                  HorizontalScrollBarVisibility="Disabled"
-                                  MaxHeight="160">
-                            <ItemsControl ItemsSource="{Binding Combos}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel Orientation="Horizontal" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.Styles>
-                                    <!-- Background/BorderBrush are per-combo (data-bound
-                                         to ComboColorPalette via Color/DarkColor on the
-                                         VM). Default fill is the light pastel + dark
-                                         text; hover/active swap to the darkened sibling
-                                         + light text, mirroring the on-key pill. -->
-                                    <Style Selector="Button.comboTile">
-                                        <Setter Property="Background" Value="{StaticResource ComboFill}" />
-                                        <Setter Property="BorderBrush" Value="{StaticResource ComboStroke}" />
-                                        <Setter Property="BorderThickness" Value="2" />
-                                        <Setter Property="CornerRadius" Value="4" />
-                                        <Setter Property="Padding" Value="10,5" />
-                                        <Setter Property="Margin" Value="0,0,6,6" />
-                                        <Setter Property="MinWidth" Value="56" />
-                                        <Setter Property="Cursor" Value="Hand" />
-                                        <Setter Property="Transitions">
-                                            <Transitions>
-                                                <BrushTransition Property="Background" Duration="0:0:0.12" />
-                                            </Transitions>
-                                        </Setter>
-                                    </Style>
-                                    <Style Selector="Button.comboTile TextBlock">
-                                        <Setter Property="Foreground" Value="{StaticResource BgBase}" />
-                                    </Style>
-                                    <Style Selector="Button.comboTile:pointerover /template/ ContentPresenter">
-                                        <Setter Property="Background" Value="{StaticResource ComboStroke}" />
-                                        <Setter Property="BorderBrush" Value="{Binding DataContext.BoardStyle.PressHighlightColor, ElementName=MainWin, Converter={StaticResource HexToBrush}}" />
-                                    </Style>
-                                    <Style Selector="Button.comboTile:pointerover TextBlock">
-                                        <Setter Property="Foreground" Value="{StaticResource Text}" />
-                                    </Style>
-                                    <Style Selector="Button.comboTile.active /template/ ContentPresenter">
-                                        <Setter Property="Background" Value="{StaticResource ComboStroke}" />
-                                        <Setter Property="BorderBrush" Value="{Binding DataContext.BoardStyle.PressHighlightColor, ElementName=MainWin, Converter={StaticResource HexToBrush}}" />
-                                    </Style>
-                                    <Style Selector="Button.comboTile.active TextBlock">
-                                        <Setter Property="Foreground" Value="{StaticResource Text}" />
-                                    </Style>
-                                    <!-- Pending-change mark (edit mode): a yellow border,
-                                         the board's changed-key colour. Declared last so
-                                         it outranks the hover/active BorderBrush — the
-                                         mark never blinks off under the pointer. -->
-                                    <Style Selector="Button.comboTile.changed /template/ ContentPresenter">
-                                        <Setter Property="BorderBrush" Value="{StaticResource AccentYellow}" />
-                                    </Style>
-                                </ItemsControl.Styles>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:ComboViewModel">
-                                        <Button Classes="comboTile"
-                                            Classes.active="{Binding IsHighlighted}"
-                                            Classes.changed="{Binding IsChanged}"
-                                            Focusable="False"
-                                            PointerEntered="OnComboTilePointerEntered"
-                                            PointerExited="OnComboTilePointerExited"
-                                            PointerPressed="OnComboTilePointerPressed"
-                                            DoubleTapped="OnComboTileDoubleTapped"
-                                            ToolTip.Tip="{Binding ParticipatingKeysText}">
-                                            <StackPanel Orientation="Horizontal" Spacing="8"
-                                                    VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Number}"
-                                                       FontSize="11"
-                                                       FontWeight="Bold"
-                                                       VerticalAlignment="Top"
-                                                       Opacity="0.85" />
-                                                <TextBlock Text="{Binding Label}"
-                                                       FontSize="15"
-                                                       FontWeight="SemiBold"
-                                                       VerticalAlignment="Center" />
-                                                <TextBlock Text="{Binding Subscript}"
-                                                       FontSize="11"
-                                                       VerticalAlignment="Bottom"
-                                                       Opacity="0.85"
-                                                       IsVisible="{Binding Subscript, Converter={x:Static avconv:StringConverters.IsNotNullOrEmpty}}" />
-                                                <!-- Edit-mode actions: edit/delete live on
-                                                     the edit VM, addressed through
-                                                     MainWin (the tile's own DataContext is
-                                                     the combo). A press here never reaches
-                                                     the tile's single/right-click paths
-                                                     with an editor side effect. -->
-                                                <Button IsVisible="{Binding IsEditable}"
-                                                    Focusable="False"
-                                                    Padding="4,0"
-                                                    Background="Transparent"
-                                                    BorderThickness="0"
-                                                    VerticalAlignment="Center"
-                                                    ToolTip.Tip="{Binding [Tooltip_ComboMenu], Source={StaticResource Loc}}">
-                                                    <TextBlock Text="⋮" FontSize="12" />
-                                                    <Button.Flyout>
-                                                        <MenuFlyout Placement="Bottom">
-                                                            <MenuItem Header="{Binding [Edit_ComboMenuEdit], Source={StaticResource Loc}}"
-                                                                  Command="{Binding DataContext.Edit.EditComboCommand, ElementName=MainWin}"
-                                                                  CommandParameter="{Binding Number}" />
-                                                            <MenuItem Header="{Binding [Edit_ComboMenuDelete], Source={StaticResource Loc}}"
-                                                                  Command="{Binding DataContext.Edit.DeleteComboCommand, ElementName=MainWin}"
-                                                                  CommandParameter="{Binding Number}" />
-                                                        </MenuFlyout>
-                                                    </Button.Flyout>
-                                                </Button>
-                                            </StackPanel>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
-                    </Grid>
-                </DockPanel>
+                <views:ComboLegendView DataContext="{Binding ComboLegend}" />
             </Border>
 
             <!-- Layer tabs -->
             <Border x:Name="LayerTabs" Grid.Row="2"
                     Background="{Binding TabBackground, Converter={StaticResource HexToBrush}}"
                     Padding="8,2">
-                <DockPanel>
-                    <!-- Layer actions: edit mode only, right-aligned, styled like
-                         the edit banner's buttons. The tab strip fills the rest
-                         of the row. The "⋮" menu rides the shown-layer commands,
-                         so its items grey out exactly like the shortcuts. -->
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4"
-                                IsVisible="{Binding IsEditing}">
-                        <Button Command="{Binding Edit.NewLayerCommand}"
-                                Focusable="False"
-                                Padding="8,4"
-                                ToolTip.Tip="{Binding [Tooltip_EditAddLayer], Source={StaticResource Loc}}">
-                            <TextBlock Text="+" FontSize="14" />
-                        </Button>
-                        <Button Focusable="False"
-                                Padding="8,4"
-                                ToolTip.Tip="{Binding [Tooltip_EditLayerMenu], Source={StaticResource Loc}}">
-                            <TextBlock Text="⋮" FontSize="16" />
-                            <Button.Flyout>
-                                <MenuFlyout Placement="Bottom">
-                                    <MenuItem Header="{Binding [Edit_LayerMenuRename], Source={StaticResource Loc}}"
-                                              Command="{Binding Edit.RenameShownLayerCommand}" />
-                                    <MenuItem Header="{Binding [Edit_LayerMenuDuplicate], Source={StaticResource Loc}}"
-                                              Command="{Binding Edit.DuplicateShownLayerCommand}" />
-                                    <MenuItem Header="{Binding [Edit_LayerMenuMoveLeft], Source={StaticResource Loc}}"
-                                              Command="{Binding Edit.MoveShownLayerLeftCommand}" />
-                                    <MenuItem Header="{Binding [Edit_LayerMenuMoveRight], Source={StaticResource Loc}}"
-                                              Command="{Binding Edit.MoveShownLayerRightCommand}" />
-                                    <Separator />
-                                    <MenuItem Header="{Binding [Edit_LayerMenuDelete], Source={StaticResource Loc}}"
-                                              Command="{Binding Edit.DeleteShownLayerCommand}" />
-                                </MenuFlyout>
-                            </Button.Flyout>
-                        </Button>
-                    </StackPanel>
-                    <ItemsControl ItemsSource="{Binding Layers}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel Orientation="Horizontal" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:LayerViewModel">
-                                <!-- Right-click menu and double-click rename act on
-                                     this tab's own commands; the Opening handler
-                                     cancels the menu outside edit mode. -->
-                                <Button Command="{Binding SelectCommand}"
-                                        MinWidth="48"
-                                        Classes="toggle layerTab"
-                                        Classes.active="{Binding IsSelected}"
-                                        IsVisible="{Binding IsShown}"
-                                        HorizontalContentAlignment="Center"
-                                        Padding="8,4"
-                                        Loaded="OnLayerTabLoaded"
-                                        DoubleTapped="OnLayerTabDoubleTapped">
-                                    <Button.ContextMenu>
-                                        <ContextMenu Opening="OnLayerTabMenuOpening">
-                                            <MenuItem Header="{Binding [Edit_LayerMenuRename], Source={StaticResource Loc}}"
-                                                      Command="{Binding RenameCommand}" />
-                                            <MenuItem Header="{Binding [Edit_LayerMenuDuplicate], Source={StaticResource Loc}}"
-                                                      Command="{Binding DuplicateCommand}" />
-                                            <MenuItem Header="{Binding [Edit_LayerMenuMoveLeft], Source={StaticResource Loc}}"
-                                                      Command="{Binding MoveLeftCommand}" />
-                                            <MenuItem Header="{Binding [Edit_LayerMenuMoveRight], Source={StaticResource Loc}}"
-                                                      Command="{Binding MoveRightCommand}" />
-                                            <Separator />
-                                            <MenuItem Header="{Binding [Edit_LayerMenuDelete], Source={StaticResource Loc}}"
-                                                      Command="{Binding DeleteCommand}" />
-                                        </ContextMenu>
-                                    </Button.ContextMenu>
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <Border Width="10" Height="10" CornerRadius="5"
-                                                Background="{Binding TabColor, Converter={StaticResource HexToBrush}}" />
-                                        <TextBlock Text="{Binding DisplayName}"
-                                                   VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </Button>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </DockPanel>
+                <views:LayerTabsView DataContext="{Binding LayerTabs}" />
             </Border>
         </Grid>
 

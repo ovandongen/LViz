@@ -1,0 +1,272 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:LViz.App.ViewModels"
+             xmlns:conv="using:LViz.App.Converters"
+             xmlns:i="https://github.com/projektanker/icons.avalonia"
+             x:Class="LViz.App.Views.SettingsTabs.DeviceRoutingTab"
+             x:DataType="vm:SettingsViewModel">
+    <UserControl.Resources>
+        <conv:HexColorToBrushConverter x:Key="HexToBrush" />
+    </UserControl.Resources>
+
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="20" Spacing="16">
+
+            <!-- Master opt-in + availability status. -->
+            <StackPanel Spacing="6">
+                <TextBlock Text="{Binding [Settings_DeviceRouting_SectionMaster], Source={StaticResource Loc}}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                <TextBlock Text="{Binding [Settings_DeviceRouting_Hint], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+                <CheckBox Content="{Binding [Settings_DeviceRouting_Enable], Source={StaticResource Loc}}"
+                          IsChecked="{Binding DeviceRouting.RoutingEnabled, Mode=TwoWay}"
+                          Foreground="{StaticResource Text}"
+                          Margin="0,4,0,0" />
+                <!-- Lights up (green) as soon as one device speaks the
+                     protocol; muted until then. -->
+                <TextBlock Text="{Binding DeviceRouting.RoutingStatus}"
+                           Foreground="{StaticResource AccentGreen}" FontSize="12" TextWrapping="Wrap"
+                           IsVisible="{Binding DeviceRouting.HasCapableDevice}" />
+                <TextBlock Text="{Binding [Settings_DeviceRouting_NoProtocol], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap"
+                           IsVisible="{Binding DeviceRouting.HasNoCapableDevice}" />
+            </StackPanel>
+
+            <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+            <!-- Discovered devices + their capability surface. -->
+            <StackPanel Spacing="6">
+                <TextBlock Text="{Binding [Settings_DeviceRouting_SectionDevices], Source={StaticResource Loc}}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                <TextBlock Text="{Binding [Settings_DeviceRouting_NoDevices], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic" TextWrapping="Wrap"
+                           IsVisible="{Binding DeviceRouting.HasNoDevices}" />
+                <ItemsControl ItemsSource="{Binding DeviceRouting.Devices}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:RoutedDeviceRow">
+                            <Border Margin="0,3,0,3" Padding="8" CornerRadius="4"
+                                    Background="{StaticResource BgSurface0}">
+                                <StackPanel Spacing="2">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="{Binding DisplayName}"
+                                                   Foreground="{StaticResource Text}" FontWeight="SemiBold" />
+                                        <Border Background="{StaticResource BgSurface1}" CornerRadius="3"
+                                                Padding="4,0" VerticalAlignment="Center"
+                                                IsVisible="{Binding IsKeyboard}">
+                                            <TextBlock Text="{Binding [Settings_DeviceRouting_KeyboardBadge], Source={StaticResource Loc}}"
+                                                       Foreground="{StaticResource TextSubtle}" FontSize="10" />
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding [Settings_DeviceRouting_NoManifest], Source={StaticResource Loc}}"
+                                               Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic"
+                                               IsVisible="{Binding !HasManifest}" />
+                                    <Grid ColumnDefinitions="64,*" IsVisible="{Binding HasManifest}">
+                                        <TextBlock Grid.Column="0"
+                                                   Text="{Binding [Settings_DeviceRouting_Triggers], Source={StaticResource Loc}}"
+                                                   Foreground="{StaticResource TextMuted}" FontSize="12" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Triggers}"
+                                                   Foreground="{StaticResource TextSubtle}" FontSize="12"
+                                                   TextWrapping="Wrap" />
+                                    </Grid>
+                                    <Grid ColumnDefinitions="64,*" IsVisible="{Binding HasManifest}">
+                                        <TextBlock Grid.Column="0"
+                                                   Text="{Binding [Settings_DeviceRouting_Handles], Source={StaticResource Loc}}"
+                                                   Foreground="{StaticResource TextMuted}" FontSize="12" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Handles}"
+                                                   Foreground="{StaticResource TextSubtle}" FontSize="12"
+                                                   TextWrapping="Wrap" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+            <!-- Routing table: per (source, capability) group, an
+                 enable/disable checkbox per candidate handler. -->
+            <StackPanel Spacing="6">
+                <TextBlock Text="{Binding [Settings_DeviceRouting_SectionRoutes], Source={StaticResource Loc}}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                <TextBlock Text="{Binding [Settings_DeviceRouting_NoRoutes], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic" TextWrapping="Wrap"
+                           IsVisible="{Binding DeviceRouting.HasNoRoutes}" />
+                <ItemsControl ItemsSource="{Binding DeviceRouting.Routes}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:RouteRow">
+                            <StackPanel Spacing="2" Margin="0,3,0,6">
+                                <TextBlock Text="{Binding Title}"
+                                           Foreground="{StaticResource Text}" FontSize="12" FontWeight="SemiBold" />
+                                <ItemsControl ItemsSource="{Binding Handlers}" Margin="12,0,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:RouteHandlerRow">
+                                            <CheckBox Content="{Binding DisplayName}"
+                                                      IsChecked="{Binding Routed, Mode=TwoWay}"
+                                                      Foreground="{StaticResource Text}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <Border Height="1" Background="{StaticResource BgSurface0}" />
+
+            <!-- App-originated control: have LViz send an action to a
+                 device directly (advanced / handler testing). -->
+            <StackPanel Spacing="6">
+                <TextBlock Text="{Binding [Settings_DeviceRouting_SectionControl], Source={StaticResource Loc}}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                <TextBlock Text="{Binding [Settings_DeviceRouting_ControlHint], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                    <TextBlock Text="{Binding [Settings_DeviceRouting_ControlTarget], Source={StaticResource Loc}}"
+                               Foreground="{StaticResource Text}" FontSize="12" VerticalAlignment="Center" />
+                    <ComboBox MinWidth="200"
+                              ItemsSource="{Binding DeviceRouting.Devices}"
+                              SelectedItem="{Binding DeviceRouting.ControlTarget, Mode=TwoWay}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:RoutedDeviceRow">
+                                <TextBlock Text="{Binding DisplayName}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+
+                <!-- Prompt until a target is chosen. -->
+                <TextBlock Text="{Binding [Settings_DeviceRouting_ControlPickTarget], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic" TextWrapping="Wrap"
+                           IsVisible="{Binding DeviceRouting.NoTargetSelected}" />
+
+                <!-- Pointing actions the target handles — one row each. -->
+                <ItemsControl ItemsSource="{Binding DeviceRouting.PointingControls}"
+                              IsVisible="{Binding DeviceRouting.HasPointingControls}" Margin="0,4,0,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PointingControlRow">
+                            <Grid ColumnDefinitions="120,140,Auto" ColumnSpacing="8" Margin="0,3,0,0">
+                                <TextBlock Grid.Column="0" Text="{Binding Label}"
+                                           Foreground="{StaticResource Text}" FontSize="12" VerticalAlignment="Center" />
+                                <!-- Toggle actions (snipe, drag-scroll): on/off checkbox. -->
+                                <CheckBox Grid.Column="1" VerticalAlignment="Center"
+                                          IsVisible="{Binding IsToggle}"
+                                          IsChecked="{Binding IsOn, Mode=TwoWay}"
+                                          Content="{Binding [Settings_DeviceRouting_On], Source={StaticResource Loc}}" />
+                                <!-- Count / index actions (DPI, DPI index): numeric field. -->
+                                <NumericUpDown Grid.Column="1"
+                                               IsVisible="{Binding IsNumeric}"
+                                               Minimum="0" Maximum="2147483647" Increment="1" FormatString="0"
+                                               Value="{Binding Value, Mode=TwoWay}" />
+                                <Button Grid.Column="2"
+                                        Content="{Binding [Settings_DeviceRouting_Send], Source={StaticResource Loc}}"
+                                        Command="{Binding SendCommand}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- RGB (core.rgb.set): a single multi-field editor with
+                     its own send logic. Each field has an Include toggle
+                     (left) gating its value (right); only included fields
+                     are sent, honouring the wire presence mask. -->
+                <StackPanel Spacing="3" Margin="0,8,0,0"
+                            IsVisible="{Binding DeviceRouting.HasRgbControl}">
+                    <TextBlock Text="{Binding [Settings_DeviceRouting_Rgb], Source={StaticResource Loc}}"
+                               Foreground="{StaticResource Text}" FontSize="12" FontWeight="SemiBold" />
+                    <!-- On/off -->
+                    <Grid ColumnDefinitions="120,140" ColumnSpacing="8">
+                        <CheckBox Grid.Column="0" VerticalAlignment="Center"
+                                  Content="{Binding [Settings_DeviceRouting_RgbOn], Source={StaticResource Loc}}"
+                                  IsChecked="{Binding DeviceRouting.RgbControl.IncludeOn, Mode=TwoWay}" />
+                        <CheckBox Grid.Column="1" VerticalAlignment="Center"
+                                  IsEnabled="{Binding DeviceRouting.RgbControl.IncludeOn}"
+                                  IsChecked="{Binding DeviceRouting.RgbControl.On, Mode=TwoWay}"
+                                  Content="{Binding [Settings_DeviceRouting_On], Source={StaticResource Loc}}" />
+                    </Grid>
+                    <!-- Colour: hue + saturation + brightness picked
+                         together (the ColorView flyout has a brightness
+                         slider); decoded to the wire HSB on send. -->
+                    <Grid ColumnDefinitions="120,140" ColumnSpacing="8">
+                        <CheckBox Grid.Column="0" VerticalAlignment="Center"
+                                  Content="{Binding [Settings_DeviceRouting_RgbColor], Source={StaticResource Loc}}"
+                                  IsChecked="{Binding DeviceRouting.RgbControl.IncludeColor, Mode=TwoWay}" />
+                        <Button Grid.Column="1" Padding="3" HorizontalAlignment="Left"
+                                IsEnabled="{Binding DeviceRouting.RgbControl.IncludeColor}">
+                            <Border Width="56" Height="22" CornerRadius="3"
+                                    Background="{Binding DeviceRouting.RgbControl.ColorHex, Converter={StaticResource HexToBrush}}"
+                                    BorderBrush="{StaticResource BgSurface1}" BorderThickness="1" />
+                            <Button.Flyout>
+                                <Flyout Placement="BottomEdgeAlignedLeft">
+                                    <ColorView Color="{Binding DeviceRouting.RgbControl.Color, Mode=TwoWay}"
+                                               IsAlphaVisible="False" />
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                    </Grid>
+                    <!-- Brightness: a separate dimmer, independent of the
+                         picked colour. -->
+                    <Grid ColumnDefinitions="120,140" ColumnSpacing="8">
+                        <CheckBox Grid.Column="0" VerticalAlignment="Center"
+                                  Content="{Binding [Settings_DeviceRouting_RgbBrightness], Source={StaticResource Loc}}"
+                                  IsChecked="{Binding DeviceRouting.RgbControl.IncludeBrightness, Mode=TwoWay}" />
+                        <Slider Grid.Column="1" Minimum="0" Maximum="100"
+                                VerticalAlignment="Center"
+                                IsEnabled="{Binding DeviceRouting.RgbControl.IncludeBrightness}"
+                                Value="{Binding DeviceRouting.RgbControl.Brightness, Mode=TwoWay}" />
+                    </Grid>
+                    <!-- Effect index -->
+                    <Grid ColumnDefinitions="120,140,Auto" ColumnSpacing="8">
+                        <CheckBox Grid.Column="0" VerticalAlignment="Center"
+                                  Content="{Binding [Settings_DeviceRouting_RgbEffect], Source={StaticResource Loc}}"
+                                  IsChecked="{Binding DeviceRouting.RgbControl.IncludeEffect, Mode=TwoWay}" />
+                        <NumericUpDown Grid.Column="1" Minimum="0" Maximum="255" Increment="1" FormatString="0"
+                                       IsEnabled="{Binding DeviceRouting.RgbControl.IncludeEffect}"
+                                       Value="{Binding DeviceRouting.RgbControl.Effect, Mode=TwoWay}" />
+                        <Button Grid.Column="2" VerticalAlignment="Center"
+                                Content="{Binding [Settings_DeviceRouting_Send], Source={StaticResource Loc}}"
+                                Command="{Binding DeviceRouting.RgbControl.SendCommand}" />
+                    </Grid>
+                </StackPanel>
+
+                <!-- Layer actions: a shared layer index + only the
+                     buttons the target advertises handling. -->
+                <Grid ColumnDefinitions="120,140,*" ColumnSpacing="8" Margin="0,8,0,0"
+                      IsVisible="{Binding DeviceRouting.HasLayerControls}">
+                    <TextBlock Grid.Column="0" Text="{Binding [Settings_DeviceRouting_Layer], Source={StaticResource Loc}}"
+                               Foreground="{StaticResource Text}" FontSize="12" VerticalAlignment="Center" />
+                    <NumericUpDown Grid.Column="1"
+                                   Minimum="0" Maximum="255" Increment="1" FormatString="0"
+                                   Value="{Binding DeviceRouting.ControlLayerIndex, Mode=TwoWay}" />
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Left"
+                                VerticalAlignment="Center">
+                        <Button Content="{Binding [Settings_DeviceRouting_SetBase], Source={StaticResource Loc}}"
+                                Command="{Binding DeviceRouting.SetBaseLayerCommand}"
+                                IsVisible="{Binding DeviceRouting.CanSetBase}" />
+                        <Button Content="{Binding [Settings_DeviceRouting_Activate], Source={StaticResource Loc}}"
+                                Command="{Binding DeviceRouting.ActivateLayerCommand}"
+                                IsVisible="{Binding DeviceRouting.CanActivate}" />
+                        <Button Content="{Binding [Settings_DeviceRouting_Deactivate], Source={StaticResource Loc}}"
+                                Command="{Binding DeviceRouting.DeactivateLayerCommand}"
+                                IsVisible="{Binding DeviceRouting.CanDeactivate}" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- Target selected, but nothing LViz can originate. -->
+                <TextBlock Text="{Binding [Settings_DeviceRouting_ControlNone], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" FontStyle="Italic" TextWrapping="Wrap"
+                           IsVisible="{Binding DeviceRouting.ShowControlPlaceholder}" />
+
+                <TextBlock Text="{Binding DeviceRouting.ControlStatus}"
+                           Foreground="{StaticResource AccentGreen}" FontSize="12" TextWrapping="Wrap"
+                           IsVisible="{Binding DeviceRouting.ControlStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+
+</UserControl>

@@ -122,12 +122,12 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
         // Settings carry the reference, never the cache file path.
         Assert.Equal(TestRefString, settings.Current.LayoutJsonPaths["Corne"]);
         Assert.Equal(new[] { TestRefString }, settings.Current.RecentKeymapPaths["Corne"]);
-        Assert.Equal(new[] { TestRefString }, vm.RecentKeymaps);
+        Assert.Equal(new[] { TestRefString }, vm.Recents.Entries);
         Assert.True(vm.HasLayoutLoaded);
         Assert.Equal(tempPath, vm.LoadedLayoutPath);
         Assert.False(vm.Toast.IsVisible);
 
-        var row = vm.RecentKeymapItems[0];
+        var row = vm.Recents.Items[0];
         Assert.True(row.IsGitHub);
         Assert.Equal("cosmos82.keymap", row.FileName);
         Assert.Equal("ovandongen/zmk-config-cosmos82 · main", row.Folder);
@@ -150,7 +150,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
         await vm.OpenGitHubKeymapAsync(R);
 
         Assert.True(vm.HasLayoutLoaded);
-        Assert.Equal(TestRefString, vm.RecentKeymaps[0]);
+        Assert.Equal(TestRefString, vm.Recents.Entries[0]);
         Assert.True(vm.Toast.IsVisible);
         Assert.Equal(
             "GitHub not reachable, opened the cached copy of cosmos82.keymap",
@@ -166,14 +166,13 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
             OnOpen = _ => Task.FromResult<GitHubOpenResult>(
                 new GitHubOpenResult.Failed(GitHubErrorKind.Unauthorized, "sign in")),
         };
-        var vm = new MainWindowViewModel(settings, keymapState: Ok(), gitHub: fake);
-        var openRequests = 0;
-        vm.OpenFromGitHubRequested = () => openRequests++;
+        var shell = new FakeMainWindowShell();
+        var vm = new MainWindowViewModel(settings, keymapState: Ok(), gitHub: fake, shell: shell);
         var savesBefore = settings.SaveCount;
 
         await vm.OpenGitHubKeymapAsync(R);
 
-        Assert.Equal(1, openRequests);
+        Assert.Equal(1, shell.GitHubPickerCount);
         Assert.False(vm.HasLayoutLoaded);
         // Nothing loaded and nothing written — recents unchanged.
         Assert.Equal(savesBefore, settings.SaveCount);
@@ -208,7 +207,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
         Assert.False(vm.HasLayoutLoaded);
         // The entry is kept: the repo may just be temporarily unreachable.
         Assert.Equal(savesBefore, settings.SaveCount);
-        Assert.Equal(new[] { TestRefString, "/keymaps/kept.keymap" }, vm.RecentKeymaps);
+        Assert.Equal(new[] { TestRefString, "/keymaps/kept.keymap" }, vm.Recents.Entries);
         // The status bar shows what it said before "Loading…" again.
         Assert.Equal("Loaded ok.keymap (2 layers)", vm.StatusMessage);
         Assert.Equal(
@@ -239,7 +238,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
         await vm.OpenGitHubKeymapAsync(R);
 
         Assert.False(vm.HasLayoutLoaded);
-        Assert.Contains(TestRefString, vm.RecentKeymaps);
+        Assert.Contains(TestRefString, vm.Recents.Entries);
         Assert.Equal(
             "cosmos82.keymap wasn't found on GitHub, or LViz has no access to the repo",
             vm.Toast.Message);
@@ -268,17 +267,17 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
         var keymapState = Ok();
         var vm = new MainWindowViewModel(settings, keymapState: keymapState, gitHub: fake)
         {
-            FileExists = _ => false,
+            Library = { FileExists = _ => false },
         };
 
-        var row = vm.RecentKeymapItems[0];
-        vm.OpenRecentKeymapCommand.Execute(row);
+        var row = vm.Recents.Items[0];
+        vm.Recents.OpenCommand.Execute(row);
 
         Assert.Contains("OpenAsync", fake.Calls);
         Assert.True(vm.HasLayoutLoaded);
         Assert.Equal(tempPath, vm.LoadedLayoutPath);
         // The entry moved to the front of recents as its own string.
-        Assert.Equal(new[] { TestRefString }, vm.RecentKeymaps);
+        Assert.Equal(new[] { TestRefString }, vm.Recents.Entries);
     }
 
     [Fact]
@@ -310,8 +309,8 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
         Assert.DoesNotContain("OpenAsync", fake.Calls);
         // The stored entry stays the reference — the cache path is never written.
         Assert.Equal(TestRefString, settings.Current.LayoutJsonPaths["Corne"]);
-        Assert.Equal(TestRefString, vm.RecentKeymaps[0]);
-        Assert.True(vm.RecentKeymapItems[0].IsCurrent);
+        Assert.Equal(TestRefString, vm.Recents.Entries[0]);
+        Assert.True(vm.Recents.Items[0].IsCurrent);
     }
 
     private static InMemorySettingsService StartupSettings() => new()
@@ -349,7 +348,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
         Assert.Equal(2, keymapState.LoadCallCount);
         Assert.Equal(newPath, vm.LoadedLayoutPath);
         Assert.Equal("Loaded the newer cosmos82.keymap from GitHub", vm.Toast.Message);
-        Assert.Equal(TestRefString, vm.RecentKeymaps[0]);
+        Assert.Equal(TestRefString, vm.Recents.Entries[0]);
     }
 
     [Fact]
@@ -386,9 +385,8 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
             OnFetchRepo = (_, _, _) => throw new GitHubApiException(GitHubErrorKind.Network, "offline"),
         };
         var keymapState = Ok();
-        var vm = new MainWindowViewModel(StartupSettings(), keymapState: keymapState, gitHub: fake);
-        var opened = 0;
-        vm.OpenFromGitHubRequested = () => opened++;
+        var shell = new FakeMainWindowShell();
+        var vm = new MainWindowViewModel(StartupSettings(), keymapState: keymapState, gitHub: fake, shell: shell);
 
         vm.InitializeAsync();
         await vm.PendingGitHubCheck!;
@@ -396,7 +394,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
         Assert.Equal(1, keymapState.LoadCallCount);
         Assert.Equal(path, vm.LoadedLayoutPath);
         Assert.False(vm.Toast.IsVisible);
-        Assert.Equal(0, opened);
+        Assert.Equal(0, shell.GitHubPickerCount);
         Assert.Equal(signedIn, fake.Calls.Contains("FetchRepoAsync"));
     }
 
@@ -478,7 +476,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
         Assert.Equal("GO60", vm.SelectedKeyboard.Id);
         Assert.Equal("GO60", settings.Current.Keyboard);
         Assert.False(vm.HasLayoutLoaded);
-        Assert.Empty(vm.Layers);
+        Assert.Empty(vm.LayerTabs.Layers);
         Assert.False(settings.Current.LayoutJsonPaths.ContainsKey("GO60"));
         Assert.Equal(new[] { TestRefString }, settings.Current.RecentKeymapPaths["GO60"]);
         Assert.False(vm.Toast.IsVisible);
@@ -496,13 +494,13 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
         };
         var vm = new MainWindowViewModel(settings, keymapState: Ok(), gitHub: fake)
         {
-            FileExists = _ => true,
+            Library = { FileExists = _ => true },
         };
         await vm.OpenGitHubKeymapAsync(R);
 
         vm.LoadLayoutFromPath("/keymaps/local.keymap");
 
-        var rows = vm.RecentKeymapItems;
+        var rows = vm.Recents.Items;
         var local = rows.Single(r => !r.IsGitHub);
         var github = rows.Single(r => r.IsGitHub);
         Assert.Equal("/keymaps/local.keymap", local.Path);
@@ -549,11 +547,11 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
         // No gitHub service at all.
         var vm = new MainWindowViewModel(settings, keymapState: keymapState);
 
-        var row = vm.RecentKeymapItems[0];
+        var row = vm.Recents.Items[0];
         Assert.True(row.IsGitHub);
         Assert.True(row.Exists);
 
-        vm.OpenRecentKeymapCommand.Execute(row);
+        vm.Recents.OpenCommand.Execute(row);
 
         Assert.Equal(0, keymapState.LoadCallCount);
         Assert.False(vm.HasLayoutLoaded);

@@ -269,18 +269,18 @@ public class MainWindowViewModelEditTests : IDisposable
     public void EditMode_SwitchingLayer_DropsTheSelection_ChangedOutlineStaysOnItsLayer()
     {
         var vm = StartEditing(out _);
-        vm.Layers[1].SelectCommand.Execute(null);
+        vm.LayerTabs.Layers[1].SelectCommand.Execute(null);
         Tap(vm, 0);
         vm.Edit!.ClearSelectedKey(toNone: true);
         Assert.True(vm.Keys[0].IsEditChanged);
 
-        vm.Layers[0].SelectCommand.Execute(null);
+        vm.LayerTabs.Layers[0].SelectCommand.Execute(null);
 
         Assert.False(vm.Keys[0].IsEditChanged);
         Assert.False(vm.Keys[0].IsEditSelected);
         Assert.Null(vm.Edit!.SelectedKeyIndex);
 
-        vm.Layers[1].SelectCommand.Execute(null);
+        vm.LayerTabs.Layers[1].SelectCommand.Execute(null);
 
         Assert.True(vm.Keys[0].IsEditChanged);
         Assert.False(vm.Keys[0].IsEditSelected);
@@ -303,7 +303,7 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var vm = StartEditing(out _);
 
-        vm.Layers[1].SelectCommand.Execute(null);
+        vm.LayerTabs.Layers[1].SelectCommand.Execute(null);
 
         // Base key 5 is &kp A; outside edit mode Lower's &trans resolves to it.
         // In edit mode the layer's own binding is what paints.
@@ -357,19 +357,19 @@ public class MainWindowViewModelEditTests : IDisposable
         });
         var vm = NewVm(settings);
         vm.LoadLayoutFromPath(WriteTempKeymap());
-        Assert.False(vm.Layers[1].IsShown);
+        Assert.False(vm.LayerTabs.Layers[1].IsShown);
 
         vm.StartEditCommand.Execute(null);
 
         // Edit mode shows every tab and hands each one the layer actions.
-        Assert.All(vm.Layers, l => Assert.True(l.IsShown));
-        Assert.All(vm.Layers, l => Assert.True(l.IsEditable));
+        Assert.All(vm.LayerTabs.Layers, l => Assert.True(l.IsShown));
+        Assert.All(vm.LayerTabs.Layers, l => Assert.True(l.IsEditable));
 
         vm.DiscardEditCommand.Execute(null);
 
-        Assert.False(vm.Layers[1].IsShown);
+        Assert.False(vm.LayerTabs.Layers[1].IsShown);
         // Leaving edit mode rebuilds the plain tabs — no actions again.
-        Assert.All(vm.Layers, l => Assert.False(l.IsEditable));
+        Assert.All(vm.LayerTabs.Layers, l => Assert.False(l.IsEditable));
         // "in memory only, never persisted": the hidden setting survived untouched.
         Assert.Equal(new[] { 1 }, settings.Current.HiddenLayers["Corne"]);
     }
@@ -382,7 +382,7 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var vm = NewVm(settings);
         vm.LoadLayoutFromPath(WriteTempKeymap(text: KeymapText3()));
-        Assert.Equal(3, vm.Layers.Count);
+        Assert.Equal(3, vm.LayerTabs.Layers.Count);
         vm.StartEditCommand.Execute(null);
         Assert.True(vm.IsEditing);
         return vm;
@@ -392,7 +392,7 @@ public class MainWindowViewModelEditTests : IDisposable
     public void Discard_OnHiddenLayer_FallsBackToNearestShown_LowerIndexWinsTie()
     {
         var vm = StartEditing3(NewSettings(HiddenCorneLayers(1)));
-        vm.Layers[1].SelectCommand.Execute(null);
+        vm.LayerTabs.Layers[1].SelectCommand.Execute(null);
         Assert.Equal(1, vm.ActiveLayerIndex);
 
         vm.DiscardEditCommand.Execute(null);
@@ -405,7 +405,7 @@ public class MainWindowViewModelEditTests : IDisposable
     public void Discard_WithAllHigherLayersHidden_FallsBackToBase()
     {
         var vm = StartEditing3(NewSettings(HiddenCorneLayers(1, 2)));
-        vm.Layers[2].SelectCommand.Execute(null);
+        vm.LayerTabs.Layers[2].SelectCommand.Execute(null);
         Assert.Equal(2, vm.ActiveLayerIndex);
 
         vm.DiscardEditCommand.Execute(null);
@@ -417,7 +417,7 @@ public class MainWindowViewModelEditTests : IDisposable
     public void Discard_WhileOnShownLayer_StaysOnThatLayer()
     {
         var vm = StartEditing3(NewSettings(HiddenCorneLayers(2)));
-        vm.Layers[1].SelectCommand.Execute(null);
+        vm.LayerTabs.Layers[1].SelectCommand.Execute(null);
         Assert.Equal(1, vm.ActiveLayerIndex);
 
         vm.DiscardEditCommand.Execute(null);
@@ -537,7 +537,7 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var vm = StartEditing(out _);
         ClearKeyZero(vm);
-        vm.Layers[1].SelectCommand.Execute(null);
+        vm.LayerTabs.Layers[1].SelectCommand.Execute(null);
         Assert.Equal(1, vm.ActiveLayerIndex);
 
         await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
@@ -551,7 +551,7 @@ public class MainWindowViewModelEditTests : IDisposable
     public async Task SaveEdit_OnHiddenLayer_FallsBackToNearestShown()
     {
         var vm = StartEditing3(NewSettings(HiddenCorneLayers(1)));
-        vm.Layers[1].SelectCommand.Execute(null);
+        vm.LayerTabs.Layers[1].SelectCommand.Execute(null);
         // Lower is all &trans — clearing key 0 to &none is the one change.
         Tap(vm, 0);
         vm.Edit!.ClearSelectedKey(toNone: true);
@@ -777,7 +777,7 @@ public class MainWindowViewModelEditTests : IDisposable
     public async Task KeyDialog_ActiveLowerLayer_RequestNamesLayerOne_ChangeLandsThere()
     {
         var vm = StartEditing(out _);
-        vm.Layers[1].SelectCommand.Execute(null);
+        vm.LayerTabs.Layers[1].SelectCommand.Execute(null);
         Tap(vm, 3);
 
         KeyDialogRequest? captured = null;
@@ -936,7 +936,7 @@ public class MainWindowViewModelEditTests : IDisposable
     public void DuplicateShownLayer_OnUpper_CopiesAfterItAndShowsTheCopy()
     {
         var vm = StartEditing(out _);
-        vm.Layers[1].SelectCommand.Execute(null);
+        vm.LayerTabs.Layers[1].SelectCommand.Execute(null);
 
         vm.Edit!.DuplicateShownLayerCommand.Execute(null);
 
@@ -948,7 +948,7 @@ public class MainWindowViewModelEditTests : IDisposable
     public void MoveShownLayerRight_MovesItStaysShown_EndsDisableTheMove()
     {
         var vm = StartEditing3();
-        vm.Layers[1].SelectCommand.Execute(null); // Lower
+        vm.LayerTabs.Layers[1].SelectCommand.Execute(null); // Lower
 
         vm.Edit!.MoveShownLayerRightCommand.Execute(null);
 
@@ -957,7 +957,7 @@ public class MainWindowViewModelEditTests : IDisposable
         Assert.False(vm.Edit!.MoveShownLayerRightCommand.CanExecute(null));
         Assert.True(vm.Edit!.MoveShownLayerLeftCommand.CanExecute(null));
 
-        vm.Layers[0].SelectCommand.Execute(null);
+        vm.LayerTabs.Layers[0].SelectCommand.Execute(null);
         Assert.False(vm.Edit!.MoveShownLayerLeftCommand.CanExecute(null));
         Assert.True(vm.Edit!.MoveShownLayerRightCommand.CanExecute(null));
     }
@@ -966,7 +966,7 @@ public class MainWindowViewModelEditTests : IDisposable
     public void UndoAndRedoOfAMove_TheBoardFollowsTheLayer()
     {
         var vm = StartEditing3();
-        vm.Layers[1].SelectCommand.Execute(null); // Lower
+        vm.LayerTabs.Layers[1].SelectCommand.Execute(null); // Lower
         vm.Edit!.MoveShownLayerRightCommand.Execute(null);
         Assert.Equal(2, vm.ActiveLayerIndex);
 
@@ -984,7 +984,7 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var vm = StartEditing3();
         vm.Edit!.MoveLayer(0, 0 + (2));                       // Lower, Raise, Base — Base shown at 2
-        vm.Layers[1].SelectCommand.Execute(null); // Raise
+        vm.LayerTabs.Layers[1].SelectCommand.Execute(null); // Raise
 
         vm.Edit!.UndoCommand.Execute(null);       // Base, Lower, Raise
 
@@ -1095,13 +1095,13 @@ public class MainWindowViewModelEditTests : IDisposable
 
         vm.Edit!.AddLayer();
 
-        Assert.Equal(3, vm.Layers.Count);
-        Assert.Equal("2 : Layer 2", vm.Layers[2].DisplayName);
-        Assert.True(vm.Layers[2].IsSelected);
-        Assert.False(vm.Layers[0].IsSelected);
+        Assert.Equal(3, vm.LayerTabs.Layers.Count);
+        Assert.Equal("2 : Layer 2", vm.LayerTabs.Layers[2].DisplayName);
+        Assert.True(vm.LayerTabs.Layers[2].IsSelected);
+        Assert.False(vm.LayerTabs.Layers[0].IsSelected);
         // A new layer has no baseline, so it gets the palette default of its
         // position rather than any override.
-        Assert.Equal(LayerColorPalette.GetDefaultColor(2), vm.Layers[2].TabColor);
+        Assert.Equal(LayerColorPalette.GetDefaultColor(2), vm.LayerTabs.Layers[2].TabColor);
     }
 
     [Fact]
@@ -1119,15 +1119,15 @@ public class MainWindowViewModelEditTests : IDisposable
         var vm = NewVm(settings);
         vm.LoadLayoutFromPath(WriteTempKeymap(text: KeymapText3()));
         vm.StartEditCommand.Execute(null);
-        Assert.Equal("#123456", vm.Layers[1].TabColor);
+        Assert.Equal("#123456", vm.LayerTabs.Layers[1].TabColor);
 
         vm.Edit!.MoveLayer(1, 1 + (1)); // Base, Raise, Lower
 
-        Assert.Equal("2 : Lower", vm.Layers[2].DisplayName);
+        Assert.Equal("2 : Lower", vm.LayerTabs.Layers[2].DisplayName);
         // The colour travels with the layer it belongs to…
-        Assert.Equal("#123456", vm.Layers[2].TabColor);
+        Assert.Equal("#123456", vm.LayerTabs.Layers[2].TabColor);
         // …and the vacated position reads as the layer now standing there.
-        Assert.Equal(LayerColorPalette.GetDefaultColor(2), vm.Layers[1].TabColor);
+        Assert.Equal(LayerColorPalette.GetDefaultColor(2), vm.LayerTabs.Layers[1].TabColor);
     }
 
     [Fact]
@@ -1137,23 +1137,23 @@ public class MainWindowViewModelEditTests : IDisposable
 
         vm.Edit!.RenameLayer(1, "Nav");
 
-        Assert.Equal("1 : Nav", vm.Layers[1].DisplayName);
+        Assert.Equal("1 : Nav", vm.LayerTabs.Layers[1].DisplayName);
     }
 
     [Fact]
     public void KeyEdit_KeepsTheSameTabInstances()
     {
         var vm = StartEditing(out _);
-        var tabs = vm.Layers.ToList();
+        var tabs = vm.LayerTabs.Layers.ToList();
 
         Tap(vm, 0);
         vm.Edit!.ClearSelectedKey(toNone: false);
 
         // A plain key edit must not replace the tab buttons — only structural
         // changes rebuild the strip.
-        Assert.Equal(tabs.Count, vm.Layers.Count);
+        Assert.Equal(tabs.Count, vm.LayerTabs.Layers.Count);
         for (var i = 0; i < tabs.Count; i++)
-            Assert.Same(tabs[i], vm.Layers[i]);
+            Assert.Same(tabs[i], vm.LayerTabs.Layers[i]);
     }
 
     [Fact]
@@ -1162,8 +1162,8 @@ public class MainWindowViewModelEditTests : IDisposable
         var vm = NewVm(NewSettings());
         vm.LoadLayoutFromPath(WriteTempKeymap());
 
-        Assert.Equal(2, vm.Layers.Count);
-        Assert.All(vm.Layers, tab =>
+        Assert.Equal(2, vm.LayerTabs.Layers.Count);
+        Assert.All(vm.LayerTabs.Layers, tab =>
         {
             Assert.False(tab.IsEditable);
             Assert.False(tab.RenameCommand.CanExecute(null));
@@ -1223,8 +1223,8 @@ public class MainWindowViewModelEditTests : IDisposable
         // The in-memory engine list follows the persisted rules.
         Assert.Equal(new AppLayerRule("code", 2), Assert.Single(vm.AutoSwitch.AppLayerRules));
         // The reloaded tabs read the remapped palette.
-        Assert.Equal("2 : Lower", vm.Layers[2].DisplayName);
-        Assert.Equal("#123456", vm.Layers[2].TabColor);
+        Assert.Equal("2 : Lower", vm.LayerTabs.Layers[2].DisplayName);
+        Assert.Equal("#123456", vm.LayerTabs.Layers[2].TabColor);
         // Nothing was dropped — nothing is reported.
         Assert.Null(shown);
     }
@@ -1295,7 +1295,7 @@ public class MainWindowViewModelEditTests : IDisposable
 
         vm.Edit!.MoveLayer(1, 1 + (1));
         vm.Edit!.MoveLayer(2, 2 + (-1)); // back to the baseline order
-        vm.Layers[0].SelectCommand.Execute(null);
+        vm.LayerTabs.Layers[0].SelectCommand.Execute(null);
         ClearKeyZero(vm);
 
         await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
@@ -1336,19 +1336,19 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var raised = new List<string?>();
         var vm = NewVm(NewSettings());
-        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        vm.ComboLegend.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
         vm.LoadLayoutFromPath(WriteTempKeymap());
 
-        Assert.False(vm.IsComboOverlayVisible); // the persisted toggle is off
+        Assert.False(vm.ComboLegend.IsOverlayVisible); // the persisted toggle is off
         vm.StartEditCommand.Execute(null);
         Assert.True(vm.IsEditing);
-        Assert.True(vm.IsComboLegendVisible);   // edit mode shows the legend anyway
-        Assert.Contains(nameof(vm.IsComboLegendVisible), raised);
+        Assert.True(vm.ComboLegend.IsLegendVisible);   // edit mode shows the legend anyway
+        Assert.Contains(nameof(ComboLegendViewModel.IsLegendVisible), raised);
 
         vm.DiscardEditCommand.Execute(null);
 
         Assert.False(vm.IsEditing);
-        Assert.False(vm.IsComboLegendVisible);
+        Assert.False(vm.ComboLegend.IsLegendVisible);
     }
 
     [Fact]
@@ -1369,9 +1369,9 @@ public class MainWindowViewModelEditTests : IDisposable
         Assert.Null(captured.ComboIndex);
         Assert.Equal(vm.ActiveLayerIndex, captured.ShownLayerIndex);
 
-        Assert.Single(vm.Combos);
-        Assert.True(vm.Combos[0].IsEditable);
-        Assert.True(vm.Combos[0].IsChanged);
+        Assert.Single(vm.ComboLegend.Combos);
+        Assert.True(vm.ComboLegend.Combos[0].IsEditable);
+        Assert.True(vm.ComboLegend.Combos[0].IsChanged);
         Assert.Equal(1, Unsaved(vm));
         Assert.Single(vm.Edit!.Session.Current.Combos);
     }
@@ -1384,7 +1384,7 @@ public class MainWindowViewModelEditTests : IDisposable
 
         // The tile numbers are out of range of an empty combo list.
         await edit.EditComboCommand.ExecuteAsync(1);
-        Assert.Empty(vm.Combos);
+        Assert.Empty(vm.ComboLegend.Combos);
         Assert.Equal(0, Unsaved(vm));
         Assert.Empty(_dialogs.ComboRequests);
 
@@ -1392,7 +1392,7 @@ public class MainWindowViewModelEditTests : IDisposable
         Assert.False(edit.NewComboCommand.CanExecute(null));
         await edit.NewComboCommand.ExecuteAsync(null); // a closed edit: nothing, no dialog, no throw
         edit.DeleteComboCommand.Execute(1);
-        Assert.Empty(vm.Combos);
+        Assert.Empty(vm.ComboLegend.Combos);
         Assert.Empty(_dialogs.ComboRequests);
     }
 
@@ -1414,7 +1414,7 @@ public class MainWindowViewModelEditTests : IDisposable
 
         gate.SetResult(EscCombo([0, 1]));
         await first;
-        Assert.Single(vm.Combos);
+        Assert.Single(vm.ComboLegend.Combos);
     }
 
     [Fact]
@@ -1462,19 +1462,19 @@ public class MainWindowViewModelEditTests : IDisposable
         var vm = StartEditing(out _);
         _dialogs.Combo = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
         await vm.Edit!.NewComboCommand.ExecuteAsync(null);
-        Assert.Single(vm.Combos);
+        Assert.Single(vm.ComboLegend.Combos);
         Assert.Equal(1, Unsaved(vm));
 
         vm.Edit!.DeleteComboCommand.Execute(1);
 
         // The session's change event rebuilds the legend, and add-plus-delete
         // nets against the baseline.
-        Assert.Empty(vm.Combos);
+        Assert.Empty(vm.ComboLegend.Combos);
         Assert.Equal(0, Unsaved(vm));
 
         vm.Edit!.DeleteComboCommand.Execute(1); // out of range: nothing, no throw
         vm.Edit!.DeleteComboCommand.Execute(0);
-        Assert.Empty(vm.Combos);
+        Assert.Empty(vm.ComboLegend.Combos);
     }
 
     [Fact]
@@ -1483,7 +1483,7 @@ public class MainWindowViewModelEditTests : IDisposable
         var vm = StartEditing(out _);
         _dialogs.Combo = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
         await vm.Edit!.NewComboCommand.ExecuteAsync(null);
-        Assert.Single(vm.Combos);
+        Assert.Single(vm.ComboLegend.Combos);
 
         var opened = 0;
         _dialogs.Combo = _ => { opened++; return Task.FromResult<ZmkCombo?>(EscCombo([0, 2])); };
@@ -1503,11 +1503,11 @@ public class MainWindowViewModelEditTests : IDisposable
         var vm = StartEditing(out _);
         _dialogs.Combo = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
         await vm.Edit!.NewComboCommand.ExecuteAsync(null);
-        Assert.Single(vm.Combos);
+        Assert.Single(vm.ComboLegend.Combos);
 
         vm.Edit!.UndoCommand.Execute(null);
 
-        Assert.Empty(vm.Combos);
+        Assert.Empty(vm.ComboLegend.Combos);
         Assert.Equal(0, Unsaved(vm));
     }
 
@@ -1528,9 +1528,9 @@ public class MainWindowViewModelEditTests : IDisposable
 
         // Out of edit mode the legend is the reloaded file's combo — no
         // edit-mode flags left on the tile.
-        Assert.Single(vm.Combos);
-        Assert.False(vm.Combos[0].IsEditable);
-        Assert.False(vm.Combos[0].IsChanged);
+        Assert.Single(vm.ComboLegend.Combos);
+        Assert.False(vm.ComboLegend.Combos[0].IsEditable);
+        Assert.False(vm.ComboLegend.Combos[0].IsChanged);
     }
 
     [Fact]
@@ -1548,7 +1548,7 @@ public class MainWindowViewModelEditTests : IDisposable
         await vm.Edit!.NewComboCommand.ExecuteAsync(null);
         await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
-        vm.SetComboLabelOverride("0,1", new ComboLabelOverride { MainLabel = "Esc" });
+        vm.ComboLegend.SetLabelOverride("0,1", new ComboLabelOverride { MainLabel = "Esc" });
         Assert.NotNull(ComboLabelOverrides.Get("Corne", "0,1"));
 
         // Move it to keys 0+2 — the label follows the combo to the new key.

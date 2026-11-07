@@ -89,7 +89,7 @@ public class MainWindowViewModelLoadTests
         // The fix: a parse failure must not mutate the profile or claim a layout.
         Assert.Same(profileBefore, vm.SelectedKeyboard);
         Assert.False(vm.HasLayoutLoaded);
-        Assert.Empty(vm.Layers);
+        Assert.Empty(vm.LayerTabs.Layers);
     }
 
     [Fact]
@@ -104,7 +104,7 @@ public class MainWindowViewModelLoadTests
         vm.LoadLayoutFromPath("ok.keymap");
 
         Assert.True(vm.HasLayoutLoaded);
-        Assert.Equal(2, vm.Layers.Count);
+        Assert.Equal(2, vm.LayerTabs.Layers.Count);
         Assert.Equal("Corne", vm.SelectedKeyboard.Id);
     }
 
@@ -136,7 +136,7 @@ public class MainWindowViewModelLoadTests
         vm.LoadLayoutFromPath("first.keymap");
 
         Assert.Equal(new[] { "first.keymap" }, settings.Current.RecentKeymapPaths["Corne"]);
-        Assert.Equal(new[] { "first.keymap" }, vm.RecentKeymaps);
+        Assert.Equal(new[] { "first.keymap" }, vm.Recents.Entries);
     }
 
     [Fact]
@@ -155,7 +155,7 @@ public class MainWindowViewModelLoadTests
         // never under the profile the user was on when picking the file.
         Assert.Equal(new[] { "glove.keymap" }, settings.Current.RecentKeymapPaths["Glove80"]);
         Assert.False(settings.Current.RecentKeymapPaths.ContainsKey("Corne"));
-        Assert.Equal(new[] { "glove.keymap" }, vm.RecentKeymaps);
+        Assert.Equal(new[] { "glove.keymap" }, vm.Recents.Entries);
     }
 
     [Fact]
@@ -164,10 +164,8 @@ public class MainWindowViewModelLoadTests
         // Sofle and GO60 both have 60 keys; with a Go60 plugged in, an
         // explicit open from the 42-key Corne lands on GO60, not Sofle.
         var settings = new InMemorySettingsService();
-        var vm = new MainWindowViewModel(settings, keymapState: SixtyKeymap("go60.keymap"))
-        {
-            AttachedHidNames = () => ["Go60 Left"],
-        };
+        var vm = new MainWindowViewModel(settings, keymapState: SixtyKeymap("go60.keymap"));
+        vm.Devices.AttachedHidNames = () => ["Go60 Left"];
 
         vm.LoadLayoutFromPath("go60.keymap");
 
@@ -180,10 +178,8 @@ public class MainWindowViewModelLoadTests
     public void LoadLayoutFromPath_AutoSwitch_SameKeyCount_NothingAttached_KeepsRegistryOrder()
     {
         var settings = new InMemorySettingsService();
-        var vm = new MainWindowViewModel(settings, keymapState: SixtyKeymap("go60.keymap"))
-        {
-            AttachedHidNames = () => [],
-        };
+        var vm = new MainWindowViewModel(settings, keymapState: SixtyKeymap("go60.keymap"));
+        vm.Devices.AttachedHidNames = () => [];
 
         vm.LoadLayoutFromPath("go60.keymap");
 
@@ -226,7 +222,7 @@ public class MainWindowViewModelLoadTests
         Assert.Equal("GO60", settings.Current.Keyboard);
         // The keymap is not shown.
         Assert.False(vm.HasLayoutLoaded);
-        Assert.Empty(vm.Layers);
+        Assert.Empty(vm.LayerTabs.Layers);
         Assert.Null(fake.Current);
         Assert.False(vm.HasUnmatchedKeymap);
         // Booking dropped, recents entry kept.
@@ -268,7 +264,7 @@ public class MainWindowViewModelLoadTests
 
         Assert.True(vm.HasLayoutLoaded);
         Assert.Equal("Corne", vm.SelectedKeyboard.Id);
-        Assert.Equal(2, vm.Layers.Count);
+        Assert.Equal(2, vm.LayerTabs.Layers.Count);
         Assert.Equal("ok.keymap", settings.Current.LayoutJsonPaths["Corne"]);
         Assert.Equal(new[] { "ok.keymap" }, settings.Current.RecentKeymapPaths["Corne"]);
     }
@@ -292,7 +288,7 @@ public class MainWindowViewModelLoadTests
         Assert.Equal("Corne", vm.SelectedKeyboard.Id);
         Assert.Equal("Corne", settings.Current.Keyboard);
         Assert.False(vm.HasLayoutLoaded);
-        Assert.Empty(vm.Layers);
+        Assert.Empty(vm.LayerTabs.Layers);
         Assert.False(vm.HasUnmatchedKeymap);
     }
 
@@ -341,7 +337,7 @@ public class MainWindowViewModelLoadTests
         vm.LoadLayoutFromPath("gone.keymap");
 
         Assert.Equal(new[] { "still.keymap" }, settings.Current.RecentKeymapPaths["Corne"]);
-        Assert.Equal(new[] { "still.keymap" }, vm.RecentKeymaps);
+        Assert.Equal(new[] { "still.keymap" }, vm.Recents.Entries);
     }
 
     [Fact]
@@ -353,10 +349,10 @@ public class MainWindowViewModelLoadTests
         var vm = new MainWindowViewModel(settings, keymapState: ok);
 
         var raised = new List<string?>();
-        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        vm.Recents.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
         vm.LoadLayoutFromPath("ok.keymap");
 
-        Assert.Contains("RecentKeymaps", raised);
+        Assert.Contains("Entries", raised);
     }
 
     [Fact]
@@ -368,10 +364,10 @@ public class MainWindowViewModelLoadTests
         var vm = new MainWindowViewModel(settings, keymapState: failing);
 
         var raised = new List<string?>();
-        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        vm.Recents.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
         vm.LoadLayoutFromPath("bad.keymap");
 
-        Assert.Contains("RecentKeymaps", raised);
+        Assert.Contains("Entries", raised);
     }
 
     [Fact]
@@ -399,12 +395,12 @@ public class MainWindowViewModelLoadTests
         var glove80 = KeyboardProfileRegistry.All.First(p => p.Id == "Glove80");
 
         var raised = new List<string?>();
-        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        vm.Recents.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
         vm.SelectKeyboardCommand.Execute(glove80);
 
-        Assert.Contains("RecentKeymaps", raised);
+        Assert.Contains("Entries", raised);
         // The surfaced list follows the new profile — Corne's recents don't leak.
-        Assert.Empty(vm.RecentKeymaps);
+        Assert.Empty(vm.Recents.Entries);
     }
 
     // --- Recents flyout surface: RecentKeymapItems / HasRecentKeymaps / commands ---
@@ -426,12 +422,12 @@ public class MainWindowViewModelLoadTests
             new KeymapLoadResult.Success(SampleKeymap(), "one.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
         var vm = new MainWindowViewModel(settings, keymapState: ok)
         {
-            FileExists = p => p != "/keymaps/gone.keymap",
+            Library = { FileExists = p => p != "/keymaps/gone.keymap" },
         };
 
         vm.LoadLayoutFromPath("/keymaps/one.keymap");
 
-        var items = vm.RecentKeymapItems;
+        var items = vm.Recents.Items;
         Assert.Equal(2, items.Count);
 
         Assert.Equal("/keymaps/one.keymap", items[0].Path);
@@ -456,11 +452,11 @@ public class MainWindowViewModelLoadTests
             new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
         var vm = new MainWindowViewModel(settings, keymapState: ok);
 
-        Assert.False(vm.HasRecentKeymaps);
+        Assert.False(vm.Recents.HasAny);
 
         vm.LoadLayoutFromPath("ok.keymap");
 
-        Assert.True(vm.HasRecentKeymaps);
+        Assert.True(vm.Recents.HasAny);
     }
 
     [Fact]
@@ -478,16 +474,16 @@ public class MainWindowViewModelLoadTests
         };
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "second.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
-        var vm = new MainWindowViewModel(settings, keymapState: ok) { FileExists = _ => true };
+        var vm = new MainWindowViewModel(settings, keymapState: ok) { Library = { FileExists = _ => true } };
 
-        var target = vm.RecentKeymapItems.First(i => i.Path == "/keymaps/second.keymap");
-        vm.OpenRecentKeymapCommand.Execute(target);
+        var target = vm.Recents.Items.First(i => i.Path == "/keymaps/second.keymap");
+        vm.Recents.OpenCommand.Execute(target);
 
         Assert.Equal("/keymaps/second.keymap", vm.LoadedLayoutPath);
         Assert.Equal(
             new[] { "/keymaps/second.keymap", "/keymaps/first.keymap" },
-            vm.RecentKeymaps);
-        Assert.True(vm.RecentKeymapItems[0].IsCurrent);
+            vm.Recents.Entries);
+        Assert.True(vm.Recents.Items[0].IsCurrent);
     }
 
     [Fact]
@@ -507,11 +503,11 @@ public class MainWindowViewModelLoadTests
             new KeymapLoadResult.Success(SampleKeymap(), "kept.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
         var vm = new MainWindowViewModel(settings, keymapState: ok)
         {
-            FileExists = p => p == "/keymaps/kept.keymap",
+            Library = { FileExists = p => p == "/keymaps/kept.keymap" },
         };
 
-        var target = vm.RecentKeymapItems.First(i => i.Path == "/keymaps/gone.keymap");
-        vm.OpenRecentKeymapCommand.Execute(target);
+        var target = vm.Recents.Items.First(i => i.Path == "/keymaps/gone.keymap");
+        vm.Recents.OpenCommand.Execute(target);
 
         Assert.Equal(new[] { "/keymaps/kept.keymap" }, settings.Current.RecentKeymapPaths["Corne"]);
         // The load path was never entered — the stale entry was pruned.
@@ -540,14 +536,14 @@ public class MainWindowViewModelLoadTests
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "one.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
         // Nothing exists — a null click must not fall through to the prune path.
-        var vm = new MainWindowViewModel(settings, keymapState: ok) { FileExists = _ => false };
+        var vm = new MainWindowViewModel(settings, keymapState: ok) { Library = { FileExists = _ => false } };
         var savesBefore = settings.SaveCount;
 
-        vm.OpenRecentKeymapCommand.Execute(null);
+        vm.Recents.OpenCommand.Execute(null);
 
         Assert.Equal(savesBefore, settings.SaveCount);
         Assert.Equal(0, ok.LoadCallCount);
-        Assert.Equal(new[] { "/keymaps/one.keymap" }, vm.RecentKeymaps);
+        Assert.Equal(new[] { "/keymaps/one.keymap" }, vm.Recents.Entries);
     }
 
     [Fact]
@@ -566,14 +562,14 @@ public class MainWindowViewModelLoadTests
         };
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
-        var vm = new MainWindowViewModel(settings, keymapState: ok) { FileExists = _ => true };
+        var vm = new MainWindowViewModel(settings, keymapState: ok) { Library = { FileExists = _ => true } };
 
-        vm.ClearRecentKeymapsCommand.Execute(null);
+        vm.Recents.ClearCommand.Execute(null);
 
         Assert.False(settings.Current.RecentKeymapPaths.ContainsKey("Corne"));
         Assert.Equal(new[] { "/keymaps/glove.keymap" }, settings.Current.RecentKeymapPaths["Glove80"]);
-        Assert.False(vm.HasRecentKeymaps);
-        Assert.Empty(vm.RecentKeymapItems);
+        Assert.False(vm.Recents.HasAny);
+        Assert.Empty(vm.Recents.Items);
     }
 
     [Fact]
@@ -586,7 +582,7 @@ public class MainWindowViewModelLoadTests
         var savesBefore = settings.SaveCount;
         var currentBefore = settings.Current;
 
-        vm.ClearRecentKeymapsCommand.Execute(null);
+        vm.Recents.ClearCommand.Execute(null);
 
         Assert.Equal(savesBefore, settings.SaveCount);
         Assert.Same(currentBefore, settings.Current);
@@ -601,12 +597,12 @@ public class MainWindowViewModelLoadTests
         var vm = new MainWindowViewModel(settings, keymapState: ok);
 
         var raised = new List<string?>();
-        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
-        vm.RefreshRecentKeymapsCommand.Execute(null);
+        vm.Recents.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        vm.Recents.RefreshCommand.Execute(null);
 
-        Assert.Contains("RecentKeymapItems", raised);
-        Assert.Contains("HasRecentKeymaps", raised);
-        Assert.Contains("RecentKeymaps", raised);
+        Assert.Contains("Items", raised);
+        Assert.Contains("HasAny", raised);
+        Assert.Contains("Entries", raised);
     }
 
     [Fact]
@@ -618,14 +614,14 @@ public class MainWindowViewModelLoadTests
         var vm = new MainWindowViewModel(settings, keymapState: failing);
 
         var raised = new List<string?>();
-        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        vm.Recents.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
         vm.LoadLayoutFromPath("bad.keymap");
 
         // The "RecentKeymaps" raise on this path is pinned by
         // LoadLayoutFromPath_Failure_RaisesPropertyChangedForRecentKeymaps;
         // the derived flyout members must ride along with it.
-        Assert.Contains("RecentKeymapItems", raised);
-        Assert.Contains("HasRecentKeymaps", raised);
+        Assert.Contains("Items", raised);
+        Assert.Contains("HasAny", raised);
     }
 
     // --- Per-layer tab visibility (hidden layer buttons) ---
@@ -648,9 +644,9 @@ public class MainWindowViewModelLoadTests
 
         // The hidden layer stays in Layers (Settings pickers + keyboard push
         // depend on it) — only its button visibility flag flips.
-        Assert.Equal(2, vm.Layers.Count);
-        Assert.True(vm.Layers[0].IsShown);
-        Assert.False(vm.Layers[1].IsShown);
+        Assert.Equal(2, vm.LayerTabs.Layers.Count);
+        Assert.True(vm.LayerTabs.Layers[0].IsShown);
+        Assert.False(vm.LayerTabs.Layers[1].IsShown);
     }
 
     [Fact]
@@ -662,15 +658,15 @@ public class MainWindowViewModelLoadTests
         var vm = new MainWindowViewModel(settings, keymapState: ok);
         vm.LoadLayoutFromPath("ok.keymap");
 
-        vm.SetLayerShown(1, false);
+        vm.LayerTabs.SetShown(1, false);
 
         Assert.Equal(new[] { 1 }, settings.Current.HiddenLayers["Corne"]);
-        Assert.False(vm.Layers[1].IsShown);
+        Assert.False(vm.LayerTabs.Layers[1].IsShown);
 
-        vm.SetLayerShown(1, true);
+        vm.LayerTabs.SetShown(1, true);
 
         Assert.False(settings.Current.HiddenLayers.ContainsKey("Corne"));
-        Assert.True(vm.Layers[1].IsShown);
+        Assert.True(vm.LayerTabs.Layers[1].IsShown);
     }
 
     [Fact]
@@ -682,10 +678,10 @@ public class MainWindowViewModelLoadTests
         var vm = new MainWindowViewModel(settings, keymapState: ok);
         vm.LoadLayoutFromPath("ok.keymap");
 
-        vm.SetLayerShown(0, false);
+        vm.LayerTabs.SetShown(0, false);
 
         Assert.False(settings.Current.HiddenLayers.ContainsKey("Corne"));
-        Assert.True(vm.Layers[0].IsShown);
+        Assert.True(vm.LayerTabs.Layers[0].IsShown);
     }
 
     // --- Picking a board always shows that board ---
@@ -733,12 +729,12 @@ public class MainWindowViewModelLoadTests
             var vm = new MainWindowViewModel(settings, keymapState: ok);
             vm.LoadLayoutFromPath(path);
             Assert.Equal("Sofle", vm.SelectedKeyboard.Id);
-            Assert.False(vm.Layers[1].IsShown);
+            Assert.False(vm.LayerTabs.Layers[1].IsShown);
 
             vm.SelectKeyboardCommand.Execute(KeyboardProfileRegistry.All.First(p => p.Id == "GO60"));
 
             Assert.True(vm.HasLayoutLoaded);
-            Assert.True(vm.Layers[1].IsShown);
+            Assert.True(vm.LayerTabs.Layers[1].IsShown);
         }
         finally
         {
@@ -761,7 +757,7 @@ public class MainWindowViewModelLoadTests
 
         Assert.Equal("GO60", vm.SelectedKeyboard.Id);
         Assert.False(vm.HasLayoutLoaded);
-        Assert.Empty(vm.Layers);
+        Assert.Empty(vm.LayerTabs.Layers);
         Assert.Equal(
             Loc.Instance.Format("Status_KeyboardSwitchedUnloaded", Go60DisplayName),
             vm.StatusMessage);
@@ -849,7 +845,7 @@ public class MainWindowViewModelLoadTests
 
         settingsVm.LayerEntries[1].IsShown = false;
 
-        Assert.False(vm.Layers[1].IsShown);
+        Assert.False(vm.LayerTabs.Layers[1].IsShown);
         Assert.Equal(new[] { 1 }, settings.Current.HiddenLayers["Corne"]);
     }
 }

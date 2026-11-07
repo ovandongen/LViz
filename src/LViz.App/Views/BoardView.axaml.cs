@@ -17,7 +17,7 @@ public partial class BoardView : UserControl
     /// <summary>
     /// Pointer enters a per-combo pill on a key → highlight that single
     /// combo's legend tile (and every participating-key pill across the
-    /// board, via <see cref="MainWindowViewModel.SetHighlightedCombos"/>).
+    /// board, via <see cref="ComboLegendViewModel.SetHighlighted"/>).
     /// Inert if the hosting surface isn't the main VM (e.g. the exit-key
     /// picker).
     /// </summary>
@@ -26,14 +26,14 @@ public partial class BoardView : UserControl
         if (sender is not Control c) return;
         if (c.DataContext is not KeyComboBadgeViewModel badge) return;
         if (TryGetMainVm(c) is not MainWindowViewModel mainVm) return;
-        mainVm.SetHighlightedCombos(new[] { badge.Number });
+        mainVm.ComboLegend.SetHighlighted(new[] { badge.Number });
     }
 
     private void OnComboBadgePointerExited(object? sender, PointerEventArgs e)
     {
         if (sender is not Control c) return;
         if (TryGetMainVm(c) is not MainWindowViewModel mainVm) return;
-        mainVm.SetHighlightedCombos(EmptyComboNumbers);
+        mainVm.ComboLegend.SetHighlighted(EmptyComboNumbers);
     }
 
     private static MainWindowViewModel? TryGetMainVm(Control source) =>

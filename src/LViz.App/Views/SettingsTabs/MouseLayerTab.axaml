@@ -1,0 +1,88 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:LViz.App.ViewModels"
+             xmlns:conv="using:LViz.App.Converters"
+             xmlns:i="https://github.com/projektanker/icons.avalonia"
+             x:Class="LViz.App.Views.SettingsTabs.MouseLayerTab"
+             x:DataType="vm:SettingsViewModel">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="20" Spacing="12">
+
+            <TextBlock Text="{Binding [Settings_MouseLayer_Title], Source={StaticResource Loc}}"
+                       FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+            <TextBlock Text="{Binding [Settings_MouseLayer_Hint], Source={StaticResource Loc}}"
+                       Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+
+            <CheckBox Content="{Binding [Settings_MouseLayer_Enable], Source={StaticResource Loc}}"
+                      IsChecked="{Binding MouseLayer.IsEnabled, Mode=TwoWay}"
+                      Foreground="{StaticResource Text}"
+                      Margin="0,4,0,0" />
+
+            <!-- Layer-while-moving picker. Disabled when the engine is off
+                 (no point picking a target when nothing will fire). -->
+            <StackPanel Spacing="4" Margin="0,4,0,0"
+                        IsEnabled="{Binding MouseLayer.IsEnabled}">
+                <TextBlock Text="{Binding [Settings_MouseLayer_Layer], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource Text}" FontSize="12" />
+                <ComboBox MinWidth="200" HorizontalAlignment="Left"
+                          ItemsSource="{Binding MainViewModel.LayerTabs.Layers}"
+                          SelectedItem="{Binding MouseLayer.SelectedLayer, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LayerViewModel">
+                            <TextBlock Text="{Binding DisplayName}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+
+            <!-- Idle-timeout slider, 200–2000 ms; numeric readout to the right.
+                 Disabled when Endless is checked — the value is preserved so
+                 toggling endless off restores the previous timeout. -->
+            <StackPanel Spacing="4" Margin="0,4,0,0"
+                        IsEnabled="{Binding MouseLayer.IsEnabled}">
+                <TextBlock Text="{Binding [Settings_MouseLayer_IdleTimeout], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource Text}" FontSize="12" />
+                <Grid ColumnDefinitions="*,Auto"
+                      IsEnabled="{Binding MouseLayer.IsIdleTimeoutEnabled}">
+                    <Slider Grid.Column="0"
+                            Minimum="200" Maximum="2000"
+                            TickFrequency="50"
+                            IsSnapToTickEnabled="True"
+                            Value="{Binding MouseLayer.IdleTimeoutMs, Mode=TwoWay}"
+                            VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding MouseLayer.IdleTimeoutMs}"
+                               Foreground="{StaticResource Text}"
+                               MinWidth="44"
+                               TextAlignment="Right"
+                               VerticalAlignment="Center"
+                               Margin="8,0,0,0" />
+                </Grid>
+                <CheckBox Content="{Binding [Settings_MouseLayer_EndlessTimeout], Source={StaticResource Loc}}"
+                          IsChecked="{Binding MouseLayer.IsEndlessTimeout, Mode=TwoWay}"
+                          Foreground="{StaticResource Text}" />
+                <TextBlock Text="{Binding [Settings_MouseLayer_EndlessTimeout_Hint], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- Transparent (&trans) and empty (&none) keypress
+                 exits — independent per-flag opt-ins. When endless
+                 timeout is on the SettingsViewModel guarantees ≥1
+                 remains enabled. -->
+            <StackPanel Spacing="4" Margin="0,8,0,0"
+                        IsEnabled="{Binding MouseLayer.IsEnabled}">
+                <CheckBox Content="{Binding [Settings_MouseLayer_ExitOnTransparent], Source={StaticResource Loc}}"
+                          IsChecked="{Binding MouseLayer.IsExitOnTransparentKey, Mode=TwoWay}"
+                          Foreground="{StaticResource Text}" />
+                <CheckBox Content="{Binding [Settings_MouseLayer_ExitOnEmpty], Source={StaticResource Loc}}"
+                          IsChecked="{Binding MouseLayer.IsExitOnEmptyKey, Mode=TwoWay}"
+                          Foreground="{StaticResource Text}" />
+                <TextBlock Text="{Binding [Settings_MouseLayer_ExitOnTransparent_Hint], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextMuted}" FontSize="12" TextWrapping="Wrap" />
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+
+</UserControl>
