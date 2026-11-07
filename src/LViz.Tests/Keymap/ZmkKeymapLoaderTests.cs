@@ -200,4 +200,75 @@ public class ZmkKeymapLoaderTests
         Assert.Equal(new[] { "A" }, config.Layers[0].Bindings[0].Params);
         Assert.Equal(new[] { "1" }, config.Layers[0].Bindings[1].Params);
     }
+
+    // ---- combo properties -------------------------------------------------
+
+    [Fact]
+    public void SlabwingComboBootloader_HasNodeNameTimeoutAndDefaults()
+    {
+        var config = ZmkKeymapLoader.LoadFromText(LoadFixture("slabwing.keymap"), "test");
+        var combo = config.Combos.First(c => c.Name == "combo_bootloader");
+        Assert.Equal("combo_bootloader", combo.NodeName);
+        Assert.Equal(80, combo.TimeoutMs);
+        Assert.Null(combo.RequirePriorIdleMs);
+        Assert.False(combo.SlowRelease);
+    }
+
+    [Fact]
+    public void SlabwingCombosWithoutTimeout_HaveNullTimeoutMs()
+    {
+        var config = ZmkKeymapLoader.LoadFromText(LoadFixture("slabwing.keymap"), "test");
+        foreach (var name in new[] { "mouse-mid", "f12", "syslayer" })
+            Assert.Null(config.Combos.First(c => c.Name == name).TimeoutMs);
+    }
+
+    [Fact]
+    public void SlabwingSyslayerCombo_KeepsKeyPositionsInFileOrder()
+    {
+        var config = ZmkKeymapLoader.LoadFromText(LoadFixture("slabwing.keymap"), "test");
+        var syslayer = config.Combos.First(c => c.Name == "syslayer");
+        Assert.Equal(new[] { 53, 52 }, syslayer.KeyPositions);
+    }
+
+    [Fact]
+    public void ComboNodeWithAllProperties_ParsesEveryField()
+    {
+        const string text = """
+            / {
+                combos {
+                    compatible = "zmk,combos";
+                    lbl: combo_x {
+                        timeout-ms = <40>;
+                        require-prior-idle-ms = <150>;
+                        slow-release;
+                        key-positions = <0 1>;
+                        layers = <1 2>;
+                        bindings = <&kp A>;
+                    };
+                };
+                keymap {
+                    compatible = "zmk,keymap";
+                    base { bindings = <&kp A &kp B>; };
+                };
+            };
+            """;
+
+        var config = ZmkKeymapLoader.LoadFromText(text, "test");
+        var combo = Assert.Single(config.Combos);
+        Assert.Equal("lbl", combo.Name);
+        Assert.Equal("combo_x", combo.NodeName);
+        Assert.Equal(40, combo.TimeoutMs);
+        Assert.Equal(150, combo.RequirePriorIdleMs);
+        Assert.True(combo.SlowRelease);
+        Assert.Equal(new[] { 1, 2 }, combo.Layers);
+    }
+
+    [Fact]
+    public void Go60Combos_HaveNodeNames()
+    {
+        var config = ZmkKeymapLoader.LoadFromText(LoadFixture("go60.keymap"), "test");
+        Assert.Equal(
+            new[] { "combo_Space", "combo_snipe3" },
+            config.Combos.Select(c => c.NodeName).ToList());
+    }
 }

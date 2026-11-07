@@ -1,3 +1,6 @@
+using Avalonia.Media;
+using Avalonia.Media.Immutable;
+
 namespace LViz.App.Services;
 
 /// <summary>
@@ -33,6 +36,16 @@ internal static class AppTheme
     public const string AccentTealHex = "#94E2D5";
     public const string AccentYellowHex = "#F9E2AF";
     public const string AccentRedHex = "#F38BA8";
+    public const string AccentGoldHex = "#E8B45A";      // ring accent, ring key outline, combo picker keys
+    public const string AccentGoldSoftHex = "#29E8B45A"; // ring: highlighted list row, soft segment fill
+    public const string AccentGoldTetherHex = "#99E8B45A"; // ring: tether line to the key
+
+    // The key ring's views render without the app's resources (headless tests
+    // show them standalone), so they read these through x:Static instead of
+    // {StaticResource AccentGold…}.
+    public static readonly IImmutableSolidColorBrush AccentGoldBrush = Brush(AccentGoldHex);
+    public static readonly IImmutableSolidColorBrush AccentGoldSoftBrush = Brush(AccentGoldSoftHex);
+    public static readonly IImmutableSolidColorBrush AccentGoldTetherBrush = Brush(AccentGoldTetherHex);
 
     // ─── Tab chrome (custom, sister-app port) ───────────────────────────
     public const string TabBgHex = "#363649";
@@ -60,4 +73,6 @@ internal static class AppTheme
     public const string ErrorBgHex = "#E03131";
     public const string ErrorBorderHex = "#A51F1F";
     public const string ErrorTextHex = "#FFFFFF";
+
+    private static IImmutableSolidColorBrush Brush(string hex) => new ImmutableSolidColorBrush(Color.Parse(hex));
 }

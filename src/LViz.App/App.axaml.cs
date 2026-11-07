@@ -347,6 +347,20 @@ public partial class App : Application
             // key dialog — it answers the new binding, or null on cancel.
             viewModel.KeyRingRequested = request => mainWindow.ShowKeyRingAsync(request);
 
+            // Combo dialog: modal, awaited by the add/edit-combo command, which
+            // applies the answered combo as one undo step. A null answer (Esc,
+            // Cancel, close) changes nothing. The dialog's Binding button opens
+            // the user's default key editor anchored on the button itself.
+            // ZmkCombo is fully qualified: a `using LViz.Core.Models;` here
+            // would make KeyBinding ambiguous with Avalonia.Input's type.
+            viewModel.ComboDialogRequested = async request =>
+            {
+                var comboVm = new ComboDialogViewModel(request);
+                var dlg = new ComboDialog { DataContext = comboVm };
+                comboVm.BindingEditorRequested = r => KeyEditorHost.EditAsync(dlg, dlg.BindingAnchor, r, viewModel.UseRingKeyEditor);
+                return await dlg.ShowDialog<LViz.Core.Models.ZmkCombo?>(mainWindow);
+            };
+
             // Save conflict: the target changed underneath the edit. Modal,
             // awaited by the save command, which applies the answer (reload /
             // overwrite / keep editing) directly.
@@ -380,6 +394,17 @@ public partial class App : Application
             {
                 var dlg = new ChoiceDialog { DataContext = ChoiceDialogViewModel.LayerSettingsNotice(lines) };
                 await dlg.ShowDialog<string?>(mainWindow);
+            };
+
+            // Keyboard shortcuts: modal read-only list of every shortcut,
+            // opened from the Help menu; keys are spelled for the host OS.
+            viewModel.ShortcutsRequested = async () =>
+            {
+                var dlg = new ShortcutsWindow
+                {
+                    DataContext = new ShortcutsWindowViewModel(OperatingSystem.IsMacOS()),
+                };
+                await dlg.ShowDialog(mainWindow);
             };
 
             // Layout wizard: modal, closes with null (cancel) or the saved

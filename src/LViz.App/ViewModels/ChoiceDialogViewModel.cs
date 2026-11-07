@@ -68,13 +68,24 @@ public sealed class ChoiceDialogViewModel(
     /// The blocked-delete prompt naming the layer and listing one bulleted
     /// line per reason the delete was refused. The user only acknowledges it
     /// — there is nothing to fix from here, the blockers live in the file.
+    /// While unsaved combo changes are pending and a combo blocks the delete,
+    /// one more plain line after the bullets says those changes only reach the
+    /// file on save.
     /// </summary>
-    public static ChoiceDialogViewModel LayerDeleteBlocked(LayerDeleteBlockedRequest request) => new(
-        Loc.Instance["Edit_DeleteBlockedTitle"],
-        Bulleted(
+    public static ChoiceDialogViewModel LayerDeleteBlocked(LayerDeleteBlockedRequest request)
+    {
+        var message = Bulleted(
             Loc.Instance.Format("Edit_DeleteBlockedFormat", request.LayerName),
-            request.Blockers.Select(BlockerText)),
-        [new ChoiceDialogOption("ok", Loc.Instance["Edit_Ok"], true)]);
+            request.Blockers.Select(BlockerText));
+        if (request.ComboEditsPending
+            && request.Blockers.Any(b => b.Kind == LayerDeleteBlockerKind.Combo))
+            message += "\n" + Loc.Instance["Edit_DeleteBlockedSaveCombosFirst"];
+
+        return new ChoiceDialogViewModel(
+            Loc.Instance["Edit_DeleteBlockedTitle"],
+            message,
+            [new ChoiceDialogOption("ok", Loc.Instance["Edit_Ok"], true)]);
+    }
 
     /// <summary>
     /// The after-save notice about layer settings the structural save moved:

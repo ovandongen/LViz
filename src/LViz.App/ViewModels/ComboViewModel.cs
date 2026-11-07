@@ -36,6 +36,16 @@ public partial class ComboViewModel : ObservableObject
 
     [ObservableProperty] private bool _isHighlighted;
 
+    /// <summary>True while a keymap edit is open — the tile shows its ⋮ menu
+    /// (new/edit/delete combo). Set by <see cref="MainWindowViewModel"/>
+    /// after constructing.</summary>
+    [ObservableProperty] private bool _isEditable;
+
+    /// <summary>True while this combo was added in the open edit or differs
+    /// from its baseline version — the tile's pending-change mark. Set by
+    /// <see cref="MainWindowViewModel"/> after constructing.</summary>
+    [ObservableProperty] private bool _isChanged;
+
     public ComboViewModel(
         int number,
         ZmkCombo combo,

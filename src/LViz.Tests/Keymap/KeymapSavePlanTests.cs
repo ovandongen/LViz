@@ -47,6 +47,7 @@ public class KeymapSavePlanTests
         Assert.Empty(plan.StructureEdits);
         Assert.Empty(plan.BindingChanges);
         Assert.Empty(plan.Renames);
+        Assert.Empty(plan.ComboChanges);
     }
 
     [Fact]
@@ -137,6 +138,147 @@ public class KeymapSavePlanTests
         var reparsed = Parse(plan.NewSource);
         Assert.Equal(8, reparsed.Layers.Count);
         Assert.Equal("Test", reparsed.Layers[^1].Name);
+    }
+
+    [Fact]
+    public void Build_AddCombo_AppendsItAndReportsTheAdd()
+    {
+        var source = Source();
+        var session = Session();
+        var combo = new ZmkCombo("Esc", "", [10, 11], [-1], new KeyBinding("&kp", ["ESC"]))
+        {
+            NodeName = "combo_esc",
+        };
+        Assert.Equal(4, session.AddCombo(combo));
+
+        var plan = KeymapSavePlan.Build(source, session);
+
+        var reparsed = Parse(plan.NewSource);
+        Assert.Equal(5, reparsed.Combos.Count);
+        var written = reparsed.Combos[^1];
+        Assert.Equal("combo_esc", written.NodeName);
+        AssertSameBinding(written.Binding, "&kp", "ESC");
+
+        var change = Assert.Single(plan.ComboChanges);
+        Assert.IsType<ComboEdit.Add>(change.Edit);
+        Assert.Null(change.Old);
+        Assert.NotNull(change.New);
+        Assert.Empty(plan.BindingChanges);
+        Assert.Empty(plan.Renames);
+        Assert.Empty(plan.StructureEdits);
+        Assert.False(plan.IsEmpty);
+    }
+
+    [Fact]
+    public void Build_KeyEditAndComboChange_WritesBoth()
+    {
+        var source = Source();
+        var session = Session();
+        Assert.True(session.SetBindings([new BindingChange(0, 11, KeyBinding.Transparent)]));
+        Assert.Equal("f12", session.Current.Combos[2].NodeName);
+        var f12 = session.Current.Combos[2];
+        Assert.True(session.SetCombo(2, f12 with { Binding = new KeyBinding("&kp", ["F11"]) }));
+
+        var plan = KeymapSavePlan.Build(source, session);
+
+        Assert.Single(plan.BindingChanges);
+
+        var change = Assert.Single(plan.ComboChanges);
+        Assert.IsType<ComboEdit.Change>(change.Edit);
+        Assert.NotNull(change.Old);
+        Assert.NotNull(change.New);
+        AssertSameBinding(change.Old!.Binding, "&kp", "F12");
+        AssertSameBinding(change.New!.Binding, "&kp", "F11");
+
+        var reparsed = Parse(plan.NewSource);
+        AssertSameBinding(reparsed.Layers[0].Bindings[11], "&trans");
+        AssertSameBinding(
+            reparsed.Combos.Single(c => c.NodeName == "f12").Binding, "&kp", "F11");
+    }
+
+    [Fact]
+    public void Build_TwoCombosSwapNames_WritesBothWithoutATempNameLeftBehind()
+    {
+        // The dialog's route to a swap: f12 → tmp, syslayer → f12, tmp → syslayer.
+        // Net, the session holds Change(f12 → syslayer) and Change(syslayer → f12):
+        // each target is still taken in the text when its change runs.
+        var source = Source();
+        var session = Session();
+        var f12 = session.Current.Combos[2];
+        var sys = session.Current.Combos[3];
+        Assert.True(session.SetCombo(2, f12 with { Name = "tmp", NodeName = "tmp" }));
+        Assert.True(session.SetCombo(3, sys with { Name = "f12", NodeName = "f12" }));
+        Assert.True(session.SetCombo(2, f12 with { Name = "syslayer", NodeName = "syslayer" }));
+
+        var plan = KeymapSavePlan.Build(source, session);
+
+        Assert.Equal(2, plan.ComboChanges.Count);
+        Assert.DoesNotContain("lviz_rename_", plan.NewSource, StringComparison.Ordinal);
+
+        var reparsed = Parse(plan.NewSource);
+        Assert.Equal(4, reparsed.Combos.Count);
+        AssertSameBinding(reparsed.Combos.Single(c => c.NodeName == "syslayer").Binding, "&kp", "F12");
+        AssertSameBinding(reparsed.Combos.Single(c => c.NodeName == "f12").Binding, "&mo", "2");
+    }
+
+    [Fact]
+    public void Build_RenameIntoADeletedComboName_NeedsNoTemporaryName()
+    {
+        var source = Source();
+        var session = Session();
+        var f12 = session.Current.Combos[2];
+        session.DeleteCombo(1); // mouse-mid
+        Assert.True(session.SetCombo(1, f12 with { Name = "mouse-mid", NodeName = "mouse-mid" }));
+
+        var plan = KeymapSavePlan.Build(source, session);
+
+        var reparsed = Parse(plan.NewSource);
+        Assert.Equal(3, reparsed.Combos.Count);
+        AssertSameBinding(reparsed.Combos.Single(c => c.NodeName == "mouse-mid").Binding, "&kp", "F12");
+        Assert.DoesNotContain(reparsed.Combos, c => c.NodeName == "f12");
+    }
+
+    [Fact]
+    public void Build_DeleteCombo_RemovesNodeAndReportsTheDelete()
+    {
+        var source = Source();
+        var session = Session();
+        Assert.Equal("mouse-mid", session.Current.Combos[1].NodeName);
+        session.DeleteCombo(1);
+
+        var plan = KeymapSavePlan.Build(source, session);
+
+        Assert.DoesNotContain("mouse-mid", plan.NewSource, StringComparison.Ordinal);
+        var reparsed = Parse(plan.NewSource);
+        Assert.Equal(3, reparsed.Combos.Count);
+        Assert.DoesNotContain(reparsed.Combos, c => c.NodeName == "mouse-mid");
+
+        var change = Assert.Single(plan.ComboChanges);
+        Assert.IsType<ComboEdit.Delete>(change.Edit);
+        Assert.Null(change.New);
+        Assert.NotNull(change.Old);
+        Assert.Equal("mouse-mid", change.Old!.NodeName);
+        Assert.Equal([46, 47], change.Old!.KeyPositions);
+    }
+
+    [Fact]
+    public void Build_LayerMove_RenumbersComboBindingWithoutAComboChange()
+    {
+        var source = Source();
+        var session = Session();
+        var edit = new Move(2, 3);
+        Assert.True(session.ApplyStructure(edit, LayerReferenceRemapper.Apply(session.Current, edit)));
+
+        var plan = KeymapSavePlan.Build(source, session);
+
+        // The session holds a change for the renumbered combo, but the
+        // structure phase already wrote it into the text.
+        Assert.Contains(session.PendingComboEdits, e => e is ComboEdit.Change { NodeName: "syslayer" });
+        Assert.Empty(plan.ComboChanges);
+
+        var reparsed = Parse(plan.NewSource);
+        var syslayer = Assert.Single(reparsed.Combos, c => c.NodeName == "syslayer");
+        AssertSameBinding(syslayer.Binding, "&mo", "3");
     }
 
     [Fact]

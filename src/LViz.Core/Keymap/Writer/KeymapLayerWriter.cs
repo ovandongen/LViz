@@ -337,7 +337,7 @@ public static class KeymapLayerWriter
         var defines = LayerReferenceDefines(scan);
 
         var cells = expected.Layers[add.AtIndex].Bindings
-            .Select(b => ZmkBindingFormatter.Format(b, defines))
+            .Select(b => ZmkBindingFormatter.Format(b, defines, expected.HoldTaps))
             .ToList();
 
         string nl = scan.NewLine;

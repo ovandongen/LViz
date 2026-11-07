@@ -1,0 +1,78 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LViz.App.ViewModels"
+        x:Class="LViz.App.Views.ShortcutsWindow"
+        x:DataType="vm:ShortcutsWindowViewModel"
+        Title="{Binding [Shortcuts_Title], Source={StaticResource Loc}}"
+        SizeToContent="WidthAndHeight"
+        MaxHeight="600"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BgBase}">
+
+    <DockPanel Margin="16" MinWidth="440">
+
+        <Button DockPanel.Dock="Bottom"
+                HorizontalAlignment="Right"
+                Margin="0,12,0,0"
+                Classes="accent"
+                IsDefault="True"
+                Content="{Binding [Shortcuts_Close], Source={StaticResource Loc}}"
+                Click="OnCloseClick" />
+
+        <!-- MaxHeight above caps the window, so the list takes the remaining
+             height and scrolls on small screens. -->
+        <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding Groups}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Spacing="12" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ShortcutGroupView">
+                        <StackPanel Spacing="4">
+                            <TextBlock FontSize="13" FontWeight="Bold"
+                                       Foreground="{StaticResource Text}"
+                                       Text="{Binding Title}" />
+                            <ItemsControl ItemsSource="{Binding Rows}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Spacing="2" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ShortcutRow">
+                                        <Grid ColumnDefinitions="250,*">
+                                            <!-- Fixed-width so descriptions line up;
+                                                 the widest cell is a translated
+                                                 mouse text ("Dubbelklik op een…"),
+                                                 which wraps. -->
+                                            <TextBlock Grid.Column="0"
+                                                       FontFamily="Menlo, Consolas, monospace"
+                                                       FontSize="12"
+                                                       TextAlignment="Right"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="{StaticResource Text}"
+                                                       Text="{Binding Keys}" />
+                                            <TextBlock Grid.Column="1"
+                                                       Margin="12,0,0,0"
+                                                       FontSize="12"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="{StaticResource TextSubtle}"
+                                                       Text="{Binding Description}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+    </DockPanel>
+
+</Window>

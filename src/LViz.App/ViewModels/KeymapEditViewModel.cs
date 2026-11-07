@@ -80,6 +80,7 @@ public sealed partial class KeymapEditViewModel : ObservableObject
         Session = new KeymapEditSession(baseline);
         Keymap = new LoadedKeymap(Session.Current);
         Defines = Preprocessor.CollectDefines(source.BaselineText);
+        LayerDefines = KeymapWriter.LayerReferenceDefines(source.BaselineText, baseline);
         Session.Changed += OnSessionChanged;
         _gitHub = gitHub;
         _backups = backups;
@@ -148,6 +149,15 @@ public sealed partial class KeymapEditViewModel : ObservableObject
     /// raw-text parser so a typed <c>&amp;mo NAV</c> resolves like the file does.
     /// </summary>
     public IReadOnlyList<KeyValuePair<string, string>> Defines { get; }
+
+    /// <summary>
+    /// The defines this file uses as a layer reference — the only names a
+    /// layer number may be shown as, so a preview writes <c>&amp;mo NAV</c>
+    /// where the file does and never names a layer after an unrelated define
+    /// with the same value. Passed to the key dialog as
+    /// <see cref="KeyDialogRequest.LayerDefines"/>.
+    /// </summary>
+    public IReadOnlyList<KeyValuePair<string, string>> LayerDefines { get; }
 
     /// <summary>The one selected key, or null when nothing is selected.</summary>
     [ObservableProperty]
@@ -326,14 +336,20 @@ public sealed partial class KeymapEditViewModel : ObservableObject
     /// <summary>
     /// What deleting the layer at <paramref name="layerIndex"/> would do,
     /// without changing anything: the blockers the <c>.keymap</c> text still
-    /// holds, and how many keys would lose their layer target.
+    /// holds and the ones only the session's combo edits hold, and how many
+    /// keys would lose their layer target.
     /// </summary>
     /// <remarks>
-    /// The blockers come from the baseline text with the pending structural
-    /// edits replayed onto it, so the writer's layer indices line up with
-    /// <see cref="KeymapEditSession.Current"/>; the cleared-binding count comes
-    /// from <see cref="Current"/> itself, because key edits are never in that
-    /// text.
+    /// The text blockers come from the baseline text with the pending
+    /// structural edits replayed onto it, so the writer's layer indices line up
+    /// with <see cref="KeymapEditSession.Current"/>; the cleared-binding count
+    /// comes from <see cref="Current"/> itself, because key edits are never in
+    /// that text. Combos edited in this session are not in that text either, so
+    /// every combo the current model aims at the layer adds a
+    /// <see cref="LayerDeleteBlockerKind.Combo"/> blocker (after the text
+    /// blockers, <c>Line</c> 0) unless a text blocker already names it
+    /// (Ordinal). A combo fixed in the session but not yet saved therefore
+    /// still blocks through the text.
     /// </remarks>
     /// <remarks>
     /// <see cref="ZmkKeymapParseException"/> (the pending edits would not write)
@@ -350,8 +366,19 @@ public sealed partial class KeymapEditViewModel : ObservableObject
 
         var text = KeymapLayerWriter.ApplyAll(Source.BaselineText, Session.PendingStructureEdits);
         var check = KeymapLayerWriter.CheckDelete(text, layerIndex);
+
+        var named = new HashSet<string>(
+            check.Blockers.Select(b => b.Name), StringComparer.Ordinal);
+        var sessionCombos = new List<LayerDeleteBlocker>();
+        foreach (var name in LayerReferenceRemapper.CombosUsingLayer(Session.Current, layerIndex))
+            if (named.Add(name))
+                sessionCombos.Add(new LayerDeleteBlocker(LayerDeleteBlockerKind.Combo, name, 0));
+
         return check with
         {
+            Blockers = sessionCombos.Count == 0
+                ? check.Blockers
+                : [.. check.Blockers, .. sessionCombos],
             ClearedBindings = LayerReferenceRemapper.CountClearedBindings(Session.Current, layerIndex),
         };
     }
@@ -379,6 +406,47 @@ public sealed partial class KeymapEditViewModel : ObservableObject
         Session.ApplyStructure(edit, LayerReferenceRemapper.Apply(Session.Current, edit));
         return true;
     }
+
+    /// <summary>
+    /// Append <paramref name="combo"/> to the current combo list as a single
+    /// undo step — the thin wrapper over
+    /// <see cref="KeymapEditSession.AddCombo"/> the combo editor calls.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ArgumentNullException"/> (combo is null) propagates.
+    /// </remarks>
+    /// <returns>The index the combo landed at in <see cref="KeymapEditSession.Current"/>.Combos.</returns>
+    public int AddCombo(ZmkCombo combo) => Session.AddCombo(combo);
+
+    /// <summary>
+    /// Replace the combo at <paramref name="index"/> as a single undo step.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ArgumentNullException"/> (combo is null) and
+    /// <see cref="ArgumentOutOfRangeException"/> (index outside the current
+    /// combo list) propagate.
+    /// </remarks>
+    /// <returns>
+    /// <see langword="false"/> when the combo already
+    /// <see cref="ZmkCombo.IsSameAs">IsSameAs</see> the current one; the call
+    /// then records nothing and raises no event.
+    /// </returns>
+    public bool SetCombo(int index, ZmkCombo combo) => Session.SetCombo(index, combo);
+
+    /// <summary>Remove the combo at <paramref name="index"/> as a single undo step.</summary>
+    /// <remarks>
+    /// <see cref="ArgumentOutOfRangeException"/> (index outside the current
+    /// combo list) propagates.
+    /// </remarks>
+    public void DeleteCombo(int index) => Session.DeleteCombo(index);
+
+    /// <summary>True when the combo at <paramref name="index"/> was added in
+    /// this session or differs from its baseline version.</summary>
+    public bool IsComboChanged(int index) => Session.IsComboChanged(index);
+
+    /// <summary>True while the session holds combo adds, changes or deletes
+    /// that a save has not written yet.</summary>
+    public bool HasPendingComboEdits => Session.PendingComboEdits.Count > 0;
 
     /// <summary>
     /// Freeze the current edit into the text and the change lists a save writes,
@@ -490,6 +558,7 @@ public sealed partial class KeymapEditViewModel : ObservableObject
         OnPropertyChanged(nameof(CanUndo));
         OnPropertyChanged(nameof(CanRedo));
         OnPropertyChanged(nameof(BannerText));
+        OnPropertyChanged(nameof(HasPendingComboEdits));
 
         UndoCommand.NotifyCanExecuteChanged();
         RedoCommand.NotifyCanExecuteChanged();

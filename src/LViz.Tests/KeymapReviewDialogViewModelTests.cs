@@ -116,6 +116,75 @@ public class KeymapReviewDialogViewModelTests
     }
 
     [Fact]
+    public void Lines_ComboChanges_GoAfterRenames_BeforeKeys()
+    {
+        var zoom = new ZmkCombo("combo_zoom", "", [10, 11], [-1], Key("&kp", "Z"))
+        {
+            NodeName = "combo_zoom",
+        };
+        var f12Old = new ZmkCombo("f12", "", [0, 1], [-1], Key("&kp", "F12"))
+        {
+            NodeName = "f12",
+        };
+        var f12New = new ZmkCombo("f12", "", [0, 1], [-1], Key("&kp", "F13"))
+        {
+            NodeName = "f12",
+        };
+        var mouseMid = new ZmkCombo("mouse-mid", "", [46, 47], [-1], Key("&mkp", "MCLK"))
+        {
+            NodeName = "mouse-mid",
+        };
+
+        var plan = Plan(
+            structure: new LayerStructureEdit[] { new LayerStructureEdit.Delete(4) },
+            renames: new[] { new KeymapLayerRenameChange(1, "Lower", "Lower2") },
+            bindings: new[]
+            {
+                new KeymapBindingChange(0, "Base", 3, KeyBinding.None, Key("&kp", "Q")),
+            }) with
+        {
+            ComboChanges = new[]
+            {
+                new KeymapComboChange(new ComboEdit.Add(zoom), null, zoom),
+                new KeymapComboChange(new ComboEdit.Change("f12", f12New), f12Old, f12New),
+                new KeymapComboChange(new ComboEdit.Delete("mouse-mid"), mouseMid, null),
+            },
+        };
+
+        var vm = Review(plan);
+
+        Assert.Equal(
+            new[]
+            {
+                Loc.Instance.Format("Edit_ReviewDeleteFormat", 4),
+                Loc.Instance.Format("Edit_ReviewRenameFormat", 1, "Lower", "Lower2"),
+                Loc.Instance.Format("Edit_ReviewComboAddFormat", "combo_zoom", "10+11", "&kp Z"),
+                Loc.Instance.Format("Edit_ReviewComboEditFormat", "f12", "0+1", "&kp F13"),
+                Loc.Instance.Format("Edit_ReviewComboDeleteFormat", "mouse-mid", "46+47"),
+                Loc.Instance.Format("Edit_ReviewKeyFormat", "Base", 3, "&none", "&kp Q"),
+            },
+            vm.Lines);
+
+        // Resx safety net for the three combo keys: a missing key renders as
+        // "[Key]" and both sides of the comparison would resolve it alike.
+        Assert.DoesNotContain(vm.Lines, line => line.StartsWith("[", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Lines_DeleteComboWithoutOld_Throws()
+    {
+        var plan = Plan() with
+        {
+            ComboChanges = new[]
+            {
+                new KeymapComboChange(new ComboEdit.Delete("gone"), null, null),
+            },
+        };
+
+        Assert.Throws<ArgumentException>(() => Review(plan));
+    }
+
+    [Fact]
     public void Lines_EmptyPlan_IsEmpty()
         => Assert.Empty(Review(Plan()).Lines);
 

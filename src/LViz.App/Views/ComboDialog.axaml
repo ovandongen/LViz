@@ -1,0 +1,170 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LViz.App.ViewModels"
+        xmlns:views="using:LViz.App.Views"
+        xmlns:conv="using:Avalonia.Data.Converters"
+        x:Class="LViz.App.Views.ComboDialog"
+        x:DataType="vm:ComboDialogViewModel"
+        Title="{Binding TitleText}"
+        Width="640" Height="560"
+        MinWidth="480" MinHeight="440"
+        CanResize="True"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BgBase}">
+
+    <!-- Dock order is bottom-up: the first Bottom-docked child sits lowest.
+         Visual top-to-bottom: label layer row, board, keys summary,
+         form fields, errors/warnings, buttons. -->
+    <DockPanel Margin="16">
+
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto,Auto" Margin="0,12,0,0">
+            <Button Grid.Column="1"
+                    Content="{Binding [Edit_Cancel], Source={StaticResource Loc}}"
+                    Click="OnCancelClick" />
+            <Button Grid.Column="2"
+                    Content="{Binding [Edit_Ok], Source={StaticResource Loc}}"
+                    Margin="8,0,0,0"
+                    Classes="accent"
+                    IsDefault="True"
+                    IsEnabled="{Binding CanConfirm}"
+                    Click="OnOkClick" />
+        </Grid>
+
+        <!-- Blocking problems red, advisory firmware limits yellow. -->
+        <StackPanel DockPanel.Dock="Bottom" Spacing="2" Margin="0,8,0,0">
+            <ItemsControl ItemsSource="{Binding Errors}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                        <TextBlock Text="{Binding}" FontSize="12" TextWrapping="Wrap"
+                                   Foreground="{StaticResource AccentRed}" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <ItemsControl ItemsSource="{Binding Warnings}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                        <TextBlock Text="{Binding}" FontSize="12" TextWrapping="Wrap"
+                                   Foreground="{StaticResource AccentYellow}" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+
+        <!-- Field form. -->
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+              Margin="0,12,0,0">
+            <Grid.Styles>
+                <Style Selector="TextBlock.field">
+                    <Setter Property="Foreground" Value="{StaticResource TextSubtle}" />
+                    <Setter Property="FontSize" Value="12" />
+                    <Setter Property="VerticalAlignment" Value="Center" />
+                    <Setter Property="Margin" Value="0,0,12,0" />
+                </Style>
+            </Grid.Styles>
+
+            <TextBlock Grid.Row="0" Grid.Column="0" Classes="field"
+                       Text="{Binding [Combo_FieldName], Source={StaticResource Loc}}" />
+            <TextBox Grid.Row="0" Grid.Column="1" Margin="0,3"
+                     Text="{Binding NodeName, Mode=TwoWay}" />
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Classes="field"
+                       Text="{Binding [Combo_FieldBinding], Source={StaticResource Loc}}" />
+            <Button Grid.Row="1" Grid.Column="1" Margin="0,3"
+                    x:Name="BindingButton"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Left"
+                    Command="{Binding EditBindingCommand}">
+                <TextBlock Text="{Binding BindingText}"
+                           FontFamily="Menlo, Consolas, monospace"
+                           Foreground="{StaticResource Text}"
+                           TextTrimming="CharacterEllipsis" />
+            </Button>
+
+            <TextBlock Grid.Row="2" Grid.Column="0" Classes="field"
+                       Text="{Binding [Combo_FieldTimeout], Source={StaticResource Loc}}" />
+            <Grid Grid.Row="2" Grid.Column="1" Margin="0,3" ColumnDefinitions="160,Auto">
+                <TextBox Grid.Column="0"
+                         Text="{Binding TimeoutText, Mode=TwoWay}"
+                         Watermark="{Binding [Combo_TimeoutWatermark], Source={StaticResource Loc}}" />
+                <TextBlock Grid.Column="1" Classes="field" Margin="8,0,0,0" Text="ms" />
+            </Grid>
+
+            <TextBlock Grid.Row="3" Grid.Column="0" Classes="field"
+                       Text="{Binding [Combo_FieldLayers], Source={StaticResource Loc}}" />
+            <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,3" Spacing="4">
+                <CheckBox Content="{Binding [Combo_AllLayers], Source={StaticResource Loc}}"
+                          IsChecked="{Binding AllLayers, Mode=TwoWay}" />
+                <ItemsControl ItemsSource="{Binding LayerToggles}"
+                              IsVisible="{Binding !AllLayers}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ComboLayerToggle">
+                            <ToggleButton Content="{Binding Name}"
+                                          IsChecked="{Binding IsOn, Mode=TwoWay}"
+                                          Focusable="False"
+                                          Padding="8,2"
+                                          Margin="0,0,6,4" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <TextBlock Grid.Row="4" Grid.Column="0" Classes="field"
+                       Text="{Binding [Combo_FieldIdle], Source={StaticResource Loc}}" />
+            <Grid Grid.Row="4" Grid.Column="1" Margin="0,3" ColumnDefinitions="160,Auto">
+                <TextBox Grid.Column="0"
+                         Text="{Binding IdleText, Mode=TwoWay}"
+                         Watermark="{Binding [Combo_IdleWatermark], Source={StaticResource Loc}}" />
+                <TextBlock Grid.Column="1" Classes="field" Margin="8,0,0,0" Text="ms" />
+            </Grid>
+
+            <TextBlock Grid.Row="5" Grid.Column="0" Classes="field"
+                       Text="{Binding [Combo_FieldSlowRelease], Source={StaticResource Loc}}" />
+            <CheckBox Grid.Row="5" Grid.Column="1" Margin="0,3"
+                      Content="{Binding [Combo_SlowReleaseHint], Source={StaticResource Loc}}"
+                      IsChecked="{Binding SlowRelease, Mode=TwoWay}" />
+        </Grid>
+
+        <!-- Centre: label-layer row on top, the picker board, and the picked
+             keys' summary under it. -->
+        <DockPanel>
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+                <TextBlock Margin="0"
+                           Foreground="{StaticResource TextSubtle}" FontSize="12"
+                           VerticalAlignment="Center"
+                           Text="{Binding [Combo_LabelLayer], Source={StaticResource Loc}}" />
+                <ComboBox ItemsSource="{Binding LabelLayers}"
+                          SelectedItem="{Binding LabelLayer, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LayerChoice">
+                            <TextBlock Text="{Binding Text}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+
+            <Grid DockPanel.Dock="Bottom" Margin="0,8,0,0" MinHeight="18">
+                <TextBlock Text="{Binding KeysSummary}"
+                           Foreground="{StaticResource AccentGreen}" FontSize="12" FontWeight="SemiBold"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding KeysSummary, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+                <TextBlock Text="{Binding [Combo_KeysHint], Source={StaticResource Loc}}"
+                           Foreground="{StaticResource TextSubtle}" FontSize="12" FontStyle="Italic"
+                           IsVisible="{Binding KeysSummary, Converter={x:Static conv:StringConverters.IsNullOrEmpty}}" />
+            </Grid>
+
+            <Border BorderBrush="{StaticResource BgSurface0}" BorderThickness="1" CornerRadius="6"
+                    Background="{StaticResource BgBase}" Padding="12" MinHeight="140">
+                <views:BoardView />
+            </Border>
+        </DockPanel>
+
+    </DockPanel>
+
+</Window>

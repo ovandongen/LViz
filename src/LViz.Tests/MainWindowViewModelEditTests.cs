@@ -1416,4 +1416,253 @@ public class MainWindowViewModelEditTests : IDisposable
         // Only a save moves settings — a discarded move never does.
         AssertSettingsUnchanged(settings.Current);
     }
+
+    // ---- combo legend and combo actions while editing ----------------------
+
+    /// <summary>A dialog answer: the combo on <paramref name="keys"/> fires
+    /// <c>&amp;kp ESC</c> on every layer, node name <c>combo_ESC</c>.</summary>
+    private static ZmkCombo EscCombo(IReadOnlyList<int> keys) =>
+        new("ESC", "", keys, [-1], new KeyBinding("&kp", ["ESC"])) { NodeName = "combo_ESC" };
+
+    /// <summary>A review callback answering go-ahead, so the save proceeds.</summary>
+    private static Task<KeymapReviewAnswer?> GoAhead(KeymapReviewRequest _) =>
+        Task.FromResult<KeymapReviewAnswer?>(new KeymapReviewAnswer(null));
+
+    [Fact]
+    public void IsComboLegendVisible_ForcedOnWhileEditing_OffAgainAfterDiscard()
+    {
+        var raised = new List<string?>();
+        var vm = NewVm(NewSettings());
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        vm.LoadLayoutFromPath(WriteTempKeymap());
+
+        Assert.False(vm.IsComboOverlayVisible); // the persisted toggle is off
+        vm.StartEditCommand.Execute(null);
+        Assert.True(vm.IsEditing);
+        Assert.True(vm.IsComboLegendVisible);   // edit mode shows the legend anyway
+        Assert.Contains(nameof(vm.IsComboLegendVisible), raised);
+
+        vm.DiscardEditCommand.Execute(null);
+
+        Assert.False(vm.IsEditing);
+        Assert.False(vm.IsComboLegendVisible);
+    }
+
+    [Fact]
+    public async Task NewCombo_Answer_AddsEditableChangedTile_AndCarriesRequest()
+    {
+        var vm = StartEditing(out _);
+        ComboDialogRequest? captured = null;
+        vm.ComboDialogRequested = request =>
+        {
+            captured = request;
+            return Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
+        };
+
+        await vm.NewComboCommand.ExecuteAsync(null);
+
+        Assert.NotNull(captured);
+        Assert.Same(vm.SelectedKeyboard, captured!.Profile);
+        Assert.Null(captured.ComboIndex);
+        Assert.Equal(vm.ActiveLayerIndex, captured.ShownLayerIndex);
+
+        Assert.Single(vm.Combos);
+        Assert.True(vm.Combos[0].IsEditable);
+        Assert.True(vm.Combos[0].IsChanged);
+        Assert.Equal(1, vm.UnsavedEditCount);
+        Assert.Single(vm.Edit!.Session.Current.Combos);
+    }
+
+    [Fact]
+    public async Task ComboCommands_WithoutCallbackOrWithoutEdit_DoNothing()
+    {
+        var vm = StartEditing(out _);
+
+        // No callback wired up: opening the dialog does nothing.
+        await vm.NewComboCommand.ExecuteAsync(null);
+        await vm.EditComboCommand.ExecuteAsync(1);
+        Assert.Empty(vm.Combos);
+        Assert.Equal(0, vm.UnsavedEditCount);
+
+        vm.DiscardEditCommand.Execute(null);
+        Assert.False(vm.NewComboCommand.CanExecute(null));
+        vm.DeleteComboCommand.Execute(1); // outside an edit: nothing, no throw
+        Assert.Empty(vm.Combos);
+    }
+
+    [Fact]
+    public async Task NewCombo_SecondRequestWhileDialogOpen_IsIgnored()
+    {
+        var vm = StartEditing(out _);
+        var gate = new TaskCompletionSource<ZmkCombo?>();
+        var calls = 0;
+        vm.ComboDialogRequested = _ =>
+        {
+            calls++;
+            return gate.Task;
+        };
+
+        var first = vm.NewComboCommand.ExecuteAsync(null);
+        await vm.NewComboCommand.ExecuteAsync(null); // guard: returns at once
+        Assert.Equal(1, calls);
+
+        gate.SetResult(EscCombo([0, 1]));
+        await first;
+        Assert.Single(vm.Combos);
+    }
+
+    [Fact]
+    public async Task EditCombo_Answer_ReplacesBinding_NullAndOutOfRange_ChangeNothing()
+    {
+        var vm = StartEditing(out _);
+        vm.ComboDialogRequested = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
+        await vm.NewComboCommand.ExecuteAsync(null);
+        var original = vm.Edit!.Session.Current.Combos[0];
+
+        var changed = original with { Binding = new KeyBinding("&kp", ["TAB"]) };
+        ComboDialogRequest? captured = null;
+        vm.ComboDialogRequested = request =>
+        {
+            captured = request;
+            return Task.FromResult<ZmkCombo?>(changed);
+        };
+        await vm.EditComboCommand.ExecuteAsync(1);
+
+        Assert.NotNull(captured);
+        Assert.Equal(0, captured!.ComboIndex);
+        Assert.Equal(vm.ActiveLayerIndex, captured.ShownLayerIndex);
+        Assert.Same(changed.Binding, vm.Edit!.Session.Current.Combos[0].Binding);
+
+        // A cancelled dialog (null) changes nothing.
+        vm.ComboDialogRequested = _ => Task.FromResult<ZmkCombo?>(null);
+        await vm.EditComboCommand.ExecuteAsync(1);
+        Assert.Same(changed.Binding, vm.Edit.Session.Current.Combos[0].Binding);
+
+        // An out-of-range tile number never even reaches the callback.
+        var called = false;
+        vm.ComboDialogRequested = _ =>
+        {
+            called = true;
+            return Task.FromResult<ZmkCombo?>(changed);
+        };
+        await vm.EditComboCommand.ExecuteAsync(2);
+        Assert.False(called);
+        Assert.Same(changed.Binding, vm.Edit.Session.Current.Combos[0].Binding);
+    }
+
+    [Fact]
+    public async Task DeleteCombo_RemovesTheAddedTile_NetsBackToZero()
+    {
+        var vm = StartEditing(out _);
+        vm.ComboDialogRequested = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
+        await vm.NewComboCommand.ExecuteAsync(null);
+        Assert.Single(vm.Combos);
+        Assert.Equal(1, vm.UnsavedEditCount);
+
+        vm.DeleteComboCommand.Execute(1);
+
+        // The session's change event rebuilds the legend, and add-plus-delete
+        // nets against the baseline.
+        Assert.Empty(vm.Combos);
+        Assert.Equal(0, vm.UnsavedEditCount);
+
+        vm.DeleteComboCommand.Execute(1); // out of range: nothing, no throw
+        vm.DeleteComboCommand.Execute(0);
+        Assert.Empty(vm.Combos);
+    }
+
+    [Fact]
+    public async Task ComboEditAndDelete_DoNothingWhileASaveIsInFlight()
+    {
+        var vm = StartEditing(out _);
+        vm.ComboDialogRequested = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
+        await vm.NewComboCommand.ExecuteAsync(null);
+        Assert.Single(vm.Combos);
+
+        var opened = 0;
+        vm.ComboDialogRequested = _ => { opened++; return Task.FromResult<ZmkCombo?>(EscCombo([0, 2])); };
+        vm.IsSavingEdit = true;
+
+        // The save plan is already built: an edit now would be lost.
+        vm.DeleteComboCommand.Execute(1);
+        await vm.EditComboCommand.ExecuteAsync(1);
+
+        Assert.Single(vm.Edit!.Session.Current.Combos);
+        Assert.Equal(0, opened);
+    }
+
+    [Fact]
+    public async Task NewCombo_Undo_EmptiesTheLegendAgain()
+    {
+        var vm = StartEditing(out _);
+        vm.ComboDialogRequested = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
+        await vm.NewComboCommand.ExecuteAsync(null);
+        Assert.Single(vm.Combos);
+
+        vm.Edit!.UndoCommand.Execute(null);
+
+        Assert.Empty(vm.Combos);
+        Assert.Equal(0, vm.UnsavedEditCount);
+    }
+
+    [Fact]
+    public async Task SaveEdit_AfterComboAdd_WritesComboNode_ReloadsOnePlainTile()
+    {
+        var vm = StartEditing(out var path);
+        vm.ReviewChangesRequested = GoAhead;
+        vm.ComboDialogRequested = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
+        await vm.NewComboCommand.ExecuteAsync(null);
+
+        await vm.SaveEditCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsEditing);
+        var saved = File.ReadAllText(path);
+        Assert.Contains("combo_ESC", saved);
+        Assert.Single(ZmkKeymapLoader.LoadFromText(saved, "test").Combos);
+
+        // Out of edit mode the legend is the reloaded file's combo — no
+        // edit-mode flags left on the tile.
+        Assert.Single(vm.Combos);
+        Assert.False(vm.Combos[0].IsEditable);
+        Assert.False(vm.Combos[0].IsChanged);
+    }
+
+    [Fact]
+    public async Task SaveEdit_MovesComboLabelWithCombo_ClearsItOnDelete()
+    {
+        var settings = NewSettings();
+        var vm = NewVm(settings);
+        var path = WriteTempKeymap();
+        vm.LoadLayoutFromPath(path);
+        vm.ReviewChangesRequested = GoAhead;
+
+        // Add the combo on keys 0+1 and get it into the file.
+        vm.StartEditCommand.Execute(null);
+        vm.ComboDialogRequested = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
+        await vm.NewComboCommand.ExecuteAsync(null);
+        await vm.SaveEditCommand.ExecuteAsync(null);
+
+        vm.SetComboLabelOverride("0,1", new ComboLabelOverride { MainLabel = "Esc" });
+        Assert.NotNull(ComboLabelOverrides.Get("Corne", "0,1"));
+
+        // Move it to keys 0+2 — the label follows the combo to the new key.
+        vm.StartEditCommand.Execute(null);
+        vm.ComboDialogRequested = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 2]));
+        await vm.EditComboCommand.ExecuteAsync(1);
+        await vm.SaveEditCommand.ExecuteAsync(null);
+
+        Assert.NotNull(ComboLabelOverrides.Get("Corne", "0,2"));
+        Assert.Null(ComboLabelOverrides.Get("Corne", "0,1"));
+        Assert.True(settings.Current.ComboLabelOverrides.TryGetValue("Corne", out var stored)
+            && stored.ContainsKey("0,2") && !stored.ContainsKey("0,1"));
+
+        // Delete the combo — its label goes with it.
+        vm.StartEditCommand.Execute(null);
+        vm.DeleteComboCommand.Execute(1);
+        await vm.SaveEditCommand.ExecuteAsync(null);
+
+        Assert.Null(ComboLabelOverrides.Get("Corne", "0,2"));
+        Assert.False(settings.Current.ComboLabelOverrides.TryGetValue("Corne", out var left)
+            && left.ContainsKey("0,2"));
+    }
 }

@@ -100,6 +100,10 @@ public class SettingsViewModelMainPropertyCoverageTests
         "CanStartEdit",
         "EditButtonTooltip",
         "IsSavingEdit",
+
+        // Legend visibility, main window only — the persisted toggle
+        // (IsComboOverlayVisible, bound directly) or forced on while editing.
+        "IsComboLegendVisible",
     };
 
     [Fact]

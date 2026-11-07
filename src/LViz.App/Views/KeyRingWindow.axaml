@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:svc="using:LViz.App.Services"
         x:Class="LViz.App.Views.KeyRingWindow"
         SystemDecorations="None"
         Background="Transparent"
@@ -13,9 +14,9 @@
          canvas is filled with a near-transparent colour (alpha 1/255): a fully
          transparent pixel lets the click through to the window below on
          macOS, so without it a click beside the ring would never reach us.
-         No app resources: the view brings its own literals (KeyRingView.axaml). -->
+         No app resources: colours come from AppTheme via x:Static. -->
     <Canvas x:Name="Host" Background="#01000000" ClipToBounds="False">
-        <Line x:Name="Tether" Stroke="#99E8B45A" StrokeThickness="1.5"
+        <Line x:Name="Tether" Stroke="{x:Static svc:AppTheme.AccentGoldTetherBrush}" StrokeThickness="1.5"
               StrokeLineCap="Round" IsHitTestVisible="False" IsVisible="False" />
     </Canvas>
 

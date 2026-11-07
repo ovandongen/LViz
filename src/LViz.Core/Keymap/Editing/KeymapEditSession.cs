@@ -16,7 +16,10 @@ namespace LViz.Core.Keymap.Editing;
 /// Layers are tracked by an internal id (baseline layer <c>i</c> starts as id
 /// <c>i</c>) rather than by position, so inserting, removing or moving layers
 /// keeps already-recorded steps and per-layer change tracking correct while
-/// positions shift underneath them.
+/// positions shift underneath them. Combos are tracked by an internal id the
+/// same way (baseline combo <c>i</c> starts as id <c>i</c>), which is what lets
+/// added, changed and deleted combos be counted and turned back into the net
+/// <see cref="PendingComboEdits"/> while positions shift underneath them.
 /// </para>
 /// </summary>
 public sealed class KeymapEditSession
@@ -40,6 +43,21 @@ public sealed class KeymapEditSession
     /// that held it was deleted again — which keeps origins and steps unambiguous.</summary>
     private int _nextLayerId;
 
+    /// <summary>Combo id at each position of <see cref="Current"/>.Combos.</summary>
+    private readonly List<int> _comboIds = [];
+
+    /// <summary>The baseline combo each baseline combo id is measured against.</summary>
+    private readonly Dictionary<int, ZmkCombo> _comboOrigins = [];
+
+    /// <summary>Combo ids the baseline owns (<c>0 … n−1</c>): a current id at or
+    /// above this count is a combo this session added, a number below it that is
+    /// gone from <see cref="_comboIds"/> is a combo it deleted.</summary>
+    private readonly int _baselineComboCount;
+
+    /// <summary>One past the highest combo id this session ever handed out; like
+    /// the layer ids, an id is never reused.</summary>
+    private int _nextComboId;
+
     /// <exception cref="ArgumentNullException"><paramref name="baseline"/> is null.</exception>
     public KeymapEditSession(KeyboardConfig baseline)
     {
@@ -58,6 +76,15 @@ public sealed class KeymapEditSession
 
         _baselineLayerCount = baseline.Layers.Count;
         _nextLayerId = baseline.Layers.Count;
+
+        for (int i = 0; i < baseline.Combos.Count; i++)
+        {
+            _comboIds.Add(i);
+            _comboOrigins[i] = baseline.Combos[i];
+        }
+
+        _baselineComboCount = baseline.Combos.Count;
+        _nextComboId = baseline.Combos.Count;
     }
 
     /// <summary>The keymap as it was loaded. This instance is never modified.</summary>
@@ -66,7 +93,8 @@ public sealed class KeymapEditSession
     /// <summary>
     /// The keymap with every applied edit in it. Starts out as the
     /// <see cref="Baseline"/> instance; each edit replaces it with a new record
-    /// whose untouched layers, macros, hold-taps and combos are the same instances.
+    /// whose untouched parts — layers, macros, hold-taps, and for a non-combo
+    /// edit the combos — are the same instances.
     /// </summary>
     public KeyboardConfig Current { get; private set; }
 
@@ -205,7 +233,8 @@ public sealed class KeymapEditSession
     /// </exception>
     /// <exception cref="ArgumentException">
     /// An add carries the wrong number of bindings or an invalid name, or
-    /// <paramref name="after"/> has the number of layers the edit does not produce.
+    /// <paramref name="after"/> has the number of layers the edit does not produce
+    /// or a combo list other than the one it started from.
     /// </exception>
     /// <exception cref="InvalidOperationException">
     /// The last layer of the keymap would be deleted, or the keymap has no layer to
@@ -278,6 +307,14 @@ public sealed class KeymapEditSession
             throw new ArgumentException(
                 $"{Describe(edit)} needs the resulting keymap to have {expected} layer(s), "
                 + $"it has {after.Layers.Count}.",
+                nameof(after));
+
+        // A layer structure edit renumbers layer references; it never touches the
+        // combo list. Combos come and go through AddCombo/SetCombo/DeleteCombo.
+        if (after.Combos.Count != Current.Combos.Count)
+            throw new ArgumentException(
+                $"{Describe(edit)} does not change the combo list, it has {after.Combos.Count} "
+                + $"combo(s), the keymap has {Current.Combos.Count}.",
                 nameof(after));
 
         var beforeIds = _layerIds.ToArray();
@@ -421,6 +458,129 @@ public sealed class KeymapEditSession
         return true;
     }
 
+    // ---- combo edits ------------------------------------------------------------
+
+    /// <summary>
+    /// Append <paramref name="combo"/> to <see cref="Current"/>.Combos as a single
+    /// undo step. The session accepts any combo — name, key-count and duplicate
+    /// rules (<see cref="ComboRules"/>) are the caller's job.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="combo"/> is null.</exception>
+    /// <returns>The index the combo landed at in <see cref="Current"/>.Combos.</returns>
+    public int AddCombo(ZmkCombo combo)
+    {
+        ArgumentNullException.ThrowIfNull(combo);
+
+        var index = Current.Combos.Count;
+        Commit(new ComboStep(index, null, combo, _nextComboId++));
+        return index;
+    }
+
+    /// <summary>
+    /// Replace the combo at <paramref name="index"/> as a single undo step.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="combo"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="index"/> is outside the current combo list.
+    /// </exception>
+    /// <returns>
+    /// <see langword="false"/> when the combo already
+    /// <see cref="ZmkCombo.IsSameAs">IsSameAs</see> the current one; the call
+    /// then records nothing and raises no event.
+    /// </returns>
+    public bool SetCombo(int index, ZmkCombo combo)
+    {
+        ArgumentNullException.ThrowIfNull(combo);
+
+        var combos = Current.Combos;
+        if (index < 0 || index >= combos.Count)
+            throw new ArgumentOutOfRangeException(
+                nameof(index),
+                $"combo change targets combo {index}, the keymap has {combos.Count} combo(s).");
+
+        var current = combos[index];
+        if (current.IsSameAs(combo)) return false;
+
+        Commit(new ComboStep(index, current, combo, _comboIds[index]));
+        return true;
+    }
+
+    /// <summary>Remove the combo at <paramref name="index"/> as a single undo step.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="index"/> is outside the current combo list.
+    /// </exception>
+    public void DeleteCombo(int index)
+    {
+        var combos = Current.Combos;
+        if (index < 0 || index >= combos.Count)
+            throw new ArgumentOutOfRangeException(
+                nameof(index),
+                $"combo delete targets combo {index}, the keymap has {combos.Count} combo(s).");
+
+        Commit(new ComboStep(index, combos[index], null, _comboIds[index]));
+    }
+
+    /// <summary>
+    /// True when the combo at <paramref name="index"/> was added in this session
+    /// or is not <see cref="ZmkCombo.IsSameAs">IsSameAs</see> its baseline
+    /// version. An index outside <see cref="Current"/> reads as unchanged.
+    /// </summary>
+    public bool IsComboChanged(int index)
+    {
+        if (index < 0 || index >= _comboIds.Count) return false;
+
+        var id = _comboIds[index];
+        if (id >= _baselineComboCount) return true; // added here, changed by definition
+        return !Current.Combos[index].IsSameAs(_comboOrigins[id]);
+    }
+
+    /// <summary>
+    /// The combo adds, changes and deletes that turn the baseline combo list into
+    /// the current one — derived from where each combo started and where it is
+    /// now, not from the undo history, so steps the user reversed by hand (an add
+    /// and the delete of that combo) never show up.
+    /// </summary>
+    /// <remarks>
+    /// The order: all deletes first, in baseline order, then changes in current
+    /// order, then adds in current order. A delete or change names the combo by
+    /// its <b>baseline</b> node name — <c>NodeName</c>, or <c>Name</c> for a
+    /// combo that never came from a <c>.keymap</c> — the name the file knows it
+    /// by, even when the edit renames it. Empty whenever nothing differs.
+    /// </remarks>
+    public IReadOnlyList<ComboEdit> PendingComboEdits
+    {
+        get
+        {
+            var edits = new List<ComboEdit>();
+            var present = new HashSet<int>(_comboIds);
+
+            for (int id = 0; id < _baselineComboCount; id++)
+            {
+                if (present.Contains(id)) continue;
+                var origin = _comboOrigins[id];
+                edits.Add(new ComboEdit.Delete(origin.NodeName ?? origin.Name));
+            }
+
+            for (int i = 0; i < _comboIds.Count; i++)
+            {
+                var id = _comboIds[i];
+                if (id >= _baselineComboCount) continue; // an add, listed below
+                var origin = _comboOrigins[id];
+                var combo = Current.Combos[i];
+                if (!combo.IsSameAs(origin))
+                    edits.Add(new ComboEdit.Change(origin.NodeName ?? origin.Name, combo));
+            }
+
+            for (int i = 0; i < _comboIds.Count; i++)
+            {
+                if (_comboIds[i] >= _baselineComboCount)
+                    edits.Add(new ComboEdit.Add(Current.Combos[i]));
+            }
+
+            return edits;
+        }
+    }
+
     /// <summary>Undo the last step. Does nothing when there is no step to undo.</summary>
     /// <returns><see langword="true"/> when a step was undone.</returns>
     public bool Undo()
@@ -555,10 +715,12 @@ public sealed class KeymapEditSession
     /// Changed keys and renamed layers over every layer, plus what is structurally
     /// different from the baseline: one per added layer, one per deleted baseline
     /// layer, and one more as soon as the surviving baseline layers sit in a
-    /// different relative order. Always computed from <see cref="Current"/> against
-    /// the origins — never from the undo stack — so undoing everything, editing a
-    /// key back to its baseline value, or moving a layer and moving it back reads
-    /// as clean again.
+    /// different relative order. Over the combos: one per added combo, one per
+    /// deleted baseline combo, and one per surviving baseline combo that is not
+    /// <see cref="ZmkCombo.IsSameAs">IsSameAs</see> its baseline version. Always
+    /// computed from <see cref="Current"/> against the origins — never from the
+    /// undo stack — so undoing everything, editing a key or combo back to its
+    /// baseline value, or moving a layer and moving it back reads as clean again.
     /// </summary>
     public int ChangeCount
     {
@@ -606,6 +768,23 @@ public sealed class KeymapEditSession
                 }
             }
 
+            // Combos: one per added combo, one per baseline combo that is gone,
+            // one per surviving baseline combo that is not IsSameAs its origin.
+            var baselineCombosPresent = 0;
+            for (int i = 0; i < _comboIds.Count; i++)
+            {
+                var id = _comboIds[i];
+                if (id >= _baselineComboCount)
+                {
+                    count++; // added here
+                    continue;
+                }
+                baselineCombosPresent++;
+                if (!Current.Combos[i].IsSameAs(_comboOrigins[id])) count++;
+            }
+
+            count += _baselineComboCount - baselineCombosPresent; // the deleted ones
+
             return count;
         }
     }
@@ -652,6 +831,40 @@ public sealed class KeymapEditSession
         var layers = Current.Layers.ToArray();
         layers[position] = layer with { Index = position }; // Index mirrors position, always
         Current = Current with { Layers = layers };
+    }
+
+    /// <summary>
+    /// Run one combo step: forward lands on <see cref="ComboStep.New"/>, backward
+    /// on <see cref="ComboStep.Old"/>. No old combo is an add, no new one a
+    /// delete; the id rides along so <see cref="_comboIds"/> stays parallel to
+    /// the list. Undo/redo replay strictly last-in-first-out, so the recorded
+    /// index is still the right position — also around a structural step, whose
+    /// snapshots carry the combo list but never re-shuffle the combo ids.
+    /// </summary>
+    private void WriteCombo(ComboStep step, bool forward)
+    {
+        var combos = Current.Combos.ToList();
+
+        var insert = step.Old is null;
+        var remove = step.New is null;
+        if (!forward) (insert, remove) = (remove, insert); // an undo removes an add and restores a delete
+
+        if (insert)
+        {
+            combos.Insert(step.Index, (forward ? step.New : step.Old)!);
+            _comboIds.Insert(step.Index, step.Id);
+        }
+        else if (remove)
+        {
+            combos.RemoveAt(step.Index);
+            _comboIds.RemoveAt(step.Index);
+        }
+        else
+        {
+            combos[step.Index] = forward ? step.New! : step.Old!;
+        }
+
+        Current = Current with { Combos = combos };
     }
 
     /// <summary>Swap the whole layer list and its ids for a snapshot taken by a
@@ -732,6 +945,19 @@ public sealed class KeymapEditSession
         public override void Apply(KeymapEditSession session) => session.SetLayerName(LayerId, NewName);
 
         public override void Revert(KeymapEditSession session) => session.SetLayerName(LayerId, OldName);
+    }
+
+    /// <summary>
+    /// One combo action: an add carries no <see cref="Old"/>, a delete no
+    /// <see cref="New"/>, a change both; <see cref="Id"/> is the combo's session
+    /// id — a fresh never-reused one for an add — so undo and redo can put it
+    /// back into <c>_comboIds</c> at <see cref="Index"/> exactly as it was.
+    /// </summary>
+    private sealed record ComboStep(int Index, ZmkCombo? Old, ZmkCombo? New, int Id) : EditStep
+    {
+        public override void Apply(KeymapEditSession session) => session.WriteCombo(this, forward: true);
+
+        public override void Revert(KeymapEditSession session) => session.WriteCombo(this, forward: false);
     }
 
     /// <summary>

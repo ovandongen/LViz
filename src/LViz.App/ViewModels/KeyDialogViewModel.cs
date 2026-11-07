@@ -19,7 +19,11 @@ namespace LViz.App.ViewModels;
 /// (&amp;bt, &amp;out, …) edits its command on one tab taking the binding's
 /// whole param list (a command name plus an optional profile number).
 /// Anything the editors cannot show (an unknown behavior, a param-count
-/// mismatch, a seed the editors reject) opens as Custom free text.
+/// mismatch, a seed the editors reject) opens as Custom free text. A
+/// parameter of <see cref="ZmkBehaviorParamKind.Ignored"/> gets no editor:
+/// its binding cell keeps the value it opened with, or is written <c>0</c>
+/// on a fresh pick, and a <c>[Layer, Ignored]</c> hold-tap whose uses all
+/// name one layer prefills that layer — one pick in total.
 /// </summary>
 public sealed partial class KeyDialogViewModel : ObservableObject
 {
@@ -37,6 +41,12 @@ public sealed partial class KeyDialogViewModel : ObservableObject
 
     private readonly KeyboardConfig _config;
     private readonly IReadOnlyList<KeyValuePair<string, string>> _defines;
+
+    /// <summary>The defines a layer number may be spelled as when the dialog
+    /// shows binding text; every define stays in <see cref="_defines"/> for
+    /// parsing typed text.</summary>
+    private readonly IReadOnlyList<KeyValuePair<string, string>> _displayDefines;
+
     private readonly IReadOnlyDictionary<string, ZmkMacro> _macros;
 
     public KeyDialogViewModel(KeyDialogRequest request)
@@ -45,6 +55,7 @@ public sealed partial class KeyDialogViewModel : ObservableObject
 
         _config = request.Config;
         _defines = request.Defines;
+        _displayDefines = request.LayerDefines ?? request.Defines;
 
         if (request.LayerIndex < 0 || request.LayerIndex >= _config.Layers.Count)
         {
@@ -52,11 +63,25 @@ public sealed partial class KeyDialogViewModel : ObservableObject
                 nameof(request), request.LayerIndex, "Layer index is outside the keymap.");
         }
 
-        var bindings = _config.Layers[request.LayerIndex].Bindings;
-        if (request.KeyIndex < 0 || request.KeyIndex >= bindings.Count)
+        var layerName = _config.Layers[request.LayerIndex].Name;
+
+        // A carried binding (e.g. a combo's) replaces the layer key's; the
+        // layer is then only context, so KeyIndex is neither checked nor used.
+        KeyBinding binding;
+        if (request.Binding is { } carried)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(request), request.KeyIndex, "Key index is outside the layer.");
+            binding = carried;
+        }
+        else
+        {
+            var bindings = _config.Layers[request.LayerIndex].Bindings;
+            if (request.KeyIndex < 0 || request.KeyIndex >= bindings.Count)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(request), request.KeyIndex, "Key index is outside the layer.");
+            }
+
+            binding = bindings[request.KeyIndex];
         }
 
         Usage = ZmkKeycodeUsage.Count(_config);
@@ -66,10 +91,11 @@ public sealed partial class KeyDialogViewModel : ObservableObject
             .GroupBy(macro => macro.Name, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
 
-        TitleText = Loc.Instance.Format(
-            "KeyDialog_TitleFormat", request.KeyIndex, _config.Layers[request.LayerIndex].Name);
+        TitleText = request.Caption ?? (request.Binding is not null
+            ? Loc.Instance.Format("KeyDialog_TitleCustomFormat", layerName)
+            : Loc.Instance.Format("KeyDialog_TitleFormat", request.KeyIndex, layerName));
 
-        Seed(bindings[request.KeyIndex]);
+        Seed(binding);
     }
 
     // ─── Lists and selection ──────────────────────────────────────────────
@@ -88,9 +114,21 @@ public sealed partial class KeyDialogViewModel : ObservableObject
     public IReadOnlyList<KeyBehaviorChoice> OtherBehaviors =>
         AllOtherBehaviors.Where(choice => KeyBehaviorChoices.Matches(choice, BehaviorFilter)).ToArray();
 
-    /// <summary>The one editor per parameter of the selected behavior; empty
-    /// for Custom and for parameterless behaviors.</summary>
+    /// <summary>The one editor per parameter the editors show; empty for
+    /// Custom and for parameterless behaviors. An
+    /// <see cref="ZmkBehaviorParamKind.Ignored"/> parameter gets no editor —
+    /// its cell keeps the binding's value, or is written <c>0</c> on a fresh
+    /// pick (see <see cref="_ignoredGroups"/>).</summary>
     public IReadOnlyList<KeyParamViewModel> Params { get; private set; } = [];
+
+    /// <summary>One entry per original parameter position of the selected
+    /// behavior: the kept group of an Ignored parameter (written back in its
+    /// original spot by <see cref="Result"/>), null for a position an editor
+    /// shows. Rebuilt with every <see cref="BuildParams"/>.</summary>
+    private IReadOnlyList<string>?[] _ignoredGroups = [];
+
+    /// <summary>What a fresh behavior pick writes into an Ignored parameter.</summary>
+    private static IReadOnlyList<string> DefaultIgnoredGroup { get; } = ["0"];
 
     /// <summary>True while the free-text entry is selected.</summary>
     public bool IsCustom => SelectedBehavior.IsCustom;
@@ -150,7 +188,10 @@ public sealed partial class KeyDialogViewModel : ObservableObject
 
     /// <summary>Rebuilds the editors for the new behavior, carries over what
     /// still fits, and lands on the first parameter tab without a value (the
-    /// last one when all have values, tab 0 without params).</summary>
+    /// last one when all have values, tab 0 without params). A
+    /// <c>[Layer, Ignored]</c> hold-tap whose uses all name one layer is the
+    /// exception: the pinned layer fills the layer editor and the tab stays
+    /// on the behavior — the pick is complete on its own.</summary>
     private void SwitchBehavior(
         KeyBehaviorChoice next, IReadOnlyList<KeyParamViewModel> previousParams, string previousPreview)
     {
@@ -159,7 +200,8 @@ public sealed partial class KeyDialogViewModel : ObservableObject
         var oldLayer = previousParams
             .LastOrDefault(param => param.Kind == ZmkBehaviorParamKind.Layer)?.Values;
 
-        SetParams(BuildParams(next.Behavior));
+        var (editors, _, ignored) = BuildParams(next.Behavior);
+        SetParams(editors, ignored);
 
         if (next.IsCustom)
         {
@@ -181,6 +223,13 @@ public sealed partial class KeyDialogViewModel : ObservableObject
                 ((LayerParamViewModel)Params[layerIndex]).Seed(oldLayer);
         }
 
+        // The pinned layer wins over the carried-over one; the Ignored cell
+        // already holds its default, so a hit leaves nothing to pick.
+        var pinnedComplete =
+            next.Behavior?.Params is [ZmkBehaviorParamKind.Layer, ZmkBehaviorParamKind.Ignored]
+            && ZmkBehaviorCatalog.PinnedLayer(_config, next.Code) is int pinned
+            && SeedLayerEditor(pinned);
+
         int firstMissing = -1;
         for (int i = 0; i < Params.Count; i++)
         {
@@ -192,21 +241,47 @@ public sealed partial class KeyDialogViewModel : ObservableObject
         }
 
         SelectedTabIndex = Params.Count == 0 ? 0
+            : pinnedComplete ? 0
             : firstMissing >= 0 ? firstMissing
             : Params.Count;
 
         RefreshDerived();
     }
 
-    private IReadOnlyList<KeyParamViewModel> BuildParams(ZmkBehavior? behavior)
+    /// <summary>Seeds the behavior's one layer editor with a pinned layer;
+    /// false when there is no layer editor to seed.</summary>
+    private bool SeedLayerEditor(int layer)
     {
-        if (behavior is null) return [];
+        var editor = Params.OfType<LayerParamViewModel>().FirstOrDefault();
+        return editor is not null
+            && editor.Seed([layer.ToString(CultureInfo.InvariantCulture)]);
+    }
+
+    /// <summary>Builds the editor list for a behavior together with the
+    /// layout maps it needs: the original position of each editor, and one
+    /// entry per original position holding an Ignored parameter's default
+    /// group (a fresh pick's <c>["0"]</c>) or null for a shown one. The
+    /// caller replaces the Ignored groups when it seeds an existing binding.</summary>
+    private (KeyParamViewModel[] Editors, int[] Positions, IReadOnlyList<string>?[] Ignored) BuildParams(
+        ZmkBehavior? behavior)
+    {
+        if (behavior is null) return ([], [], []);
 
         var labels = KeyParamLabels.For(behavior, _config);
         var editors = new List<KeyParamViewModel>(behavior.Params.Count);
+        var positions = new List<int>(behavior.Params.Count);
+        var ignored = new IReadOnlyList<string>?[behavior.Params.Count];
         for (int i = 0; i < behavior.Params.Count; i++)
         {
             var kind = behavior.Params[i];
+            if (kind == ZmkBehaviorParamKind.Ignored)
+            {
+                ignored[i] = DefaultIgnoredGroup;
+                continue;
+            }
+
+            // The editor of original position i carries that position's
+            // label, so &magic's single editor reads Hold, not Param 1.
             // KeyParamLabels covers every arity the catalog produces; the
             // numbered fallback only catches a catalog/label drift.
             var label = i < labels.Count ? labels[i] : Loc.Instance.Format("KeyDialog_ParamFormat", i + 1);
@@ -220,9 +295,10 @@ public sealed partial class KeyDialogViewModel : ObservableObject
             };
             editor.Changed += OnEditorChanged;
             editors.Add(editor);
+            positions.Add(i);
         }
 
-        return editors;
+        return ([.. editors], [.. positions], ignored);
     }
 
     private void OnEditorChanged(object? sender, EventArgs e) => RefreshDerived();
@@ -235,10 +311,12 @@ public sealed partial class KeyDialogViewModel : ObservableObject
     /// makes the view's tab strip drop its selection.</summary>
     public IReadOnlyList<KeyDialogTab> Tabs { get; private set; } = [];
 
-    /// <summary>Sets <see cref="Params"/> and a matching fresh <see cref="Tabs"/> list.</summary>
-    private void SetParams(IReadOnlyList<KeyParamViewModel> editors)
+    /// <summary>Sets <see cref="Params"/> with its Ignored-parameter layout
+    /// and a matching fresh <see cref="Tabs"/> list.</summary>
+    private void SetParams(IReadOnlyList<KeyParamViewModel> editors, IReadOnlyList<string>?[] ignored)
     {
         Params = editors;
+        _ignoredGroups = ignored;
         Tabs = Enumerable.Range(0, editors.Count + 1).Select(_ => new KeyDialogTab()).ToArray();
         OnPropertyChanged(nameof(Params));
         OnPropertyChanged(nameof(Tabs));
@@ -307,15 +385,28 @@ public sealed partial class KeyDialogViewModel : ObservableObject
                 if (param.Values is null) return null;
             }
 
-            var binding = new KeyBinding(
-                SelectedBehavior.Code, Params.SelectMany(param => param.Values!).ToList());
+            var binding = new KeyBinding(SelectedBehavior.Code, BuildFlatParams());
             if (!Params.Any(param => param.Kind == ZmkBehaviorParamKind.Raw)) return binding;
 
             // Raw tokens go through the parser too: it validates them and
             // flattens typed modifier nests like the other editors' picks.
             return ZmkBindingText.TryParse(
-                ZmkBindingFormatter.Format(binding, _defines), _defines, _config);
+                ZmkBindingFormatter.Format(binding, _displayDefines, _config.HoldTaps), _defines, _config);
         }
+    }
+
+    /// <summary>The editors' values interleaved with the Ignored parameters'
+    /// kept groups, in the selected behavior's original parameter order.</summary>
+    private List<string> BuildFlatParams()
+    {
+        var values = new List<string>(_ignoredGroups.Length);
+        int editor = 0;
+        for (int i = 0; i < _ignoredGroups.Length; i++)
+        {
+            if (_ignoredGroups[i] is { } group) values.AddRange(group);
+            else values.AddRange(Params[editor++].Values!);
+        }
+        return values;
     }
 
     /// <summary>Whether <see cref="Result"/> holds a binding to write.</summary>
@@ -340,10 +431,11 @@ public sealed partial class KeyDialogViewModel : ObservableObject
         }
     }
 
-    /// <summary>The binding as keymap text (the file's layer defines come
-    /// back through the formatter); empty without a result.</summary>
+    /// <summary>The binding as keymap text (the layer numbers the file
+    /// spells as defines come back through the formatter); empty without a
+    /// result.</summary>
     public string PreviewText =>
-        Result is { } result ? ZmkBindingFormatter.Format(result, _defines) : "";
+        Result is { } result ? ZmkBindingFormatter.Format(result, _displayDefines, _config.HoldTaps) : "";
 
     /// <summary>The main label the key would show.</summary>
     public string PreviewLabel => PreviewParts().Label;
@@ -351,7 +443,8 @@ public sealed partial class KeyDialogViewModel : ObservableObject
     /// <summary>The subscript the key would show.</summary>
     public string PreviewSubscript => PreviewParts().Subscript;
 
-    /// <summary>The dialog caption: which key on which layer.</summary>
+    /// <summary>The dialog caption: which key on which layer, or the
+    /// request's caption when it carries one.</summary>
     public string TitleText { get; }
 
     private (string Label, string Subscript) PreviewParts()
@@ -429,15 +522,24 @@ public sealed partial class KeyDialogViewModel : ObservableObject
         // directly, so the user-side switch logic (carry-over, tab lands)
         // does not run and the start tab is simply the last parameter.
         _selectedBehavior = choice;
-        SetParams(BuildParams(behavior));
+        var (editors, positions, ignored) = BuildParams(behavior);
+        SetParams(editors, ignored);
 
-        for (int i = 0; i < Params.Count; i++)
+        // An Ignored parameter keeps the group the binding has; the editors
+        // seed from their own position's group, not from list order.
+        for (int i = 0; i < ignored.Length; i++)
         {
-            bool seeded = Params[i] switch
+            if (ignored[i] is not null) ignored[i] = groups[i];
+        }
+
+        for (int e = 0; e < Params.Count; e++)
+        {
+            var group = groups[positions[e]];
+            bool seeded = Params[e] switch
             {
-                KeycodeParamViewModel keycode => keycode.Picker.Seed(groups[i]),
-                LayerParamViewModel layer => layer.Seed(groups[i]),
-                RawParamViewModel raw => SeedRaw(raw, groups[i]),
+                KeycodeParamViewModel keycode => keycode.Picker.Seed(group),
+                LayerParamViewModel layer => layer.Seed(group),
+                RawParamViewModel raw => SeedRaw(raw, group),
                 CommandParamViewModel command => command.Seed(groups),
                 _ => false,
             };
@@ -471,11 +573,11 @@ public sealed partial class KeyDialogViewModel : ObservableObject
     private void OpenAsCustom(KeyBinding binding)
     {
         _selectedBehavior = AllOtherBehaviors.First(choice => choice.IsCustom);
-        SetParams([]);
+        SetParams([], []);
         OnPropertyChanged(nameof(IsCustom));
         OnPropertyChanged(nameof(SelectedOtherBehavior));
         SelectedTabIndex = 0;
-        CustomText = ZmkBindingFormatter.Format(binding, _defines);
+        CustomText = ZmkBindingFormatter.Format(binding, _displayDefines, _config.HoldTaps);
         RefreshDerived();
     }
 }
