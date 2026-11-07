@@ -546,11 +546,15 @@ Carried over from the upstream Moergo build and still apply verbatim:
   boards. Key-count auto-switch must go through
   `KeyboardProfileRegistry.FindByKeyCount`, never `All.FirstOrDefault`: a
   board whose HID name matches a plugged-in keyboard wins a tie (pass the
-  names, `MainWindowViewModel.AttachedHidNames`), then user layouts, then
+  names, `Devices.AttachedHidNames`), then user layouts, then
   registry order. Only explicit opens auto-switch; a board's booked keymap
   (`LoadLayoutFromPath(…, keepBoard: true)`) never moves the board, and a
-  picked board (`SelectKeyboard`) never keeps another board's keymap. `All` is a fresh array per read: don't rely on its
-  identity.
+  picked board (`SelectKeyboard`) never keeps another board's keymap. Every
+  board change goes through `MainWindowViewModel.UseProfile` (screen + push
+  engines), and a change to another board, picked *or* auto-switched, also
+  calls `DeviceStack.SwitchProfile` (HID, bus matcher, capability rescan): an
+  auto-switch that skipped these left the engines and the bus on the old board.
+  `All` is a fresh array per read: don't rely on its identity.
 - **Per-key bounds must account for rotation about the explicit pivot.**
   Rotated keys (typical thumb clusters) can swing far outside the
   unrotated `(X, Y, X+W, Y+H)` rect. Call `KeyPosition.RotatedBounds()`

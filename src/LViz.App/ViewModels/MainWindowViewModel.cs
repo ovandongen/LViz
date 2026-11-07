@@ -637,12 +637,10 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             var matching = KeyboardProfileRegistry.FindByKeyCount(bindingCount, Devices.AttachedHidNames());
             if (matching is not null)
             {
-                _profile = matching;
-                SelectedKeyboard = matching;
-                BuildKeysFromProfile();
+                UseProfile(matching);
                 PersistSetting(s => s with { Keyboard = matching.Id });
-                // Re-scope HID discovery — see SelectKeyboard for context.
-                Devices.Hid.SetActiveProfile(matching);
+                // Re-scope HID discovery and the bus exclusion, like a picked board.
+                Devices.SwitchProfile(matching);
                 autoSwitchedTo = matching;
                 DiagnosticLog.Info("MainVM",
                     $"Auto-switched profile to {matching.Id} ({bindingCount} keys) on load");
@@ -1222,10 +1220,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         if (profile is null) return;
         if (string.Equals(profile.Id, _profile.Id, StringComparison.OrdinalIgnoreCase)) return;
 
-        _profile = profile;
-        SelectedKeyboard = profile;
-        BuildKeysFromProfile();
-        Devices.Push.SetActiveProfile(profile);
+        UseProfile(profile);
 
         var km = _keymap.Current;
         var layoutFits = km is not null
@@ -1344,6 +1339,18 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// message, persistence, or HID/bus re-scope — the device the picker
     /// points at doesn't change.
     /// </summary>
+    /// <summary>Make <paramref name="profile"/> the board on screen and in the
+    /// push engines (auto-switch rules, mouse layer). Every board change goes
+    /// through here; a change to another board also calls
+    /// <see cref="DeviceStack.SwitchProfile"/> to re-scope HID and the bus.</summary>
+    private void UseProfile(IKeyboardProfile profile)
+    {
+        _profile = profile;
+        SelectedKeyboard = profile;
+        BuildKeysFromProfile();
+        Devices.Push.SetActiveProfile(profile);
+    }
+
     private void ShowProfile(IKeyboardProfile profile)
     {
         if (!string.Equals(profile.Id, _profile.Id, StringComparison.OrdinalIgnoreCase))
@@ -1354,10 +1361,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             return;
         }
 
-        _profile = profile;
-        SelectedKeyboard = profile;
-        BuildKeysFromProfile();
-        Devices.Push.SetActiveProfile(profile);
+        UseProfile(profile);
 
         var km = _keymap.Current;
         if (km is not null && km.LayerCount > 0 && km.Layers[0].Bindings.Count == profile.KeyCount)

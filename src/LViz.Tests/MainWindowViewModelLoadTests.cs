@@ -126,6 +126,33 @@ public class MainWindowViewModelLoadTests
     }
 
     [Fact]
+    public void LoadLayoutFromPath_AutoSwitch_MovesTheEnginesToTheNewBoard()
+    {
+        // The auto-switch must reach the engines like a picked board does:
+        // the app-layer rules shown are the new board's, not the old one's.
+        var settings = new InMemorySettingsService
+        {
+            Current = new UserSettings
+            {
+                AppLayerRules = new()
+                {
+                    ["Corne"] = [new AppLayerRule("Corne-app", 1)],
+                    ["Glove80"] = [new AppLayerRule("Glove-app", 2)],
+                },
+            },
+        };
+        var ok = new FakeKeymapStateService(
+            new KeymapLoadResult.Success(SampleKeymap(), "glove.keymap", LayerCount: 2, FirstLayerBindingCount: 80));
+        var vm = new MainWindowViewModel(settings, keymapState: ok);
+        Assert.Equal("Corne-app", Assert.Single(vm.AutoSwitch.AppLayerRules).ProcessMatch);
+
+        vm.LoadLayoutFromPath("glove.keymap");
+
+        Assert.Equal("Glove80", vm.SelectedKeyboard.Id);
+        Assert.Equal("Glove-app", Assert.Single(vm.AutoSwitch.AppLayerRules).ProcessMatch);
+    }
+
+    [Fact]
     public void LoadLayoutFromPath_Success_RecordsPathAtFrontOfActiveProfileRecents()
     {
         var settings = new InMemorySettingsService();
