@@ -487,6 +487,46 @@ public sealed class GitHubOpenViewModelTests : IDisposable
         Assert.Equal(ExpectedDetail("glove80-editor.keymap"), vm.Keymaps[2].Detail);
     }
 
+    // A 60-key keymap: Sofle and GO60 both have 60 keys.
+    private static string SixtyKeyKeymap()
+    {
+        var bindings = string.Join(" ", Enumerable.Repeat("&kp A", 60));
+        return $$"""
+            / {
+                keymap {
+                    compatible = "zmk,keymap";
+                    base { display-name = "Base"; bindings = <{{bindings}}>; };
+                };
+            };
+            """;
+    }
+
+    [Theory]
+    [InlineData("Go60 Left", "GO60")]
+    [InlineData(null, "Sofle")]
+    public async Task Open_SameKeyCountTie_HintNamesTheAttachedBoard(string? attached, string expectedId)
+    {
+        // The hint must name the board that opening the keymap lands on:
+        // a plugged-in Go60 wins the 60-key tie, otherwise registry order.
+        var folder = CacheFolder(
+            ("config/corne.keymap", KeymapFixtures.Read("corne.keymap")),
+            ("config/sixty.keymap", SixtyKeyKeymap()));
+        var fake = SignedInFake();
+        fake.OnFetchRepo = (_, _, _) => Task.FromResult(new GitHubCacheResult(folder, "deadbeef", true));
+        var vm = Wire(fake, [], []);
+        vm.AttachedHidNames = () => attached is null ? [] : [attached];
+
+        await vm.InitializeAsync();
+        await WaitUntil(() => vm.SelectedBranch == "main");
+        await vm.OpenCommand.ExecuteAsync(null);
+
+        var sixty = vm.Keymaps.Single(k => k.RelativePath == "config/sixty.keymap");
+        Assert.Equal(
+            Loc.Instance.Format("GitHub_KeymapBoardFormat", 60,
+                KeyboardProfileRegistry.Resolve(expectedId).DisplayName),
+            sixty.Detail);
+    }
+
     [Fact]
     public async Task PickKeymapCommand_SecondItem_ClosesWithIt()
     {

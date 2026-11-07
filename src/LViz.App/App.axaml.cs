@@ -156,15 +156,20 @@ public partial class App : Application
                 quitInProgress = true;
                 Dispatcher.UIThread.Post(async () =>
                 {
-                    if (!await ConfirmDiscardEditsAsync())
+                    // Reset however this ends (cancel, or a throw before the
+                    // close) so a later close can still ask again.
+                    try
+                    {
+                        if (!await ConfirmDiscardEditsAsync()) return;
+                        closingHandled = true;
+                        SaveWindowState();
+                        viewModel.Shutdown();
+                        mainWindow.Close();
+                    }
+                    finally
                     {
                         quitInProgress = false;
-                        return;
                     }
-                    closingHandled = true;
-                    SaveWindowState();
-                    viewModel.Shutdown();
-                    mainWindow.Close();
                 });
             };
 
@@ -174,14 +179,18 @@ public partial class App : Application
                 quitInProgress = true;
                 Dispatcher.UIThread.Post(async () =>
                 {
-                    if (!await ConfirmDiscardEditsAsync())
+                    // Reset on cancel, or when a step throws before the exit.
+                    try
+                    {
+                        if (!await ConfirmDiscardEditsAsync()) return;
+                        SaveWindowState();
+                        viewModel.Shutdown();
+                        Environment.Exit(0);
+                    }
+                    finally
                     {
                         quitInProgress = false;
-                        return;
                     }
-                    SaveWindowState();
-                    viewModel.Shutdown();
-                    Environment.Exit(0);
                 });
             };
 
@@ -457,6 +466,7 @@ public partial class App : Application
                 var ghVm = new GitHubOpenViewModel(services.GetRequiredService<IGitHubKeymapService>())
                 {
                     OpenUrl = url => services.GetRequiredService<IHostActionExecutor>().Launch(url),
+                    AttachedHidNames = viewModel.AttachedHidNames,
                 };
                 var dlg = new GitHubOpenWindow
                 {
