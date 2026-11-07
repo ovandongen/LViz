@@ -5,7 +5,7 @@ using Xunit;
 namespace LViz.Tests.Layout;
 
 /// <summary>
-/// Tests for <see cref="InfoJsonImporter"/> (part 2 of the layout wizard
+/// Tests for <see cref="InfoJsonImporter"/> (layout wizard
 /// importers): keymap-editor / QMK <c>info.json</c> files. Real-world
 /// fixtures: slabwing, cosmos82 (cross-checked against its dtsi), go60;
 /// naming, pivot, rounding and refusal rules on inline JSON.

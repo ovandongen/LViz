@@ -3,6 +3,7 @@ using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LViz.App.Localization;
+using LViz.App.Services;
 using LViz.App.Services.GitHub;
 using LViz.Core.Diagnostics;
 using LViz.Core.GitHub;
@@ -10,6 +11,7 @@ using LViz.Core.Keymap;
 using LViz.Core.Keymap.Editing;
 using LViz.Core.Keymap.Parser;
 using LViz.Core.Keymap.Writer;
+using LViz.Core.Layout;
 using LViz.Core.Models;
 using LViz.Core.Persistence;
 
@@ -49,37 +51,57 @@ public sealed record KeymapEditSource(
 /// The App-side owner of one <see cref="KeymapEditSession"/>: where the keymap
 /// came from (<see cref="Source"/>), the editable model rendered through a
 /// fresh <see cref="LoadedKeymap"/> after every change, the single selected
-/// key, clearing a key to <c>&amp;trans</c> / <c>&amp;none</c>, undo/redo, and
-/// the change count the edit banner shows, and the save: freeze the edit into
-/// a <see cref="KeymapSavePlan"/>, then write it — the local file through
+/// key, clearing a key to <c>&amp;trans</c> / <c>&amp;none</c>, undo/redo, the
+/// change count the edit banner shows, and the layer shown while editing.
+/// <para>
+/// It also owns every edit-mode action the window offers — the layer, combo and
+/// key-editor commands (<c>KeymapEditViewModel.Layers.cs</c>,
+/// <c>KeymapEditViewModel.Dialogs.cs</c>) and the save
+/// (<c>KeymapEditViewModel.Save.cs</c>): freeze the edit into a
+/// <see cref="KeymapSavePlan"/>, then write it — the local file through
 /// <see cref="KeymapFileSaver"/> (with a backup first) or GitHub as a commit
 /// against the blob SHA the edit started from. A target that changed
 /// underneath the edit is a <see cref="KeymapEditSaveOutcome.Conflict"/>
-/// result, not an error.
+/// result, not an error. Dialogs go through <see cref="IKeymapEditDialogs"/>;
+/// what the main window must do afterwards (settings, reload) leaves through
+/// <see cref="Completed"/> and <see cref="Reported"/>.
+/// </para>
 /// </summary>
 public sealed partial class KeymapEditViewModel : ObservableObject
 {
     private readonly IGitHubKeymapService? _gitHub;
     private readonly KeymapBackupStore _backups;
+    private readonly IKeymapEditDialogs _dialogs;
+    private readonly IKeyboardProfile _profile;
 
     /// <summary>The pending layer structure <see cref="Defines"/> and
     /// <see cref="LayerDefines"/> were last computed for, so key-only changes
     /// don't replay the writers. Empty until the first recompute.</summary>
     private IReadOnlyList<LayerStructureEdit> _definesStructure = [];
 
+    /// <param name="dialogs">Where the edit's dialogs open.</param>
+    /// <param name="profile">The board the combo dialog draws its key picker on.</param>
+    /// <param name="shownLayerIndex">The layer shown when the edit opens
+    /// (clamped into the layer list).</param>
     /// <exception cref="ArgumentNullException">
-    /// <paramref name="source"/>, <paramref name="baseline"/> or
-    /// <paramref name="backups"/> is null.
+    /// <paramref name="source"/>, <paramref name="baseline"/>,
+    /// <paramref name="backups"/>, <paramref name="dialogs"/> or
+    /// <paramref name="profile"/> is null.
     /// </exception>
     public KeymapEditViewModel(
         KeymapEditSource source,
         KeyboardConfig baseline,
         IGitHubKeymapService? gitHub,
-        KeymapBackupStore backups)
+        KeymapBackupStore backups,
+        IKeymapEditDialogs dialogs,
+        IKeyboardProfile profile,
+        int shownLayerIndex = 0)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(baseline);
         ArgumentNullException.ThrowIfNull(backups);
+        ArgumentNullException.ThrowIfNull(dialogs);
+        ArgumentNullException.ThrowIfNull(profile);
 
         Source = source;
         Session = new KeymapEditSession(baseline);
@@ -89,6 +111,12 @@ public sealed partial class KeymapEditViewModel : ObservableObject
         Session.Changed += OnSessionChanged;
         _gitHub = gitHub;
         _backups = backups;
+        _dialogs = dialogs;
+        _profile = profile;
+
+        var count = Session.Current.Layers.Count;
+        _shownLayerIndex = count == 0 ? 0 : Math.Clamp(shownLayerIndex, 0, count - 1);
+        _shownLayerId = count == 0 ? null : Session.LayerIdAt(_shownLayerIndex);
     }
 
     /// <summary>
@@ -103,6 +131,9 @@ public sealed partial class KeymapEditViewModel : ObservableObject
     /// unavailable).</param>
     /// <param name="backups">Backup store the local save snapshots into; never
     /// null.</param>
+    /// <param name="dialogs">Where the edit's dialogs open.</param>
+    /// <param name="profile">The board the combo dialog draws on.</param>
+    /// <param name="shownLayerIndex">The layer shown when the edit opens.</param>
     /// <remarks>
     /// Read and parse failures (IOException, UnauthorizedAccessException,
     /// <see cref="ZmkKeymapParseException"/>) propagate to the caller, which
@@ -115,7 +146,10 @@ public sealed partial class KeymapEditViewModel : ObservableObject
         string localPath,
         string entry,
         IGitHubKeymapService? gitHub,
-        KeymapBackupStore backups)
+        KeymapBackupStore backups,
+        IKeymapEditDialogs dialogs,
+        IKeyboardProfile profile,
+        int shownLayerIndex = 0)
     {
         // The SHA is of the bytes as read, before any text decoding, so it
         // matches exactly what a later GitHub save is committed against.
@@ -132,7 +166,10 @@ public sealed partial class KeymapEditViewModel : ObservableObject
             new KeymapEditSource(localPath, entry, text, baseBlobSha, gitHubRef),
             baseline,
             gitHub,
-            backups);
+            backups,
+            dialogs,
+            profile,
+            shownLayerIndex);
     }
 
     /// <summary>Where this edit came from.</summary>
@@ -197,6 +234,35 @@ public sealed partial class KeymapEditViewModel : ObservableObject
     /// </summary>
     public event EventHandler? Changed;
 
+    /// <summary>
+    /// True from the start of the edit until the main window closes it
+    /// (<see cref="Close"/>). A dialog answer that arrives after that is thrown
+    /// away, and the edit's commands refuse to run.
+    /// </summary>
+    public bool IsOpen { get; private set; } = true;
+
+    /// <summary>The main window left this edit (saved, discarded, reloaded):
+    /// from now on its commands do nothing and late dialog answers are dropped.</summary>
+    public void Close()
+    {
+        IsOpen = false;
+        NotifyCommandState();
+    }
+
+    /// <summary>
+    /// Raised when an action finished that the main window must follow up on —
+    /// a save that was written, or a conflict answered with "reload". Single
+    /// subscriber (the main window); the action waits for the handler, which is
+    /// how the notice dialog after a save stays inside the saving state.
+    /// </summary>
+    public event Func<KeymapEditCompletion, Task>? Completed;
+
+    /// <summary>A translated line for the status bar or a toast.</summary>
+    public event Action<KeymapEditReport>? Reported;
+
+    private void Report(KeymapEditReportKind kind, string message) =>
+        Reported?.Invoke(new KeymapEditReport(kind, message));
+
     /// <summary>Select one key; a negative index clears the selection.</summary>
     public void SelectKey(int keyIndex) => SelectedKeyIndex = keyIndex < 0 ? null : keyIndex;
 
@@ -244,308 +310,9 @@ public sealed partial class KeymapEditViewModel : ObservableObject
         return Session.SetBindings([new BindingChange(layerIndex, keyIndex, binding)]);
     }
 
-    /// <summary>True when the key differs from what it was in the baseline.</summary>
-    public bool IsKeyChanged(int layerIndex, int keyIndex) => Session.IsKeyChanged(layerIndex, keyIndex);
-
-    /// <summary>
-    /// Append a new layer at the end of the layer list — every key
-    /// <c>&amp;trans</c>, named "Layer N" for its index (made unique against the
-    /// names in use) — as a single undo step.
-    /// </summary>
-    /// <returns>
-    /// The index the new layer sits at, or <see langword="null"/> when the
-    /// keymap has no layers at all, so the key count of a new layer is unknown.
-    /// </returns>
-    public int? AddLayer()
-    {
-        var layers = Session.Current.Layers;
-        if (layers.Count == 0) return null;
-
-        var index = layers.Count;
-        var edit = new LayerStructureEdit.Add(
-            index,
-            LayerNames.Unique($"Layer {index}", layers.Select(l => l.Name)),
-            [.. Enumerable.Repeat(KeyBinding.Transparent, layers[0].Bindings.Count)]);
-
-        Session.ApplyStructure(edit, LayerReferenceRemapper.Apply(Session.Current, edit));
-        return index;
-    }
-
-    /// <summary>
-    /// Insert a copy of the layer at <paramref name="layerIndex"/> right after
-    /// it — same bindings, named "&lt;name&gt; copy" (made unique against the
-    /// names in use) — as a single undo step. Layer references in the copy point
-    /// where the original's pointed, renumbered for the insertion.
-    /// </summary>
-    /// <returns>
-    /// The index the copy sits at (<paramref name="layerIndex"/> + 1), or
-    /// <see langword="null"/> when <paramref name="layerIndex"/> falls outside
-    /// <see cref="KeymapEditSession.Current"/>.
-    /// </returns>
-    public int? DuplicateLayer(int layerIndex)
-    {
-        var layers = Session.Current.Layers;
-        if (layerIndex < 0 || layerIndex >= layers.Count) return null;
-
-        var source = layers[layerIndex];
-        var index = layerIndex + 1;
-        var edit = new LayerStructureEdit.Add(
-            index,
-            LayerNames.Unique($"{source.Name} copy", layers.Select(l => l.Name)),
-            [.. source.Bindings]);
-
-        Session.ApplyStructure(edit, LayerReferenceRemapper.Apply(Session.Current, edit));
-        return index;
-    }
-
-    /// <summary>
-    /// Move the layer at <paramref name="layerIndex"/> to
-    /// <paramref name="toIndex"/> (remove, then insert there in the shortened
-    /// list) as a single undo step, renumbering every layer reference.
-    /// </summary>
-    /// <returns>
-    /// <see langword="false"/> — without touching anything — when either index
-    /// falls outside <see cref="KeymapEditSession.Current"/> or they are equal.
-    /// </returns>
-    public bool MoveLayer(int layerIndex, int toIndex)
-    {
-        var count = Session.Current.Layers.Count;
-        if (layerIndex < 0 || layerIndex >= count) return false;
-        if (toIndex < 0 || toIndex >= count) return false;
-        if (layerIndex == toIndex) return false;
-
-        var edit = new LayerStructureEdit.Move(layerIndex, toIndex);
-        return Session.ApplyStructure(edit, LayerReferenceRemapper.Apply(Session.Current, edit));
-    }
-
-    /// <summary>
-    /// Give the layer at <paramref name="layerIndex"/> a new
-    /// <c>display-name</c> (<paramref name="name"/> trimmed) as a single undo
-    /// step.
-    /// </summary>
-    /// <returns>
-    /// <see langword="false"/> — without touching anything, never throwing —
-    /// when <paramref name="layerIndex"/> falls outside
-    /// <see cref="KeymapEditSession.Current"/>, the trimmed name is empty or
-    /// holds a control character (a quoted devicetree string cannot), or the
-    /// layer already has that name.
-    /// </returns>
-    public bool RenameLayer(int layerIndex, string name)
-    {
-        var layers = Session.Current.Layers;
-        if (layerIndex < 0 || layerIndex >= layers.Count) return false;
-
-        var trimmed = (name ?? string.Empty).Trim();
-        if (trimmed.Length == 0 || trimmed.Any(char.IsControl)) return false;
-        if (string.Equals(trimmed, layers[layerIndex].Name, StringComparison.Ordinal)) return false;
-
-        return Session.RenameLayer(layerIndex, trimmed);
-    }
-
-    /// <summary>
-    /// What deleting the layer at <paramref name="layerIndex"/> would do,
-    /// without changing anything: the blockers the <c>.keymap</c> text still
-    /// holds and the ones only the session's combo edits hold, and how many
-    /// keys would lose their layer target.
-    /// </summary>
-    /// <remarks>
-    /// The text blockers come from the baseline text with the pending
-    /// structural edits replayed onto it, so the writer's layer indices line up
-    /// with <see cref="KeymapEditSession.Current"/>; the cleared-binding count
-    /// comes from <see cref="Current"/> itself, because key edits are never in
-    /// that text. Combos edited in this session are not in that text either, so
-    /// every combo the current model aims at the layer adds a
-    /// <see cref="LayerDeleteBlockerKind.Combo"/> blocker (after the text
-    /// blockers, <c>Line</c> 0) unless a text blocker already names it
-    /// (Ordinal). A combo fixed in the session but not yet saved therefore
-    /// still blocks through the text.
-    /// </remarks>
-    /// <remarks>
-    /// <see cref="ZmkKeymapParseException"/> (the pending edits would not write)
-    /// propagates — the caller shows it.
-    /// </remarks>
-    /// <returns>
-    /// The check, or <see langword="null"/> when <paramref name="layerIndex"/>
-    /// falls outside <see cref="KeymapEditSession.Current"/>.
-    /// </returns>
-    public LayerDeleteCheck? CheckDeleteLayer(int layerIndex)
-    {
-        var layers = Session.Current.Layers;
-        if (layerIndex < 0 || layerIndex >= layers.Count) return null;
-
-        var text = KeymapLayerWriter.ApplyAll(Source.BaselineText, Session.PendingStructureEdits);
-        var check = KeymapLayerWriter.CheckDelete(text, layerIndex);
-
-        var named = new HashSet<string>(
-            check.Blockers.Select(b => b.Name), StringComparer.Ordinal);
-        var sessionCombos = new List<LayerDeleteBlocker>();
-        foreach (var name in LayerReferenceRemapper.CombosUsingLayer(Session.Current, layerIndex))
-            if (named.Add(name))
-                sessionCombos.Add(new LayerDeleteBlocker(LayerDeleteBlockerKind.Combo, name, 0));
-
-        return check with
-        {
-            Blockers = sessionCombos.Count == 0
-                ? check.Blockers
-                : [.. check.Blockers, .. sessionCombos],
-            ClearedBindings = LayerReferenceRemapper.CountClearedBindings(Session.Current, layerIndex),
-        };
-    }
-
-    /// <summary>
-    /// Delete the layer at <paramref name="layerIndex"/> as a single undo step,
-    /// clearing the layer bindings that targeted it — only when
-    /// <see cref="CheckDeleteLayer"/> finds no blocker (combos, conditional
-    /// layers, define usages refuse the delete).
-    /// </summary>
-    /// <remarks>
-    /// <see cref="ZmkKeymapParseException"/> propagates through the check.
-    /// </remarks>
-    /// <returns>
-    /// <see langword="false"/> — without touching anything — when the index
-    /// falls outside <see cref="KeymapEditSession.Current"/> or the delete has
-    /// blockers.
-    /// </returns>
-    public bool DeleteLayer(int layerIndex)
-    {
-        var check = CheckDeleteLayer(layerIndex);
-        if (check is null || !check.CanDelete) return false;
-
-        var edit = new LayerStructureEdit.Delete(layerIndex);
-        Session.ApplyStructure(edit, LayerReferenceRemapper.Apply(Session.Current, edit));
-        return true;
-    }
-
-    /// <summary>
-    /// Append <paramref name="combo"/> to the current combo list as a single
-    /// undo step — the thin wrapper over
-    /// <see cref="KeymapEditSession.AddCombo"/> the combo editor calls.
-    /// </summary>
-    /// <remarks>
-    /// <see cref="ArgumentNullException"/> (combo is null) propagates.
-    /// </remarks>
-    /// <returns>The index the combo landed at in <see cref="KeymapEditSession.Current"/>.Combos.</returns>
-    public int AddCombo(ZmkCombo combo) => Session.AddCombo(combo);
-
-    /// <summary>
-    /// Replace the combo at <paramref name="index"/> as a single undo step.
-    /// </summary>
-    /// <remarks>
-    /// <see cref="ArgumentNullException"/> (combo is null) and
-    /// <see cref="ArgumentOutOfRangeException"/> (index outside the current
-    /// combo list) propagate.
-    /// </remarks>
-    /// <returns>
-    /// <see langword="false"/> when the combo already
-    /// <see cref="ZmkCombo.IsSameAs">IsSameAs</see> the current one; the call
-    /// then records nothing and raises no event.
-    /// </returns>
-    public bool SetCombo(int index, ZmkCombo combo) => Session.SetCombo(index, combo);
-
-    /// <summary>Remove the combo at <paramref name="index"/> as a single undo step.</summary>
-    /// <remarks>
-    /// <see cref="ArgumentOutOfRangeException"/> (index outside the current
-    /// combo list) propagates.
-    /// </remarks>
-    public void DeleteCombo(int index) => Session.DeleteCombo(index);
-
-    /// <summary>True when the combo at <paramref name="index"/> was added in
-    /// this session or differs from its baseline version.</summary>
-    public bool IsComboChanged(int index) => Session.IsComboChanged(index);
-
     /// <summary>True while the session holds combo adds, changes or deletes
     /// that a save has not written yet.</summary>
     public bool HasPendingComboEdits => Session.PendingComboEdits.Count > 0;
-
-    /// <summary>
-    /// Freeze the current edit into the text and the change lists a save writes,
-    /// against the baseline text this editor opened.
-    /// </summary>
-    /// <remarks>
-    /// <see cref="ZmkKeymapParseException"/> (a writer refused the text) and
-    /// <see cref="ArgumentException"/> (the session drifted from the baseline)
-    /// propagate — the caller shows them and keeps the user in edit mode.
-    /// </remarks>
-    public KeymapSavePlan BuildSavePlan() => KeymapSavePlan.Build(Source.BaselineText, Session);
-
-    /// <summary>The English commit message a GitHub save of <paramref name="plan"/> uses.</summary>
-    public string CommitMessageFor(KeymapSavePlan plan) => KeymapCommitMessage.Build(plan);
-
-    /// <summary>
-    /// Write <paramref name="plan"/> to where this edit came from: the local
-    /// file through <see cref="KeymapFileSaver"/> (the content on disk is
-    /// backed up first), or GitHub as a commit on the keymap's branch against
-    /// <see cref="KeymapEditSource.BaseBlobSha"/> with
-    /// <paramref name="commitMessage"/> (the message the user edited in the
-    /// review dialog), or <see cref="CommitMessageFor"/> when it is null. A
-    /// local save ignores the message. A target that changed since the edit
-    /// started reports <see cref="KeymapEditSaveOutcome.Conflict"/>;
-    /// <paramref name="overwrite"/> replaces it anyway.
-    /// </summary>
-    /// <remarks>
-    /// The only exceptions caught are the local <see cref="IOException"/> and
-    /// <see cref="UnauthorizedAccessException"/>, which become a translated
-    /// <see cref="KeymapEditSaveOutcome.Failed"/>; GitHub failures map to
-    /// Failed through <see cref="GitHubOpenViewModel.MessageFor"/>, and a
-    /// missing service to <c>Edit_SaveGitHubUnavailable</c>. A cancelled
-    /// <paramref name="ct"/> propagates. Saving never touches the session —
-    /// after any outcome the edit and its undo history are intact.
-    /// </remarks>
-    public async Task<KeymapEditSaveOutcome> SaveAsync(
-        KeymapSavePlan plan,
-        bool overwrite,
-        string? commitMessage = null,
-        CancellationToken ct = default)
-    {
-        if (!Source.IsGitHub)
-        {
-            try
-            {
-                var local = await KeymapFileSaver.SaveAsync(
-                    Source.LocalPath, Source.BaselineText, plan.NewSource, overwrite, _backups, ct);
-
-                return local == KeymapFileSaveResult.Saved
-                    ? new KeymapEditSaveOutcome.Saved(Source.LocalPath)
-                    : new KeymapEditSaveOutcome.Conflict();
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                DiagnosticLog.Warn("Editor", $"Local save of {Source.LocalPath} failed: {ex}");
-                return new KeymapEditSaveOutcome.Failed(
-                    Loc.Instance.Format("Edit_SaveFailedFormat", ex.Message));
-            }
-        }
-
-        if (_gitHub is null)
-            return new KeymapEditSaveOutcome.Failed(Loc.Instance["Edit_SaveGitHubUnavailable"]);
-
-        var save = await _gitHub.SaveAsync(
-            Source.GitHub!,
-            new UTF8Encoding(false).GetBytes(plan.NewSource),
-            Source.BaseBlobSha,
-            commitMessage ?? CommitMessageFor(plan),
-            overwrite,
-            ct);
-
-        switch (save)
-        {
-            case GitHubSaveResult.Saved committed:
-                DiagnosticLog.Info("Editor", $"Committed {Source.Entry} to GitHub as {committed.CommitSha}.");
-                return new KeymapEditSaveOutcome.Saved(
-                    _gitHub.LocalPathFor(Source.GitHub!) ?? Source.LocalPath);
-
-            case GitHubSaveResult.Failed failure:
-                return new KeymapEditSaveOutcome.Failed(GitHubOpenViewModel.MessageFor(
-                    new GitHubApiException(failure.Kind, failure.Message)));
-
-            case GitHubSaveResult.Conflict:
-                return new KeymapEditSaveOutcome.Conflict();
-
-            default:
-                throw new InvalidOperationException(
-                    $"unsupported GitHub save result {save.GetType().Name}.");
-        }
-    }
 
     [RelayCommand(CanExecute = nameof(CanUndo))]
     private void Undo() => Session.Undo();
@@ -562,6 +329,7 @@ public sealed partial class KeymapEditViewModel : ObservableObject
     {
         Keymap = new LoadedKeymap(Session.Current);
         RefreshDefines();
+        FollowShownLayer();
 
         OnPropertyChanged(nameof(ChangeCount));
         OnPropertyChanged(nameof(HasChanges));
@@ -572,6 +340,7 @@ public sealed partial class KeymapEditViewModel : ObservableObject
 
         UndoCommand.NotifyCanExecuteChanged();
         RedoCommand.NotifyCanExecuteChanged();
+        NotifyCommandState();
 
         Changed?.Invoke(this, EventArgs.Empty);
     }

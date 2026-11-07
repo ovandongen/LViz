@@ -6,7 +6,7 @@ using LViz.Core.Models;
 namespace LViz.App.ViewModels;
 
 /// <summary>
-/// What the "review before saving" dialog is shown (part 8): the frozen plan
+/// What the "review before saving" dialog is shown: the frozen plan
 /// whose change lists it renders, the target the save writes to (a file name or
 /// <c>owner/repo (branch)</c>), and the commit message — only for a GitHub
 /// save, where the commit is visible to others.
@@ -26,7 +26,7 @@ public sealed record KeymapReviewRequest(KeymapSavePlan Plan, string TargetName,
 public sealed record KeymapReviewAnswer(string? CommitMessage);
 
 /// <summary>
-/// What the save-conflict dialog is shown (part 9): the target that changed
+/// What the save-conflict dialog is shown: the target that changed
 /// underneath the edit, so the prompt can name it and word itself for a file
 /// versus a repository.
 /// </summary>
@@ -80,7 +80,7 @@ public sealed record KeyDialogRequest(
 }
 
 /// <summary>
-/// What the rename-layer dialog is shown (part 7): which layer is being
+/// What the rename-layer dialog is shown: which layer is being
 /// renamed and the name it has right now, so the dialog can pre-fill it.
 /// </summary>
 /// <param name="LayerIndex">Which layer is being renamed.</param>
@@ -88,7 +88,7 @@ public sealed record KeyDialogRequest(
 public sealed record RenameLayerRequest(int LayerIndex, string CurrentName);
 
 /// <summary>
-/// What the blocked-delete dialog is shown (part 7): the layer that cannot be
+/// What the blocked-delete dialog is shown: the layer that cannot be
 /// deleted and every reason why, so the dialog can name the layer and list
 /// what stands in the way.
 /// </summary>
@@ -129,3 +129,35 @@ public sealed record ComboDialogRequest(
     IReadOnlyList<KeyValuePair<string, string>> LayerDefines,
     int? ComboIndex,
     int ShownLayerIndex);
+
+/// <summary>
+/// What an edit that has finished its work asks the main window to do next;
+/// raised through <see cref="KeymapEditViewModel.Completed"/>.
+/// </summary>
+public abstract record KeymapEditCompletion
+{
+    private KeymapEditCompletion() { }
+
+    /// <summary>The edit was written; carry the per-layer settings along, close
+    /// the edit and reload what was written.</summary>
+    /// <param name="Plan">The plan that was written.</param>
+    /// <param name="ReloadPath">The file to load afterwards.</param>
+    public sealed record Saved(KeymapSavePlan Plan, string ReloadPath) : KeymapEditCompletion;
+
+    /// <summary>The user answered a save conflict with "reload": drop the edit
+    /// and show the target as it stands.</summary>
+    public sealed record ReloadRequested : KeymapEditCompletion;
+}
+
+/// <summary>What kind of line an edit reports to the main window.</summary>
+public enum KeymapEditReportKind
+{
+    /// <summary>A status-bar line.</summary>
+    Status,
+
+    /// <summary>A toast; something did not go through.</summary>
+    Error,
+}
+
+/// <summary>One translated line the edit reports to the main window.</summary>
+public sealed record KeymapEditReport(KeymapEditReportKind Kind, string Message);

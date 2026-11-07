@@ -486,12 +486,12 @@
                         <Button Classes="onAccent primary"
                                 Focusable="False"
                                 Padding="8,4"
-                                Command="{Binding SaveEditCommand}">
+                                Command="{Binding Edit.SaveEditCommand}">
                             <StackPanel>
                                 <TextBlock Text="{Binding [Edit_Save], Source={StaticResource Loc}}"
-                                           IsVisible="{Binding !IsSavingEdit}" />
+                                           IsVisible="{Binding !Edit.IsSaving}" />
                                 <TextBlock Text="{Binding [Edit_Saving], Source={StaticResource Loc}}"
-                                           IsVisible="{Binding IsSavingEdit}" />
+                                           IsVisible="{Binding Edit.IsSaving}" />
                             </StackPanel>
                         </Button>
                     </StackPanel>
@@ -515,7 +515,7 @@
                     Padding="8,4">
                 <DockPanel>
                     <Button DockPanel.Dock="Left"
-                            Command="{Binding NewComboCommand}"
+                            Command="{Binding Edit.NewComboCommand}"
                             IsVisible="{Binding IsEditing}"
                             Focusable="False"
                             Padding="8,4"
@@ -624,7 +624,7 @@
                                                        Opacity="0.85"
                                                        IsVisible="{Binding Subscript, Converter={x:Static avconv:StringConverters.IsNotNullOrEmpty}}" />
                                                 <!-- Edit-mode actions: edit/delete live on
-                                                     the window VM, addressed through
+                                                     the edit VM, addressed through
                                                      MainWin (the tile's own DataContext is
                                                      the combo). A press here never reaches
                                                      the tile's single/right-click paths
@@ -640,10 +640,10 @@
                                                     <Button.Flyout>
                                                         <MenuFlyout Placement="Bottom">
                                                             <MenuItem Header="{Binding [Edit_ComboMenuEdit], Source={StaticResource Loc}}"
-                                                                  Command="{Binding DataContext.EditComboCommand, ElementName=MainWin}"
+                                                                  Command="{Binding DataContext.Edit.EditComboCommand, ElementName=MainWin}"
                                                                   CommandParameter="{Binding Number}" />
                                                             <MenuItem Header="{Binding [Edit_ComboMenuDelete], Source={StaticResource Loc}}"
-                                                                  Command="{Binding DataContext.DeleteComboCommand, ElementName=MainWin}"
+                                                                  Command="{Binding DataContext.Edit.DeleteComboCommand, ElementName=MainWin}"
                                                                   CommandParameter="{Binding Number}" />
                                                         </MenuFlyout>
                                                     </Button.Flyout>
@@ -669,7 +669,7 @@
                          so its items grey out exactly like the shortcuts. -->
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4"
                                 IsVisible="{Binding IsEditing}">
-                        <Button Command="{Binding NewLayerCommand}"
+                        <Button Command="{Binding Edit.NewLayerCommand}"
                                 Focusable="False"
                                 Padding="8,4"
                                 ToolTip.Tip="{Binding [Tooltip_EditAddLayer], Source={StaticResource Loc}}">
@@ -682,16 +682,16 @@
                             <Button.Flyout>
                                 <MenuFlyout Placement="Bottom">
                                     <MenuItem Header="{Binding [Edit_LayerMenuRename], Source={StaticResource Loc}}"
-                                              Command="{Binding RenameShownLayerCommand}" />
+                                              Command="{Binding Edit.RenameShownLayerCommand}" />
                                     <MenuItem Header="{Binding [Edit_LayerMenuDuplicate], Source={StaticResource Loc}}"
-                                              Command="{Binding DuplicateShownLayerCommand}" />
+                                              Command="{Binding Edit.DuplicateShownLayerCommand}" />
                                     <MenuItem Header="{Binding [Edit_LayerMenuMoveLeft], Source={StaticResource Loc}}"
-                                              Command="{Binding MoveShownLayerLeftCommand}" />
+                                              Command="{Binding Edit.MoveShownLayerLeftCommand}" />
                                     <MenuItem Header="{Binding [Edit_LayerMenuMoveRight], Source={StaticResource Loc}}"
-                                              Command="{Binding MoveShownLayerRightCommand}" />
+                                              Command="{Binding Edit.MoveShownLayerRightCommand}" />
                                     <Separator />
                                     <MenuItem Header="{Binding [Edit_LayerMenuDelete], Source={StaticResource Loc}}"
-                                              Command="{Binding DeleteShownLayerCommand}" />
+                                              Command="{Binding Edit.DeleteShownLayerCommand}" />
                                 </MenuFlyout>
                             </Button.Flyout>
                         </Button>

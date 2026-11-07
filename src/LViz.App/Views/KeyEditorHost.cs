@@ -97,27 +97,51 @@ public static class KeyEditorHost
     /// when <paramref name="useRing"/> and it fits, else the dialog. A ring that
     /// hands over continues in the dialog on the same VM. Null on cancel.
     /// Exceptions are logged (DiagnosticLog.Error "KeyRing") and answer null.</summary>
-    public static async Task<ZmkKeyBinding?> EditAsync(
+    public static Task<ZmkKeyBinding?> EditAsync(
         Window owner, Control anchor, KeyDialogRequest request, bool useRing)
+    {
+        // The anchor's bounds in screen pixels, like the main window takes
+        // its key rect: PointToScreen of the two corners.
+        var bounds = anchor.Bounds;
+        return EditAsync(
+            owner,
+            request,
+            useRing
+                ? new KeyEditorRingAnchor(
+                    anchor.PointToScreen(bounds.TopLeft), anchor.PointToScreen(bounds.BottomRight))
+                : null);
+    }
+
+    /// <summary>The user's key editor for <paramref name="request"/>: the ring on
+    /// <paramref name="ring"/> when given and it fits, else the dialog. A ring
+    /// that hands over (or has no room) continues in the dialog on the same VM.
+    /// Null on cancel. Exceptions are logged (DiagnosticLog.Error "KeyRing") and
+    /// answer null. The one place that decides ring versus dialog.</summary>
+    public static async Task<ZmkKeyBinding?> EditAsync(
+        Window owner, KeyDialogRequest request, KeyEditorRingAnchor? ring)
     {
         try
         {
             var dialogVm = new KeyDialogViewModel(request);
-            if (!useRing) return await ShowDialogAsync(owner, dialogVm);
+            if (ring is null) return await ShowDialogAsync(owner, dialogVm);
 
-            // The anchor's bounds in screen pixels, like the main window takes
-            // its key rect: PointToScreen of the two corners.
-            var bounds = anchor.Bounds;
             var closed = await ShowRingAsync(
                 owner,
                 new KeyRingViewModel(dialogVm, request),
-                anchor.PointToScreen(bounds.TopLeft),
-                anchor.PointToScreen(bounds.BottomRight));
+                ring.TopLeft,
+                ring.BottomRight,
+                ring.Cancel);
 
             // Null: no screen, or the ring doesn't fit there — the dialog is
             // the user's editor. OpenInDialog: the ring's hand-over, so the
             // same dialog VM continues the half-made edit.
-            if (closed is null || closed.OpenInDialog) return await ShowDialogAsync(owner, dialogVm);
+            if (closed is null || closed.OpenInDialog)
+            {
+                ring.BeforeDialog?.Invoke();
+                return await ShowDialogAsync(owner, dialogVm);
+            }
+
+            owner.Activate();
             return closed.Result;
         }
         catch (Exception ex)
@@ -127,3 +151,13 @@ public static class KeyEditorHost
         }
     }
 }
+
+/// <summary>Where <see cref="KeyEditorHost.EditAsync(Window, KeyDialogRequest, KeyEditorRingAnchor?)"/>
+/// puts the ring: the anchor's screen-pixel corners, a token that closes the
+/// ring as a cancel, and a hook that runs when the editor continues in the
+/// dialog instead (the owner takes its ring decorations down there).</summary>
+public sealed record KeyEditorRingAnchor(
+    PixelPoint TopLeft,
+    PixelPoint BottomRight,
+    CancellationToken Cancel = default,
+    Action? BeforeDialog = null);

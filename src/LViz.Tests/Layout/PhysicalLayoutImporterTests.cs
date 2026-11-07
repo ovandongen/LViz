@@ -6,7 +6,7 @@ using Xunit;
 namespace LViz.Tests.Layout;
 
 /// <summary>
-/// Tests for the shared import contract (part 1 of the layout wizard importers):
+/// Tests for the shared import contract (layout wizard importers):
 /// <see cref="DtsiText"/> comment masking and node lookup, the per-node
 /// <see cref="DtsiPhysicalLayoutParser.ParseAll"/> behaviour, and the
 /// <see cref="PhysicalLayoutImporter"/> mapping. Real-world fixture:

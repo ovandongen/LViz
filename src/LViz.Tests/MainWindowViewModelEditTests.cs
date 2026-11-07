@@ -144,6 +144,9 @@ public class MainWindowViewModelEditTests : IDisposable
     private readonly string _backupsRoot =
         Path.Combine(Path.GetTempPath(), $"lviz-mainedit-backups-{Guid.NewGuid():N}");
     private readonly List<string> _tempFiles = new();
+    private readonly FakeKeymapEditDialogs _dialogs = new();
+
+    private static int Unsaved(MainWindowViewModel vm) => vm.Edit?.ChangeCount ?? 0;
 
     private static InMemorySettingsService NewSettings(UserSettings? seed = null) =>
         new() { Current = (seed ?? new UserSettings()) with { LiveKeyHighlighting = false } };
@@ -155,7 +158,8 @@ public class MainWindowViewModelEditTests : IDisposable
     };
 
     private MainWindowViewModel NewVm(InMemorySettingsService settings, IKeymapStateService? keymapState = null) =>
-        new(settings, keymapState: keymapState, keymapBackups: new KeymapBackupStore(_backupsRoot));
+        new(settings, keymapState: keymapState, keymapBackups: new KeymapBackupStore(_backupsRoot),
+            editDialogs: _dialogs);
 
     /// <summary>Writes a valid 42-key keymap to a fresh temp file.</summary>
     private string WriteTempKeymap(string name = "main-edit", string? text = null)
@@ -252,13 +256,13 @@ public class MainWindowViewModelEditTests : IDisposable
         var vm = StartEditing(out _);
 
         Tap(vm, 0);
-        vm.EditClearSelectedKey(toNone: false);
+        vm.Edit!.ClearSelectedKey(toNone: false);
 
         Assert.Equal("▽", vm.Keys[0].Label);
         Assert.True(vm.Keys[0].IsEditChanged);
         Assert.True(vm.Keys[0].IsEditSelected);
         Assert.False(vm.Keys[1].IsEditSelected);
-        Assert.Equal(1, vm.UnsavedEditCount);
+        Assert.Equal(1, Unsaved(vm));
     }
 
     [Fact]
@@ -267,7 +271,7 @@ public class MainWindowViewModelEditTests : IDisposable
         var vm = StartEditing(out _);
         vm.Layers[1].SelectCommand.Execute(null);
         Tap(vm, 0);
-        vm.EditClearSelectedKey(toNone: true);
+        vm.Edit!.ClearSelectedKey(toNone: true);
         Assert.True(vm.Keys[0].IsEditChanged);
 
         vm.Layers[0].SelectCommand.Execute(null);
@@ -287,7 +291,7 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var vm = StartEditing(out _);
         Tap(vm, 0);
-        vm.EditClearSelectedKey(toNone: false);
+        vm.Edit!.ClearSelectedKey(toNone: false);
 
         vm.Edit!.UndoCommand.Execute(null);
 
@@ -312,14 +316,14 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var vm = StartEditing(out _);
         Tap(vm, 0);
-        vm.EditClearSelectedKey(toNone: false);
+        vm.Edit!.ClearSelectedKey(toNone: false);
         Assert.Equal("▽", vm.Keys[0].Label);
 
         vm.Edit!.UndoCommand.Execute(null);
 
         Assert.Equal("Q", vm.Keys[0].Label);
         Assert.False(vm.Keys[0].IsEditChanged);
-        Assert.Equal(0, vm.UnsavedEditCount);
+        Assert.Equal(0, Unsaved(vm));
     }
 
     [Fact]
@@ -327,7 +331,7 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var vm = StartEditing(out _);
         Tap(vm, 0);
-        vm.EditClearSelectedKey(toNone: false);
+        vm.Edit!.ClearSelectedKey(toNone: false);
 
         vm.DiscardEditCommand.Execute(null);
 
@@ -476,7 +480,7 @@ public class MainWindowViewModelEditTests : IDisposable
     private static void ClearKeyZero(MainWindowViewModel vm)
     {
         Tap(vm, 0);
-        vm.EditClearSelectedKey(toNone: false);
+        vm.Edit!.ClearSelectedKey(toNone: false);
     }
 
     /// <summary>Puts the file on disk out of sync with what the edit opened, so
@@ -489,23 +493,24 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var vm = StartEditing(out _);
 
-        Assert.False(vm.SaveEditCommand.CanExecute(null));
+        Assert.False(vm.Edit!.SaveEditCommand.CanExecute(null));
 
         ClearKeyZero(vm);
 
-        Assert.True(vm.SaveEditCommand.CanExecute(null));
+        Assert.True(vm.Edit!.SaveEditCommand.CanExecute(null));
     }
 
     [Fact]
-    public async Task SaveEdit_NoCallbacks_WritesFile_LeavesEdit_ReportsInStatusBar()
+    public async Task SaveEdit_WritesFile_LeavesEdit_ReportsInStatusBar()
     {
         var vm = StartEditing(out var path);
+        var edit = vm.Edit!;
         ClearKeyZero(vm);
 
-        await vm.SaveEditCommand.ExecuteAsync(null);
+        await edit.SaveEditCommand.ExecuteAsync(null);
 
         Assert.False(vm.IsEditing);
-        Assert.False(vm.IsSavingEdit);
+        Assert.False(edit.IsSaving);
 
         // The plan replaced only key 0 of Base; the neighbour survived.
         var saved = File.ReadAllText(path);
@@ -535,7 +540,7 @@ public class MainWindowViewModelEditTests : IDisposable
         vm.Layers[1].SelectCommand.Execute(null);
         Assert.Equal(1, vm.ActiveLayerIndex);
 
-        await vm.SaveEditCommand.ExecuteAsync(null);
+        await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
         // A reload lands on layer 0; the save must put the user back on Lower.
         Assert.Equal(1, vm.ActiveLayerIndex);
@@ -549,10 +554,10 @@ public class MainWindowViewModelEditTests : IDisposable
         vm.Layers[1].SelectCommand.Execute(null);
         // Lower is all &trans — clearing key 0 to &none is the one change.
         Tap(vm, 0);
-        vm.EditClearSelectedKey(toNone: true);
-        Assert.Equal(1, vm.UnsavedEditCount);
+        vm.Edit!.ClearSelectedKey(toNone: true);
+        Assert.Equal(1, Unsaved(vm));
 
-        await vm.SaveEditCommand.ExecuteAsync(null);
+        await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
         Assert.False(vm.IsEditing);
         // Same rule as on discard: layer 1's tab is hidden again after the
@@ -566,7 +571,7 @@ public class MainWindowViewModelEditTests : IDisposable
         var vm = StartEditing(out var path);
         ClearKeyZero(vm);
 
-        await vm.SaveEditCommand.ExecuteAsync(null);
+        await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
         // The reload's "Loaded … (2 layers)" base stays up — a save must not
         // reset the tooltip to "No layout loaded"; only the status bar changes.
@@ -585,17 +590,17 @@ public class MainWindowViewModelEditTests : IDisposable
         var vm = StartEditing(out var path);
         var before = File.ReadAllText(path);
         KeymapReviewRequest? captured = null;
-        vm.ReviewChangesRequested = request =>
+        _dialogs.Review = request =>
         {
             captured = request;
             return Task.FromResult<KeymapReviewAnswer?>(null);
         };
         ClearKeyZero(vm);
 
-        await vm.SaveEditCommand.ExecuteAsync(null);
+        await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
         Assert.True(vm.IsEditing);
-        Assert.Equal(1, vm.UnsavedEditCount);
+        Assert.Equal(1, Unsaved(vm));
         Assert.Equal(before, File.ReadAllText(path));
 
         Assert.NotNull(captured);
@@ -612,17 +617,17 @@ public class MainWindowViewModelEditTests : IDisposable
         ChangeFileOnDisk(path);
         var onDisk = File.ReadAllText(path);
         KeymapConflictRequest? captured = null;
-        vm.SaveConflictRequested = request =>
+        _dialogs.Conflict = request =>
         {
             captured = request;
             return Task.FromResult(KeymapSaveConflictChoice.Cancel);
         };
         ClearKeyZero(vm);
 
-        await vm.SaveEditCommand.ExecuteAsync(null);
+        await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
         Assert.True(vm.IsEditing);
-        Assert.Equal(1, vm.UnsavedEditCount);
+        Assert.Equal(1, Unsaved(vm));
         Assert.Equal(onDisk, File.ReadAllText(path));
 
         Assert.NotNull(captured);
@@ -635,10 +640,10 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var vm = StartEditing(out var path);
         ChangeFileOnDisk(path);
-        vm.SaveConflictRequested = _ => Task.FromResult(KeymapSaveConflictChoice.Overwrite);
+        _dialogs.Conflict = _ => Task.FromResult(KeymapSaveConflictChoice.Overwrite);
         ClearKeyZero(vm);
 
-        await vm.SaveEditCommand.ExecuteAsync(null);
+        await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
         Assert.False(vm.IsEditing);
         var saved = File.ReadAllText(path);
@@ -653,10 +658,10 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var vm = StartEditing(out var path);
         ChangeFileOnDisk(path);
-        vm.SaveConflictRequested = _ => Task.FromResult(KeymapSaveConflictChoice.Reload);
+        _dialogs.Conflict = _ => Task.FromResult(KeymapSaveConflictChoice.Reload);
         ClearKeyZero(vm);
 
-        await vm.SaveEditCommand.ExecuteAsync(null);
+        await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
         Assert.False(vm.IsEditing);
         // Nothing was written and nothing was reloaded from the edit: the file
@@ -673,11 +678,11 @@ public class MainWindowViewModelEditTests : IDisposable
         ChangeFileOnDisk(path);
         ClearKeyZero(vm);
 
-        await vm.SaveEditCommand.ExecuteAsync(null);
+        await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
-        // No dialog wired up (parts 8-9): the safe answer, keep editing.
+        // The default fake answers a conflict with cancel: keep editing.
         Assert.True(vm.IsEditing);
-        Assert.Equal(1, vm.UnsavedEditCount);
+        Assert.Equal(1, Unsaved(vm));
         var onDisk = File.ReadAllText(path);
         Assert.Contains("someone else", onDisk);
         Assert.Contains("&kp Q", onDisk);
@@ -693,9 +698,9 @@ public class MainWindowViewModelEditTests : IDisposable
         vm.StartEditCommand.Execute(null);
         Assert.True(vm.DiscardEditCommand.CanExecute(null));
 
-        vm.IsSavingEdit = true;
+        vm.Edit!.IsSaving = true;
         Assert.False(vm.DiscardEditCommand.CanExecute(null));
-        Assert.False(vm.SaveEditCommand.CanExecute(null));
+        Assert.False(vm.Edit!.SaveEditCommand.CanExecute(null));
     }
 
     // ---- the key dialog --------------------------------------------------------------
@@ -710,13 +715,13 @@ public class MainWindowViewModelEditTests : IDisposable
         var configAtOpen = vm.Edit!.Session.Current;
 
         KeyDialogRequest? captured = null;
-        vm.KeyDialogRequested = request =>
+        _dialogs.KeyEditor = request =>
         {
             captured = request;
             return Task.FromResult<KeyBinding?>(Kp("B"));
         };
 
-        await vm.EditSelectedKeyAsync();
+        await vm.Edit!.EditSelectedKeyAsync();
 
         Assert.NotNull(captured);
         Assert.Equal(vm.ActiveLayerIndex, captured!.LayerIndex);
@@ -732,7 +737,7 @@ public class MainWindowViewModelEditTests : IDisposable
         var now = vm.Edit!.Session.Current.Layers[0].Bindings[1];
         Assert.Equal("&kp", now.Behavior);
         Assert.Equal("B", now.Params[0]);
-        Assert.Equal(1, vm.UnsavedEditCount);
+        Assert.Equal(1, Unsaved(vm));
         Assert.Equal("B", vm.Keys[1].Label);
     }
 
@@ -741,11 +746,11 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var vm = StartEditing(out _);
         Tap(vm, 1);
-        vm.KeyDialogRequested = _ => Task.FromResult<KeyBinding?>(null);
+        _dialogs.KeyEditor = _ => Task.FromResult<KeyBinding?>(null);
 
-        await vm.EditSelectedKeyAsync();
+        await vm.Edit!.EditSelectedKeyAsync();
 
-        Assert.Equal(0, vm.UnsavedEditCount);
+        Assert.Equal(0, Unsaved(vm));
         Assert.False(vm.Edit!.CanUndo);
         Assert.Equal("W", vm.Keys[1].Label);
     }
@@ -755,29 +760,18 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var vm = StartEditing(out _);
         var calls = 0;
-        vm.KeyDialogRequested = _ =>
+        _dialogs.KeyEditor = _ =>
         {
             calls++;
             return Task.FromResult<KeyBinding?>(Kp("B"));
         };
 
-        await vm.EditSelectedKeyAsync();
+        await vm.Edit!.EditSelectedKeyAsync();
 
         Assert.Equal(0, calls);
-        Assert.Equal(0, vm.UnsavedEditCount);
+        Assert.Equal(0, Unsaved(vm));
     }
 
-    [Fact]
-    public async Task KeyDialog_NoCallback_DoesNothing()
-    {
-        var vm = StartEditing(out _);
-        Tap(vm, 1);
-
-        await vm.EditSelectedKeyAsync();
-
-        Assert.Equal(0, vm.UnsavedEditCount);
-        Assert.False(vm.Edit!.CanUndo);
-    }
 
     [Fact]
     public async Task KeyDialog_ActiveLowerLayer_RequestNamesLayerOne_ChangeLandsThere()
@@ -787,13 +781,13 @@ public class MainWindowViewModelEditTests : IDisposable
         Tap(vm, 3);
 
         KeyDialogRequest? captured = null;
-        vm.KeyDialogRequested = request =>
+        _dialogs.KeyEditor = request =>
         {
             captured = request;
             return Task.FromResult<KeyBinding?>(Kp("B"));
         };
 
-        await vm.EditSelectedKeyAsync();
+        await vm.Edit!.EditSelectedKeyAsync();
 
         Assert.Equal(1, captured!.LayerIndex);
         Assert.Equal(1, vm.ActiveLayerIndex);
@@ -812,23 +806,23 @@ public class MainWindowViewModelEditTests : IDisposable
 
         var gate = new TaskCompletionSource<KeyBinding?>(TaskCreationOptions.RunContinuationsAsynchronously);
         var calls = 0;
-        vm.KeyDialogRequested = _ =>
+        _dialogs.KeyEditor = _ =>
         {
             calls++;
             return gate.Task;
         };
 
-        var first = vm.EditSelectedKeyAsync();
+        var first = vm.Edit!.EditSelectedKeyAsync();
         Assert.Equal(1, calls);
 
-        await vm.EditSelectedKeyAsync();
+        await vm.Edit!.EditSelectedKeyAsync();
         Assert.Equal(1, calls);
 
         gate.SetResult(Kp("B"));
         await first;
 
         Assert.Equal(1, calls);
-        Assert.Equal(1, vm.UnsavedEditCount);
+        Assert.Equal(1, Unsaved(vm));
         Assert.Equal("B", vm.Edit!.Session.Current.Layers[0].Bindings[1].Params[0]);
     }
 
@@ -842,7 +836,7 @@ public class MainWindowViewModelEditTests : IDisposable
         vm.StartEditCommand.Execute(null);
 
         KeyDialogRequest? captured = null;
-        vm.KeyDialogRequested = request =>
+        _dialogs.KeyEditor = request =>
         {
             captured = request;
             return Task.FromResult<KeyBinding?>(null);
@@ -856,103 +850,20 @@ public class MainWindowViewModelEditTests : IDisposable
         Assert.Equal(1, captured!.KeyIndex);
     }
 
-    // ---- the ring editor routing -----------------------------------------------------
-
     [Fact]
-    public async Task RingSetting_Default_IsOn()
+    public void RingSetting_DefaultsOn_AndPersists_ForTheDialogHostToRead()
     {
-        // The ring became the default key editor: a fresh view-model opens it
-        // without anyone touching the setting.
-        var vm = StartEditing(out _);
+        // Ring versus dialog is the dialog host's call (AvaloniaKeymapEditDialogs
+        // reads RingKeyEditor from the settings service on every open), so the
+        // setting must reach the settings service the moment it changes.
+        var settings = NewSettings();
+        var vm = NewVm(settings);
         Assert.True(vm.UseRingKeyEditor);
-        Tap(vm, 1);
-        var dialogCalls = 0;
-        var ringCalls = 0;
-        vm.KeyDialogRequested = _ =>
-        {
-            dialogCalls++;
-            return Task.FromResult<KeyBinding?>(null);
-        };
-        vm.KeyRingRequested = _ =>
-        {
-            ringCalls++;
-            return Task.FromResult<KeyBinding?>(null);
-        };
+        Assert.True(settings.Current.RingKeyEditor);
 
-        await vm.EditSelectedKeyAsync();
+        vm.UseRingKeyEditor = false;
 
-        Assert.Equal(1, ringCalls);
-        Assert.Equal(0, dialogCalls);
-    }
-
-    [Fact]
-    public async Task RingSetting_Off_OpensDialog_NotTheRing()
-    {
-        var vm = StartEditing(out _);
-        vm.UseRingKeyEditor = false; // the ring is the default — switch it off explicitly
-        Tap(vm, 1);
-        var dialogCalls = 0;
-        var ringCalls = 0;
-        vm.KeyDialogRequested = _ =>
-        {
-            dialogCalls++;
-            return Task.FromResult<KeyBinding?>(null);
-        };
-        vm.KeyRingRequested = _ =>
-        {
-            ringCalls++;
-            return Task.FromResult<KeyBinding?>(null);
-        };
-
-        await vm.EditSelectedKeyAsync();
-
-        Assert.Equal(1, dialogCalls);
-        Assert.Equal(0, ringCalls);
-    }
-
-    [Fact]
-    public async Task RingSetting_On_RingCallbackOpens_AndItsAnswerAppliesAsOneStep()
-    {
-        var vm = StartEditing(out _);
-        vm.UseRingKeyEditor = true;
-        Tap(vm, 1);
-        var dialogCalls = 0;
-        KeyDialogRequest? captured = null;
-        vm.KeyDialogRequested = _ =>
-        {
-            dialogCalls++;
-            return Task.FromResult<KeyBinding?>(Kp("C"));
-        };
-        vm.KeyRingRequested = request =>
-        {
-            captured = request;
-            return Task.FromResult<KeyBinding?>(Kp("B"));
-        };
-
-        await vm.EditSelectedKeyAsync();
-
-        Assert.Equal(0, dialogCalls);
-        Assert.NotNull(captured);
-        Assert.Equal(vm.ActiveLayerIndex, captured!.LayerIndex);
-        Assert.Equal(1, captured.KeyIndex);
-        var now = vm.Edit!.Session.Current.Layers[0].Bindings[1];
-        Assert.Equal("&kp", now.Behavior);
-        Assert.Equal("B", now.Params[0]);
-        Assert.Equal(1, vm.UnsavedEditCount);
-    }
-
-    [Fact]
-    public async Task RingSetting_On_NoRingCallback_OpensDialogInstead()
-    {
-        var vm = StartEditing(out _);
-        vm.UseRingKeyEditor = true;
-        Tap(vm, 1);
-        vm.KeyDialogRequested = _ => Task.FromResult<KeyBinding?>(Kp("C"));
-
-        await vm.EditSelectedKeyAsync();
-
-        Assert.Equal("C", vm.Edit!.Session.Current.Layers[0].Bindings[1].Params[0]);
-        Assert.Equal(1, vm.UnsavedEditCount);
+        Assert.False(settings.Current.RingKeyEditor);
     }
 
     // ---- the Settings keyboard picker lock ------------------------------------------
@@ -1006,12 +917,12 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var vm = StartEditing(out _);
 
-        Assert.True(vm.NewLayerCommand.CanExecute(null));
-        vm.NewLayerCommand.Execute(null);
+        Assert.True(vm.Edit!.NewLayerCommand.CanExecute(null));
+        vm.Edit!.NewLayerCommand.Execute(null);
 
         Assert.Equal(3, vm.Edit!.Session.Current.Layers.Count);
         Assert.Equal(2, vm.ActiveLayerIndex);
-        Assert.Equal(1, vm.UnsavedEditCount);
+        Assert.Equal(1, Unsaved(vm));
 
         // Undoing the add removes the shown layer — the board falls back to
         // the last remaining one instead of painting nothing.
@@ -1027,7 +938,7 @@ public class MainWindowViewModelEditTests : IDisposable
         var vm = StartEditing(out _);
         vm.Layers[1].SelectCommand.Execute(null);
 
-        vm.DuplicateShownLayerCommand.Execute(null);
+        vm.Edit!.DuplicateShownLayerCommand.Execute(null);
 
         Assert.Equal("Lower copy", LayerNames(vm)[2]);
         Assert.Equal(2, vm.ActiveLayerIndex);
@@ -1039,16 +950,16 @@ public class MainWindowViewModelEditTests : IDisposable
         var vm = StartEditing3();
         vm.Layers[1].SelectCommand.Execute(null); // Lower
 
-        vm.MoveShownLayerRightCommand.Execute(null);
+        vm.Edit!.MoveShownLayerRightCommand.Execute(null);
 
         Assert.Equal(new[] { "Base", "Raise", "Lower" }, LayerNames(vm));
         Assert.Equal(2, vm.ActiveLayerIndex);
-        Assert.False(vm.MoveShownLayerRightCommand.CanExecute(null));
-        Assert.True(vm.MoveShownLayerLeftCommand.CanExecute(null));
+        Assert.False(vm.Edit!.MoveShownLayerRightCommand.CanExecute(null));
+        Assert.True(vm.Edit!.MoveShownLayerLeftCommand.CanExecute(null));
 
         vm.Layers[0].SelectCommand.Execute(null);
-        Assert.False(vm.MoveShownLayerLeftCommand.CanExecute(null));
-        Assert.True(vm.MoveShownLayerRightCommand.CanExecute(null));
+        Assert.False(vm.Edit!.MoveShownLayerLeftCommand.CanExecute(null));
+        Assert.True(vm.Edit!.MoveShownLayerRightCommand.CanExecute(null));
     }
 
     [Fact]
@@ -1056,7 +967,7 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var vm = StartEditing3();
         vm.Layers[1].SelectCommand.Execute(null); // Lower
-        vm.MoveShownLayerRightCommand.Execute(null);
+        vm.Edit!.MoveShownLayerRightCommand.Execute(null);
         Assert.Equal(2, vm.ActiveLayerIndex);
 
         vm.Edit!.UndoCommand.Execute(null);
@@ -1072,7 +983,7 @@ public class MainWindowViewModelEditTests : IDisposable
     public void UndoOfAMove_WhileAnotherLayerIsShown_KeepsShowingThatLayer()
     {
         var vm = StartEditing3();
-        vm.MoveLayer(0, 2);                       // Lower, Raise, Base — Base shown at 2
+        vm.Edit!.MoveLayer(0, 0 + (2));                       // Lower, Raise, Base — Base shown at 2
         vm.Layers[1].SelectCommand.Execute(null); // Raise
 
         vm.Edit!.UndoCommand.Execute(null);       // Base, Lower, Raise
@@ -1085,13 +996,13 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var vm = StartEditing3();
         RenameLayerRequest? captured = null;
-        vm.RenameLayerRequested = request =>
+        _dialogs.Rename = request =>
         {
             captured = request;
             return Task.FromResult<string?>("Nav");
         };
 
-        await vm.RenameLayerAsync(1);
+        await vm.Edit!.RenameLayerAsync(1);
 
         Assert.NotNull(captured);
         Assert.Equal(1, captured!.LayerIndex);
@@ -1103,23 +1014,12 @@ public class MainWindowViewModelEditTests : IDisposable
     public async Task RenameLayer_CallbackCancels_ChangesNothing()
     {
         var vm = StartEditing3();
-        vm.RenameLayerRequested = _ => Task.FromResult<string?>(null);
+        _dialogs.Rename = _ => Task.FromResult<string?>(null);
 
-        await vm.RenameLayerAsync(1);
-
-        Assert.Equal("Lower", LayerNames(vm)[1]);
-        Assert.Equal(0, vm.UnsavedEditCount);
-    }
-
-    [Fact]
-    public async Task RenameLayer_NoCallback_DoesNothing()
-    {
-        var vm = StartEditing3();
-
-        await vm.RenameLayerAsync(1);
+        await vm.Edit!.RenameLayerAsync(1);
 
         Assert.Equal("Lower", LayerNames(vm)[1]);
-        Assert.Equal(0, vm.UnsavedEditCount);
+        Assert.Equal(0, Unsaved(vm));
     }
 
     [Fact]
@@ -1127,13 +1027,13 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var vm = StartEditing3();
         var blockedCalled = false;
-        vm.LayerDeleteBlockedRequested = _ =>
+        _dialogs.DeleteBlocked = _ =>
         {
             blockedCalled = true;
             return Task.CompletedTask;
         };
 
-        await vm.DeleteLayerAsync(1); // "Lower", unreferenced
+        await vm.Edit!.DeleteLayerAsync(1); // "Lower", unreferenced
 
         Assert.False(blockedCalled);
         Assert.Equal(new[] { "Base", "Raise" }, LayerNames(vm));
@@ -1147,16 +1047,16 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var vm = StartEditing(out _); // "Base", "Lower"
         LayerDeleteBlockedRequest? blocked = null;
-        vm.LayerDeleteBlockedRequested = request =>
+        _dialogs.DeleteBlocked = request =>
         {
             blocked = request;
             return Task.CompletedTask;
         };
 
-        await vm.DeleteLayerAsync(1); // allowed — Lower goes first
+        await vm.Edit!.DeleteLayerAsync(1); // allowed — Lower goes first
         Assert.Equal("Base", Assert.Single(LayerNames(vm)));
 
-        await vm.DeleteLayerAsync(0); // Base is now the only layer
+        await vm.Edit!.DeleteLayerAsync(0); // Base is now the only layer
 
         Assert.NotNull(blocked);
         Assert.Equal("Base", blocked!.LayerName);
@@ -1167,20 +1067,23 @@ public class MainWindowViewModelEditTests : IDisposable
     }
 
     [Fact]
-    public void LayerCommands_NotEditing_AllDisabled_AddLayerDoesNothing()
+    public void LayerCommands_AfterTheEditClosed_AllDisabled_AddLayerDoesNothing()
     {
-        var vm = NewVm(NewSettings());
-
-        Assert.False(vm.NewLayerCommand.CanExecute(null));
-        Assert.False(vm.DuplicateShownLayerCommand.CanExecute(null));
-        Assert.False(vm.MoveShownLayerLeftCommand.CanExecute(null));
-        Assert.False(vm.MoveShownLayerRightCommand.CanExecute(null));
-        Assert.False(vm.RenameShownLayerCommand.CanExecute(null));
-        Assert.False(vm.DeleteShownLayerCommand.CanExecute(null));
-
-        vm.AddLayer();
-
+        var vm = StartEditing(out _);
+        var edit = vm.Edit!;
+        vm.DiscardEditCommand.Execute(null);
         Assert.Null(vm.Edit);
+
+        Assert.False(edit.NewLayerCommand.CanExecute(null));
+        Assert.False(edit.DuplicateShownLayerCommand.CanExecute(null));
+        Assert.False(edit.MoveShownLayerLeftCommand.CanExecute(null));
+        Assert.False(edit.MoveShownLayerRightCommand.CanExecute(null));
+        Assert.False(edit.RenameShownLayerCommand.CanExecute(null));
+        Assert.False(edit.DeleteShownLayerCommand.CanExecute(null));
+
+        Assert.Null(edit.AddLayer());
+
+        Assert.Equal(2, edit.Session.Current.Layers.Count);
     }
 
     // ---- the layer tabs follow the edit ---------------------------------------------
@@ -1190,7 +1093,7 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var vm = StartEditing(out _);
 
-        vm.AddLayer();
+        vm.Edit!.AddLayer();
 
         Assert.Equal(3, vm.Layers.Count);
         Assert.Equal("2 : Layer 2", vm.Layers[2].DisplayName);
@@ -1218,7 +1121,7 @@ public class MainWindowViewModelEditTests : IDisposable
         vm.StartEditCommand.Execute(null);
         Assert.Equal("#123456", vm.Layers[1].TabColor);
 
-        vm.MoveLayer(1, 1); // Base, Raise, Lower
+        vm.Edit!.MoveLayer(1, 1 + (1)); // Base, Raise, Lower
 
         Assert.Equal("2 : Lower", vm.Layers[2].DisplayName);
         // The colour travels with the layer it belongs to…
@@ -1244,7 +1147,7 @@ public class MainWindowViewModelEditTests : IDisposable
         var tabs = vm.Layers.ToList();
 
         Tap(vm, 0);
-        vm.EditClearSelectedKey(toNone: false);
+        vm.Edit!.ClearSelectedKey(toNone: false);
 
         // A plain key edit must not replace the tab buttons — only structural
         // changes rebuild the strip.
@@ -1302,15 +1205,15 @@ public class MainWindowViewModelEditTests : IDisposable
         var settings = NewSettings(LayerScopedCorneSettings());
         var vm = StartEditing3(settings);
         IReadOnlyList<string>? shown = null;
-        vm.LayerSettingsNoticeRequested = lines =>
+        _dialogs.Notices = lines =>
         {
             shown = lines;
             return Task.CompletedTask;
         };
 
-        vm.MoveLayer(1, 1); // Base, Raise, Lower
+        vm.Edit!.MoveLayer(1, 1 + (1)); // Base, Raise, Lower
 
-        await vm.SaveEditCommand.ExecuteAsync(null);
+        await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
         Assert.False(vm.IsEditing);
         var saved = settings.Current;
@@ -1338,15 +1241,15 @@ public class MainWindowViewModelEditTests : IDisposable
         });
         var vm = StartEditing3(settings);
         IReadOnlyList<string>? shown = null;
-        vm.LayerSettingsNoticeRequested = lines =>
+        _dialogs.Notices = lines =>
         {
             shown = lines;
             return Task.CompletedTask;
         };
 
-        await vm.DeleteLayerAsync(1); // "Lower", unreferenced
+        await vm.Edit!.DeleteLayerAsync(1); // "Lower", unreferenced
 
-        await vm.SaveEditCommand.ExecuteAsync(null);
+        await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
         Assert.False(vm.IsEditing);
         // The rule aimed at the deleted layer is gone, and one line says so.
@@ -1362,7 +1265,7 @@ public class MainWindowViewModelEditTests : IDisposable
         var settings = NewSettings(LayerScopedCorneSettings());
         var vm = StartEditing3(settings);
         IReadOnlyList<string>? shown = null;
-        vm.LayerSettingsNoticeRequested = lines =>
+        _dialogs.Notices = lines =>
         {
             shown = lines;
             return Task.CompletedTask;
@@ -1370,7 +1273,7 @@ public class MainWindowViewModelEditTests : IDisposable
 
         ClearKeyZero(vm);
 
-        await vm.SaveEditCommand.ExecuteAsync(null);
+        await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
         Assert.False(vm.IsEditing);
         // Only bindings were written — the layer numbers never moved.
@@ -1384,18 +1287,18 @@ public class MainWindowViewModelEditTests : IDisposable
         var settings = NewSettings(LayerScopedCorneSettings());
         var vm = StartEditing3(settings);
         IReadOnlyList<string>? shown = null;
-        vm.LayerSettingsNoticeRequested = lines =>
+        _dialogs.Notices = lines =>
         {
             shown = lines;
             return Task.CompletedTask;
         };
 
-        vm.MoveLayer(1, 1);
-        vm.MoveLayer(2, -1); // back to the baseline order
+        vm.Edit!.MoveLayer(1, 1 + (1));
+        vm.Edit!.MoveLayer(2, 2 + (-1)); // back to the baseline order
         vm.Layers[0].SelectCommand.Execute(null);
         ClearKeyZero(vm);
 
-        await vm.SaveEditCommand.ExecuteAsync(null);
+        await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
         Assert.False(vm.IsEditing);
         // The layer list is back to the baseline, so there was nothing to move.
@@ -1409,7 +1312,7 @@ public class MainWindowViewModelEditTests : IDisposable
         var settings = NewSettings(LayerScopedCorneSettings());
         var vm = StartEditing3(settings);
 
-        vm.MoveLayer(1, 1);
+        vm.Edit!.MoveLayer(1, 1 + (1));
         vm.DiscardEditCommand.Execute(null);
 
         Assert.False(vm.IsEditing);
@@ -1453,13 +1356,13 @@ public class MainWindowViewModelEditTests : IDisposable
     {
         var vm = StartEditing(out _);
         ComboDialogRequest? captured = null;
-        vm.ComboDialogRequested = request =>
+        _dialogs.Combo = request =>
         {
             captured = request;
             return Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
         };
 
-        await vm.NewComboCommand.ExecuteAsync(null);
+        await vm.Edit!.NewComboCommand.ExecuteAsync(null);
 
         Assert.NotNull(captured);
         Assert.Same(vm.SelectedKeyboard, captured!.Profile);
@@ -1469,25 +1372,28 @@ public class MainWindowViewModelEditTests : IDisposable
         Assert.Single(vm.Combos);
         Assert.True(vm.Combos[0].IsEditable);
         Assert.True(vm.Combos[0].IsChanged);
-        Assert.Equal(1, vm.UnsavedEditCount);
+        Assert.Equal(1, Unsaved(vm));
         Assert.Single(vm.Edit!.Session.Current.Combos);
     }
 
     [Fact]
-    public async Task ComboCommands_WithoutCallbackOrWithoutEdit_DoNothing()
+    public async Task ComboCommands_AfterTheEditClosed_DoNothing()
     {
         var vm = StartEditing(out _);
+        var edit = vm.Edit!;
 
-        // No callback wired up: opening the dialog does nothing.
-        await vm.NewComboCommand.ExecuteAsync(null);
-        await vm.EditComboCommand.ExecuteAsync(1);
+        // The tile numbers are out of range of an empty combo list.
+        await edit.EditComboCommand.ExecuteAsync(1);
         Assert.Empty(vm.Combos);
-        Assert.Equal(0, vm.UnsavedEditCount);
+        Assert.Equal(0, Unsaved(vm));
+        Assert.Empty(_dialogs.ComboRequests);
 
         vm.DiscardEditCommand.Execute(null);
-        Assert.False(vm.NewComboCommand.CanExecute(null));
-        vm.DeleteComboCommand.Execute(1); // outside an edit: nothing, no throw
+        Assert.False(edit.NewComboCommand.CanExecute(null));
+        await edit.NewComboCommand.ExecuteAsync(null); // a closed edit: nothing, no dialog, no throw
+        edit.DeleteComboCommand.Execute(1);
         Assert.Empty(vm.Combos);
+        Assert.Empty(_dialogs.ComboRequests);
     }
 
     [Fact]
@@ -1496,14 +1402,14 @@ public class MainWindowViewModelEditTests : IDisposable
         var vm = StartEditing(out _);
         var gate = new TaskCompletionSource<ZmkCombo?>();
         var calls = 0;
-        vm.ComboDialogRequested = _ =>
+        _dialogs.Combo = _ =>
         {
             calls++;
             return gate.Task;
         };
 
-        var first = vm.NewComboCommand.ExecuteAsync(null);
-        await vm.NewComboCommand.ExecuteAsync(null); // guard: returns at once
+        var first = vm.Edit!.NewComboCommand.ExecuteAsync(null);
+        await vm.Edit!.NewComboCommand.ExecuteAsync(null); // guard: returns at once
         Assert.Equal(1, calls);
 
         gate.SetResult(EscCombo([0, 1]));
@@ -1515,18 +1421,18 @@ public class MainWindowViewModelEditTests : IDisposable
     public async Task EditCombo_Answer_ReplacesBinding_NullAndOutOfRange_ChangeNothing()
     {
         var vm = StartEditing(out _);
-        vm.ComboDialogRequested = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
-        await vm.NewComboCommand.ExecuteAsync(null);
+        _dialogs.Combo = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
+        await vm.Edit!.NewComboCommand.ExecuteAsync(null);
         var original = vm.Edit!.Session.Current.Combos[0];
 
         var changed = original with { Binding = new KeyBinding("&kp", ["TAB"]) };
         ComboDialogRequest? captured = null;
-        vm.ComboDialogRequested = request =>
+        _dialogs.Combo = request =>
         {
             captured = request;
             return Task.FromResult<ZmkCombo?>(changed);
         };
-        await vm.EditComboCommand.ExecuteAsync(1);
+        await vm.Edit!.EditComboCommand.ExecuteAsync(1);
 
         Assert.NotNull(captured);
         Assert.Equal(0, captured!.ComboIndex);
@@ -1534,18 +1440,18 @@ public class MainWindowViewModelEditTests : IDisposable
         Assert.Same(changed.Binding, vm.Edit!.Session.Current.Combos[0].Binding);
 
         // A cancelled dialog (null) changes nothing.
-        vm.ComboDialogRequested = _ => Task.FromResult<ZmkCombo?>(null);
-        await vm.EditComboCommand.ExecuteAsync(1);
+        _dialogs.Combo = _ => Task.FromResult<ZmkCombo?>(null);
+        await vm.Edit!.EditComboCommand.ExecuteAsync(1);
         Assert.Same(changed.Binding, vm.Edit.Session.Current.Combos[0].Binding);
 
         // An out-of-range tile number never even reaches the callback.
         var called = false;
-        vm.ComboDialogRequested = _ =>
+        _dialogs.Combo = _ =>
         {
             called = true;
             return Task.FromResult<ZmkCombo?>(changed);
         };
-        await vm.EditComboCommand.ExecuteAsync(2);
+        await vm.Edit!.EditComboCommand.ExecuteAsync(2);
         Assert.False(called);
         Assert.Same(changed.Binding, vm.Edit.Session.Current.Combos[0].Binding);
     }
@@ -1554,20 +1460,20 @@ public class MainWindowViewModelEditTests : IDisposable
     public async Task DeleteCombo_RemovesTheAddedTile_NetsBackToZero()
     {
         var vm = StartEditing(out _);
-        vm.ComboDialogRequested = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
-        await vm.NewComboCommand.ExecuteAsync(null);
+        _dialogs.Combo = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
+        await vm.Edit!.NewComboCommand.ExecuteAsync(null);
         Assert.Single(vm.Combos);
-        Assert.Equal(1, vm.UnsavedEditCount);
+        Assert.Equal(1, Unsaved(vm));
 
-        vm.DeleteComboCommand.Execute(1);
+        vm.Edit!.DeleteComboCommand.Execute(1);
 
         // The session's change event rebuilds the legend, and add-plus-delete
         // nets against the baseline.
         Assert.Empty(vm.Combos);
-        Assert.Equal(0, vm.UnsavedEditCount);
+        Assert.Equal(0, Unsaved(vm));
 
-        vm.DeleteComboCommand.Execute(1); // out of range: nothing, no throw
-        vm.DeleteComboCommand.Execute(0);
+        vm.Edit!.DeleteComboCommand.Execute(1); // out of range: nothing, no throw
+        vm.Edit!.DeleteComboCommand.Execute(0);
         Assert.Empty(vm.Combos);
     }
 
@@ -1575,17 +1481,17 @@ public class MainWindowViewModelEditTests : IDisposable
     public async Task ComboEditAndDelete_DoNothingWhileASaveIsInFlight()
     {
         var vm = StartEditing(out _);
-        vm.ComboDialogRequested = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
-        await vm.NewComboCommand.ExecuteAsync(null);
+        _dialogs.Combo = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
+        await vm.Edit!.NewComboCommand.ExecuteAsync(null);
         Assert.Single(vm.Combos);
 
         var opened = 0;
-        vm.ComboDialogRequested = _ => { opened++; return Task.FromResult<ZmkCombo?>(EscCombo([0, 2])); };
-        vm.IsSavingEdit = true;
+        _dialogs.Combo = _ => { opened++; return Task.FromResult<ZmkCombo?>(EscCombo([0, 2])); };
+        vm.Edit!.IsSaving = true;
 
         // The save plan is already built: an edit now would be lost.
-        vm.DeleteComboCommand.Execute(1);
-        await vm.EditComboCommand.ExecuteAsync(1);
+        vm.Edit!.DeleteComboCommand.Execute(1);
+        await vm.Edit!.EditComboCommand.ExecuteAsync(1);
 
         Assert.Single(vm.Edit!.Session.Current.Combos);
         Assert.Equal(0, opened);
@@ -1595,25 +1501,25 @@ public class MainWindowViewModelEditTests : IDisposable
     public async Task NewCombo_Undo_EmptiesTheLegendAgain()
     {
         var vm = StartEditing(out _);
-        vm.ComboDialogRequested = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
-        await vm.NewComboCommand.ExecuteAsync(null);
+        _dialogs.Combo = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
+        await vm.Edit!.NewComboCommand.ExecuteAsync(null);
         Assert.Single(vm.Combos);
 
         vm.Edit!.UndoCommand.Execute(null);
 
         Assert.Empty(vm.Combos);
-        Assert.Equal(0, vm.UnsavedEditCount);
+        Assert.Equal(0, Unsaved(vm));
     }
 
     [Fact]
     public async Task SaveEdit_AfterComboAdd_WritesComboNode_ReloadsOnePlainTile()
     {
         var vm = StartEditing(out var path);
-        vm.ReviewChangesRequested = GoAhead;
-        vm.ComboDialogRequested = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
-        await vm.NewComboCommand.ExecuteAsync(null);
+        _dialogs.Review = GoAhead;
+        _dialogs.Combo = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
+        await vm.Edit!.NewComboCommand.ExecuteAsync(null);
 
-        await vm.SaveEditCommand.ExecuteAsync(null);
+        await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
         Assert.False(vm.IsEditing);
         var saved = File.ReadAllText(path);
@@ -1634,22 +1540,22 @@ public class MainWindowViewModelEditTests : IDisposable
         var vm = NewVm(settings);
         var path = WriteTempKeymap();
         vm.LoadLayoutFromPath(path);
-        vm.ReviewChangesRequested = GoAhead;
+        _dialogs.Review = GoAhead;
 
         // Add the combo on keys 0+1 and get it into the file.
         vm.StartEditCommand.Execute(null);
-        vm.ComboDialogRequested = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
-        await vm.NewComboCommand.ExecuteAsync(null);
-        await vm.SaveEditCommand.ExecuteAsync(null);
+        _dialogs.Combo = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 1]));
+        await vm.Edit!.NewComboCommand.ExecuteAsync(null);
+        await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
         vm.SetComboLabelOverride("0,1", new ComboLabelOverride { MainLabel = "Esc" });
         Assert.NotNull(ComboLabelOverrides.Get("Corne", "0,1"));
 
         // Move it to keys 0+2 — the label follows the combo to the new key.
         vm.StartEditCommand.Execute(null);
-        vm.ComboDialogRequested = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 2]));
-        await vm.EditComboCommand.ExecuteAsync(1);
-        await vm.SaveEditCommand.ExecuteAsync(null);
+        _dialogs.Combo = _ => Task.FromResult<ZmkCombo?>(EscCombo([0, 2]));
+        await vm.Edit!.EditComboCommand.ExecuteAsync(1);
+        await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
         Assert.NotNull(ComboLabelOverrides.Get("Corne", "0,2"));
         Assert.Null(ComboLabelOverrides.Get("Corne", "0,1"));
@@ -1658,8 +1564,8 @@ public class MainWindowViewModelEditTests : IDisposable
 
         // Delete the combo — its label goes with it.
         vm.StartEditCommand.Execute(null);
-        vm.DeleteComboCommand.Execute(1);
-        await vm.SaveEditCommand.ExecuteAsync(null);
+        vm.Edit!.DeleteComboCommand.Execute(1);
+        await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
         Assert.Null(ComboLabelOverrides.Get("Corne", "0,2"));
         Assert.False(settings.Current.ComboLabelOverrides.TryGetValue("Corne", out var left)

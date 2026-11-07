@@ -6,7 +6,7 @@ using Xunit;
 namespace LViz.Tests.Layout;
 
 /// <summary>
-/// Tests for <see cref="GridLayoutGenerator"/> (part 4 of the guided
+/// Tests for <see cref="GridLayoutGenerator"/> (guided
 /// questions): a plain grid built from the wizard's answers. The keys per
 /// half fill full rows of the column count, so the last row can be shorter
 /// — inner-aligned on a split board, centred on a unibody. Binding order is

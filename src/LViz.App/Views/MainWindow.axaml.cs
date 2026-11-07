@@ -182,39 +182,39 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 break;
             case EditShortcut.ClearToTransparent:
-                vm.EditClearSelectedKey(false);
+                vm.Edit!.ClearSelectedKey(false);
                 e.Handled = true;
                 break;
             case EditShortcut.ClearToNone:
-                vm.EditClearSelectedKey(true);
+                vm.Edit!.ClearSelectedKey(true);
                 e.Handled = true;
                 break;
             case EditShortcut.ClearSelection:
-                vm.EditClearSelection();
+                vm.Edit!.ClearSelection();
                 e.Handled = true;
                 break;
             case EditShortcut.OpenKeyDialog:
-                _ = vm.EditSelectedKeyAsync();
+                _ = vm.Edit!.EditSelectedKeyAsync();
                 e.Handled = true;
                 break;
             case EditShortcut.NewLayer:
-                if (vm.NewLayerCommand.CanExecute(null))
-                    vm.NewLayerCommand.Execute(null);
+                if (vm.Edit!.NewLayerCommand.CanExecute(null))
+                    vm.Edit!.NewLayerCommand.Execute(null);
                 e.Handled = true;
                 break;
             case EditShortcut.DuplicateLayer:
-                if (vm.DuplicateShownLayerCommand.CanExecute(null))
-                    vm.DuplicateShownLayerCommand.Execute(null);
+                if (vm.Edit!.DuplicateShownLayerCommand.CanExecute(null))
+                    vm.Edit!.DuplicateShownLayerCommand.Execute(null);
                 e.Handled = true;
                 break;
             case EditShortcut.MoveLayerLeft:
-                if (vm.MoveShownLayerLeftCommand.CanExecute(null))
-                    vm.MoveShownLayerLeftCommand.Execute(null);
+                if (vm.Edit!.MoveShownLayerLeftCommand.CanExecute(null))
+                    vm.Edit!.MoveShownLayerLeftCommand.Execute(null);
                 e.Handled = true;
                 break;
             case EditShortcut.MoveLayerRight:
-                if (vm.MoveShownLayerRightCommand.CanExecute(null))
-                    vm.MoveShownLayerRightCommand.Execute(null);
+                if (vm.Edit!.MoveShownLayerRightCommand.CanExecute(null))
+                    vm.Edit!.MoveShownLayerRightCommand.Execute(null);
                 e.Handled = true;
                 break;
         }
@@ -421,7 +421,7 @@ public partial class MainWindow : Window
         if (c.DataContext is not ComboViewModel combo) return;
         if (DataContext is not MainWindowViewModel { IsEditing: true } vm) return;
 
-        vm.EditComboCommand.Execute(combo.Number);
+        vm.Edit!.EditComboCommand.Execute(combo.Number);
         e.Handled = true;
     }
 
@@ -448,9 +448,8 @@ public partial class MainWindow : Window
 
     // ---- key ring ---------------------------------------------------------------
 
-    /// <summary>True while <see cref="ShowKeyRingAsync"/> hosts the ring: edit
-    /// shortcuts pause (the ring owns the keyboard) and a second request is
-    /// ignored.</summary>
+    /// <summary>True while <see cref="EditKeyAsync"/> hosts the ring: edit
+    /// shortcuts pause (the ring owns the keyboard) and a scrim press cancels it.</summary>
     private bool _keyRingOpen;
 
     /// <summary>Cancels the currently open ring: a scrim press and a resize
@@ -468,103 +467,69 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Opens the key ring for <paramref name="request"/>: the board dims, the
-    /// edited key gets a gold outline, and the ring opens on the key in a
-    /// <see cref="KeyRingWindow"/> over the key's screen, so it is placed
-    /// against the monitor, not this window. Answers the binding the ring
-    /// saves, or null on a cancel (Esc, a click beside the ring, another app
-    /// activated, this window resized). When the edit moves to the key dialog,
-    /// or the screen is too small for the ring, answers what the dialog
-    /// answers instead. Returns null immediately when a ring is already open.
+    /// Opens the user's key editor for <paramref name="request"/>. With
+    /// <paramref name="useRing"/> the board dims, the edited key gets a gold
+    /// outline, and the ring opens on the key in a <see cref="KeyRingWindow"/>
+    /// over the key's screen, so it is placed against the monitor, not this
+    /// window; a resize or a press on the dimmed board cancels it. Without it
+    /// (or when the ring has no room, or hands over) the key dialog opens. The
+    /// ring-versus-dialog fallback itself is <see cref="KeyEditorHost"/>'s.
+    /// Answers the new binding, or null on cancel. The caller (the edit view-model)
+    /// allows one editor at a time.
     /// </summary>
-    public async Task<ZmkKeyBinding?> ShowKeyRingAsync(KeyDialogRequest request)
+    public async Task<ZmkKeyBinding?> EditKeyAsync(KeyDialogRequest request, bool useRing)
     {
-        if (_keyRingOpen) return null;
-        _keyRingOpen = true;
+        if (!useRing) return await KeyEditorHost.EditAsync(this, request, null);
 
         // Whatever happens on the way, the scrim comes down and the edit
         // shortcuts come back; otherwise one exception leaves the board
         // dimmed and the keyboard dead until restart.
-        try
-        {
-            return await OpenKeyRingAsync(request);
-        }
-        catch (Exception ex)
-        {
-            DiagnosticLog.Error("KeyRing", $"Key ring failed: {ex}");
-            return null;
-        }
-        finally
-        {
-            KeyRingLayer.IsVisible = false;
-            _keyRingOpen = false;
-        }
-    }
-
-    private async Task<ZmkKeyBinding?> OpenKeyRingAsync(KeyDialogRequest request)
-    {
-        var dialogVm = new KeyDialogViewModel(request);
-        var ringVm = new KeyRingViewModel(dialogVm, request);
-
-        // A collapsed panel has no bounds, so show the layer before finding
-        // the key in it.
-        KeyRingLayer.IsVisible = true;
-        UpdateLayout();
-        var key = FindKeyRect(request.KeyIndex, KeyRingLayer.Bounds.Size);
-
-        // The ring's window covers the working area of the key's screen;
-        // the host turns these screen-pixel corners into DIPs inside it.
-        var keyTopLeft = KeyRingLayer.PointToScreen(key.TopLeft);
-        var keyBottomRight = KeyRingLayer.PointToScreen(key.BottomRight);
-
-        // The board stays dimmed behind the ring, its key outlined in gold.
-        // The host's placement never moves the key, so the outline is set
-        // from the key rect before the ring opens.
-        var outline = key.Inflate(3);
-        Canvas.SetLeft(KeyRingKeyOutline, outline.X);
-        Canvas.SetTop(KeyRingKeyOutline, outline.Y);
-        KeyRingKeyOutline.Width = outline.Width;
-        KeyRingKeyOutline.Height = outline.Height;
-
-        // A resize moves the board under the outline: cancel. A press on the
-        // dimmed board cancels through the same source (OnKeyRingScrimPressed).
+        _keyRingOpen = true;
         var cts = new CancellationTokenSource();
         _keyRingCancel = cts;
         EventHandler<SizeChangedEventArgs> sizeCancel = (_, _) => cts.Cancel();
-        SizeChanged += sizeCancel;
-
-        KeyRingClosedEventArgs? closed;
         try
         {
-            // The host shows the ring over the key's screen and owns the
-            // ring window; a null answer means no screen or no room there.
-            closed = await KeyEditorHost.ShowRingAsync(
-                this, ringVm, keyTopLeft, keyBottomRight, cts.Token);
+            // A collapsed panel has no bounds, so show the layer before finding
+            // the key in it.
+            KeyRingLayer.IsVisible = true;
+            UpdateLayout();
+            var key = FindKeyRect(request.KeyIndex, KeyRingLayer.Bounds.Size);
+
+            // The ring's window covers the working area of the key's screen;
+            // the host turns these screen-pixel corners into DIPs inside it.
+            var keyTopLeft = KeyRingLayer.PointToScreen(key.TopLeft);
+            var keyBottomRight = KeyRingLayer.PointToScreen(key.BottomRight);
+
+            // The board stays dimmed behind the ring, its key outlined in gold.
+            // The host's placement never moves the key, so the outline is set
+            // from the key rect before the ring opens.
+            var outline = key.Inflate(3);
+            Canvas.SetLeft(KeyRingKeyOutline, outline.X);
+            Canvas.SetTop(KeyRingKeyOutline, outline.Y);
+            KeyRingKeyOutline.Width = outline.Width;
+            KeyRingKeyOutline.Height = outline.Height;
+
+            // A resize moves the board under the outline: cancel. A press on
+            // the dimmed board cancels through the same source
+            // (OnKeyRingScrimPressed).
+            SizeChanged += sizeCancel;
+
+            return await KeyEditorHost.EditAsync(
+                this,
+                request,
+                new KeyEditorRingAnchor(
+                    keyTopLeft, keyBottomRight, cts.Token,
+                    BeforeDialog: () => KeyRingLayer.IsVisible = false));
         }
         finally
         {
             SizeChanged -= sizeCancel;
             _keyRingCancel = null;
             cts.Dispose();
+            KeyRingLayer.IsVisible = false;
+            _keyRingOpen = false;
         }
-
-        // No screen, or the screen is too small for the ring: the dialog.
-        if (closed is null) return await ShowKeyDialogAsync(dialogVm);
-
-        // The same dialog VM, so a half-made edit carries over.
-        if (closed.OpenInDialog) return await ShowKeyDialogAsync(dialogVm);
-
-        Activate();
-        return closed.Result;
-    }
-
-    /// <summary>The key dialog on the ring's own dialog view-model: the
-    /// ring's "open in the key dialog" button, and the fallback when the
-    /// screen is too small for the ring.</summary>
-    private async Task<ZmkKeyBinding?> ShowKeyDialogAsync(KeyDialogViewModel dialogVm)
-    {
-        KeyRingLayer.IsVisible = false;
-        return await KeyEditorHost.ShowDialogAsync(this, dialogVm);
     }
 
     /// <summary>

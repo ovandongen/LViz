@@ -11,7 +11,7 @@ using Xunit;
 namespace LViz.Tests.Rendering;
 
 /// <summary>
-/// The shared key editor host (part 16): <see cref="KeyEditorHost"/> holds the
+/// The shared key editor host: <see cref="KeyEditorHost"/> holds the
 /// screen math, the ring window lifetime and the modal key dialog that
 /// <see cref="MainWindow"/> used to inline, so any window can open the ring.
 /// The pure <see cref="KeyEditorHost.ToWorkArea"/> conversion is pinned with

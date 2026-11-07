@@ -5,7 +5,7 @@ using Xunit;
 namespace LViz.Tests.Layout;
 
 /// <summary>
-/// Tests for <see cref="MatrixTransformImporter"/> (part 3 of the layout
+/// Tests for <see cref="MatrixTransformImporter"/> (layout
 /// wizard importers): rough layout from <c>zmk,matrix-transform</c> nodes.
 /// Text layout when the map spans several lines, RC wiring grid when it is
 /// on one line. Real-world fixtures: slabwing.overlay and cosmos82.dtsi.

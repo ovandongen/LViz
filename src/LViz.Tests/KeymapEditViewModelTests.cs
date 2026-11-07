@@ -78,12 +78,12 @@ public class KeymapEditViewModelTests
 
     private static KeymapEditViewModel NewVm() => NewVm(KeymapText);
 
-    private static KeymapEditViewModel NewVm(string text) =>
+    private static KeymapEditViewModel NewVm(string text, FakeKeymapEditDialogs? dialogs = null) =>
         new(
             new KeymapEditSource("x.keymap", "x.keymap", text, "sha", null),
             ZmkKeymapLoader.LoadFromText(text, "editor"),
             gitHub: null,
-            new KeymapBackupStore(TempBackupsRoot()));
+            new KeymapBackupStore(TempBackupsRoot()), dialogs ?? new FakeKeymapEditDialogs(), new FakeKeyboardProfile());
 
     private static string TempKeymapPath() =>
         Path.Combine(Path.GetTempPath(), $"lviz-edit-{Guid.NewGuid():N}.keymap");
@@ -111,6 +111,84 @@ public class KeymapEditViewModelTests
     }
 
     // ---- a fresh view-model ---------------------------------------------------------
+
+    // ---- the shown layer ---------------------------------------------------------------
+
+    [Fact]
+    public void ShowLayer_RaisesOnce_DropsTheSelection_AndIgnoresSameOrOutOfRange()
+    {
+        var vm = NewVm();
+        var raised = 0;
+        vm.ShownLayerChanged += (_, _) => raised++;
+        vm.SelectKey(1);
+
+        vm.ShowLayer(0);
+        vm.ShowLayer(-1);
+        vm.ShowLayer(2);
+
+        Assert.Equal(0, raised);
+        Assert.Equal(1, vm.SelectedKeyIndex);
+
+        vm.ShowLayer(1);
+
+        Assert.Equal(1, raised);
+        Assert.Equal(1, vm.ShownLayerIndex);
+        Assert.Null(vm.SelectedKeyIndex);
+    }
+
+    [Fact]
+    public void ShownLayer_FollowsItsLayerThroughUndo_ReportedByChangedNotShownLayerChanged()
+    {
+        var vm = NewVm();
+        vm.ShowLayer(1); // Lower
+        Assert.True(vm.MoveLayer(1, 0)); // Lower now sits first, and is shown there
+        Assert.Equal(0, vm.ShownLayerIndex);
+
+        var shownEvents = 0;
+        var changes = 0;
+        vm.ShownLayerChanged += (_, _) => shownEvents++;
+        vm.Changed += (_, _) => changes++;
+
+        vm.UndoCommand.Execute(null);
+
+        Assert.Equal(1, vm.ShownLayerIndex);
+        Assert.Equal(1, changes);
+        Assert.Equal(0, shownEvents);
+    }
+
+    // ---- dialogs ------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Close_WhileTheKeyEditorIsOpen_DropsItsLateAnswer()
+    {
+        var gate = new TaskCompletionSource<KeyBinding?>();
+        var dialogs = new FakeKeymapEditDialogs { KeyEditor = _ => gate.Task };
+        var vm = NewVm(KeymapText, dialogs);
+        vm.SelectKey(1);
+
+        var pending = vm.EditSelectedKeyAsync();
+        vm.Close();
+        gate.SetResult(new KeyBinding("&kp", new[] { "Z" }));
+        await pending;
+
+        Assert.Equal(0, vm.ChangeCount);
+    }
+
+    [Fact]
+    public async Task EditSelectedKey_WhileAnotherDialogIsOpen_IsIgnored()
+    {
+        var gate = new TaskCompletionSource<KeyBinding?>();
+        var dialogs = new FakeKeymapEditDialogs { KeyEditor = _ => gate.Task };
+        var vm = NewVm(KeymapText, dialogs);
+        vm.SelectKey(1);
+
+        var first = vm.EditSelectedKeyAsync();
+        await vm.EditSelectedKeyAsync();
+        gate.SetResult(null);
+        await first;
+
+        Assert.Single(dialogs.KeyEditorRequests);
+    }
 
     [Fact]
     public void New_HasNoChanges_AndNothingSelected()
@@ -141,7 +219,7 @@ public class KeymapEditViewModelTests
             new KeymapEditSource("d.keymap", "d.keymap", text, "sha", null),
             ZmkKeymapLoader.LoadFromText(text, "editor"),
             gitHub: null,
-            new KeymapBackupStore(TempBackupsRoot()));
+            new KeymapBackupStore(TempBackupsRoot()), new FakeKeymapEditDialogs(), new FakeKeyboardProfile());
 
         Assert.Contains(new KeyValuePair<string, string>("NAV", "1"), vm.Defines);
     }
@@ -167,7 +245,7 @@ public class KeymapEditViewModelTests
         new KeymapEditSource("d.keymap", "d.keymap", NavKeymapText, "sha", null),
         ZmkKeymapLoader.LoadFromText(NavKeymapText, "editor"),
         gitHub: null,
-        new KeymapBackupStore(TempBackupsRoot()));
+        new KeymapBackupStore(TempBackupsRoot()), new FakeKeymapEditDialogs(), new FakeKeyboardProfile());
 
     [Fact]
     public void MoveLayer_UpdatesLayerDefinesToTheMovedValue()
@@ -218,7 +296,7 @@ public class KeymapEditViewModelTests
         Assert.True(vm.ClearKey(0, 1, toNone: false));
 
         Assert.Equal("&trans", vm.Keymap.Config.Layers[0].Bindings[1].Behavior);
-        Assert.True(vm.IsKeyChanged(0, 1));
+        Assert.True(vm.Session.IsKeyChanged(0, 1));
         Assert.Equal(1, vm.ChangeCount);
         Assert.Equal(Loc.Instance["Edit_BannerOne"], vm.BannerText);
         Assert.Equal(1, raised);
@@ -589,7 +667,7 @@ public class KeymapEditViewModelTests
     {
         var vm = NewSlabwingVm();
 
-        vm.AddCombo(Combo("extra", "&mo", "5"));
+        vm.Session.AddCombo(Combo("extra", "&mo", "5"));
 
         var check = vm.CheckDeleteLayer(5);
         Assert.NotNull(check);
@@ -621,7 +699,7 @@ public class KeymapEditViewModelTests
         var raised = 0;
         vm.Changed += (_, _) => raised++;
 
-        Assert.Equal(0, vm.AddCombo(Combo("c", "&kp", "X")));
+        Assert.Equal(0, vm.Session.AddCombo(Combo("c", "&kp", "X")));
 
         Assert.Equal(1, raised);
         Assert.Equal(1, vm.ChangeCount);
@@ -634,22 +712,22 @@ public class KeymapEditViewModelTests
     }
 
     [Fact]
-    public void SetCombo_AndDeleteCombo_WrapTheSession_AndIsComboChangedTracksIt()
+    public void SessionComboEdits_FlowIntoTheChangeCount()
     {
         var vm = NewVm();
-        var index = vm.AddCombo(Combo("c", "&kp", "X"));
-        Assert.True(vm.IsComboChanged(index));
+        var index = vm.Session.AddCombo(Combo("c", "&kp", "X"));
+        Assert.True(vm.Session.IsComboChanged(index));
 
         // The same combo: false, no second step.
-        Assert.False(vm.SetCombo(index, Combo("c", "&kp", "X")));
+        Assert.False(vm.Session.SetCombo(index, Combo("c", "&kp", "X")));
         Assert.Equal(1, vm.ChangeCount);
 
-        Assert.True(vm.SetCombo(index, Combo("c", "&kp", "Y")));
+        Assert.True(vm.Session.SetCombo(index, Combo("c", "&kp", "Y")));
         // The count is the net diff against the baseline, not the undo steps:
         // still the one added combo.
         Assert.Equal(1, vm.ChangeCount);
 
-        vm.DeleteCombo(index);
+        vm.Session.DeleteCombo(index);
         Assert.Empty(vm.Session.Current.Combos);
         // The add and the delete of that added combo net out.
         Assert.Equal(0, vm.ChangeCount);
@@ -666,7 +744,7 @@ public class KeymapEditViewModelTests
         {
             File.WriteAllText(path, KeymapText);
 
-            var vm = KeymapEditViewModel.Start(path, path, gitHub: null, new KeymapBackupStore(TempBackupsRoot()));
+            var vm = KeymapEditViewModel.Start(path, path, gitHub: null, new KeymapBackupStore(TempBackupsRoot()), new FakeKeymapEditDialogs(), new FakeKeyboardProfile());
 
             Assert.Equal(File.ReadAllText(path), vm.Source.BaselineText);
             Assert.Equal(GitBlobSha.Compute(File.ReadAllBytes(path)), vm.Source.BaseBlobSha);
@@ -687,7 +765,7 @@ public class KeymapEditViewModelTests
         {
             File.WriteAllText(path, KeymapText);
 
-            var vm = KeymapEditViewModel.Start(path, "github:o/r:main:config/x.keymap", gitHub: null, new KeymapBackupStore(TempBackupsRoot()));
+            var vm = KeymapEditViewModel.Start(path, "github:o/r:main:config/x.keymap", gitHub: null, new KeymapBackupStore(TempBackupsRoot()), new FakeKeymapEditDialogs(), new FakeKeyboardProfile());
 
             Assert.True(vm.Source.IsGitHub);
             Assert.Equal("o/r (main)", vm.Source.TargetName);
@@ -709,7 +787,7 @@ public class KeymapEditViewModelTests
             bytes.AddRange(Encoding.UTF8.GetBytes(KeymapText));
             File.WriteAllBytes(path, bytes.ToArray());
 
-            var vm = KeymapEditViewModel.Start(path, path, gitHub: null, new KeymapBackupStore(TempBackupsRoot()));
+            var vm = KeymapEditViewModel.Start(path, path, gitHub: null, new KeymapBackupStore(TempBackupsRoot()), new FakeKeymapEditDialogs(), new FakeKeyboardProfile());
 
             Assert.False(vm.Source.BaselineText.StartsWith('\uFEFF'));
             Assert.Equal(KeymapText, vm.Source.BaselineText);
@@ -729,7 +807,7 @@ public class KeymapEditViewModelTests
             File.WriteAllText(path, "this is not a keymap");
 
             Assert.Throws<ZmkKeymapParseException>(
-                () => KeymapEditViewModel.Start(path, path, gitHub: null, new KeymapBackupStore(TempBackupsRoot())));
+                () => KeymapEditViewModel.Start(path, path, gitHub: null, new KeymapBackupStore(TempBackupsRoot()), new FakeKeymapEditDialogs(), new FakeKeyboardProfile()));
         }
         finally
         {
@@ -747,7 +825,7 @@ public class KeymapEditViewModelTests
         try
         {
             File.WriteAllText(path, KeymapText);
-            var vm = KeymapEditViewModel.Start(path, path, gitHub: null, backups);
+            var vm = KeymapEditViewModel.Start(path, path, gitHub: null, backups, new FakeKeymapEditDialogs(), new FakeKeyboardProfile());
             Assert.True(vm.ClearKey(0, 1, toNone: false));
             var plan = vm.BuildSavePlan();
 
@@ -776,7 +854,7 @@ public class KeymapEditViewModelTests
         try
         {
             File.WriteAllText(path, KeymapText);
-            var vm = KeymapEditViewModel.Start(path, path, gitHub: null, backups);
+            var vm = KeymapEditViewModel.Start(path, path, gitHub: null, backups, new FakeKeymapEditDialogs(), new FakeKeyboardProfile());
             Assert.True(vm.ClearKey(0, 1, toNone: false));
             var plan = vm.BuildSavePlan();
 
@@ -826,7 +904,7 @@ public class KeymapEditViewModelTests
         {
             File.WriteAllText(path, KeymapText);
             var vm = KeymapEditViewModel.Start(
-                path, "github:o/r:main:config/x.keymap", fake, backups);
+                path, "github:o/r:main:config/x.keymap", fake, backups, new FakeKeymapEditDialogs(), new FakeKeyboardProfile());
             Assert.True(vm.ClearKey(0, 1, toNone: false));
             var plan = vm.BuildSavePlan();
 
@@ -866,7 +944,7 @@ public class KeymapEditViewModelTests
         {
             File.WriteAllText(path, KeymapText);
             var vm = KeymapEditViewModel.Start(
-                path, "github:o/r:main:config/x.keymap", fake, backups);
+                path, "github:o/r:main:config/x.keymap", fake, backups, new FakeKeymapEditDialogs(), new FakeKeyboardProfile());
             Assert.True(vm.ClearKey(0, 1, toNone: false));
 
             await vm.SaveAsync(vm.BuildSavePlan(), overwrite: false, commitMessage: "Swap the B key");
@@ -895,7 +973,7 @@ public class KeymapEditViewModelTests
         {
             File.WriteAllText(path, KeymapText);
             var vm = KeymapEditViewModel.Start(
-                path, "github:o/r:main:config/x.keymap", fake, backups);
+                path, "github:o/r:main:config/x.keymap", fake, backups, new FakeKeymapEditDialogs(), new FakeKeyboardProfile());
             Assert.True(vm.ClearKey(0, 1, toNone: false));
             var plan = vm.BuildSavePlan();
 
@@ -928,7 +1006,7 @@ public class KeymapEditViewModelTests
         {
             File.WriteAllText(path, KeymapText);
             var vm = KeymapEditViewModel.Start(
-                path, "github:o/r:main:config/x.keymap", fake, backups);
+                path, "github:o/r:main:config/x.keymap", fake, backups, new FakeKeymapEditDialogs(), new FakeKeyboardProfile());
             Assert.True(vm.ClearKey(0, 1, toNone: false));
             var plan = vm.BuildSavePlan();
 
@@ -959,7 +1037,7 @@ public class KeymapEditViewModelTests
         {
             File.WriteAllText(path, KeymapText);
             var vm = KeymapEditViewModel.Start(
-                path, "github:o/r:main:config/x.keymap", fake, backups);
+                path, "github:o/r:main:config/x.keymap", fake, backups, new FakeKeymapEditDialogs(), new FakeKeyboardProfile());
             Assert.True(vm.ClearKey(0, 1, toNone: false));
             var plan = vm.BuildSavePlan();
 
@@ -984,7 +1062,8 @@ public class KeymapEditViewModelTests
         {
             File.WriteAllText(path, KeymapText);
             var vm = KeymapEditViewModel.Start(
-                path, "github:o/r:main:config/x.keymap", gitHub: null, backups);
+                path, "github:o/r:main:config/x.keymap", gitHub: null, backups,
+                new FakeKeymapEditDialogs(), new FakeKeyboardProfile());
             Assert.True(vm.ClearKey(0, 1, toNone: false));
             var plan = vm.BuildSavePlan();
 

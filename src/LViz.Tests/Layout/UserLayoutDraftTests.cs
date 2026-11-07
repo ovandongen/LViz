@@ -6,7 +6,7 @@ using Xunit;
 namespace LViz.Tests.Layout;
 
 /// <summary>
-/// Tests for <see cref="UserLayoutDraft"/> (part 2 of the layout wizard):
+/// Tests for <see cref="UserLayoutDraft"/> (layout wizard):
 /// store-legal unique ids, the automatic left/right midline (largest gap in
 /// the middle band, rotated centres, fallback to the board centre), the draft
 /// <see cref="UserLayoutFile"/> the wizard saves, and the name suggestion.

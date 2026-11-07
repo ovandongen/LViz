@@ -130,19 +130,41 @@ public partial class App : Application
             // two quick quits run Shutdown() twice.
             var quitInProgress = false;
 
-            // Quit guard: unsaved keymap edits are confirmed before anything
-            // shuts down. With no edits both quit paths below run exactly as
-            // before (save window state, shut down, close/exit).
+            // Confirm discarding unsaved keymap edits, then run `finish`. With
+            // no edits the prompt is skipped and `finish` runs straight away.
+            // The flag resets however this ends (cancel, or a throw before
+            // `finish` exits), so a later quit can still ask again.
+            void QuitAfterConfirm(Action finish)
+            {
+                if (quitInProgress) return;
+                quitInProgress = true;
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    try
+                    {
+                        if (!await ConfirmDiscardEditsAsync()) return;
+                        SaveWindowState();
+                        viewModel.Shutdown();
+                        finish();
+                    }
+                    finally
+                    {
+                        quitInProgress = false;
+                    }
+                });
+            }
+
             async Task<bool> ConfirmDiscardEditsAsync()
             {
-                if (viewModel.UnsavedEditCount == 0) return true;
+                var unsaved = viewModel.Edit?.ChangeCount ?? 0;
+                if (unsaved == 0) return true;
                 // The global hotkey can hide the window while the user keeps
                 // editing, and a modal dialog on a hidden owner never shows.
                 mainWindow.Show();
                 mainWindow.Activate();
                 var dlg = new ChoiceDialog
                 {
-                    DataContext = ChoiceDialogViewModel.QuitWithUnsavedEdits(viewModel.UnsavedEditCount),
+                    DataContext = ChoiceDialogViewModel.QuitWithUnsavedEdits(unsaved),
                 };
                 var result = await dlg.ShowDialog<string?>(mainWindow);
                 return result == "quit";
@@ -152,47 +174,14 @@ public partial class App : Application
             {
                 if (closingHandled) return;
                 e.Cancel = true;
-                if (quitInProgress) return;
-                quitInProgress = true;
-                Dispatcher.UIThread.Post(async () =>
+                QuitAfterConfirm(() =>
                 {
-                    // Reset however this ends (cancel, or a throw before the
-                    // close) so a later close can still ask again.
-                    try
-                    {
-                        if (!await ConfirmDiscardEditsAsync()) return;
-                        closingHandled = true;
-                        SaveWindowState();
-                        viewModel.Shutdown();
-                        mainWindow.Close();
-                    }
-                    finally
-                    {
-                        quitInProgress = false;
-                    }
+                    closingHandled = true;
+                    mainWindow.Close();
                 });
             };
 
-            viewModel.QuitRequested = () =>
-            {
-                if (quitInProgress) return;
-                quitInProgress = true;
-                Dispatcher.UIThread.Post(async () =>
-                {
-                    // Reset on cancel, or when a step throws before the exit.
-                    try
-                    {
-                        if (!await ConfirmDiscardEditsAsync()) return;
-                        SaveWindowState();
-                        viewModel.Shutdown();
-                        Environment.Exit(0);
-                    }
-                    finally
-                    {
-                        quitInProgress = false;
-                    }
-                });
-            };
+            viewModel.QuitRequested = () => QuitAfterConfirm(() => Environment.Exit(0));
 
             // Tray icon: localize menu headers + pipe clicks to the VM
             var trayIcons = TrayIcon.GetIcons(this);
@@ -352,78 +341,6 @@ public partial class App : Application
                     if (result.Saved)
                         viewModel.SetComboLabelOverride(keyPositionsKey, result.Value);
                 });
-            };
-
-            // Review-before-save: modal, awaited by the save command, so the
-            // save only continues when the user approved the listed changes,
-            // with the commit message as the user left it.
-            viewModel.ReviewChangesRequested = async request =>
-            {
-                var dlg = new KeymapReviewDialog { DataContext = new KeymapReviewDialogViewModel(request) };
-                return await dlg.ShowDialog<KeymapReviewAnswer?>(mainWindow);
-            };
-
-            // Key dialog: modal, awaited by the open-key command, which
-            // applies the answered binding as one undo step. A null answer
-            // (Esc, Cancel, close) changes nothing.
-            viewModel.KeyDialogRequested = async request =>
-            {
-                var dlg = new KeyDialog { DataContext = new KeyDialogViewModel(request) };
-                return await dlg.ShowDialog<KeyBinding?>(mainWindow);
-            };
-
-            // Key ring: hosted by the main window as an overlay (a dialog
-            // fallback while the window is too small); same lifecycle as the
-            // key dialog — it answers the new binding, or null on cancel.
-            viewModel.KeyRingRequested = request => mainWindow.ShowKeyRingAsync(request);
-
-            // Combo dialog: modal, awaited by the add/edit-combo command, which
-            // applies the answered combo as one undo step. A null answer (Esc,
-            // Cancel, close) changes nothing. The dialog's Binding button opens
-            // the user's default key editor anchored on the button itself.
-            // ZmkCombo is fully qualified: a `using LViz.Core.Models;` here
-            // would make KeyBinding ambiguous with Avalonia.Input's type.
-            viewModel.ComboDialogRequested = async request =>
-            {
-                var comboVm = new ComboDialogViewModel(request);
-                var dlg = new ComboDialog { DataContext = comboVm };
-                comboVm.BindingEditorRequested = r => KeyEditorHost.EditAsync(dlg, dlg.BindingAnchor, r, viewModel.UseRingKeyEditor);
-                return await dlg.ShowDialog<LViz.Core.Models.ZmkCombo?>(mainWindow);
-            };
-
-            // Save conflict: the target changed underneath the edit. Modal,
-            // awaited by the save command, which applies the answer (reload /
-            // overwrite / keep editing) directly.
-            viewModel.SaveConflictRequested = async request =>
-            {
-                var dlg = new ChoiceDialog { DataContext = ChoiceDialogViewModel.Conflict(request) };
-                return ChoiceDialogViewModel.ToConflictChoice(await dlg.ShowDialog<string?>(mainWindow));
-            };
-
-            // Rename layer: modal, awaited by the rename command, which
-            // applies the answered name. A null answer (Esc, Cancel, close)
-            // keeps the current name.
-            viewModel.RenameLayerRequested = async request =>
-            {
-                var dlg = new RenameLayerDialog { DataContext = new RenameLayerDialogViewModel(request) };
-                return await dlg.ShowDialog<string?>(mainWindow);
-            };
-
-            // Blocked layer delete: modal notice listing every reason the
-            // delete was refused; the user just acknowledges it.
-            viewModel.LayerDeleteBlockedRequested = async request =>
-            {
-                var dlg = new ChoiceDialog { DataContext = ChoiceDialogViewModel.LayerDeleteBlocked(request) };
-                await dlg.ShowDialog<string?>(mainWindow);
-            };
-
-            // After-save report about layer settings the structural save
-            // moved or dropped; the lines are already translated, the user
-            // just acknowledges them.
-            viewModel.LayerSettingsNoticeRequested = async lines =>
-            {
-                var dlg = new ChoiceDialog { DataContext = ChoiceDialogViewModel.LayerSettingsNotice(lines) };
-                await dlg.ShowDialog<string?>(mainWindow);
             };
 
             // Keyboard shortcuts: modal read-only list of every shortcut,

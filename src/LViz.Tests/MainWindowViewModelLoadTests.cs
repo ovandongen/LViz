@@ -771,7 +771,7 @@ public class MainWindowViewModelLoadTests
     public void SelectKeyboard_BookedKeymapDoesNotFit_StaysOnPickedBoard()
     {
         // The reported bug: GO60 booked with a Corne-sized keymap. Picking
-        // GO60 must show GO60 and refuse the keymap (part 1's refusal),
+        // GO60 must show GO60 and refuse the keymap,
         // not jump to the board whose key count matches.
         var path = Path.Combine(Path.GetTempPath(), $"lviz-nomatch-{Guid.NewGuid():N}.keymap");
         File.WriteAllText(path, "/* booked keymap stand-in */");

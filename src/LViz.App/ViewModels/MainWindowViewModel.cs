@@ -92,6 +92,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     // don't wire it — GitHub entries then only ever load from nothing and a
     // click on one toasts "GitHub is not available".
     private readonly IGitHubKeymapService? _gitHub;
+    private readonly IKeymapEditDialogs _editDialogs;
 
     // Backup store the keymap editor's local save snapshots into. App injects
     // the shared one; tests point it at a temp folder. Only ever written by a
@@ -699,9 +700,11 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         ICapabilityControl? capabilityControl = null,
         IHostActionExecutor? hostActionExecutor = null,
         IGitHubKeymapService? gitHub = null,
-        KeymapBackupStore? keymapBackups = null)
+        KeymapBackupStore? keymapBackups = null,
+        IKeymapEditDialogs? editDialogs = null)
     {
         _settingsService = settingsService;
+        _editDialogs = editDialogs ?? new UnavailableKeymapEditDialogs();
         _keymap = keymapState ?? new KeymapStateService();
         _gitHub = gitHub;
         _keymapBackups = keymapBackups ?? new KeymapBackupStore(KeymapBackupStore.DefaultRoot);
@@ -1367,13 +1370,15 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         _hid.Dispose();
     }
 
-    // --- Keymap edit mode (start/discard/save here; the UI is part 7) ---
+    // --- Keymap edit mode (starting, leaving and the follow-up to a save; the
+    // edit's own actions live on KeymapEditViewModel) ---
 
     /// <summary>
-    /// The open keymap edit, or null. Setting it (from <see cref="StartEdit"/>
-    /// and <see cref="LeaveEdit"/>) drives everything the view changes while
-    /// editing — <see cref="IsEditing"/>, <see cref="UnsavedEditCount"/>,
-    /// <see cref="CanStartEdit"/> and the Start command's enable state.
+    /// The open keymap edit, or null. Bind to it directly for everything the
+    /// edit offers (<c>Edit.SaveEditCommand</c>, <c>Edit.NewLayerCommand</c>,
+    /// ...). Setting it (from <see cref="StartEdit"/> and <see cref="LeaveEdit"/>)
+    /// drives <see cref="IsEditing"/>, <see cref="CanStartEdit"/> and the Start
+    /// command's enable state.
     /// </summary>
     [ObservableProperty]
     private KeymapEditViewModel? _edit;
@@ -1381,9 +1386,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// <summary>True while a keymap edit is open — locks keymap/board switching
     /// and routes key taps into the editor.</summary>
     public bool IsEditing => Edit is not null;
-
-    /// <summary>Changes still differing from the baseline; 0 when not editing.</summary>
-    public int UnsavedEditCount => Edit?.ChangeCount ?? 0;
 
     /// <summary>Only a loaded <c>.keymap</c> file can be edited (the Moergo
     /// <c>.json</c> export stays import-only), and only one edit at a time.</summary>
@@ -1403,24 +1405,10 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     partial void OnEditChanged(KeymapEditViewModel? value)
     {
         OnPropertyChanged(nameof(IsEditing));
-        OnPropertyChanged(nameof(UnsavedEditCount));
         OnPropertyChanged(nameof(CanStartEdit));
         OnPropertyChanged(nameof(IsComboLegendVisible));
         StartEditCommand.NotifyCanExecuteChanged();
-        NotifyEditCommandState();
-    }
-
-    /// <summary>
-    /// Re-query the commands whose enable state hangs off <see cref="Edit"/> and
-    /// <see cref="IsSavingEdit"/>. Every site that can move that state calls this
-    /// so one of them can't be forgotten.
-    /// </summary>
-    private void NotifyEditCommandState()
-    {
-        SaveEditCommand.NotifyCanExecuteChanged();
         DiscardEditCommand.NotifyCanExecuteChanged();
-        NewComboCommand.NotifyCanExecuteChanged();
-        NotifyLayerCommandState();
     }
 
     /// <summary>
@@ -1435,7 +1423,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         try
         {
             edit = KeymapEditViewModel.Start(
-                LoadedLayoutPath!, _loadedEntry ?? LoadedLayoutPath!, _gitHub, _keymapBackups);
+                LoadedLayoutPath!, _loadedEntry ?? LoadedLayoutPath!, _gitHub, _keymapBackups,
+                _editDialogs, _profile, ActiveLayerIndex);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ZmkKeymapParseException)
         {
@@ -1447,6 +1436,10 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
         Edit = edit;
         edit.Changed += OnEditChanged;
+        edit.ShownLayerChanged += OnEditShownLayerChanged;
+        edit.PropertyChanged += OnEditPropertyChanged;
+        edit.Reported += OnEditReported;
+        edit.Completed += OnEditCompletedAsync;
 
         // The tabs rebuild off the edit: every layer shows (hidden ones
         // included, purely in memory) and each tab carries the per-layer
@@ -1454,42 +1447,113 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         // persisted setting.
         RebuildLayers();
 
-        ApplyActiveLayer(ActiveLayerIndex);
+        ApplyActiveLayer(edit.ShownLayerIndex);
 
         // The legend follows the edit too: it shows the edited combos, and
         // every tile becomes editable with its pending-change mark.
         BuildCombosForConfig();
     }
 
-    /// <summary>One edit change: repaint the board off the edited keymap and
-    /// refresh the banner count and the save/discard enable state. The board
-    /// follows the shown <em>layer</em>, not its position, so an undo or redo of
-    /// a move shows that layer where it went. When the shown layer is gone (an
-    /// undone add) the position is kept, or the last layer when that position
-    /// no longer exists. Structural changes (add/delete/move/rename) also
+    /// <summary>One edit change: repaint the board off the edited keymap. The
+    /// edit has already moved its shown layer along (a layer is followed by id
+    /// through undo and redo). Structural changes (add/delete/move/rename) also
     /// rebuild the tab strip — a plain key edit leaves the tabs alone, since
     /// rebuilding replaces the tab buttons.</summary>
     private void OnEditChanged(object? sender, EventArgs e)
     {
-        var index = ActiveLayerIndex;
-        if (Edit is { } edit)
-        {
-            if (_shownLayerId is int id && edit.Session.IndexOfLayerId(id) is int followed)
-                index = followed;
-            var count = edit.Session.Current.Layers.Count;
-            if (count > 0 && (index < 0 || index >= count)) index = count - 1;
-        }
+        if (Edit is not { } edit) return;
+
         if (!TabsMatchEdit()) RebuildLayers();
-        ApplyActiveLayer(index);
-        OnPropertyChanged(nameof(UnsavedEditCount));
+        ApplyActiveLayer(edit.ShownLayerIndex);
         // A tab color can move to another position while the shown index (and
         // with it the NotifyPropertyChangedFor above) stays put.
         OnPropertyChanged(nameof(ActiveLayerTintColor));
-        NotifyEditCommandState();
 
         // The legend re-reads the edited combos — a key edit can retake a
         // tile's labels, an undo can add or drop tiles entirely.
         BuildCombosForConfig();
+    }
+
+    /// <summary>The edit showed another layer on purpose (an added or moved
+    /// layer): repaint it. One direction only — painting never writes back to
+    /// the edit.</summary>
+    private void OnEditShownLayerChanged(object? sender, EventArgs e)
+    {
+        if (Edit is { } edit) ApplyActiveLayer(edit.ShownLayerIndex);
+    }
+
+    private void OnEditPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        switch (e.PropertyName)
+        {
+            case nameof(KeymapEditViewModel.SelectedKeyIndex):
+                RefreshEditSelectionFlags();
+                break;
+            case nameof(KeymapEditViewModel.IsSaving):
+                DiscardEditCommand.NotifyCanExecuteChanged();
+                break;
+        }
+    }
+
+    private void OnEditReported(KeymapEditReport report)
+    {
+        if (report.Kind == KeymapEditReportKind.Error) Toast.Show(report.Message);
+        else StatusMessage = report.Message;
+    }
+
+    /// <summary>
+    /// What follows a finished edit action. A save that was written: carry the
+    /// per-layer settings and combo labels along, close the edit, reload what
+    /// was written, stay on the layer the editor was on and report it in the
+    /// status bar. A conflict answered with "reload": drop the edit and show
+    /// the target as it stands. Every reload happens <em>after</em>
+    /// <see cref="LeaveEdit"/>: the edit-mode locks refuse
+    /// <see cref="LoadLayoutFromPath"/> and <see cref="OpenGitHubKeymapAsync"/>
+    /// while an edit is open.
+    /// </summary>
+    private async Task OnEditCompletedAsync(KeymapEditCompletion completion)
+    {
+        if (Edit is not { } edit) return;
+
+        switch (completion)
+        {
+            case KeymapEditCompletion.Saved saved:
+            {
+                // A reload always lands on layer 0; a save must not move the
+                // user off the layer they were editing — unless that layer's
+                // tab is hidden, then the nearest shown one takes over.
+                var layer = ActiveLayerIndex;
+
+                // The layers just moved on disk for good — renumber this
+                // keyboard's per-layer settings with them and collect what
+                // the move could not carry over.
+                var notices = edit.Session.PendingStructureEdits.Count > 0
+                    ? MoveLayerSettings(edit.Session.BaselineLayerMap())
+                    : Array.Empty<LayerSettingsNotice>();
+
+                // Combo labels follow their combo the same way layer
+                // settings follow their layers — before the edit closes.
+                MoveComboLabelOverrides(saved.Plan.ComboChanges);
+
+                LeaveEdit();
+                LoadLayoutFromPath(saved.ReloadPath, edit.Source.Entry);
+                ApplyActiveLayer(NearestShownLayer(layer));
+                StatusMessage = Loc.Instance.Format(
+                    "Status_EditSavedFormat", Path.GetFileName(saved.ReloadPath));
+
+                if (notices.Count > 0)
+                    await _editDialogs.ShowLayerSettingsNoticesAsync(notices.Select(NoticeLine).ToList());
+                break;
+            }
+
+            case KeymapEditCompletion.ReloadRequested:
+                LeaveEdit();
+                if (edit.Source.GitHub is { } gitHubRef)
+                    await OpenGitHubKeymapAsync(gitHubRef);
+                else
+                    LoadLayoutFromPath(edit.Source.LocalPath, edit.Source.Entry);
+                break;
+        }
     }
 
     /// <summary>True while <see cref="Layers"/> still mirrors the open edit —
@@ -1519,7 +1583,14 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     private void LeaveEdit()
     {
         if (Edit is { } edit)
+        {
             edit.Changed -= OnEditChanged;
+            edit.ShownLayerChanged -= OnEditShownLayerChanged;
+            edit.PropertyChanged -= OnEditPropertyChanged;
+            edit.Reported -= OnEditReported;
+            edit.Completed -= OnEditCompletedAsync;
+            edit.Close();
+        }
         Edit = null;
         RebuildLayers();
         ApplyActiveLayer(NearestShownLayer(ActiveLayerIndex));
@@ -1547,26 +1618,24 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             .First().Index;
     }
 
-    /// <summary>Drop the edit and its changes — the editor's Discard/Esc in part 7.</summary>
+    /// <summary>Drop the edit and its changes.</summary>
     [RelayCommand(CanExecute = nameof(CanDiscardEdit))]
     private void DiscardEdit()
     {
         if (IsEditing) LeaveEdit();
     }
 
+    private bool CanDiscardEdit => Edit is { IsSaving: false };
+
     /// <summary>Left-click on a key while editing selects it for the BoardView.</summary>
-    private void OnEditKeyTapped(int keyIndex)
-    {
-        Edit!.SelectKey(keyIndex);
-        RefreshEditSelectionFlags();
-    }
+    private void OnEditKeyTapped(int keyIndex) => Edit!.SelectKey(keyIndex);
 
     /// <summary>Double-click on a key while editing selects it and opens the
     /// key editor on it — fire and forget, the editor owns its own errors.</summary>
     private void OnEditKeyDoubleTapped(int keyIndex)
     {
         OnEditKeyTapped(keyIndex);
-        _ = EditSelectedKeyAsync();
+        _ = Edit!.EditSelectedKeyAsync();
     }
 
     /// <summary>Mark the editor's current selection on every key.</summary>
@@ -1575,552 +1644,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         if (Edit is not { } edit) return;
         for (var i = 0; i < Keys.Count; i++)
             Keys[i].IsEditSelected = edit.SelectedKeyIndex == i;
-    }
-
-    /// <summary>
-    /// Clear the selected key on the visible layer to <c>&amp;none</c>
-    /// (<paramref name="toNone"/>) or <c>&amp;trans</c> — Delete / Shift+Delete
-    /// in part 7. Does nothing while not editing or when nothing is selected;
-    /// the session's Changed event repaints the board and the flags.
-    /// </summary>
-    public void EditClearSelectedKey(bool toNone)
-    {
-        if (Edit is not { } edit) return;
-        if (edit.SelectedKeyIndex is not int selected) return;
-        edit.ClearKey(ActiveLayerIndex, selected, toNone);
-    }
-
-    /// <summary>Drop the key selection — Esc in part 7. Does nothing while not editing.</summary>
-    public void EditClearSelection()
-    {
-        if (Edit is not { } edit) return;
-        edit.ClearSelection();
-        RefreshEditSelectionFlags();
-    }
-
-    // ---- the key dialog ------------------------------------------------------------
-
-    /// <summary>
-    /// Invoked when the user asks to rebind a key (double-click or Enter while
-    /// editing): the callback (set by <c>App.axaml.cs</c>, part 9) owns the key
-    /// dialog's lifecycle and answers the new binding, or
-    /// <see langword="null"/> when the dialog was cancelled. Null means the
-    /// dialog isn't wired up — opening it does nothing.
-    /// </summary>
-    public Func<KeyDialogRequest, Task<KeyBinding?>>? KeyDialogRequested { get; set; }
-
-    /// <summary>
-    /// Invoked when the user asks to rebind a key and the ring editor is the
-    /// one to open (see <see cref="UseRingKeyEditor"/>): the callback (set by
-    /// <c>App.axaml.cs</c>, part 10) owns the ring's lifecycle and answers the
-    /// new binding, or <see langword="null"/> when the ring was cancelled.
-    /// Null means the ring isn't wired up — the key dialog is used instead.
-    /// </summary>
-    public Func<KeyDialogRequest, Task<KeyBinding?>>? KeyRingRequested { get; set; }
-
-    /// <summary>True while a callback from an earlier <see cref="EditSelectedKeyAsync"/>
-    /// is still open; a second Enter/double-click is ignored until it closes.</summary>
-    private bool _keyDialogOpen;
-
-    /// <summary>
-    /// Open the key editor on the selected key of the shown layer and apply
-    /// what it answers as one undo step: the ring when <see cref="UseRingKeyEditor"/>
-    /// is on and a ring host is wired up, the key dialog otherwise.
-    /// Does nothing when not editing, when nothing is selected, when the
-    /// selection sits outside the active layer, when no callback is wired up,
-    /// or while an earlier editor is still open. A cancelled editor (null)
-    /// changes nothing; so does a result once the edit it was opened on has
-    /// been replaced underneath the await.
-    /// </summary>
-    public async Task EditSelectedKeyAsync()
-    {
-        if (Edit is not { } edit) return;
-        if (edit.SelectedKeyIndex is not int key) return;
-
-        var layer = ActiveLayerIndex;
-        var layers = edit.Session.Current.Layers;
-        if (layer < 0 || layer >= layers.Count) return;
-        if (key < 0 || key >= layers[layer].Bindings.Count) return;
-
-        // The ring when the setting picks it and a host is wired up; the key
-        // dialog in every other case.
-        var callback = UseRingKeyEditor && KeyRingRequested is not null
-            ? KeyRingRequested
-            : KeyDialogRequested;
-        if (callback is not { } open) return;
-        if (_keyDialogOpen) return;
-
-        _keyDialogOpen = true;
-        try
-        {
-            var result = await open(
-                new KeyDialogRequest(edit.Session.Current, edit.Defines, layer, key)
-                {
-                    LayerDefines = edit.LayerDefines,
-                });
-
-            if (result is not null && ReferenceEquals(Edit, edit))
-                edit.SetKey(layer, key, result);
-        }
-        finally
-        {
-            _keyDialogOpen = false;
-        }
-    }
-
-    // ---- the combo dialog ----------------------------------------------------------
-
-    /// <summary>
-    /// Invoked when the user asks to add or edit a combo (double-click on a
-    /// tile, or the tile's ⋮ menu — never a single click): the callback (set
-    /// by <c>App.axaml.cs</c>, part 15) owns the combo dialog's lifecycle and
-    /// answers the new combo, or <see langword="null"/> when the dialog was
-    /// cancelled. Null means the dialog isn't wired up — opening it does
-    /// nothing.
-    /// </summary>
-    public Func<ComboDialogRequest, Task<ZmkCombo?>>? ComboDialogRequested { get; set; }
-
-    /// <summary>True while a combo-dialog callback is still open; a second
-    /// new/edit request is ignored until it closes.</summary>
-    private bool _comboDialogOpen;
-
-    /// <summary>
-    /// Open the combo dialog for a new combo and append what it answers as one
-    /// undo step. Does nothing when not editing, while a save is in flight,
-    /// when no callback is wired up, or while a combo dialog is already open.
-    /// A cancelled dialog (null) changes nothing; so does a result once the
-    /// edit it was opened on has been replaced underneath the await.
-    /// </summary>
-    [RelayCommand(CanExecute = nameof(CanEditLayers))]
-    private async Task NewComboAsync()
-    {
-        if (Edit is not { } edit) return;
-        if (IsSavingEdit) return;
-        if (ComboDialogRequested is not { } open) return;
-        if (_comboDialogOpen) return;
-
-        _comboDialogOpen = true;
-        try
-        {
-            var result = await open(new ComboDialogRequest(
-                _profile,
-                edit.Session.Current,
-                edit.Defines,
-                edit.LayerDefines,
-                null,
-                ActiveLayerIndex));
-
-            if (result is not null && ReferenceEquals(Edit, edit))
-                edit.AddCombo(result);
-        }
-        finally
-        {
-            _comboDialogOpen = false;
-        }
-    }
-
-    /// <summary>
-    /// Open the combo dialog on tile <paramref name="number"/> (the 1-based
-    /// tile number) and replace that combo with what it answers, as one undo
-    /// step. An out-of-range number, no edit, no callback, a save in flight,
-    /// or an already-open dialog do nothing; so does a cancelled dialog (null)
-    /// or a result once the edit has been replaced underneath the await — or
-    /// once the tile it was opened on no longer exists.
-    /// </summary>
-    [RelayCommand]
-    private async Task EditComboAsync(int number)
-    {
-        var index = number - 1;
-        if (!CanEditLayers || Edit is not { } edit) return;
-        if (ComboDialogRequested is not { } open) return;
-        if (_comboDialogOpen) return;
-        if (index < 0 || index >= edit.Session.Current.Combos.Count) return;
-
-        _comboDialogOpen = true;
-        try
-        {
-            var result = await open(new ComboDialogRequest(
-                _profile,
-                edit.Session.Current,
-                edit.Defines,
-                edit.LayerDefines,
-                index,
-                ActiveLayerIndex));
-
-            if (result is not null && ReferenceEquals(Edit, edit)
-                && index < edit.Session.Current.Combos.Count)
-                edit.SetCombo(index, result);
-        }
-        finally
-        {
-            _comboDialogOpen = false;
-        }
-    }
-
-    /// <summary>
-    /// Remove the combo on tile <paramref name="number"/> (the 1-based tile
-    /// number) as one undo step — no confirmation, like deleting a layer. An
-    /// out-of-range number, a closed edit or a save in flight does nothing.
-    /// </summary>
-    [RelayCommand]
-    private void DeleteCombo(int number)
-    {
-        var index = number - 1;
-        // Not while a save is in flight: the plan is already built, so the
-        // delete would be lost when the save closes the edit.
-        if (!CanEditLayers || Edit is not { } edit) return;
-        if (index < 0 || index >= edit.Session.Current.Combos.Count) return;
-
-        edit.DeleteCombo(index);
-    }
-
-    // ---- layer operations --------------------------------------------------------
-
-    /// <summary>
-    /// Invoked when the user asks to rename a layer: the callback (set by
-    /// <c>App.axaml.cs</c>, part 7) owns the rename dialog's lifecycle and
-    /// answers the new name, or <see langword="null"/> when it was cancelled.
-    /// Null means the dialog isn't wired up — renaming does nothing.
-    /// </summary>
-    public Func<RenameLayerRequest, Task<string?>>? RenameLayerRequested { get; set; }
-
-    /// <summary>
-    /// Invoked when a delete is refused: the callback (set by
-    /// <c>App.axaml.cs</c>, part 7) owns the dialog listing the blockers. Null
-    /// means the dialog isn't wired up — the refused delete passes silently.
-    /// </summary>
-    public Func<LayerDeleteBlockedRequest, Task>? LayerDeleteBlockedRequested { get; set; }
-
-    /// <summary>True while a callback from <see cref="RenameLayerAsync"/> or
-    /// <see cref="DeleteLayerAsync"/> is still open; a second request is
-    /// ignored until it closes.</summary>
-    private bool _layerDialogOpen;
-
-    /// <summary>Layer actions need an open edit and no save in flight.</summary>
-    private bool CanEditLayers => IsEditing && !IsSavingEdit;
-
-    /// <summary>
-    /// Append a new layer to the edit and show it. Does nothing when not
-    /// editing or while saving; a keymap with no layers yields no new layer
-    /// (and so no shown-layer change).
-    /// </summary>
-    public void AddLayer()
-    {
-        if (!CanEditLayers) return;
-        if (Edit!.AddLayer() is int added) ApplyActiveLayer(added);
-    }
-
-    /// <summary>
-    /// Copy the layer at <paramref name="layerIndex"/> right after itself and
-    /// show the copy. Does nothing when not editing, while saving, or when the
-    /// index falls outside the edited layers.
-    /// </summary>
-    public void DuplicateLayer(int layerIndex)
-    {
-        if (!CanEditLayers) return;
-        if (Edit!.DuplicateLayer(layerIndex) is int copy) ApplyActiveLayer(copy);
-    }
-
-    /// <summary>
-    /// Move the layer at <paramref name="layerIndex"/> by
-    /// <paramref name="delta"/> places and keep showing it (the board follows
-    /// the layer, not the position). Does nothing when not editing, while
-    /// saving, or when the move is refused.
-    /// </summary>
-    public void MoveLayer(int layerIndex, int delta)
-    {
-        if (!CanEditLayers) return;
-        var to = layerIndex + delta;
-        if (Edit!.MoveLayer(layerIndex, to)) ApplyActiveLayer(to);
-    }
-
-    /// <summary>
-    /// Rename the layer at <paramref name="layerIndex"/> through the rename
-    /// dialog. Does nothing when not editing, while saving, when the index
-    /// falls outside the edited layers, when no callback is wired up, or while
-    /// an earlier layer dialog is still open. A cancelled dialog (null) changes
-    /// nothing; so does an answer once the edit it was opened on has been
-    /// replaced underneath the await.
-    /// </summary>
-    public async Task RenameLayerAsync(int layerIndex)
-    {
-        if (!CanEditLayers) return;
-        var edit = Edit!;
-        var layers = edit.Session.Current.Layers;
-        if (layerIndex < 0 || layerIndex >= layers.Count) return;
-
-        if (RenameLayerRequested is not { } callback) return;
-        if (_layerDialogOpen) return;
-
-        _layerDialogOpen = true;
-        try
-        {
-            var answer = await callback(new RenameLayerRequest(layerIndex, layers[layerIndex].Name));
-
-            if (answer is not null && ReferenceEquals(Edit, edit))
-                edit.RenameLayer(layerIndex, answer);
-        }
-        finally
-        {
-            _layerDialogOpen = false;
-        }
-    }
-
-    /// <summary>
-    /// Delete the layer at <paramref name="layerIndex"/>, no confirmation:
-    /// when the check allows it, delete it, show the layer before it (layer 0
-    /// when layer 0 went), and report it in the status bar — with the cleared
-    /// key count when keys pointed at the layer. When it is refused, show the
-    /// blockers through <see cref="LayerDeleteBlockedRequested"/> and change
-    /// nothing. Does nothing when not editing, while saving, when the index
-    /// falls outside the edited layers, or while an earlier layer dialog is
-    /// still open. A writer refusal toasts why and changes nothing.
-    /// </summary>
-    public async Task DeleteLayerAsync(int layerIndex)
-    {
-        if (!CanEditLayers) return;
-        var edit = Edit!;
-        var layers = edit.Session.Current.Layers;
-        if (layerIndex < 0 || layerIndex >= layers.Count) return;
-        var name = layers[layerIndex].Name;
-
-        try
-        {
-            if (edit.CheckDeleteLayer(layerIndex) is not { } check) return;
-
-            if (!check.CanDelete)
-            {
-                if (LayerDeleteBlockedRequested is { } blocked && !_layerDialogOpen)
-                {
-                    _layerDialogOpen = true;
-                    try
-                    {
-                        await blocked(new LayerDeleteBlockedRequest(name, check.Blockers)
-                        {
-                            ComboEditsPending = edit.HasPendingComboEdits,
-                        });
-                    }
-                    finally
-                    {
-                        _layerDialogOpen = false;
-                    }
-                }
-                return;
-            }
-
-            if (edit.DeleteLayer(layerIndex))
-            {
-                ApplyActiveLayer(Math.Max(layerIndex - 1, 0));
-                StatusMessage = check.ClearedBindings > 0
-                    ? Loc.Instance.Format("Edit_LayerDeletedFormat", name, check.ClearedBindings)
-                    : Loc.Instance.Format("Edit_LayerDeletedNoRefsFormat", name);
-            }
-        }
-        catch (ZmkKeymapParseException ex)
-        {
-            // The text refused the change; the edit and its undo history are
-            // untouched, so the user stays put.
-            Toast.Show(Loc.Instance.Format("Edit_LayerActionFailedFormat", ex.Message));
-            DiagnosticLog.Warn("MainVM", $"The layer action on '{name}' failed: {ex}");
-        }
-    }
-
-    [RelayCommand(CanExecute = nameof(CanEditLayers))]
-    private void NewLayer() => AddLayer();
-
-    [RelayCommand(CanExecute = nameof(CanEditLayers))]
-    private void DuplicateShownLayer() => DuplicateLayer(ActiveLayerIndex);
-
-    private bool CanMoveShownLayerLeft => CanEditLayers && ActiveLayerIndex > 0;
-
-    [RelayCommand(CanExecute = nameof(CanMoveShownLayerLeft))]
-    private void MoveShownLayerLeft() => MoveLayer(ActiveLayerIndex, -1);
-
-    private bool CanMoveShownLayerRight =>
-        CanEditLayers && Edit is { } edit && ActiveLayerIndex < edit.Session.Current.Layers.Count - 1;
-
-    [RelayCommand(CanExecute = nameof(CanMoveShownLayerRight))]
-    private void MoveShownLayerRight() => MoveLayer(ActiveLayerIndex, +1);
-
-    [RelayCommand(CanExecute = nameof(CanEditLayers))]
-    private Task RenameShownLayerAsync() => RenameLayerAsync(ActiveLayerIndex);
-
-    [RelayCommand(CanExecute = nameof(CanEditLayers))]
-    private Task DeleteShownLayerAsync() => DeleteLayerAsync(ActiveLayerIndex);
-
-    /// <summary>Re-query the six layer commands — the "⋮" menu items and the
-    /// shortcuts ride their enable state.</summary>
-    private void NotifyLayerCommandState()
-    {
-        NewLayerCommand.NotifyCanExecuteChanged();
-        DuplicateShownLayerCommand.NotifyCanExecuteChanged();
-        MoveShownLayerLeftCommand.NotifyCanExecuteChanged();
-        MoveShownLayerRightCommand.NotifyCanExecuteChanged();
-        RenameShownLayerCommand.NotifyCanExecuteChanged();
-        DeleteShownLayerCommand.NotifyCanExecuteChanged();
-    }
-
-    // ---- saving the edit ----
-
-    /// <summary>
-    /// Invoked between building the save plan and writing it: the callback (set
-    /// by <c>App.axaml.cs</c>) owns the review dialog's lifecycle and answers
-    /// <see langword="null"/> to abandon the save, else the commit message the
-    /// user approved. No callback means approved with the generated message —
-    /// in tests, saving goes straight through.
-    /// </summary>
-    public Func<KeymapReviewRequest, Task<KeymapReviewAnswer?>>? ReviewChangesRequested { get; set; }
-
-    /// <summary>
-    /// Invoked when the target changed underneath the edit: the callback (set by
-    /// <c>App.axaml.cs</c>, part 9) owns the conflict dialog and answers reload /
-    /// overwrite / cancel. Null means <see cref="KeymapSaveConflictChoice.Cancel"/>
-    /// — nothing is ever written over a changed target silently.
-    /// </summary>
-    public Func<KeymapConflictRequest, Task<KeymapSaveConflictChoice>>? SaveConflictRequested { get; set; }
-
-    /// <summary>
-    /// Invoked after a save that added, deleted or moved layers and with them
-    /// the per-layer settings, when something broke on the way: one translated
-    /// line per notice, in notice order. The callback (set by
-    /// <c>App.axaml.cs</c>, part 7) owns the dialog's lifecycle. Null — as in
-    /// tests — means nothing is shown.
-    /// </summary>
-    public Func<IReadOnlyList<string>, Task>? LayerSettingsNoticeRequested { get; set; }
-
-    /// <summary>True while a save is in flight; gates Save and Discard so
-    /// neither can run against an edit that is being written.</summary>
-    [ObservableProperty]
-    private bool _isSavingEdit;
-
-    partial void OnIsSavingEditChanged(bool value) => NotifyEditCommandState();
-
-    /// <summary>Only an edit with something to write can be saved, and only
-    /// while no save is already running.</summary>
-    private bool CanSaveEdit => Edit is { HasChanges: true } && !IsSavingEdit;
-
-    private bool CanDiscardEdit => IsEditing && !IsSavingEdit;
-
-    /// <summary>
-    /// Write the open edit where it came from: freeze it into a
-    /// <see cref="KeymapSavePlan"/> (a writer refusal toasts and keeps the user
-    /// in edit mode), pass it by the review callback, then save it through
-    /// <see cref="KeymapEditViewModel.SaveAsync"/>.
-    /// <list type="bullet">
-    /// <item><description>saved — leave edit mode, reload what was written, stay
-    /// on the layer the editor was on, and report it in the status bar (toasts
-    /// are for errors only);</description></item>
-    /// <item><description>conflict — ask: reload loses the changes and shows the
-    /// target as it stands, overwrite writes anyway, cancel keeps editing;
-    /// </description></item>
-    /// <item><description>failed — toast the translated reason and keep editing
-    /// with the changes intact.</description></item>
-    /// </list>
-    /// Every reload happens <em>after</em> <see cref="LeaveEdit"/>: the edit-mode
-    /// locks refuse <see cref="LoadLayoutFromPath"/> and
-    /// <see cref="OpenGitHubKeymapAsync"/> while an edit is open.
-    /// </summary>
-    [RelayCommand(CanExecute = nameof(CanSaveEdit))]
-    private async Task SaveEditAsync()
-    {
-        var edit = Edit;
-        if (edit is null) return;
-
-        KeymapSavePlan plan;
-        try
-        {
-            plan = edit.BuildSavePlan();
-        }
-        catch (Exception ex) when (ex is ZmkKeymapParseException or ArgumentException)
-        {
-            // The text was never written; the edit and its undo history are
-            // untouched, so the user stays put and can keep working.
-            Toast.Show(Loc.Instance.Format("Edit_SaveRefusedFormat", ex.Message));
-            DiagnosticLog.Warn("MainVM", $"Building the keymap save plan failed: {ex}");
-            return;
-        }
-
-        string? commitMessage = null;
-        if (ReviewChangesRequested is { } review)
-        {
-            var answer = await review(new KeymapReviewRequest(
-                plan,
-                edit.Source.TargetName,
-                edit.Source.IsGitHub ? edit.CommitMessageFor(plan) : null));
-            if (answer is null) return;
-            commitMessage = answer.CommitMessage;
-        }
-
-        IsSavingEdit = true;
-        try
-        {
-            var overwrite = false;
-
-            while (true)
-            {
-                var outcome = await edit.SaveAsync(plan, overwrite, commitMessage);
-
-                if (outcome is KeymapEditSaveOutcome.Saved saved)
-                {
-                    // A reload always lands on layer 0; a save must not move the
-                    // user off the layer they were editing — unless that layer's
-                    // tab is hidden, then the nearest shown one takes over.
-                    var layer = ActiveLayerIndex;
-
-                    // The layers just moved on disk for good — renumber this
-                    // keyboard's per-layer settings with them and collect what
-                    // the move could not carry over.
-                    var notices = edit.Session.PendingStructureEdits.Count > 0
-                        ? MoveLayerSettings(edit.Session.BaselineLayerMap())
-                        : Array.Empty<LayerSettingsNotice>();
-
-                    // Combo labels follow their combo the same way layer
-                    // settings follow their layers — before the edit closes.
-                    MoveComboLabelOverrides(plan.ComboChanges);
-
-                    LeaveEdit();
-                    LoadLayoutFromPath(saved.ReloadPath, edit.Source.Entry);
-                    ApplyActiveLayer(NearestShownLayer(layer));
-                    StatusMessage = Loc.Instance.Format(
-                        "Status_EditSavedFormat", Path.GetFileName(saved.ReloadPath));
-
-                    if (notices.Count > 0 && LayerSettingsNoticeRequested is { } notify)
-                        await notify(notices.Select(NoticeLine).ToList());
-
-                    return;
-                }
-
-                if (outcome is KeymapEditSaveOutcome.Failed failed)
-                {
-                    Toast.Show(failed.Message);
-                    return;
-                }
-
-                // Conflict: the target moved since the edit opened.
-                var choice = SaveConflictRequested is { } askConflict
-                    ? await askConflict(new KeymapConflictRequest(
-                        edit.Source.IsGitHub, edit.Source.TargetName))
-                    : KeymapSaveConflictChoice.Cancel;
-
-                if (choice == KeymapSaveConflictChoice.Cancel) return;
-
-                if (choice == KeymapSaveConflictChoice.Reload)
-                {
-                    LeaveEdit();
-                    if (edit.Source.GitHub is { } gitHubRef)
-                        await OpenGitHubKeymapAsync(gitHubRef);
-                    else
-                        LoadLayoutFromPath(edit.Source.LocalPath, edit.Source.Entry);
-                    return;
-                }
-
-                overwrite = true;
-            }
-        }
-        finally
-        {
-            IsSavingEdit = false;
-        }
     }
 
     /// <summary>
@@ -2325,7 +1848,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         }
     }
 
-    // --- Layout wizard ("My own board…", window lives in part 6) ---
+    // --- Layout wizard ("My own board…") ---
 
     /// <summary>
     /// Everything the wizard window can't discover itself, read from live VM
@@ -2567,10 +2090,13 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                 $"{layer.Index} : {layer.Name}",
                 LayerColorFor(layer.Index),
                 SelectLayer,
-                editing
+                edit is { } e
                     ? new LayerTabActions(
-                        i => _ = RenameLayerAsync(i), DuplicateLayer, MoveLayer,
-                        i => _ = DeleteLayerAsync(i), layerCount)
+                        i => _ = e.RenameLayerAsync(i),
+                        i => e.DuplicateLayer(i),
+                        (i, delta) => e.MoveLayer(i, i + delta),
+                        i => _ = e.DeleteLayerAsync(i),
+                        layerCount)
                     : null);
             if (hiddenLayers is { } hidden)
                 layerVm.IsShown = !HiddenLayers.IsHidden(hidden, _profile.Id, layer.Index);
@@ -2578,9 +2104,13 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         }
     }
 
+    /// <summary>A tab click. While editing the edit owns the shown layer and
+    /// the repaint follows its event, so the board never paints a layer the edit
+    /// does not know about.</summary>
     private void SelectLayer(int index)
     {
-        ApplyActiveLayer(index);
+        if (Edit is { } edit) edit.ShowLayer(index);
+        else ApplyActiveLayer(index);
     }
 
     /// <summary>Routes a layer push through the HID pipeline. Test-tab plumbing for SettingsViewModel.</summary>
@@ -2618,11 +2148,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public Task<string?> QueryConfigIdAsync(TimeSpan timeout, CancellationToken ct) =>
         _hid.QueryConfigIdAsync(timeout, ct);
 
-    /// <summary>The edit session's id of the shown layer (see
-    /// <see cref="KeymapEditSession.LayerIdAt"/>), so <see cref="OnEditChanged"/>
-    /// can follow the layer through undo and redo; null outside an edit.</summary>
-    private int? _shownLayerId;
-
     private void ApplyActiveLayer(int index)
     {
         // While editing, the edited config paints instead of the loaded one.
@@ -2631,15 +2156,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         if (km is null) return;
         if (index < 0 || index >= km.LayerCount) return;
 
-        var previousLayerId = _shownLayerId;
         ActiveLayerIndex = index;
-        _shownLayerId = edit?.Session.LayerIdAt(index);
-
-        // A selection is a key on the layer it was made on: showing another
-        // layer drops it. Undo/redo and the repaint after a save keep the
-        // same layer id, so they keep it.
-        if (edit is not null && previousLayerId is not null && previousLayerId != _shownLayerId)
-            edit.ClearSelection();
 
         for (int i = 0; i < Keys.Count; i++)
         {
@@ -2689,15 +2206,12 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                     macros: km.MacrosByName,
                     ignoreLabelOverride: true);
             }
-            Keys[i].IsEditChanged = edit.IsKeyChanged(index, i);
+            Keys[i].IsEditChanged = edit.Session.IsKeyChanged(index, i);
             Keys[i].IsEditSelected = edit.SelectedKeyIndex == i;
         }
 
         for (int i = 0; i < Layers.Count; i++)
             Layers[i].IsSelected = Layers[i].Index == index;
-
-        // The shown layer decides whether the layer moves are possible.
-        NotifyLayerCommandState();
     }
 
     /// <summary>
@@ -2764,7 +2278,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             if (edit is not null)
             {
                 tile.IsEditable = true;
-                tile.IsChanged = edit.IsComboChanged(i);
+                tile.IsChanged = edit.Session.IsComboChanged(i);
             }
             Combos.Add(tile);
         }

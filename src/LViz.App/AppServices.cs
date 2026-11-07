@@ -6,6 +6,7 @@ using LViz.App.Services.Hotkeys;
 using LViz.App.Services.MouseIdle;
 using LViz.App.Services.Secrets;
 using LViz.App.ViewModels;
+using LViz.App.Views;
 using LViz.Core.Diagnostics;
 using LViz.Core.GitHub;
 using LViz.Core.Persistence;
@@ -107,6 +108,8 @@ internal static class AppServices
             sp.GetRequiredService<GitHubSession>(),
             sp.GetRequiredService<GitHubRepoCache>()));
 
+        services.AddSingleton<IKeymapEditDialogs, AvaloniaKeymapEditDialogs>();
+
         services.AddSingleton<MainWindowViewModel>(sp =>
             new MainWindowViewModel(
                 sp.GetRequiredService<ISettingsService>(),
@@ -115,7 +118,8 @@ internal static class AppServices
                 keymapState: null,
                 capabilityControl: sp.GetRequiredService<ICapabilityControl>(),
                 hostActionExecutor: sp.GetRequiredService<IHostActionExecutor>(),
-                gitHub: sp.GetRequiredService<IGitHubKeymapService>()));
+                gitHub: sp.GetRequiredService<IGitHubKeymapService>(),
+                editDialogs: sp.GetRequiredService<IKeymapEditDialogs>()));
 
         services.AddTransient<SettingsViewModel>(sp =>
             new SettingsViewModel(

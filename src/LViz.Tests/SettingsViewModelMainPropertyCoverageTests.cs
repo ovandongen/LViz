@@ -90,16 +90,14 @@ public class SettingsViewModelMainPropertyCoverageTests
         "CanEditLayout",
 
         // Recents-menu emptiness flag, bound directly in the main window's
-        // recents flyout (part 2); settings never renders recents.
+        // recents flyout; settings never renders recents.
         "HasRecentKeymaps",
 
         // Keymap edit mode: main-window-only state. (IsEditing is not here —
         // it propagates to SettingsViewModel.CanPickKeyboard, the picker lock.)
         "Edit",
-        "UnsavedEditCount",
         "CanStartEdit",
         "EditButtonTooltip",
-        "IsSavingEdit",
 
         // Legend visibility, main window only — the persisted toggle
         // (IsComboOverlayVisible, bound directly) or forced on while editing.

@@ -38,8 +38,7 @@ public sealed record KeycodeItem(
 /// left-hand ones), key recording, and the flat params the
 /// selection produces (<see cref="Value"/>, e.g. <c>["LS","A"]</c> for
 /// <c>&amp;kp LS(A)</c>). One instance per keycode parameter of a binding
-/// (<c>&amp;kp</c>'s key, <c>&amp;mt</c>'s hold and tap); part 5 wires the
-/// dialog around it.
+/// (<c>&amp;kp</c>'s key, <c>&amp;mt</c>'s hold and tap); the key dialog wraps it.
 /// </summary>
 public sealed partial class KeycodePickerViewModel : ObservableObject
 {

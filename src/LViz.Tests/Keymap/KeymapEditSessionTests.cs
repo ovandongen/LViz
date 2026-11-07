@@ -391,7 +391,7 @@ public class KeymapEditSessionTests
     [Fact]
     public void TouchedLayerIndexFollowsPosition_EvenWhenTheBaselineDisagrees()
     {
-        // What the structural edits of part 2 lean on: a touched layer gets its
+        // What the structural edits lean on: a touched layer gets its
         // Index rewritten to the position it is written at, so the
         // "Index == position" invariant of Layer survives layers moving.
         var layers = new List<Layer>

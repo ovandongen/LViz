@@ -13,7 +13,7 @@ using Xunit;
 namespace LViz.Tests;
 
 /// <summary>
-/// Part 5 main-window hooks for the layout wizard: the start command, the
+/// Main-window hooks for the layout wizard: the start command, the
 /// <see cref="MainWindowViewModel.HasUnmatchedKeymap"/> bookkeeping, the
 /// context snapshot handed to the wizard window, and applying its result.
 /// Fake setup mirrors <see cref="MainWindowViewModelLoadTests"/>; the profile

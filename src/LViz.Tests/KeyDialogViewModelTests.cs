@@ -141,7 +141,7 @@ public class KeyDialogViewModelTests
         Assert.Equal("Key 3 on layer Base", Dialog(3).TitleText);
     }
 
-    // --- Opening on a carried binding (a combo's, part 14) -------------------
+    // --- Opening on a carried binding (a combo's) -------------------
 
     [Fact]
     public void CarriedKpBinding_EditsIt_AndCaptionIsTheTitle()
