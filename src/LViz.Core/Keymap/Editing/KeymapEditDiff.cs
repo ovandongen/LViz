@@ -57,7 +57,7 @@ public static class KeymapEditDiff
                     nameof(to));
 
             for (int key = 0; key < before.Bindings.Count; key++)
-                if (!KeymapEditSession.IsSameBinding(before.Bindings[key], after.Bindings[key]))
+                if (!before.Bindings[key].SameAs(after.Bindings[key]))
                     bindings.Add(new BindingEdit(layer, key, after.Bindings[key]));
 
             if (!string.Equals(before.Name, after.Name, StringComparison.Ordinal))

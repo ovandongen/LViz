@@ -270,7 +270,7 @@
     <comment/>
   </data>
   <data name="Status_KeyboardSwitchedUnloaded" xml:space="preserve">
-    <value>Keyboard switched to {0} — reload your layout</value>
+    <value>Keyboard switched to {0} — no keymap opened for this board yet</value>
     <comment/>
   </data>
   <data name="Status_KeyboardHintFormat" xml:space="preserve">
@@ -283,6 +283,10 @@
   </data>
   <data name="Status_LoadKeyCountMismatch" xml:space="preserve">
     <value>layout has {0} keys but {1} expects {2} — switch keyboard or load a matching JSON</value>
+    <comment/>
+  </data>
+  <data name="Status_BookedKeymapDoesNotFitFormat" xml:space="preserve">
+    <value>{0} has {1} keys, but {2} has {3} — open a keymap for this board</value>
     <comment/>
   </data>
   <data name="Status_AutoSwitchedKeyboard" xml:space="preserve">

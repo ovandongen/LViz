@@ -270,7 +270,7 @@
     <comment/>
   </data>
   <data name="Status_KeyboardSwitchedUnloaded" xml:space="preserve">
-    <value>Toetsenbord gewisseld naar {0} — laad de layout opnieuw</value>
+    <value>Toetsenbord gewisseld naar {0} — nog geen keymap geopend voor dit toetsenbord</value>
     <comment/>
   </data>
   <data name="Status_KeyboardHintFormat" xml:space="preserve">
@@ -283,6 +283,10 @@
   </data>
   <data name="Status_LoadKeyCountMismatch" xml:space="preserve">
     <value>layout heeft {0} toetsen maar {1} verwacht er {2} — wissel toetsenbord of laad een passende JSON</value>
+    <comment/>
+  </data>
+  <data name="Status_BookedKeymapDoesNotFitFormat" xml:space="preserve">
+    <value>{0} heeft {1} toetsen, maar {2} heeft er {3} — open een keymap voor dit toetsenbord</value>
     <comment/>
   </data>
   <data name="Status_AutoSwitchedKeyboard" xml:space="preserve">

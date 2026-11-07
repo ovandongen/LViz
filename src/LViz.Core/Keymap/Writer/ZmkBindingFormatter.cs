@@ -1,4 +1,5 @@
 using System.Globalization;
+using LViz.Core.Keymap.Catalog;
 using LViz.Core.Models;
 
 namespace LViz.Core.Keymap.Writer;
@@ -12,16 +13,6 @@ namespace LViz.Core.Keymap.Writer;
 /// </summary>
 public static class ZmkBindingFormatter
 {
-    /// <summary>
-    /// The functions the interpreter flattens out of <c>LS(...)</c>-style
-    /// wrappers; anything else (e.g. <c>LSHFT</c> as an &amp;mt param) is a
-    /// plain identifier token and stays bare.
-    /// </summary>
-    private static readonly HashSet<string> ModifierFunctions = new(StringComparer.Ordinal)
-    {
-        "LS", "RS", "LC", "RC", "LA", "RA", "LG", "RG",
-    };
-
     /// <summary>Behaviors whose first param is a layer reference.</summary>
     internal static readonly HashSet<string> LayerBehaviors = new(StringComparer.Ordinal)
     {
@@ -140,7 +131,7 @@ public static class ZmkBindingFormatter
         for (int i = parameters.Count - 1; i >= 0; i--)
         {
             var p = parameters[i];
-            if (ModifierFunctions.Contains(p) && stack.Count > 0)
+            if (ZmkModifierWrap.IsModifierFunction(p) && stack.Count > 0)
                 stack.Push(p + "(" + stack.Pop() + ")");
             else
                 stack.Push(p);

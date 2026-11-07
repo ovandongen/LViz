@@ -77,6 +77,44 @@ public sealed class KeyboardProfileRegistryUserLayoutTests
     }
 
     [Fact]
+    public void FindByKeyCount_SameKeyCount_PrefersBoardWhoseHidNameIsAttached()
+    {
+        // Sofle comes before GO60 in the registry; a plugged-in Go60 wins the tie.
+        Assert.IsType<Go60Profile>(KeyboardProfileRegistry.FindByKeyCount(60, ["Go60 Left"]));
+        Assert.IsType<SofleProfile>(KeyboardProfileRegistry.FindByKeyCount(60, ["Sofle"]));
+    }
+
+    [Fact]
+    public void FindByKeyCount_NoAttachedNameMatches_KeepsRegistryOrder()
+    {
+        Assert.IsType<SofleProfile>(KeyboardProfileRegistry.FindByKeyCount(60));
+        Assert.IsType<SofleProfile>(KeyboardProfileRegistry.FindByKeyCount(60, []));
+        // A Glove80 is plugged in, but it has no 60-key profile to win with.
+        Assert.IsType<SofleProfile>(KeyboardProfileRegistry.FindByKeyCount(60, ["Glove80 Left"]));
+    }
+
+    [Fact]
+    public void FindByKeyCount_AttachedBundledBoard_WinsOverUnattachedUserLayout()
+    {
+        // FakeKeyboardProfile never matches a HID name.
+        var user60 = new FakeKeyboardProfile("user:sixty", keyCount: 60);
+
+        try
+        {
+            KeyboardProfileRegistry.SetUserProfiles([user60]);
+
+            Assert.IsType<Go60Profile>(KeyboardProfileRegistry.FindByKeyCount(60, ["Go60"]));
+            Assert.IsType<SofleProfile>(KeyboardProfileRegistry.FindByKeyCount(60, ["Sofle"]));
+            // Nothing attached matches a 60-key board: the user layout wins, as before.
+            Assert.Same(user60, KeyboardProfileRegistry.FindByKeyCount(60, ["Ploopy Bean"]));
+        }
+        finally
+        {
+            KeyboardProfileRegistry.SetUserProfiles([]);
+        }
+    }
+
+    [Fact]
     public void SetUserProfiles_ReplacesInsteadOfAppending()
     {
         var first = new FakeKeyboardProfile("user:first");

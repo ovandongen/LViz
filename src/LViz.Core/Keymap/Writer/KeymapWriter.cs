@@ -110,7 +110,7 @@ public static class KeymapWriter
         foreach (var edit in bindingEdits)
         {
             var current = config.Layers[edit.LayerIndex].Bindings[edit.KeyIndex];
-            if (IsSameBinding(current, edit.Binding)) continue;
+            if (current.SameAs(edit.Binding)) continue;
             expectedBindings[edit.LayerIndex][edit.KeyIndex] = edit.Binding;
             realEdits.Add(edit);
         }
@@ -325,7 +325,7 @@ public static class KeymapWriter
 
             for (int key = 0; key < expectedBindings[layer].Length; key++)
             {
-                if (!IsSameBinding(actual.Bindings[key], expectedBindings[layer][key]))
+                if (!actual.Bindings[key].SameAs(expectedBindings[layer][key]))
                     throw new InvalidOperationException(
                         $"after writing, layer {layer} ('{actual.Name}') key {key} is "
                         + $"'{actual.Bindings[key].Display}', expected "
@@ -333,10 +333,4 @@ public static class KeymapWriter
             }
         }
     }
-
-    /// <summary>KeyBinding's record equality ignores the contents of
-    /// <c>Params</c> — compare behavior plus params explicitly.</summary>
-    internal static bool IsSameBinding(KeyBinding a, KeyBinding b) =>
-        string.Equals(a.Behavior, b.Behavior, StringComparison.Ordinal)
-        && a.Params.SequenceEqual(b.Params, StringComparer.Ordinal);
 }

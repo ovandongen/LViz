@@ -1,5 +1,3 @@
-using LViz.Core.Keymap.Editing;
-
 namespace LViz.Core.Models;
 
 /// <summary>
@@ -51,7 +49,7 @@ public sealed record ZmkCombo(
         if (!string.Equals(Name, other.Name, StringComparison.Ordinal)) return false;
         if (!SameSet(KeyPositions, other.KeyPositions)) return false;
         if (!SameLayerScope(Layers, other.Layers)) return false;
-        if (!KeymapEditSession.IsSameBinding(Binding, other.Binding)) return false;
+        if (!Binding.SameAs(other.Binding)) return false;
         return TimeoutMs == other.TimeoutMs
             && RequirePriorIdleMs == other.RequirePriorIdleMs
             && SlowRelease == other.SlowRelease;

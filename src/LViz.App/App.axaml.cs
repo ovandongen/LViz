@@ -124,6 +124,12 @@ public partial class App : Application
 
             var closingHandled = false;
 
+            // Both quit paths await the unsaved-edits prompt, so a second close
+            // click or tray Quit lands while the first prompt is still open.
+            // Without this flag that queues a second prompt, and with no edits
+            // two quick quits run Shutdown() twice.
+            var quitInProgress = false;
+
             // Quit guard: unsaved keymap edits are confirmed before anything
             // shuts down. With no edits both quit paths below run exactly as
             // before (save window state, shut down, close/exit).
@@ -146,9 +152,15 @@ public partial class App : Application
             {
                 if (closingHandled) return;
                 e.Cancel = true;
+                if (quitInProgress) return;
+                quitInProgress = true;
                 Dispatcher.UIThread.Post(async () =>
                 {
-                    if (!await ConfirmDiscardEditsAsync()) return;
+                    if (!await ConfirmDiscardEditsAsync())
+                    {
+                        quitInProgress = false;
+                        return;
+                    }
                     closingHandled = true;
                     SaveWindowState();
                     viewModel.Shutdown();
@@ -156,13 +168,22 @@ public partial class App : Application
                 });
             };
 
-            viewModel.QuitRequested = () => Dispatcher.UIThread.Post(async () =>
+            viewModel.QuitRequested = () =>
             {
-                if (!await ConfirmDiscardEditsAsync()) return;
-                SaveWindowState();
-                viewModel.Shutdown();
-                Environment.Exit(0);
-            });
+                if (quitInProgress) return;
+                quitInProgress = true;
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    if (!await ConfirmDiscardEditsAsync())
+                    {
+                        quitInProgress = false;
+                        return;
+                    }
+                    SaveWindowState();
+                    viewModel.Shutdown();
+                    Environment.Exit(0);
+                });
+            };
 
             // Tray icon: localize menu headers + pipe clicks to the VM
             var trayIcons = TrayIcon.GetIcons(this);

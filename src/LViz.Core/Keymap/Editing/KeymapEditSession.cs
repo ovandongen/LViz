@@ -161,7 +161,7 @@ public sealed class KeymapEditSession
         foreach (var change in changes)
         {
             var current = layers[change.LayerIndex].Bindings[change.KeyIndex];
-            if (IsSameBinding(current, change.Binding)) continue;
+            if (current.SameAs(change.Binding)) continue;
             cells.Add(new CellChange(_layerIds[change.LayerIndex], change.KeyIndex, current, change.Binding));
         }
 
@@ -896,19 +896,10 @@ public sealed class KeymapEditSession
     private bool TryGetOrigin(int layerIndex, out LayerOrigin origin) =>
         _origins.TryGetValue(_layerIds[layerIndex], out origin!);
 
-    /// <summary>KeyBinding's record equality ignores the contents of
-    /// <c>Params</c> — compare behavior plus params explicitly. Internal because
-    /// <see cref="KeymapEditDiff"/> computes the same equality for the save diff;
-    /// <see cref="LViz.Core.Keymap.Writer.KeymapWriter"/> still carries its own
-    /// private copy, and lifting all of them into Models is a later change.</summary>
-    internal static bool IsSameBinding(KeyBinding a, KeyBinding b) =>
-        string.Equals(a.Behavior, b.Behavior, StringComparison.Ordinal)
-        && a.Params.SequenceEqual(b.Params, StringComparer.Ordinal);
-
     /// <summary>A missing side means the key was added or taken away since the
     /// baseline, which differs from any binding.</summary>
     private static bool KeyDiffers(KeyBinding? now, KeyBinding? was) =>
-        now is null || was is null || !IsSameBinding(now, was);
+        now is null || was is null || !now.SameAs(was);
 
     // ---- steps ----------------------------------------------------------------
     // Nested inside the session on purpose: a step reaches the id list and the

@@ -366,8 +366,9 @@ public sealed partial class CommandParamViewModel : KeyParamViewModel
 
     /// <summary>Opens the editor on one existing logical param: one token
     /// naming a listed command that takes no number, or a command that takes
-    /// one followed by its profile number (a number beyond the bundled range
-    /// is added to <see cref="Profiles"/>). Returns whether it took.</summary>
+    /// one followed by its profile number written the way it is written back,
+    /// e.g. <c>0</c>, not <c>00</c> (a number beyond the bundled range is
+    /// added to <see cref="Profiles"/>). Returns whether it took.</summary>
     public bool Seed(IReadOnlyList<IReadOnlyList<string>> groups)
     {
         if (groups.Count is not (1 or 2)) return false;
@@ -387,6 +388,16 @@ public sealed partial class CommandParamViewModel : KeyParamViewModel
         if (!choice.Command.TakesNumber) return false;
         if (!int.TryParse(groups[1][0], NumberStyles.None, CultureInfo.InvariantCulture, out var number)
             || number < 0)
+        {
+            return false;
+        }
+
+        // The number has to be spelled the way this editor writes it, or OK
+        // would rewrite "&bt BT_SEL 00" to "&bt BT_SEL 0" and break the
+        // dialog's "open unchanged, confirm unchanged" rule. Such a binding
+        // opens as custom text instead.
+        if (!string.Equals(
+                number.ToString(CultureInfo.InvariantCulture), groups[1][0], StringComparison.Ordinal))
         {
             return false;
         }
