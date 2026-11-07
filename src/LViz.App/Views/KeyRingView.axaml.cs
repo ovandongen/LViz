@@ -27,7 +27,7 @@ public sealed class KeyRingClosedEventArgs(ZmkKeyBinding? result, bool openInDia
 
 /// <summary>
 /// The key ring as the host shows it: the ring itself
-/// (<see cref="KeyRingControl"/>, part 8), the list panel with its search
+/// (<see cref="KeyRingControl"/>), the list panel with its search
 /// box, the centre text box for the free-text step, and an
 /// "open in the key dialog" escape hatch. Everything is driven by the
 /// <see cref="KeyRingViewModel"/> on the DataContext; the only thing the
@@ -59,7 +59,7 @@ public partial class KeyRingView : UserControl
         };
 
         // The control draws a frame-wide transparent rectangle, so every
-        // press reaches it (part 8): a centre save raises SaveRequested,
+        // press reaches it: a centre save raises SaveRequested,
         // anything off ring, crumbs and hint raises Dismissed.
         RingControl.SaveRequested += (_, _) => Close(_ring?.CloseResult);
         RingControl.Dismissed += (_, _) => Close(null);
@@ -164,9 +164,9 @@ public partial class KeyRingView : UserControl
 
             // A highlighted panel row is picked — unless the caret is in
             // the centre box, where Enter should save (rule 3).
-            if (!ReferenceEquals(e.Source, CenterText) && vm.Panel?.HighlightedId is { } id)
+            if (!ReferenceEquals(e.Source, CenterText) && vm.Panel?.HighlightedTarget is { } target)
             {
-                vm.Choose(id);
+                vm.Choose(target);
                 e.Handled = true;
                 return;
             }
@@ -248,7 +248,7 @@ public partial class KeyRingView : UserControl
             return;
         }
 
-        _lastRowPicked = vm.Choose(row.Id) && KeyRingViewModel.PicksAValue(row.Id);
+        _lastRowPicked = vm.Choose(row.Target) && row.Target.PicksAValue;
     }
 
     /// <summary>Scrolls the panel so the highlighted row is visible: the

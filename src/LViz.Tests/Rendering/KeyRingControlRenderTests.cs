@@ -18,7 +18,7 @@ namespace LViz.Tests.Rendering;
 /// </summary>
 public class KeyRingControlRenderTests
 {
-    // The part-3 fixture ring: &kp A is key 0 of Base (ten keys, Base/Nav).
+    // The fixture ring: &kp A is key 0 of Base (ten keys, Base/Nav).
     private const string Keymap = """
         #define NAV 1
 

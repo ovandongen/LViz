@@ -106,7 +106,7 @@ public class KeyRingSnapshotTests
     {
         var ring = BuildRing(keyIndex: 3);
         ring.GoToCrumb(2);
-        ring.Choose("layer:0");
+        ring.ChooseId("layer:0");
         Render("ring-2-layer.png", ring, c => c.SetHover("layer:3", animate: false));
     }
 
@@ -117,7 +117,7 @@ public class KeyRingSnapshotTests
     {
         var ring = BuildRing(keyIndex: 4);
         ring.GoToCrumb(2);
-        ring.Choose("prof:BT_SEL:2");
+        ring.ChooseId("prof:BT_SEL:2");
         Render("ring-3-bt-profile.png", ring, c =>
         {
             c.SetHover("cmd:BT_SEL", animate: false);
@@ -150,7 +150,7 @@ public class KeyRingSnapshotTests
     public void Ring6_IncompleteAfterSwitchToMt()
     {
         var ring = BuildRing(keyIndex: 1);
-        ring.Choose("beh:&mt");
+        ring.ChooseId("beh:&mt");
         Render("ring-6-incomplete.png", ring, c => c.SetHover("keys:Modifiers", animate: false));
     }
 

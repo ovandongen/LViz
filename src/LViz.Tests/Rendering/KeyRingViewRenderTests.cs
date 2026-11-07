@@ -14,7 +14,7 @@ using Xunit;
 namespace LViz.Tests.Rendering;
 
 /// <summary>
-/// The hosted key-ring view (part 9): the ring, its list panel and centre
+/// The hosted key-ring view: the ring, its list panel and centre
 /// text box render in a window, the "open in the key dialog" button reports
 /// itself once through <see cref="KeyRingView.Closed"/>, and Esc cancels.
 /// Snapshots go to <see cref="SnapshotPaths.File"/> next to the ring
@@ -128,7 +128,7 @@ public class KeyRingViewRenderTests
     public void DoubleClick_OnAPanelRow_PicksAndCloses()
     {
         var ring = BuildRing(0); // &kp A
-        ring.Choose("beh:&kp");  // on to the keycode step, Letters listed
+        ring.ChooseId("beh:&kp");  // on to the keycode step, Letters listed
         var (view, window) = Host(ring);
         KeyRingClosedEventArgs? closed = null;
         view.Closed += (_, e) => closed = e;

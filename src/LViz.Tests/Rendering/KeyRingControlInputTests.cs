@@ -22,7 +22,7 @@ namespace LViz.Tests.Rendering;
 /// </summary>
 public class KeyRingControlInputTests
 {
-    // The part-3 fixture ring: &kp A is key 0 of Base (ten keys, Base/Nav).
+    // The fixture ring: &kp A is key 0 of Base (ten keys, Base/Nav).
     private const string Keymap = """
         #define NAV 1
 
@@ -52,10 +52,10 @@ public class KeyRingControlInputTests
     {
         var (control, window, ring) = Show();
 
-        Assert.Equal("center", control.HitTest(KeyRingControl.RingCentre));
+        Assert.Equal("center", control.HitTest(KeyRingControl.RingCentre)?.Key);
 
         // Angle 0 is inside category 0's span on the &kp A summary ring.
-        Assert.Equal("cat:Key", control.HitTest(At(110, 0)));
+        Assert.Equal("cat:Key", control.HitTest(At(110, 0))?.Key);
 
         // π/2: the category whose span holds it, computed with SegmentAt on
         // the very angle the control will derive from the point.
@@ -63,7 +63,7 @@ public class KeyRingControlInputTests
         var angle = RingGeometry.AngleOf(
             p.X - KeyRingControl.RingCentre.X, p.Y - KeyRingControl.RingCentre.Y);
         var index = RingGeometry.SegmentAt(angle, ring.Segments.Count, RingGeometry.CenteredStart(ring.Segments.Count));
-        Assert.Equal(ring.Segments[index].Id, control.HitTest(p));
+        Assert.Equal(ring.Segments[index].Id, control.HitTest(p)?.Key);
 
         window.Close();
     }
@@ -74,15 +74,15 @@ public class KeyRingControlInputTests
         var (control, window, ring) = Show();
 
         // No band is open: the band radius belongs to nothing.
-        Assert.Null(control.HitTest(At(200, 0)));
+        Assert.Null(control.HitTest(At(200, 0))?.Key);
 
         control.SetHover("cat:Layer", animate: false);
-        var band = ring.BandFor("cat:Layer");
+        var band = ring.BandForId("cat:Layer");
         Assert.NotEmpty(band);
 
         var item = control.BandItemCentres[0]; // mid angle, radius 195
         Assert.Equal(band[0].Id, item.Id);
-        Assert.Equal(band[0].Id, control.HitTest(item.Centre));
+        Assert.Equal(band[0].Id, control.HitTest(item.Centre)?.Key);
 
         window.Close();
     }
@@ -92,10 +92,10 @@ public class KeyRingControlInputTests
     {
         var (control, window, _) = Show();
 
-        Assert.Equal("crumb:0", control.HitTest(control.CrumbBounds[0].Center));
+        Assert.Equal("crumb:0", control.HitTest(control.CrumbBounds[0].Center)?.Key);
 
         // Below-left of everything: no id, and not over the ring.
-        Assert.Null(control.HitTest(new Point(5, 500)));
+        Assert.Null(control.HitTest(new Point(5, 500))?.Key);
         Assert.False(control.IsOverRing(new Point(5, 500)));
 
         // The centre and the hint pill (its middle) are the ring's.
@@ -175,7 +175,7 @@ public class KeyRingControlInputTests
         var (control, window, ring) = Show();
 
         control.SetHover("cat:Key", animate: false);
-        ring.Choose("beh:&mo"); // a step change removes the hovered id
+        ring.ChooseId("beh:&mo"); // a step change removes the hovered id
 
         Assert.Null(control.HoverId);
         window.Close();

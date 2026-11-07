@@ -208,12 +208,12 @@ public class KeyRingViewModelTests
 
         Assert.Equal(
             new[] { "beh:&mo", "beh:&to", "beh:&tog", "beh:&sl" },
-            ring.BandFor("cat:Layer").Select(segment => segment.Id));
+            ring.BandForId("cat:Layer").Select(segment => segment.Id));
         Assert.Equal(
             Loc.Instance["Ring_Short_Mo"],
-            ring.BandFor("cat:Layer").First(segment => segment.Id == "beh:&mo").Sub);
+            ring.BandForId("cat:Layer").First(segment => segment.Id == "beh:&mo").Sub);
 
-        var keyBand = ring.BandFor("cat:Key");
+        var keyBand = ring.BandForId("cat:Key");
         Assert.Equal(
             new[] { "beh:&kp", "beh:&sk", "beh:&caps_word", "beh:&key_repeat" },
             keyBand.Select(segment => segment.Id));
@@ -229,10 +229,10 @@ public class KeyRingViewModelTests
     {
         var ring = Ring(0);
 
-        Assert.Empty(ring.BandFor("cat:Bluetooth"));
-        Assert.Empty(ring.BandFor("nope"));
-        Assert.Empty(ring.BandFor("cat:0"));
-        Assert.Empty(ring.BandFor("beh:&kp"));
+        Assert.Empty(ring.BandForId("cat:Bluetooth"));
+        Assert.Empty(ring.BandForId("nope"));
+        Assert.Empty(ring.BandForId("cat:0"));
+        Assert.Empty(ring.BandForId("beh:&kp"));
     }
 
     [Fact]
@@ -242,10 +242,10 @@ public class KeyRingViewModelTests
 
         Assert.Equal(
             new[] { "beh:&hm", "beh:custom" },
-            ring.BandFor("cat:Keymap").Select(segment => segment.Id));
-        Assert.Equal(Loc.Instance["Ring_Short_Own"], Segment(ring.BandFor("cat:Keymap"), "beh:&hm").Sub);
+            ring.BandForId("cat:Keymap").Select(segment => segment.Id));
+        Assert.Equal(Loc.Instance["Ring_Short_Own"], Segment(ring.BandForId("cat:Keymap"), "beh:&hm").Sub);
 
-        var custom = Segment(ring.BandFor("cat:Keymap"), "beh:custom");
+        var custom = Segment(ring.BandForId("cat:Keymap"), "beh:custom");
         Assert.Equal(Loc.Instance["Ring_Custom_Name"], custom.Label);
         Assert.False(custom.LabelIsCode);
         Assert.Equal(Loc.Instance["Ring_Short_Custom"], custom.Sub);
@@ -256,7 +256,7 @@ public class KeyRingViewModelTests
     {
         var ring = Ring(7);
 
-        Assert.True(Segment(ring.BandFor("cat:Keymap"), "beh:custom").IsCurrent);
+        Assert.True(Segment(ring.BandForId("cat:Keymap"), "beh:custom").IsCurrent);
 
         // Custom counts as the keymap's own category; crumb 0 shows the ring
         // with the text step hidden.
@@ -276,8 +276,8 @@ public class KeyRingViewModelTests
             .Count(choice => choice.Behavior?.Group == ZmkBehaviorGroup.Keymap);
         Assert.True(own >= KeyRingViewModel.MaxBandItems);
 
-        Assert.Empty(ring.BandFor("cat:Keymap"));
-        Assert.True(ring.Choose("cat:Keymap"));
+        Assert.Empty(ring.BandForId("cat:Keymap"));
+        Assert.True(ring.ChooseId("cat:Keymap"));
         Assert.Equal(own + 1, ring.Panel!.Rows.Count);
         Assert.Equal("beh:custom", ring.Panel.Rows[^1].Id);
     }
@@ -289,7 +289,7 @@ public class KeyRingViewModelTests
     {
         var ring = Ring(0);
 
-        Assert.True(ring.Choose("beh:&mo"));
+        Assert.True(ring.ChooseId("beh:&mo"));
 
         Assert.Equal("&mo", ring.Dialog.SelectedBehavior.Code);
         Assert.Equal(KeyRingStepKind.Layer, ring.StepKind);
@@ -303,7 +303,7 @@ public class KeyRingViewModelTests
     {
         var ring = Ring(0);
 
-        Assert.True(ring.Choose("beh:&trans"));
+        Assert.True(ring.ChooseId("beh:&trans"));
 
         Assert.Equal(KeyRingStepKind.Behavior, ring.StepKind);
         Assert.False(ring.IsSummary);
@@ -315,7 +315,7 @@ public class KeyRingViewModelTests
     {
         var ring = Ring(0);
 
-        Assert.True(ring.Choose("cat:Bluetooth"));
+        Assert.True(ring.ChooseId("cat:Bluetooth"));
         Assert.Equal("&bt", ring.Dialog.SelectedBehavior.Code);
         Assert.Equal(KeyRingStepKind.Command, ring.StepKind);
     }
@@ -325,7 +325,7 @@ public class KeyRingViewModelTests
     {
         var ring = Ring(0);
 
-        Assert.False(ring.Choose("cat:Layer"));
+        Assert.False(ring.ChooseId("cat:Layer"));
         Assert.True(ring.IsSummary);
         Assert.Equal("&kp", ring.Dialog.SelectedBehavior.Code);
         Assert.Equal(1, ring.Dialog.SelectedTabIndex);
@@ -337,7 +337,7 @@ public class KeyRingViewModelTests
     {
         var ring = Ring(0);
 
-        Assert.True(ring.Choose("beh:custom"));
+        Assert.True(ring.ChooseId("beh:custom"));
         Assert.Equal(KeyRingStepKind.Text, ring.StepKind);
         Assert.True(ring.Dialog.IsCustom);
 
@@ -353,7 +353,7 @@ public class KeyRingViewModelTests
     {
         var ring = Ring(0);
 
-        Assert.True(ring.Choose("beh:&kp"));
+        Assert.True(ring.ChooseId("beh:&kp"));
 
         Assert.Equal(1, ring.Dialog.SelectedTabIndex);
         Assert.Equal(KeyRingStepKind.Keycode, ring.StepKind);
@@ -367,7 +367,7 @@ public class KeyRingViewModelTests
         // still missing, so the ring lands on parameter 1.
         var ring = Ring(1);
 
-        Assert.True(ring.Choose("beh:&mt"));
+        Assert.True(ring.ChooseId("beh:&mt"));
 
         Assert.Equal(1, ring.Dialog.SelectedTabIndex);
         Assert.Equal(KeyRingStepKind.Keycode, ring.StepKind);
@@ -383,9 +383,9 @@ public class KeyRingViewModelTests
             if (e.PropertyName == string.Empty) raised++;
         };
 
-        Assert.False(ring.Choose("zzz"));
-        Assert.False(ring.Choose("beh:"));
-        Assert.False(ring.Choose("cat:Nope"));
+        Assert.False(ring.ChooseId("zzz"));
+        Assert.False(ring.ChooseId("beh:"));
+        Assert.False(ring.ChooseId("cat:Nope"));
         Assert.True(ring.IsSummary);
         Assert.Equal(0, raised);
     }
@@ -400,7 +400,7 @@ public class KeyRingViewModelTests
             if (e.PropertyName == string.Empty) raised++;
         };
 
-        Assert.True(ring.Choose("beh:&mo"));
+        Assert.True(ring.ChooseId("beh:&mo"));
         Assert.True(raised >= 1);
     }
 
@@ -419,7 +419,7 @@ public class KeyRingViewModelTests
         };
         var ring = new KeyRingViewModel(new KeyDialogViewModel(request), request);
 
-        Assert.True(ring.Choose("beh:&magic"));
+        Assert.True(ring.ChooseId("beh:&magic"));
 
         Assert.True(ring.CanClose);
         Assert.Equal("&magic", ring.CloseResult!.Behavior);
@@ -562,7 +562,7 @@ public class KeyRingViewModelTests
             Ring(0).CenterCaption);
     }
 
-    // --- Editing a binding that isn't on a key (part 14) --------------------
+    // --- Editing a binding that isn't on a key --------------------
 
     [Fact]
     public void CarriedBinding_CaptionReplacesCenter_AndChoiceWritesThrough()
@@ -578,7 +578,7 @@ public class KeyRingViewModelTests
         Assert.True(ring.IsSummary);
         Assert.Equal(KeyRingCenterState.Unchanged, ring.CenterState);
 
-        Assert.True(ring.Choose("beh:&trans"));
+        Assert.True(ring.ChooseId("beh:&trans"));
 
         Assert.Equal("&trans", ring.CloseResult!.Behavior);
         Assert.Empty(ring.CloseResult.Params);
@@ -613,7 +613,7 @@ public class KeyRingViewModelTests
     public void Choose_BehaviorStillNeedingAValue_PromptsAndShowsTheGap()
     {
         var ring = Ring(0);
-        ring.Choose("beh:&mo");
+        ring.ChooseId("beh:&mo");
 
         Assert.Equal(KeyRingCenterState.Incomplete, ring.CenterState);
         Assert.Equal("&mo ___", ring.CenterBinding);
@@ -635,7 +635,7 @@ public class KeyRingViewModelTests
     public void Choose_CompleteOtherBehavior_OffersToSave()
     {
         var ring = Ring(0);
-        ring.Choose("beh:&trans");
+        ring.ChooseId("beh:&trans");
 
         Assert.Equal(KeyRingCenterState.Changed, ring.CenterState);
         Assert.Equal(Loc.Instance["Ring_Center_Save"], ring.CenterLine);
@@ -657,7 +657,7 @@ public class KeyRingViewModelTests
     public void HoldTap_ChoosingModTap_DropsTheLayerAndMarksEveryParamChanged()
     {
         var ring = Ring(1);
-        ring.Choose("beh:&mt");
+        ring.ChooseId("beh:&mt");
 
         Assert.Equal("&mt ___ ESC", ring.CenterBinding);
         Assert.Equal(KeyRingCrumbState.Current, ring.Crumbs[2].State);
@@ -708,7 +708,7 @@ public class KeyRingViewModelTests
         Assert.True(Segment(ring.Segments, "layer:1").IsCurrent);
         Assert.Null(ring.Panel);
 
-        Assert.True(ring.Choose("layer:0"));
+        Assert.True(ring.ChooseId("layer:0"));
 
         Assert.Equal("&mo 0", ring.CenterBinding);
         Assert.Equal(KeyRingCenterState.Changed, ring.CenterState);
@@ -732,21 +732,21 @@ public class KeyRingViewModelTests
             ring.Segments.Select(s => s.Id).Take(6).ToArray());
         Assert.True(Segment(ring.Segments, "cmd:BT_SEL").IsCurrent);
 
-        var band = ring.BandFor("cmd:BT_SEL");
+        var band = ring.BandForId("cmd:BT_SEL");
         Assert.Equal(
             new[] { "prof:BT_SEL:0", "prof:BT_SEL:1", "prof:BT_SEL:2", "prof:BT_SEL:3", "prof:BT_SEL:4" },
             band.Select(s => s.Id));
         Assert.True(Segment(band, "prof:BT_SEL:0").IsCurrent);
-        Assert.Empty(ring.BandFor("cmd:BT_CLR"));
+        Assert.Empty(ring.BandForId("cmd:BT_CLR"));
 
         // A command that eats a profile number is not a choice on its own:
         // the view pins the profile band instead.
-        Assert.False(ring.Choose("cmd:BT_SEL"));
+        Assert.False(ring.ChooseId("cmd:BT_SEL"));
 
-        Assert.True(ring.Choose("prof:BT_SEL:2"));
+        Assert.True(ring.ChooseId("prof:BT_SEL:2"));
         Assert.Equal("&bt BT_SEL 2", ring.CenterBinding);
 
-        Assert.True(ring.Choose("cmd:BT_CLR"));
+        Assert.True(ring.ChooseId("cmd:BT_CLR"));
         Assert.Equal("&bt BT_CLR", ring.CenterBinding);
     }
 
@@ -780,10 +780,10 @@ public class KeyRingViewModelTests
 
         Assert.Contains(ring.Panel!.Rows, row => row.Id == "keycode:T" && row.IsSelected);
 
-        Assert.True(ring.Choose("mod:LeftShift"));
+        Assert.True(ring.ChooseId("mod:LeftShift"));
         Assert.Equal("&kp LC(T)", ring.CenterBinding);
 
-        Assert.True(ring.Choose("mod:RightAlt"));
+        Assert.True(ring.ChooseId("mod:RightAlt"));
         Assert.Contains("RA", ring.Dialog.Result!.Params);
     }
 
@@ -803,25 +803,25 @@ public class KeyRingViewModelTests
     {
         var ring = Ring(0); // &kp A
 
-        Assert.True(ring.Choose("beh:&kp"));
-        Assert.True(ring.Choose("keys:Letters"));
+        Assert.True(ring.ChooseId("beh:&kp"));
+        Assert.True(ring.ChooseId("keys:Letters"));
         Assert.Equal(Loc.Instance["Ring_Keys_Letters"], ring.Panel!.Title);
 
-        Assert.True(ring.Choose("keycode:B"));
+        Assert.True(ring.ChooseId("keycode:B"));
         Assert.Equal("&kp B", ring.CenterBinding);
 
         ring.Panel.SearchText = "tab";
         Assert.Contains(ring.Panel.Rows, row => row.Id == "keycode:TAB");
 
-        Assert.False(ring.Choose("keycode:NOPE"));
+        Assert.False(ring.ChooseId("keycode:NOPE"));
     }
 
     [Fact]
     public void PanelHighlight_StartsOnTheSelectedRowAndClampsToTheRows()
     {
         var ring = Ring(0);
-        ring.Choose("beh:&kp");
-        ring.Choose("keys:Letters");
+        ring.ChooseId("beh:&kp");
+        ring.ChooseId("keys:Letters");
 
         var panel = ring.Panel!;
         Assert.Equal(
@@ -835,7 +835,7 @@ public class KeyRingViewModelTests
 
         panel.MoveHighlight(1);
         Assert.Equal(1, panel.HighlightIndex);
-        Assert.Equal(panel.Rows[1].Id, panel.HighlightedId);
+        Assert.Equal(panel.Rows[1].Id, panel.HighlightedTarget?.Key);
     }
 
     [Fact]
@@ -851,7 +851,7 @@ public class KeyRingViewModelTests
         ring.Panel.SearchText = "L1";
         Assert.Equal(6, ring.Panel.Rows.Count);
 
-        Assert.True(ring.Choose("layer:14"));
+        Assert.True(ring.ChooseId("layer:14"));
         Assert.Equal("&mo 14", ring.CenterBinding);
     }
 
@@ -866,14 +866,14 @@ public class KeyRingViewModelTests
 
         // A change that leaves the source alone reuses the instance, so the
         // search box (and its rows) survive it.
-        Assert.True(ring.Choose("mod:LeftAlt"));
+        Assert.True(ring.ChooseId("mod:LeftAlt"));
 
         Assert.Same(panel, ring.Panel);
         Assert.Equal("t", ring.Panel!.SearchText);
         Assert.NotEmpty(ring.Panel.Rows);
 
         // Another source — here another keycode group — is another panel.
-        Assert.True(ring.Choose("keys:Digits"));
+        Assert.True(ring.ChooseId("keys:Digits"));
         Assert.NotSame(panel, ring.Panel);
     }
 
@@ -899,7 +899,7 @@ public class KeyRingViewModelTests
         Assert.Equal(new[] { "cmd:QA" }, ring.Panel.Rows.Select(row => row.Id));
 
         ring.Panel.SearchText = "";
-        Assert.True(ring.Choose("prof:BT_SEL:3"));
+        Assert.True(ring.ChooseId("prof:BT_SEL:3"));
         Assert.Equal("&bt BT_SEL 3", ring.CenterBinding);
     }
 
@@ -913,16 +913,16 @@ public class KeyRingViewModelTests
         Assert.Equal(Loc.Instance["Ring_Panel_Layers"], ring.Panel!.Title);
 
         // …and a category too wide for a band takes the panel over.
-        Assert.Empty(ring.BandFor("cat:Keymap"));
+        Assert.Empty(ring.BandForId("cat:Keymap"));
 
-        Assert.True(ring.Choose("cat:Keymap"));
+        Assert.True(ring.ChooseId("cat:Keymap"));
 
         Assert.Equal(Loc.Instance["Ring_Category_Keymap"], ring.Panel!.Title);
         Assert.Equal(8, ring.Panel.Rows.Count);
         Assert.Equal("beh:custom", ring.Panel.Rows[^1].Id);
 
         // Any choice that isn't a category closes it again.
-        Assert.True(ring.Choose("layer:3"));
+        Assert.True(ring.Choose(new KeyRingTarget.Layer(3)));
         Assert.Equal(Loc.Instance["Ring_Panel_Layers"], ring.Panel!.Title);
     }
 
@@ -930,17 +930,33 @@ public class KeyRingViewModelTests
 
     /// <summary>Browsing a keycode group or flipping a modifier doesn't set a
     /// value, so a double-click on it never saves; every other sector does.</summary>
-    [Theory]
-    [InlineData("beh:&kp", true)]
-    [InlineData("cat:Bluetooth", true)]
-    [InlineData("layer:1", true)]
-    [InlineData("cmd:BT_CLR", true)]
-    [InlineData("prof:BT_SEL:2", true)]
-    [InlineData("keycode:A", true)]
-    [InlineData("keys:Letters", false)]
-    [InlineData("mod:LeftShift", false)]
-    public void PicksAValue_OnlyForSectorsThatSetPartOfTheBinding(string id, bool expected) =>
-        Assert.Equal(expected, KeyRingViewModel.PicksAValue(id));
+    [Fact]
+    public void PicksAValue_OnlyForSectorsThatSetPartOfTheBinding()
+    {
+        var command = new CommandChoice(new ZmkCommand("BT_SEL", TakesNumber: true), "Select", "");
+
+        Assert.True(new KeyRingTarget.Behavior(new KeyBehaviorChoice("&kp", "Key press", "", null)).PicksAValue);
+        Assert.True(new KeyRingTarget.Category(ZmkBehaviorGroup.Bluetooth).PicksAValue);
+        Assert.True(new KeyRingTarget.Layer(1).PicksAValue);
+        Assert.True(new KeyRingTarget.Command(command).PicksAValue);
+        Assert.True(new KeyRingTarget.Profile(command, new ProfileChoice(2, "2")).PicksAValue);
+        Assert.True(new KeyRingTarget.Keycode(ZmkKeycodeCatalog.Find("A")!).PicksAValue);
+        Assert.False(new KeyRingTarget.KeyGroup(KeyRingKeyGroup.Letters).PicksAValue);
+        Assert.False(new KeyRingTarget.Modifier(ZmkModifiers.LeftShift).PicksAValue);
+    }
+
+    [Fact]
+    public void Choose_TargetTheStepDoesNotOffer_DoesNothing()
+    {
+        var ring = Ring(0); // the summary of &kp A: no parameter step yet
+
+        Assert.False(ring.Choose(new KeyRingTarget.Category((ZmkBehaviorGroup)99)));
+        Assert.False(ring.Choose(new KeyRingTarget.Layer(0)));
+        Assert.False(ring.Choose(new KeyRingTarget.Keycode(ZmkKeycodeCatalog.Find("B")!)));
+        Assert.False(ring.Choose(new KeyRingTarget.KeyGroup(KeyRingKeyGroup.Letters)));
+        Assert.False(ring.Choose(new KeyRingTarget.Modifier(ZmkModifiers.LeftShift)));
+        Assert.True(ring.IsSummary);
+    }
 
     [Fact]
     public void EveryRingLabelAndSub_BuildsToAnExistingResxKey()
@@ -955,7 +971,7 @@ public class KeyRingViewModelTests
 
         foreach (var category in ring.Segments.Select(segment => segment.Id))
         {
-            foreach (var segment in ring.BandFor(category))
+            foreach (var segment in ring.BandForId(category))
             {
                 AssertResolves(segment.Label, segment.Id);
                 AssertResolves(segment.Sub ?? "", segment.Id);
@@ -979,13 +995,13 @@ public class KeyRingViewModelTests
         crowded.GoToCrumb(2);
         AssertResolves(crowded.Panel!.Title, "layer panel");
 
-        foreach (var segment in crowded.BandFor("cat:ModTap"))
+        foreach (var segment in crowded.BandForId("cat:ModTap"))
         {
             AssertResolves(segment.Label, segment.Id);
             AssertResolves(segment.Sub ?? "", segment.Id);
         }
 
-        crowded.Choose("cat:Keymap");
+        crowded.ChooseId("cat:Keymap");
         AssertResolves(crowded.Panel!.Title, "behavior panel");
     }
 

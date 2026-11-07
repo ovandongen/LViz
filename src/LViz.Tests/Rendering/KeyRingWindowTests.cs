@@ -14,7 +14,7 @@ using Xunit;
 namespace LViz.Tests.Rendering;
 
 /// <summary>
-/// The key ring's host window (part 11): <see cref="KeyRingWindow.Present"/>
+/// The key ring's host window: <see cref="KeyRingWindow.Present"/>
 /// puts the <see cref="KeyRingView"/> on the host canvas so the ring centre
 /// lands on the placement, keeps the list panel inside the window on either
 /// side of the ring, draws the tether only once the ring has moved away from
@@ -28,7 +28,7 @@ namespace LViz.Tests.Rendering;
 /// </summary>
 public class KeyRingWindowTests
 {
-    // The part 9 fixture keymap (KeyRingViewRenderTests), kept as a copy so
+    // The fixture keymap (KeyRingViewRenderTests), kept as a copy so
     // these tests stand alone. Base keys, 0-based:
     // 0 &kp A, 1 &lt NAV ESC, 2 &trans, 3 &none, 4 &mo NAV, 5 &bt BT_SEL 0,
     // 6 &hm LSHFT A, 7 &rgb_ug RGB_COLOR_HSB(…), 8 &kp LC(LS(T)),
