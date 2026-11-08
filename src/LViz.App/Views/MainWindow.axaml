@@ -279,7 +279,8 @@
                         </Button>
 
                         <!-- Keymap edit — opens edit mode (banner + key picking).
-                             Disabled states explain themselves via the tooltip. -->
+                             Disabled states explain themselves via the tooltip;
+                             over a .json keymap a click toasts why it can't edit. -->
                         <Button x:Name="EditKeymapButton" Padding="8,4"
                                 Command="{Binding StartEditCommand}"
                                 ToolTip.Tip="{Binding EditButtonTooltip}"

@@ -144,7 +144,7 @@ public class RingGeometryTests
     public void Place_AnchorInCorner_SlidesFrameInsideArea()
     {
         var p = RingGeometry.Place(new Rect(0, 0, 1000, 800), new Point(50, 780));
-        Close(new Point(236, 534), p.Centre);
+        Close(new Point(236, 508), p.Centre);
         Close(1, p.Scale);
         Assert.True(p.Fits);
     }
@@ -159,10 +159,10 @@ public class RingGeometryTests
     [Fact]
     public void Place_MarginallySmallArea_ScalesDownAndStillFits()
     {
-        var p = RingGeometry.Place(new Rect(0, 0, 600, 420), new Point(300, 210));
+        var p = RingGeometry.Place(new Rect(0, 0, 600, 440), new Point(300, 220));
         Assert.True(p.Fits);
-        Close(0.77043, p.Scale, 1e-4);
-        Close(212.31, p.Centre.Y, 1e-2);
+        Close(0.77037, p.Scale, 1e-4);
+        Close(212.30, p.Centre.Y, 1e-2);
     }
 
     [Fact]

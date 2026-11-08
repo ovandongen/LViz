@@ -9,7 +9,7 @@
         x:DataType="vm:KeyRingViewModel"
         Focusable="True"
         ClipToBounds="False"
-        Width="448" Height="514">
+        Width="448" Height="540">
 
     <!-- No app-level resources: every colour is a literal so the view also
          renders in the headless test app (HeadlessTestApp loads only the
@@ -56,7 +56,7 @@
         </Style>
     </UserControl.Styles>
 
-    <Canvas Width="448" Height="514" ClipToBounds="False">
+    <Canvas Width="448" Height="540" ClipToBounds="False">
 
         <views:KeyRingControl x:Name="RingControl" Canvas.Left="0" Canvas.Top="0"
                               Ring="{Binding}" />

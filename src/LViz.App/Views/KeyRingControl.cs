@@ -12,10 +12,10 @@ namespace LViz.App.Views;
 /// <summary>
 /// The radial key editor's view: one custom-drawn control that shows a
 /// <see cref="KeyRingViewModel"/> as a ring — backdrop, crumb row, main ring,
-/// inner modifier ring, behavior band, centre disc and hint pill. It owns the
-/// view state (hover, pinned band, keyboard cursor, animation) and the input;
-/// where things sit is <see cref="RingLayout"/> and how they look is
-/// <see cref="KeyRingPainter"/>.
+/// inner modifier ring, behavior band, centre disc, hint pill and explanation
+/// line. It owns the view state (hover, pinned band, keyboard cursor,
+/// animation) and the input; where things sit is <see cref="RingLayout"/>
+/// and how they look is <see cref="KeyRingPainter"/>.
 ///
 /// Pointer input hits through <see cref="HitTest"/> — hover, click to choose
 /// or pin a band, right-click back — and a keyboard cursor moves with
@@ -49,8 +49,8 @@ public sealed class KeyRingControl : Control
         set => SetValue(RingProperty, value);
     }
 
-    /// <summary>Suppresses the hint pill (set when the hint would cover
-    /// the edited key).</summary>
+    /// <summary>Suppresses the hint and explanation pills (set when they
+    /// would cover the edited key).</summary>
     public bool HideHint
     {
         get => GetValue(HideHintProperty);
@@ -132,6 +132,20 @@ public sealed class KeyRingControl : Control
     internal KeyRingSegment? PointedSegment =>
         (HoverId ?? KeyboardHighlightId) is { } id && _layout.Find(id) is RingHit.Segment hit
             ? hit.Value
+            : null;
+
+    /// <summary>What the pointed segment, crumb or centre does (see
+    /// <see cref="PointedSegment"/> for which one), for the explanation line
+    /// under the hint; null when nothing is pointed at or it needs none.</summary>
+    internal string? PointedExplanation =>
+        Ring is { } vm && (HoverId ?? KeyboardHighlightId) is { } id
+            ? _layout.Find(id) switch
+            {
+                RingHit.Segment hit => vm.ExplanationFor(hit.Value.Target),
+                RingHit.Center => vm.CenterExplanation,
+                RingHit.Crumb crumb => vm.CrumbExplanation(crumb.Index),
+                _ => null,
+            }
             : null;
 
     /// <summary>Points the ring at <paramref name="id"/> (see
@@ -245,10 +259,12 @@ public sealed class KeyRingControl : Control
     internal RingHit? HitTest(Point p) => _layout.HitTest(p);
 
     /// <summary>Whether a control-local point lies on anything the ring owns
-    /// (see <see cref="RingLayout.IsOverRing"/>), the hint pill included while
-    /// it shows. A left-click here never dismisses.</summary>
+    /// (see <see cref="RingLayout.IsOverRing"/>), the hint and explanation
+    /// pills included while they show. A left-click here never dismisses.</summary>
     public bool IsOverRing(Point p) =>
-        Ring is { } vm && _layout.IsOverRing(p, KeyRingPainter.HintBounds(vm, HideHint));
+        Ring is { } vm
+        && (_layout.IsOverRing(p, KeyRingPainter.HintBounds(vm, HideHint))
+            || KeyRingPainter.ExplanationBounds(PointedExplanation, HideHint)?.Contains(p) == true);
 
     // ─── pointer and keyboard input ──────────────────────────────────────
 
@@ -549,7 +565,8 @@ public sealed class KeyRingControl : Control
 
         try
         {
-            new KeyRingPainter(vm, _layout, _amounts, PointedSegment, _bandOpacity, HideHint).Paint(context);
+            new KeyRingPainter(
+                vm, _layout, _amounts, PointedSegment, _bandOpacity, HideHint, PointedExplanation).Paint(context);
         }
         catch (Exception ex)
         {

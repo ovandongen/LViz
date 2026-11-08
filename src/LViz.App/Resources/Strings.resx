@@ -1591,7 +1591,7 @@
     <value>Edit keymap</value>
     <comment/>
   </data>
-  <data name="Tooltip_EditKeymapJson" xml:space="preserve">
+  <data name="Edit_JsonNotEditable" xml:space="preserve">
     <value>MoErgo .json keymaps can't be edited. Open the .keymap file instead.</value>
     <comment/>
   </data>
@@ -2581,6 +2581,114 @@
   </data>
   <data name="Ring_Hint_Text" xml:space="preserve">
     <value>Type the binding · Enter: save · Esc: cancel</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Category_Key" xml:space="preserve">
+    <value>Plain keys: send a key, a sticky key, caps word or key repeat.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Category_HoldTap" xml:space="preserve">
+    <value>One key, two jobs: tap does one thing, hold another (mod-tap, layer-tap).</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Category_Layer" xml:space="preserve">
+    <value>Switch layers: while held, to a layer, on/off, or for one key press.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Category_Bluetooth" xml:space="preserve">
+    <value>Bluetooth profiles: select, switch, forget or disconnect.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Category_Output" xml:space="preserve">
+    <value>Choose whether keys go over USB or Bluetooth.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Category_Lighting" xml:space="preserve">
+    <value>RGB lighting: on/off, brightness, colour and effects.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Category_Mouse" xml:space="preserve">
+    <value>Mouse keys: click, scroll and move the pointer.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Category_System" xml:space="preserve">
+    <value>The keyboard itself: bootloader, restart, power off, Studio unlock.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Category_Clear" xml:space="preserve">
+    <value>Transparent (use the layer below) or do nothing at all.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Category_Keymap" xml:space="preserve">
+    <value>Behaviors defined in this keymap, or type any binding yourself.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Keys_Used" xml:space="preserve">
+    <value>The keycodes this keymap uses most, most used first.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Keys_Modifiers" xml:space="preserve">
+    <value>Shift, Ctrl, Alt and Gui as keys of their own, left and right.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Keys_Letters" xml:space="preserve">
+    <value>The letters A to Z.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Keys_Digits" xml:space="preserve">
+    <value>The number row, 0 to 9.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Keys_Punctuation" xml:space="preserve">
+    <value>Full stop, comma, semicolon, quotes, brackets and the like.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Keys_Symbols" xml:space="preserve">
+    <value>Shifted symbols such as ! @ # $ %.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Keys_Navigation" xml:space="preserve">
+    <value>Arrows, Home, End, Page Up and Page Down.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Keys_Editing" xml:space="preserve">
+    <value>Escape, Backspace, Delete and the other editing keys.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Keys_Function" xml:space="preserve">
+    <value>The function keys F1 to F24.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Keys_More" xml:space="preserve">
+    <value>Everything else: keypad, media, locks, international and more.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_CenterSave" xml:space="preserve">
+    <value>Click to save this binding to the key.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_CenterIncomplete" xml:space="preserve">
+    <value>Not finished yet: pick what the centre asks for.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_CenterClose" xml:space="preserve">
+    <value>Click to close; the key keeps its binding.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_Crumb" xml:space="preserve">
+    <value>Click to go back to this step and change it.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_CrumbCurrent" xml:space="preserve">
+    <value>The step you are on now.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_ModifierLeftFormat" xml:space="preserve">
+    <value>Holds left {0} together with the key. Click to switch it on or off.</value>
+    <comment/>
+  </data>
+  <data name="Ring_Explain_ModifierRightFormat" xml:space="preserve">
+    <value>Holds right {0} together with the key. Click to switch it on or off.</value>
     <comment/>
   </data>
   <data name="Ring_Keys_Used" xml:space="preserve">

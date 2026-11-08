@@ -1,4 +1,5 @@
 using LViz.App.Localization;
+using LViz.Core.Keymap.Catalog;
 using LViz.Core.Keymap.Writer;
 using LViz.Core.Models;
 
@@ -161,6 +162,47 @@ public sealed partial class KeyRingViewModel
         : StepKind == KeyRingStepKind.Text
             ? Loc.Instance["Ring_Hint_Text"]
             : Loc.Instance["Ring_Hint_Choose"];
+
+    // ─── Explanation line ────────────────────────────────────────────────
+
+    /// <summary>What a sector does, for the explanation line under the ring;
+    /// null where the sector's own label says it all (a listed keycode).
+    /// Behaviors and commands reuse the key dialog's help text, a layer the
+    /// help of the behavior it is for.</summary>
+    public string? ExplanationFor(KeyRingTarget target) => target switch
+    {
+        KeyRingTarget.Category category => Loc.Instance[$"Ring_Explain_Category_{category.Group}"],
+        KeyRingTarget.Behavior behavior => behavior.Choice.Help,
+        KeyRingTarget.Layer => Dialog.SelectedBehavior.Help,
+        KeyRingTarget.Command command => command.Choice.Help,
+        KeyRingTarget.Profile profile => profile.Owner.Help,
+        KeyRingTarget.KeyGroup group => Loc.Instance[$"Ring_Explain_Keys_{group.Group}"],
+        KeyRingTarget.Modifier modifier => ModifierExplanation(modifier.Flag),
+        _ => null,
+    };
+
+    /// <summary>What a click on the centre disc does right now.</summary>
+    public string CenterExplanation => CenterState switch
+    {
+        KeyRingCenterState.Changed => Loc.Instance["Ring_Explain_CenterSave"],
+        KeyRingCenterState.Incomplete => Loc.Instance["Ring_Explain_CenterIncomplete"],
+        _ => Loc.Instance["Ring_Explain_CenterClose"],
+    };
+
+    /// <summary>What crumb <paramref name="index"/> is: the step the ring is
+    /// on, or one a click goes back to.</summary>
+    public string CrumbExplanation(int index) =>
+        index == CurrentCrumb
+            ? Loc.Instance["Ring_Explain_CrumbCurrent"]
+            : Loc.Instance["Ring_Explain_Crumb"];
+
+    private static string ModifierExplanation(ZmkModifiers flag)
+    {
+        var entry = ModifierRing.First(e => e.Flag == flag);
+        return Loc.Instance.Format(
+            entry.Right ? "Ring_Explain_ModifierRightFormat" : "Ring_Explain_ModifierLeftFormat",
+            Loc.Instance[$"Ring_Mod_{entry.Kind}"]);
+    }
 
     /// <summary>Which crumb the ring is on: none in the summary, the category
     /// on the behavior ring, the behavior on the Custom text step, and

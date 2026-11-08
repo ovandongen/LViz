@@ -92,7 +92,7 @@ public class KeyRingControlRenderTests
         control.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
 
         Assert.Equal(448, control.DesiredSize.Width);
-        Assert.Equal(514, control.DesiredSize.Height);
+        Assert.Equal(540, control.DesiredSize.Height);
     }
 
     private static KeyRingViewModel BuildRing()

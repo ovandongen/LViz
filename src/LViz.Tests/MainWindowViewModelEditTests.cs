@@ -457,20 +457,26 @@ public class MainWindowViewModelEditTests : IDisposable
     // ---- .json cannot be edited ---------------------------------------------------------
 
     [Fact]
-    public void JsonKeymap_CannotStartEdit_TooltipSaysWhy()
+    public void JsonKeymap_EditClick_ToastsWhyAndStaysOutOfEditMode()
     {
         // The real service would refuse a fake path anyway; the fake reports a
         // loaded Moergo .json like MainWindowViewModelLoadTests' successes.
         var fake = new FakeKeymapStateService(new KeymapLoadResult.Success(
             SampleKeymap(), "moergo.json", LayerCount: 2, FirstLayerBindingCount: 42));
         var vm = NewVm(NewSettings(), fake);
+        const string why = "MoErgo .json keymaps can't be edited. Open the .keymap file instead.";
 
         vm.LoadLayoutFromPath("moergo.json");
 
-        Assert.False(vm.CanStartEdit);
-        Assert.Equal(
-            "MoErgo .json keymaps can't be edited. Open the .keymap file instead.",
-            vm.EditButtonTooltip);
+        // The button stays clickable so the click can explain itself.
+        Assert.True(vm.StartEditCommand.CanExecute(null));
+        Assert.Equal(why, vm.EditButtonTooltip);
+
+        vm.StartEditCommand.Execute(null);
+
+        Assert.False(vm.IsEditing);
+        Assert.True(vm.Toast.IsVisible);
+        Assert.Equal(why, vm.Toast.Message);
     }
 
     // ---- saving ------------------------------------------------------------------------

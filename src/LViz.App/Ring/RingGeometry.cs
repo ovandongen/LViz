@@ -82,6 +82,13 @@ public static class RingMetrics
     /// <summary>Gap between the hint line and the ring extent.</summary>
     public const double HintGap = 8;
 
+    /// <summary>Height of the explanation line below the hint line: what the
+    /// pointed sector, crumb or centre does.</summary>
+    public const double ExplainHeight = 22;
+
+    /// <summary>Gap between the hint line and the explanation line.</summary>
+    public const double ExplainGap = 4;
+
     /// <summary>Left half of the ring's bounding frame, px at scale 1.</summary>
     public const double FrameLeft = 224;
 
@@ -91,8 +98,9 @@ public static class RingMetrics
     /// <summary>Frame above the centre: extent plus breadcrumb gap and strip.</summary>
     public const double FrameTop = ExtentRadius + CrumbGap + CrumbHeight;
 
-    /// <summary>Frame below the centre: extent plus hint gap and line.</summary>
-    public const double FrameBottom = ExtentRadius + HintGap + HintHeight;
+    /// <summary>Frame below the centre: extent plus the hint line and the
+    /// explanation line, each with its gap.</summary>
+    public const double FrameBottom = ExtentRadius + HintGap + HintHeight + ExplainGap + ExplainHeight;
 
     /// <summary>Smallest distance the whole frame keeps from the window edge.</summary>
     public const double WindowMargin = 12;

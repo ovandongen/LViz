@@ -79,7 +79,7 @@ public partial class KeyRingView : UserControl
     public event EventHandler<KeyRingClosedEventArgs>? Closed;
 
     /// <summary>Places the panel at view coordinates — it may reach outside
-    /// the view's own 448 × 514 (the host has the room).</summary>
+    /// the view's own 448 × 540 (the host has the room).</summary>
     public void SetPanelPosition(double left, double top)
     {
         Canvas.SetLeft(PanelBorder, left);

@@ -310,7 +310,9 @@ After creating or editing a view, rebuild the App project before trusting a
   (`KeyRingTarget.PicksAValue`: not `KeyGroup`/`Modifier`) and the binding is
   complete; the second click is never hit-tested, because the ring has usually
   moved on under the pointer. Pointing at a segment shows its full label and
-  sub in the centre. The ring is the default key editor
+  sub in the centre, and what it does on the explanation pill under the hint
+  (`ExplanationFor` / `CenterExplanation` / `CrumbExplanation` on the VM;
+  behaviors and commands reuse the key dialog's `Help` text). The ring is the default key editor
   (`UserSettings.RingKeyEditor`, default true); its bottom-right button is the
   only way from the ring to the key dialog (there is no Shift+Enter).
   `KeyRingControl` marks every left press handled, so only a press on the

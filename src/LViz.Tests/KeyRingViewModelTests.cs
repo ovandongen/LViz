@@ -1005,6 +1005,62 @@ public class KeyRingViewModelTests
         AssertResolves(crowded.Panel!.Title, "behavior panel");
     }
 
+    [Fact]
+    public void EveryRingSector_HasAnExplanationFromAnExistingResxKey()
+    {
+        // Categories and their bands, then the keycode groups and the inner
+        // modifier ring: all of them build their explanation from runtime keys.
+        var ring = Ring(0);
+        var sectors = ring.Segments
+            .Concat(ring.Segments.SelectMany(category => ring.BandForId(category.Id)))
+            .Select(segment => (ring, segment))
+            .ToList();
+
+        var keycode = Ring(8);
+        keycode.GoToCrumb(2);
+        sectors.AddRange(keycode.Segments.Concat(keycode.InnerSegments).Select(segment => (keycode, segment)));
+
+        Assert.Contains(sectors, entry => entry.segment.Target is KeyRingTarget.Modifier);
+        foreach (var (owner, segment) in sectors)
+            AssertResolves(owner.ExplanationFor(segment.Target) ?? "", segment.Id);
+
+        AssertResolves(ring.CenterExplanation, "centre");
+        for (int i = 0; i < ring.Crumbs.Count; i++) AssertResolves(ring.CrumbExplanation(i), $"crumb {i}");
+    }
+
+    [Fact]
+    public void Explanations_ReuseTheDialogHelpAndFollowTheCentreAndCrumbState()
+    {
+        // A behavior band reuses the key dialog's help; a layer explains the
+        // behavior it is for.
+        var ring = Ring(0);
+        Assert.Equal(Loc.Instance["Behavior_Mt_Help"],
+            ring.ExplanationFor(ring.BandForId("cat:HoldTap").First(s => s.Id == "beh:&mt").Target));
+
+        var layer = Ring(4);
+        layer.GoToCrumb(2);
+        Assert.Equal(Loc.Instance["Behavior_Mo_Help"], layer.ExplanationFor(layer.Segments[0].Target));
+
+        Assert.Equal(
+            Loc.Instance.Format("Ring_Explain_ModifierLeftFormat", Loc.Instance["Ring_Mod_Ctrl"]),
+            ring.ExplanationFor(new KeyRingTarget.Modifier(ZmkModifiers.LeftCtrl)));
+
+        // The centre says what a click does now; the crumb row marks the step
+        // the ring is on.
+        var untouched = Ring(2);
+        Assert.Equal(Loc.Instance["Ring_Explain_CenterClose"], untouched.CenterExplanation);
+        Assert.Equal(Loc.Instance["Ring_Explain_CrumbCurrent"], untouched.CrumbExplanation(0));
+        Assert.Equal(Loc.Instance["Ring_Explain_Crumb"], untouched.CrumbExplanation(1));
+
+        var gap = Ring(0);
+        gap.ChooseId("beh:&mo");
+        Assert.Equal(Loc.Instance["Ring_Explain_CenterIncomplete"], gap.CenterExplanation);
+
+        var changed = Ring(0);
+        changed.ChooseId("beh:&trans");
+        Assert.Equal(Loc.Instance["Ring_Explain_CenterSave"], changed.CenterExplanation);
+    }
+
     // A ring cannot fit fifteen layers, and seven own hold-taps are too wide
     // for a behavior band: both go to the list panel.
     private const string ManyLayerKeymap = """

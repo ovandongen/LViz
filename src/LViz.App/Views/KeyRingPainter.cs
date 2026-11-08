@@ -60,13 +60,19 @@ internal sealed class KeyRingPainter
     private readonly KeyRingSegment? _pointed;
     private readonly double _bandOpacity;
     private readonly bool _hideHint;
+    private readonly string? _explanation;
+
+    /// <summary>Horizontal text padding inside the hint and explanation pills.</summary>
+    private const double PillPad = 12;
 
     /// <param name="amounts">Hover amount (0 to 1) per segment key; absent is 0.</param>
     /// <param name="pointed">The segment the centre describes, or null.</param>
     /// <param name="bandOpacity">Fade-in of the open band, 0 to 1.</param>
+    /// <param name="explanation">What the pointed thing does, for the line
+    /// under the hint; null draws no line.</param>
     public KeyRingPainter(
         KeyRingViewModel vm, RingLayout layout, IReadOnlyDictionary<string, double> amounts,
-        KeyRingSegment? pointed, double bandOpacity, bool hideHint)
+        KeyRingSegment? pointed, double bandOpacity, bool hideHint, string? explanation)
     {
         _vm = vm;
         _layout = layout;
@@ -74,6 +80,7 @@ internal sealed class KeyRingPainter
         _pointed = pointed;
         _bandOpacity = bandOpacity;
         _hideHint = hideHint;
+        _explanation = explanation;
     }
 
     /// <summary>The measuring the layout builds with.</summary>
@@ -103,21 +110,34 @@ internal sealed class KeyRingPainter
 
     /// <summary>The hint pill's rectangle in control coordinates, or null
     /// while it is hidden or has no text.</summary>
-    public static Rect? HintBounds(KeyRingViewModel vm, bool hideHint)
-    {
-        if (hideHint || vm.Hint.Length == 0) return null;
+    public static Rect? HintBounds(KeyRingViewModel vm, bool hideHint) =>
+        hideHint || vm.Hint.Length == 0
+            ? null
+            : PillRect(vm.Hint, HintTop).Translate(RingLayout.Centre);
 
-        var width = MeasureTextWidth(vm.Hint, InterRegular, 11) + 2 * 12;
-        return new Rect(
-            RingLayout.Centre.X - width / 2,
-            RingLayout.Centre.Y + RingMetrics.ExtentRadius + RingMetrics.HintGap,
-            width, RingMetrics.HintHeight);
+    /// <summary>The explanation pill's rectangle in control coordinates, or
+    /// null while it is hidden (with the hint) or has no text.</summary>
+    public static Rect? ExplanationBounds(string? explanation, bool hideHint) =>
+        hideHint || string.IsNullOrEmpty(explanation)
+            ? null
+            : PillRect(explanation, ExplanationTop).Translate(RingLayout.Centre);
+
+    private static double HintTop => RingMetrics.ExtentRadius + RingMetrics.HintGap;
+
+    private static double ExplanationTop => HintTop + RingMetrics.HintHeight + RingMetrics.ExplainGap;
+
+    /// <summary>A pill under the ring, centre-relative and as wide as its
+    /// text (a long one may reach past the ring frame; nothing clips it).</summary>
+    private static Rect PillRect(string text, double top)
+    {
+        var width = MeasureTextWidth(text, InterRegular, 11) + 2 * PillPad;
+        return new Rect(-width / 2, top, width, RingMetrics.HintHeight);
     }
 
     private double AmountOf(string key) => _amounts.TryGetValue(key, out var value) ? value : 0;
 
     /// <summary>Paints the whole ring: backdrop, band, sectors with their labels
-    /// and current markers, centre, crumbs and hint.</summary>
+    /// and current markers, centre, crumbs, hint and explanation line.</summary>
     public void Paint(DrawingContext context)
     {
         var vm = _vm;
@@ -197,8 +217,12 @@ internal sealed class KeyRingPainter
             // 7. crumbs (the row runs across the top of the frame)
             DrawCrumbs(context);
 
-            // 8. hint
-            DrawHint(context, vm);
+            // 8. hint, then the explanation line under it
+            if (!_hideHint)
+            {
+                if (vm.Hint.Length > 0) DrawPill(context, vm.Hint, HintTop, SubBrush);
+                if (!string.IsNullOrEmpty(_explanation)) DrawPill(context, _explanation, ExplanationTop, TextBrush);
+            }
         }
     }
 
@@ -465,18 +489,13 @@ internal sealed class KeyRingPainter
         }
     }
 
-    private void DrawHint(DrawingContext context, KeyRingViewModel vm)
+    /// <summary>One pill under the ring, centred on it.</summary>
+    private static void DrawPill(DrawingContext context, string text, double top, IBrush textBrush)
     {
-        if (_hideHint || vm.Hint.Length == 0) return;
-
-        using var text = LayoutText(vm.Hint, InterRegular, 11, SubBrush, 0);
-        var width = text.Width + 2 * 12;
-        var top = RingMetrics.ExtentRadius + RingMetrics.HintGap;
-
-        context.DrawRectangle(HintBrush, null,
-            new Rect(-width / 2, top, width, RingMetrics.HintHeight), 11, 11);
-        text.Draw(context, new Point(
-            -width / 2 + 12, top + (RingMetrics.HintHeight - text.Height) / 2));
+        var rect = PillRect(text, top);
+        using var layout = LayoutText(text, InterRegular, 11, textBrush, 0);
+        context.DrawRectangle(HintBrush, null, rect, 11, 11);
+        layout.Draw(context, new Point(rect.X + PillPad, top + (rect.Height - layout.Height) / 2));
     }
 
     // ─── paths and text helpers ──────────────────────────────────────────

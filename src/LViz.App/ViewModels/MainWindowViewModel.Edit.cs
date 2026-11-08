@@ -28,20 +28,25 @@ public partial class MainWindowViewModel
     /// and routes key taps into the editor.</summary>
     public bool IsEditing => Edit is not null;
 
-    /// <summary>Only a loaded <c>.keymap</c> file can be edited (the Moergo
-    /// <c>.json</c> export stays import-only), and only one edit at a time.</summary>
+    /// <summary>The edit button works over a loaded <c>.keymap</c> file, and
+    /// also over a Moergo <c>.json</c> export: that one is import-only, but a
+    /// greyed-out button left users guessing why, so a click toasts the
+    /// reason instead (see <see cref="StartEdit"/>). One edit at a time.</summary>
     public bool CanStartEdit =>
         !IsEditing
         && HasLayoutLoaded
         && LoadedLayoutPath is string path
-        && path.EndsWith(".keymap", StringComparison.OrdinalIgnoreCase);
+        && (path.EndsWith(".keymap", StringComparison.OrdinalIgnoreCase) || IsJsonPath(path));
 
     /// <summary>Tooltip for the edit button; over a <c>.json</c> keymap it says
     /// that format cannot be edited.</summary>
     public string EditButtonTooltip =>
-        LoadedLayoutPath is string path && path.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
-            ? Loc.Instance["Tooltip_EditKeymapJson"]
+        LoadedLayoutPath is string path && IsJsonPath(path)
+            ? Loc.Instance["Edit_JsonNotEditable"]
             : Loc.Instance["Tooltip_EditKeymap"];
+
+    private static bool IsJsonPath(string path) =>
+        path.EndsWith(".json", StringComparison.OrdinalIgnoreCase);
 
     partial void OnEditChanged(KeymapEditViewModel? value)
     {
@@ -57,11 +62,18 @@ public partial class MainWindowViewModel
     /// <summary>
     /// Open an edit on the loaded keymap: re-read the file, parse it, and show
     /// the edit view — every layer tab visible (hidden ones included, in memory
-    /// only). A read or parse failure leaves the view unedited and toasts why.
+    /// only). A read or parse failure leaves the view unedited and toasts why,
+    /// and so does a <c>.json</c> keymap, which cannot be edited.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanStartEdit))]
     private void StartEdit()
     {
+        if (IsJsonPath(LoadedLayoutPath!))
+        {
+            Toast.Show(Loc.Instance["Edit_JsonNotEditable"]);
+            return;
+        }
+
         KeymapEditViewModel edit;
         try
         {

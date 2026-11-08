@@ -88,10 +88,13 @@ public partial class KeyRingWindow : Window
         var spot = panel is { } side ? new Point(side.Left, side.Top) : DefaultPanelSpot(bounds, centre, s);
         view.SetPanelPosition((spot.X - origin.X) / s, (spot.Y - origin.Y) / s);
 
-        // The hint strip under the ring would sit on the very key being
-        // edited — hide it then.
+        // The hint and explanation lines under the ring would sit on the
+        // very key being edited — hide them then.
         var hintStrip = new Rect(
-            centre.X - 170 * s, centre.Y + 232 * s, 340 * s, RingMetrics.HintHeight * s);
+            centre.X - 170 * s,
+            centre.Y + (RingMetrics.ExtentRadius + RingMetrics.HintGap) * s,
+            340 * s,
+            (RingMetrics.HintHeight + RingMetrics.ExplainGap + RingMetrics.ExplainHeight) * s);
         view.RingControl.HideHint = hintStrip.Intersects(key);
 
         if (RingGeometry.Tether(key.Center, placement) is { } tether)
