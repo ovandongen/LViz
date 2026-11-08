@@ -13,12 +13,14 @@ once before changing anything to confirm the baseline is green.
 ## What this project is
 
 A Windows, macOS, and Linux Avalonia 11 / .NET 10 desktop overlay that
-mirrors the active layer of a ZMK keyboard in real time over Raw HID.
-Forked from [moergo-layer-viz](https://github.com/ovandongen/moergo-layer-viz)
+mirrors the active layer of a ZMK keyboard in real time over Raw HID, and
+(since v3) a keymap editor that patches the user's `.keymap` file, saved
+locally or committed to a GitHub zmk-config, leaving the rest of the file
+intact. Forked from [moergo-layer-viz](https://github.com/ovandongen/moergo-layer-viz)
 and generalized so the engine can host arbitrary ZMK boards. **Seven
 profiles ship today:** Corne 6-col, Glove80, GO60, Kyria, Lily58, Sofle,
 A-Dux (`Core/Layout/*Profile.cs`, registered in `KeyboardProfileRegistry`).
-Current release: v2.0.1 on `main`.
+Current release: v3.0.0 on `main`.
 
 The HID transport lives in `external/zmk-hid-protocol` (git submodule).
 Boards have to advertise the Raw HID interface (usage page `0xFF60`,
@@ -52,13 +54,19 @@ src/
                  custom chrome, EN/NL localization, per-key label
                  overrides + FontAwesome icon picker, OS secret stores
                  (Services/Secrets/), GitHub service (Services/GitHub/),
-                 key ring geometry (Ring/).
+                 key ring geometry (Ring/). `AppServices.cs` is the
+                 composition root; the Avalonia shell, dialog hosts and
+                 window lifecycle live in Views/.
   LViz.Core/   → pure .NET — dtsi physical-layout parser, keyboard
-                 profiles, .keymap parser (Keymap/Parser/) + Moergo
-                 .json loader (MoergoJsonKeymapLoader), Raw HID
-                 profile matching, settings, diagnostics, GitHub client,
-                 login session and repo cache (GitHub/). No Avalonia.
-  LViz.Tests/  → xUnit fixtures.
+                 profiles, user layouts + importers (Layout/,
+                 Layout/Import/), .keymap parser (Keymap/Parser/) + Moergo
+                 .json loader (MoergoJsonKeymapLoader), keymap writers
+                 (Keymap/Writer/), edit session + save plan
+                 (Keymap/Editing/), picking catalogs (Keymap/Catalog/),
+                 atomic writes, keymap saver + backups (Persistence/),
+                 Raw HID profile matching, settings, diagnostics, GitHub
+                 client, login session and repo cache (GitHub/). No Avalonia.
+  LViz.Tests/  → xUnit fixtures; headless Avalonia view tests in Rendering/.
 external/
   zmk-hid-protocol/   → submodule. Raw HID transport + report parser, and
                         the cross-device capability bus — `Capabilities/`
@@ -77,6 +85,7 @@ AGENTS.md             → this file: project conventions and gotchas.
 git submodule update --init --recursive            # first-time clone, or a fresh git worktree
 dotnet build                                       # full solution build
 dotnet test                                        # run all xUnit tests
+dotnet test src/LViz.Tests --filter "FullyQualifiedName~LViz.Tests.Rendering"  # headless view tests only; rewrites the ring snapshots
 dotnet run --project src/LViz.App                  # launch the app
 dotnet build src/LViz.App/LViz.App.csproj -t:Rebuild  # after XAML edits (see below)
 ```
@@ -260,6 +269,8 @@ After creating or editing a view, rebuild the App project before trusting a
   `KeyboardConfigValidator` for the layer-count consistency check. Unmapped on
   purpose: `decoration.color`, `inputListeners`, `custom_devicetree`. This is
   the import format the fork originally dropped, re-added scoped to Moergo.
+  A `.json` keymap is view-only: the edit button stays clickable and
+  `StartEdit` toasts `Edit_JsonNotEditable` instead of opening an edit.
 - **Picking catalogs live in `Core/Keymap/Catalog/`, codes and kinds only.**
   `ZmkKeycodeCatalog` is the pickable keycode list from the embedded
   `Resources/zmk-keycodes.json`, generated from ZMK's MIT `keys.h` by the
@@ -317,8 +328,11 @@ After creating or editing a view, rebuild the App project before trusting a
   only way from the ring to the key dialog (there is no Shift+Enter).
   `KeyRingControl` marks every left press handled, so only a press on the
   panel's padding reaches the window's "press on `Host` cancels" check
-  (`KeyRingWindowTests` pins it). Ring snapshots for review are written by
-  `KeyRingSnapshotTests` to the gitignored `docs/ideas/ring-snapshots/`.
+  (`KeyRingWindowTests` pins it). Ring snapshots for review are written on
+  every test run by `KeyRingSnapshotTests` (plus ring-10/11 from
+  `KeyRingViewRenderTests` and two smoke frames) through `SnapshotPaths` to the
+  gitignored `docs/ideas/ring-snapshots/` (a temp folder when no `LViz.sln`
+  sits above the test output).
   `KeyEditorHost` (App/Views) is the one ring-or-dialog fallback ("the ring
   when asked and it fits, else the dialog; a ring hand-over continues in the
   dialog"): `EditAsync(owner, request, KeyEditorRingAnchor?)`, plus
@@ -354,7 +368,7 @@ After creating or editing a view, rebuild the App project before trusting a
   `LayerTabsView`; `MainWindow.axaml` keeps only the `LayerTabs` border row.
   Settings pickers bind `MainViewModel.LayerTabs.Layers`. Keep the tab items
   stable: update `TabColor`/`IsShown` in place, only `Rebuild` replaces them.
-- **Combo legend: `ComboLegendViewModel` on `MainWindowViewModel.ComboLegend`.**
+- **Combo legend: `ComboLegendViewModel` on `MainWindowViewModel.Board.ComboLegend`.**
   It owns the tiles (`Combos`), the persisted overlay toggle
   (`IsOverlayVisible`), `IsLegendVisible` (overlay OR editing), the tile/key
   hover highlight (`SetHighlighted`) and the combo label overrides
@@ -754,8 +768,10 @@ LViz-specific (extend this list as we hit more):
   change adds a VM property; it is the one expected change to an existing test.
 
 - **`AppServices` is the one composition root.** `MainWindowViewModel` takes
-  every collaborator as a required constructor parameter and builds none
-  itself (except `DeviceStack`, which needs the VM's `ActiveLayerIndex`).
+  every collaborator as a required constructor parameter and builds no
+  service itself except `DeviceStack`, which needs the VM's
+  `ActiveLayerIndex`. Its child VMs and `KeymapLibrary` (`Library`), built in
+  the constructor, only wrap what it was given.
   Only `gitHub`, `activeWindowMonitor` and `mouseIdleMonitor` may be null,
   each with a meaning (no GitHub service, no app-focus switching, no
   `MouseLayer`). Tests build the VM with `TestMainVm.Create(settings, …)`,
@@ -768,7 +784,8 @@ LViz-specific (extend this list as we hit more):
   shortcuts, layout wizard, GitHub picker, edit layout and the label dialogs
   are shell methods (App/Services); a dialog method returns its result (null =
   backed out) and the VM command applies it, so the flow is testable with
-  `FakeMainWindowShell`. `AvaloniaMainWindowShell` is the real one; it and
+  `FakeMainWindowShell`. `AvaloniaMainWindowShell` (App/Views, as are the
+  other Avalonia types below) is the real one; it and
   `AvaloniaKeymapEditDialogs` find the owner at call time via
   `MainWindowOwner.Current`. `MainWindowLifecycle` owns window-state
   restore/save, the close guard and the quit-in-progress flag;

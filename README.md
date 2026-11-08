@@ -1,7 +1,9 @@
-# <img src="src/LViz.App/Assets/icon.png" alt="" width="40" align="absmiddle"> LViz — ZMK layer visualizer
+# <img src="src/LViz.App/Assets/icon.png" alt="" width="40" align="absmiddle"> LViz — ZMK keymap editor and layer visualizer
 
-A cross-platform desktop overlay (Windows, macOS, Linux) that mirrors
-the active layer of your ZMK keyboard in real time over Raw HID.
+A cross-platform desktop app (Windows, macOS, Linux) for your ZMK
+keyboard. It edits your `.keymap` file, saving locally or as a commit
+to your zmk-config on GitHub, and, as a floating overlay, shows the
+active layer in real time over Raw HID.
 
 ![LViz overlaid on a browser, with the profile picker open](pics/3.png)
 
@@ -12,14 +14,19 @@ the active layer of your ZMK keyboard in real time over Raw HID.
 
 ## What it does
 
-LViz watches your keyboard's Raw HID endpoint and renders the live
-layer state as a floating, transparency-aware overlay on your desktop.
-It ships with physical layouts for seven popular ZMK boards, parses
-your `.keymap` to label the keys, draws combos on top, and lets you
-override any label by hand. On the two Moergo boards (Glove80 / GO60)
-it also loads the Layout Editor's `.json` export directly. It also pushes layer state **back** to the
-firmware: per-app auto-switch rules and a mouse-idle layer push are
-both first-class features.
+Since v3, LViz is a **keymap editor** as well as a viewer. Open your
+`.keymap` from disk or straight from your zmk-config repository on
+GitHub, change keys, layers and combos on a picture of your board, review
+the changes, and save. LViz writes a real `.keymap` file: it changes only
+the bindings, layers and combos you edited and leaves the rest of the file
+as it was, including comments, formatting and your `#define` names.
+
+It is still the overlay it was in v2: it labels the keys from your
+keymap, follows the active layer over Raw HID, draws combos on top, and
+lets you override any key label by hand. On the two Moergo boards (Glove80 /
+GO60) it also loads the Layout Editor's `.json` export, for viewing. It
+pushes layer state **back** to the firmware too: per-app auto-switch rules
+and a mouse-idle layer push.
 
 Forked from
 [moergo-layer-viz](https://github.com/ovandongen/moergo-layer-viz) and
@@ -36,24 +43,64 @@ all from scripts. See the
 
 ## Status
 
-Early release. The core features land green and the app is in daily
-use, but the public release is recent — expect rough edges. Bug
-reports and feedback are very welcome on the
+LViz 3 is in daily use on macOS, Windows and Linux. The keymap editor is
+new in this release, so keep your keymap under version control (or rely
+on the local backups) and report anything odd on the
 [issue tracker](https://github.com/ovandongen/LViz/issues).
+
+**Firmware.** The editor works on the `.keymap` file alone and needs no
+firmware changes. The live features (active layer, key-press highlighting,
+auto-switch and the mouse-idle layer push) need the Raw HID firmware modules
+described under [Firmware](#firmware). A guided setup for those modules,
+including flashing, is planned for the next release.
+
+**Not editable yet:**
+
+- Hold-tap and home-row-mod settings (tapping term, flavor, …). You can put
+  the keymap's own hold-taps on keys, but not change their definitions.
+- Macros: the same. You can use them on keys, but not edit them.
+- Conditional layers. A layer that a conditional layer, a combo or a
+  `#define` outside the layers refers to can't be deleted. If you just
+  changed the combo so it no longer uses the layer, save first, then delete.
+- Multi-select, drag-to-swap, copy/paste of keys, and reordering layers by
+  dragging their tabs (use Move left/right instead).
+- MoErgo Layout Editor `.json` keymaps (view only; edit the `.keymap`).
+- Board layouts are saved in LViz's app data. A copy you also saved into your
+  zmk-config folder isn't updated by later edits, and layouts are never
+  committed to GitHub (only keymaps are).
+
+**Other limits:**
+
+- The `.keymap` reader is lean: `#include` lines are skipped, function-like
+  `#define` macros aren't expanded, and recursive custom-behavior resolution
+  and `/delete-node/` aren't supported. Saving refuses a layer that calls a
+  function-like macro and names its line, rather than guessing.
+- Linux: no global show/hide hotkey (it needs per-WM cooperation that isn't
+  shipped). A locked Secret Service keyring isn't unlocked for you, so the
+  GitHub sign-in then lasts only until LViz quits.
 
 ## Supported boards
 
+Bundled physical layouts:
+
 | Board | Keys |
 | --- | ---: |
-| Corne (6-col, foostan) | 42 |
+| Corne (6-col) | 42 |
 | a_dux | 34 |
-| Kyria (6-col, rev3) | 50 |
+| Kyria (6-col) | 50 |
 | Lily58 | 58 |
 | Sofle | 60 |
 | Moergo GO60 | 60 |
 | Moergo Glove80 | 80 |
 
-Adding a board means dropping its physical-layout `dtsi` into
+**Any other board:** pick **My own board…** in the board picker. The layout
+wizard reads your zmk-config folder, or a single `.dtsi`, `.overlay` or
+`info.json` file, and builds a layout from a ZMK physical layout, a QMK /
+keymap-editor `info.json`, or (roughly) a matrix transform. With no usable
+files at all, describe the board (split, keys, columns, thumbs) and place the
+keys in the editor.
+
+Adding a bundled board means dropping its physical-layout `dtsi` into
 [src/LViz.Core/Resources/](src/LViz.Core/Resources/), declaring it as
 an `EmbeddedResource` in the csproj, and subclassing
 [DtsiKeyboardProfile](src/LViz.Core/Layout/DtsiKeyboardProfile.cs).
@@ -62,26 +109,105 @@ template to copy.
 
 ## Features
 
+### Keymap editor
+
+- **Edit mode.** Press the edit button to start. A banner shows the number of
+  changes, keys you changed are marked on the board, and undo/redo cover
+  every step. Nothing is written until you press **Save**, and you get a
+  **review dialog** first that lists every key, layer and combo change.
+  Quitting with unsaved changes asks first.
+- **Ring key editor** (the default). Double-click a key, or select it and
+  press Enter, and a ring of choices opens around it: key, hold-tap, layer,
+  Bluetooth, output, lighting, mouse, system, clear, and the keymap's own
+  behaviors. Each choice explains what it does as you point at it. The
+  ring's bottom-right button opens the classic **key dialog** for the same
+  key. **Settings → General → Ring key editor** switches the default to the
+  dialog.
+- **Behaviors with pickers:**
+  - keycodes, searchable and grouped, with "Used in this keymap" first,
+    modifier wraps (`LS(…)`, `LC(…)`, …), and a recorder that takes the key
+    you press on your computer keyboard;
+  - layers, for `&mo`, `&lt`, `&to`, `&tog`, `&sl`;
+  - named commands for `&bt` (including the profile number), `&out`,
+    `&rgb_ug`, `&mkp`, `&msc` and `&mmv`, plus `&bootloader`, `&sys_reset`
+    and `&caps_word`;
+  - the keymap's own hold-taps and macros. A hold-tap that always targets
+    the same layer, such as MoErgo's `&magic`, comes with that layer filled
+    in, so it's a one-click pick;
+  - **Custom binding** for anything else: type the binding, and LViz checks
+    it before it's accepted.
+- **Quick clears.** Select a key and press Delete to make it `&trans`, or
+  Shift+Delete to make it `&none`.
+- **Layers.** Add, duplicate, rename, move and delete layers from the
+  layer menu or with shortcuts. Every layer reference in the file is
+  renumbered in the file's own style: where the file names its layers with
+  `#define`s, those defines are kept and their values updated. Keys that
+  pointed at a deleted layer are cleared (undo brings them back). LViz's own
+  per-layer settings (colours, hidden tabs, key label overrides, auto-switch
+  rules) move with their layer when you save.
+- **Combos.** Add, edit and delete combos: pick the keys on a picture of the
+  board, then set the name, binding, timeout, layers, slow release and
+  require-prior-idle. The dialog warns about the usual pitfalls (the same
+  keys as another combo, more than four keys, a key in too many combos) and
+  won't save a combo with fewer than two keys or a clashing name.
+- **Saving:**
+  - local files: a backup of the previous version is kept in LViz's app data
+    (the newest 20 per keymap), and a file changed on disk since you started
+    editing asks before it is overwritten;
+  - GitHub: a commit straight to the branch, with a commit message generated
+    from your changes (editable in the review dialog). If the file changed on
+    GitHub in the meantime, LViz asks whether to reload or overwrite.
+
+### GitHub zmk-config
+
+- Sign in with GitHub (device code, via the "LViz for ZMK" GitHub App; LViz
+  only sees the repositories you install it on). The login is kept in the OS
+  keychain.
+- **Open from GitHub…** in the Load keymap menu: pick a repository and branch, and
+  LViz lists the keymaps it finds with the board each one fits.
+- Repos are cached locally, so keymaps open offline. At startup, on a board
+  switch and on Reload, LViz checks GitHub in the background and loads a
+  newer commit when there is one.
+
+### Layouts
+
+- **User layouts** for boards LViz doesn't bundle, made by the layout
+  wizard (see [Supported boards](#supported-boards)) and stored as
+  `.layout.json` in LViz's app data, with a ZMK physical-layout `.dtsi`
+  next to it (unless the layout came from one). The wizard can save a copy
+  into your zmk-config's `config` folder too, so a second computer picks
+  the layout up without the wizard.
+- **Layout importers:** ZMK `zmk,physical-layout` `.dtsi`/`.overlay`,
+  `info.json` (QMK / keymap-editor), and the matrix transform as a rough
+  start.
+- **Key-position editor** (in the wizard and under **Edit layout…** in the
+  board picker): drag keys to move them, rotate them by the handle, mirror
+  one half onto the other, and snap to neighbouring keys' edges and centres
+  or to a 0.25u grid.
+
+### Overlay
+
 - Real-time layer mirror over Raw HID
-- `.keymap` parser (preprocess → devicetree → interpret). The v1
-  parser is intentionally lean — `#include` resolution, function-like
-  `#define` macros, recursive custom-behavior resolution, and
-  `/delete-node/` aren't supported yet, so heavily macro'd keymaps may
-  need flattening first
-- Moergo Layout Editor `.json` import (Glove80 / GO60 only) — load a
-  glove80.com / go60 export directly, no `.keymap` conversion needed
-- Per-app auto-switch rules with a configurable double-tap exit key
-- Mouse-idle layer push (e.g. flip to a Mouse layer while you're
-  moving the pointer; revert when it goes idle)
-- Combo overlay — numbered pills on participating keys, with a
+- Recent keymaps per board, and per-board hiding of layer tabs
+- Combo overlay: numbered pills on participating keys, with a
   matching legend strip
 - Per-key label overrides (main label, subscript, top-left badge,
   font size, bold) + FontAwesome icon picker (~1895 icons)
+- Per-app auto-switch rules with a configurable double-tap exit key
+- Mouse-idle layer push (e.g. flip to a Mouse layer while you're
+  moving the pointer; revert when it goes idle)
 - Native global show/hide hotkey (macOS Carbon, Windows User32; Linux
   not yet — needs per-WM cooperation that isn't shipped)
 - System tray icon, optionally tinted with the active layer's colour
 - Transparent custom chrome with 8-way edge resize and a position-aware
   toolbar/tabs swap
+
+### General
+
+- **Keyboard shortcuts** window: the toolbar's Help (?) button →
+  **Keyboard shortcuts…**
+- `.keymap` reader (preprocess → devicetree → interpret) with object-like
+  `#define`s, and the Moergo Layout Editor `.json` import (Glove80 / GO60)
 - In-app auto-updates via Velopack
 
 ## Installing
