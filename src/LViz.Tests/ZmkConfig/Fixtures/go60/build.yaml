@@ -1,0 +1,4 @@
+include:
+  - board: go60_lh
+    shield: raw_hid_adapter
+  - board: go60_rh

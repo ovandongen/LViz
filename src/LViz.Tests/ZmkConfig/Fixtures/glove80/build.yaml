@@ -1,0 +1,4 @@
+include:
+  - board: glove80_lh
+    shield: raw_hid_adapter
+  - board: glove80_rh

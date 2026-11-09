@@ -1,0 +1,7 @@
+# GitHub Actions build matrix (ZMK v0.3).
+# nice!view wired to P0.06 (CS), P0.17 (MOSI), P0.20 (SCK), VCC, GND
+# (= the nice_view_adapter defaults for nice_nano_v2).
+---
+include:
+  - board: nice_nano_v2
+    shield: slabwing nice_view_adapter nice_view

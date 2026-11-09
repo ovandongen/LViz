@@ -1,0 +1,6 @@
+if SHIELD_SLABWING
+
+config ZMK_KEYBOARD_NAME
+    default "Slabwing"
+
+endif

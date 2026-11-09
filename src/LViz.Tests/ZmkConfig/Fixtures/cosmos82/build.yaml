@@ -1,0 +1,15 @@
+# Build matrix for the Cosmos 82.
+#
+# Both halves must be flashed before the split will report keys - the central
+# stays quiet until the peripheral connects.
+---
+include:
+  - board: nice_nano_v2
+    shield: cosmos82_left      # peripheral
+  - board: nice_nano_v2
+    shield: cosmos82_right     # central (USB + Stage-2 cursor trackball)
+
+  # Wipes stored BLE bonds. Flash to BOTH halves if they refuse to pair, then
+  # reflash the real firmware. Worth having built ahead of time.
+  - board: nice_nano_v2
+    shield: settings_reset

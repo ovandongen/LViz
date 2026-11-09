@@ -30,6 +30,8 @@
     <EmbeddedResource Include="Keymap\Fixtures\*.keymap" />
     <EmbeddedResource Include="Keymap\Fixtures\*.json" />
     <EmbeddedResource Include="Layout\Fixtures\*" />
+    <!-- zmk-config folders (batch 024): read from disk by ZmkConfigInspector, so copied, not embedded. -->
+    <None Include="ZmkConfig\Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,22 @@
+# Copyright (c) 2026 OD
+# SPDX-License-Identifier: MIT
+
+# The RIGHT half is the central: it has the USB port and will host the cursor
+# trackball in Stage 2. Only the central gets a keyboard name.
+if SHIELD_COSMOS82_RIGHT
+
+# Must be less than 16 characters long!
+config ZMK_KEYBOARD_NAME
+    default "Cosmos82"
+
+config ZMK_SPLIT_ROLE_CENTRAL
+    default y
+
+endif
+
+if SHIELD_COSMOS82_LEFT || SHIELD_COSMOS82_RIGHT
+
+config ZMK_SPLIT
+    default y
+
+endif

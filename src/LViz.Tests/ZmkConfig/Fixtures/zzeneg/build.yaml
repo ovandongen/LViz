@@ -1,0 +1,6 @@
+---
+include:
+  - board: nice_nano_v2
+    shield: corne_left raw_hid_adapter
+  - board: nice_nano_v2
+    shield: corne_right

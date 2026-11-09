@@ -1,0 +1,22 @@
+# Synthetic: the module setup from the zmk-hid-viz README (zzeneg raw-hid).
+manifest:
+  remotes:
+    - name: zmkfirmware
+      url-base: https://github.com/zmkfirmware
+    - name: zzeneg
+      url-base: https://github.com/zzeneg
+    - name: ovandongen
+      url-base: https://github.com/ovandongen
+  projects:
+    - name: zmk
+      remote: zmkfirmware
+      revision: main
+      import: app/west.yml
+    - name: zmk-raw-hid
+      remote: zzeneg
+      revision: main
+    - name: zmk-hid-viz
+      remote: ovandongen
+      revision: main
+  self:
+    path: config
