@@ -122,6 +122,10 @@ public partial class MainWindowViewModel
         OnPropertyChanged(nameof(CanStartEdit));
         OnPropertyChanged(nameof(EditButtonTooltip));
         StartEditCommand.NotifyCanExecuteChanged();
+
+        // The live-features item and hint follow the newly loaded keymap's
+        // zmk-config (or its absence).
+        RefreshLiveFeatures();
     }
 
     /// <summary>
@@ -138,6 +142,7 @@ public partial class MainWindowViewModel
         ActiveLayerIndex = 0;
         HasLayoutLoaded = false;
         HasUnmatchedKeymap = false;
+        RefreshLiveFeatures();
     }
 
     /// <summary>

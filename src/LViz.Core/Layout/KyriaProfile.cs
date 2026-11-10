@@ -12,8 +12,6 @@ public sealed class KyriaProfile() : DtsiKeyboardProfile(
     id: "Kyria",
     displayName: "Kyria (50, 6-col)",
     keyCount: 50,
-    vendorId: ZmkHidIds.VendorId,
-    productId: ZmkHidIds.ProductId,
     hidNameSubstring: "Kyria",
     dtsiResourceName: "LViz.Core.Resources.kyria.dtsi",
     midlineCentiU: 800,

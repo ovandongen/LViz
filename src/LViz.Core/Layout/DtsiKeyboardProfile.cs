@@ -10,8 +10,6 @@ namespace LViz.Core.Layout;
 /// </summary>
 public class DtsiKeyboardProfile : IKeyboardProfile
 {
-    private readonly int _vendorId;
-    private readonly int _productId;
     private readonly string _hidNameSubstring;
     private readonly int _rightmostMatrixXCentiU;
     private readonly IReadOnlyDictionary<int, string>? _thumbLabels;
@@ -26,8 +24,6 @@ public class DtsiKeyboardProfile : IKeyboardProfile
     /// <param name="id">Stable id matching <c>UserSettings.Keyboard</c> (e.g. "GO60", "Glove80").</param>
     /// <param name="displayName">UI label.</param>
     /// <param name="keyCount">Total binding count.</param>
-    /// <param name="vendorId">USB HID vendor id used for device matching.</param>
-    /// <param name="productId">USB HID product id used for device matching.</param>
     /// <param name="hidNameSubstring">Case-insensitive product-name substring (e.g. "Go60", "Glove80").</param>
     /// <param name="dtsiResourceName">Embedded-resource name of the dtsi geometry file.</param>
     /// <param name="midlineCentiU">Centi-unit X that separates left-hand keys from right-hand keys.</param>
@@ -39,8 +35,6 @@ public class DtsiKeyboardProfile : IKeyboardProfile
         string id,
         string displayName,
         int keyCount,
-        int vendorId,
-        int productId,
         string hidNameSubstring,
         string dtsiResourceName,
         int midlineCentiU,
@@ -54,8 +48,6 @@ public class DtsiKeyboardProfile : IKeyboardProfile
         KeyCount = keyCount;
         CanvasWidth = canvasWidth;
         CanvasHeight = canvasHeight;
-        _vendorId = vendorId;
-        _productId = productId;
         _hidNameSubstring = hidNameSubstring;
         _rightmostMatrixXCentiU = rightmostMatrixXCentiU;
         _thumbLabels = thumbLabels;
@@ -74,8 +66,7 @@ public class DtsiKeyboardProfile : IKeyboardProfile
     public IReadOnlyList<KeyPosition> Keys { get; }
 
     public bool MatchesHidDevice(int vendorId, int productId, string? productName) =>
-        vendorId == _vendorId
-        && productId == _productId
+        ZmkHidIds.Matches(vendorId, productId)
         && NameMatches(productName);
 
     public bool NameMatches(string? productName) =>

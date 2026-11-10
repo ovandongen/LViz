@@ -47,6 +47,14 @@ internal static class AppTheme
     public static readonly IImmutableSolidColorBrush AccentGoldSoftBrush = Brush(AccentGoldSoftHex);
     public static readonly IImmutableSolidColorBrush AccentGoldTetherBrush = Brush(AccentGoldTetherHex);
 
+    // Same reason for the module setup window (ModuleSetupWindowTests).
+    public static readonly IImmutableSolidColorBrush BgBaseBrush = Brush(BgBaseHex);
+    public static readonly IImmutableSolidColorBrush TextBrush = Brush(TextHex);
+    public static readonly IImmutableSolidColorBrush TextSubtleBrush = Brush(TextSubtleHex);
+    public static readonly IImmutableSolidColorBrush AccentGreenBrush = Brush(AccentGreenHex);
+    public static readonly IImmutableSolidColorBrush AccentYellowBrush = Brush(AccentYellowHex);
+    public static readonly IImmutableSolidColorBrush AccentRedBrush = Brush(AccentRedHex);
+
     // ─── Tab chrome (custom, sister-app port) ───────────────────────────
     public const string TabBgHex = "#363649";
     public const string TabBorderHex = "#4A4A63";

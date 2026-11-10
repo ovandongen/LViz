@@ -15,8 +15,10 @@ namespace LViz.Tests.GitHub;
 /// <summary>
 /// <see cref="GitHubKeymapService"/> — tying client, session and cache
 /// together: restore-once, sign-in completion, sign-out wiping the cache,
-/// the open flow with its offline fallback, and the save flow (commit,
-/// conflict, overwrite, keeping the cache copy in step). Runs on a real
+/// the open flow with its offline fallback, the save flow (commit,
+/// conflict, overwrite, keeping the cache copy in step), and the wizard's
+/// multi-file save (the four Git Data calls as one commit, conflict with no
+/// overwrite). Runs on a real
 /// <see cref="GitHubClient"/> over <see cref="FakeHttpHandler"/>, an
 /// <see cref="InMemorySecretStore"/>, a temp cache root and tarballs built
 /// in-test with <see cref="TarWriter"/>, so nothing touches the network.
@@ -45,10 +47,23 @@ public sealed class GitHubKeymapServiceTests : IDisposable
 
     private const string CommitSha = "cccccccccccccccccccccccccccccccccccccccc";
 
+    /// <summary>The Git Data tree SHAs a <see cref="IGitHubKeymapService.SaveFilesAsync"/>
+    /// four-step trades: the base commit's tree, then the created tree.</summary>
+    private const string BaseTreeSha = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+
+    private const string NewTreeSha = "ffffffffffffffffffffffffffffffffffffffff";
+
     private static readonly byte[] NewContent = "layers { edited }\n"u8.ToArray();
 
     private static readonly GitHubKeymapRef Keymap =
         new("o", "r", "main", "config/cosmos82.keymap");
+
+    /// <summary>The two files the module wizard would commit in one go.</summary>
+    private static readonly GitHubFileWrite[] ModuleFiles =
+    [
+        new("config/west.yml", "west: modules added\n"),
+        new("build.yaml", "shield: raw_hid_adapter\n"),
+    ];
 
     private readonly string _root = Path.Combine(
         Path.GetTempPath(), $"lviz-keymap-service-tests-{Guid.NewGuid():N}");
@@ -292,6 +307,120 @@ public sealed class GitHubKeymapServiceTests : IDisposable
         Assert.Equal("keymap body", File.ReadAllText(_service.LocalPathFor(Keymap)!));
     }
 
+    // ---- SaveFilesAsync ----
+
+    [Fact]
+    public async Task SaveFiles_SignedIn_CommitsOnceAndUpdatesCache()
+    {
+        await CachedCopyAsync();
+        RouteGitDataCommit();
+
+        var result = await _service.SaveFilesAsync(
+            "o", "r", "main", Sha1, ModuleFiles, "LViz: set up modules");
+
+        var saved = Assert.IsType<GitHubSaveResult.Saved>(result);
+        Assert.Equal(CommitSha, saved.CommitSha);
+
+        // Exactly the four Git Data calls, in order — one commit, one ref move.
+        Assert.Equal(
+            new[]
+            {
+                "/repos/o/r/git/commits/" + Sha1,
+                "/repos/o/r/git/trees",
+                "/repos/o/r/git/commits",
+                "/repos/o/r/git/refs/heads/main",
+            },
+            SentPaths());
+        var patch = Assert.Single(_handler.Requests, entry => entry.Request.Method == HttpMethod.Patch);
+        Assert.Equal("/repos/o/r/git/refs/heads/main", patch.Request.RequestUri!.PathAndQuery);
+
+        // Both committed files landed in the cache folder — west.yml byte for
+        // byte (UTF-8 without BOM) — and because the commit's parent was the
+        // commit the copy was downloaded at, the folder now counts as current
+        // at the new commit.
+        var folder = _service.CacheFolderFor("o", "r", "main");
+        Assert.Equal(
+            Encoding.UTF8.GetBytes("west: modules added\n"),
+            File.ReadAllBytes(Path.Combine(folder, "config", "west.yml")));
+        Assert.Equal("shield: raw_hid_adapter\n", File.ReadAllText(Path.Combine(folder, "build.yaml")));
+        Assert.Equal(CommitSha, CachedSha());
+    }
+
+    [Fact]
+    public async Task SaveFiles_RefPatch422_ReportsConflict_AndLeavesCache()
+    {
+        await CachedCopyAsync();
+        RouteGitDataCommit();
+        // The branch no longer points at the base commit: GitHub refuses the move.
+        Route(
+            "/repos/o/r/git/refs/heads/main",
+            () => FakeHttpHandler.Json(
+                """{"message":"Refs must be fast forward."}""", (HttpStatusCode)422));
+
+        var result = await _service.SaveFilesAsync(
+            "o", "r", "main", Sha1, ModuleFiles, "LViz: set up modules");
+
+        Assert.IsType<GitHubSaveResult.Conflict>(result);
+
+        // The ref never moved, so nothing was written — the cache copies keep
+        // their old text and no new file appears.
+        var folder = _service.CacheFolderFor("o", "r", "main");
+        Assert.Equal("keymap body", File.ReadAllText(_service.LocalPathFor(Keymap)!));
+        Assert.False(File.Exists(Path.Combine(folder, "config", "west.yml")));
+        Assert.False(File.Exists(Path.Combine(folder, "build.yaml")));
+        Assert.Equal(Sha1, CachedSha());
+    }
+
+    [Fact]
+    public async Task SaveFiles_SignedOut_FailsUnauthorized_WithoutHttpRequest()
+    {
+        var result = await _service.SaveFilesAsync(
+            "o", "r", "main", Sha1, ModuleFiles, "LViz: set up modules");
+
+        var failed = Assert.IsType<GitHubSaveResult.Failed>(result);
+        Assert.Equal(GitHubErrorKind.Unauthorized, failed.Kind);
+        Assert.Equal("Not signed in", failed.Message);
+        Assert.Empty(_handler.Requests);
+    }
+
+    [Fact]
+    public async Task SaveFiles_TreePost500_FailsUnexpected()
+    {
+        await CachedCopyAsync();
+        RouteGitDataCommit();
+        Route(
+            "/repos/o/r/git/trees",
+            () => FakeHttpHandler.Json("""{"message":"boom"}""", HttpStatusCode.InternalServerError));
+
+        var result = await _service.SaveFilesAsync(
+            "o", "r", "main", Sha1, ModuleFiles, "LViz: set up modules");
+
+        var failed = Assert.IsType<GitHubSaveResult.Failed>(result);
+        Assert.Equal(GitHubErrorKind.Unexpected, failed.Kind);
+        Assert.Contains("/repos/o/r/git/trees", failed.Message);
+        Assert.DoesNotContain(AccessToken, failed.Message);
+
+        // The tree write failed, so neither the commit nor the ref was called.
+        Assert.Equal(
+            new[] { "/repos/o/r/git/commits/" + Sha1, "/repos/o/r/git/trees" },
+            SentPaths());
+    }
+
+    [Fact]
+    public async Task SaveFiles_CancelledToken_PropagatesCancellation_WithoutHttpRequest()
+    {
+        await CachedCopyAsync();
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => _service.SaveFilesAsync(
+                "o", "r", "main", Sha1, ModuleFiles, "LViz: set up modules", cancelled.Token));
+
+        Assert.Empty(_handler.Requests);
+        Assert.Equal("keymap body", File.ReadAllText(_service.LocalPathFor(Keymap)!));
+    }
+
     // ---- sign out ----
 
     [Fact]
@@ -382,6 +511,22 @@ public sealed class GitHubKeymapServiceTests : IDisposable
         Route(
             "/repos/o/r/tarball/" + sha,
             () => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(payload) });
+
+    /// <summary>
+    /// Routes the four Git Data calls a <see cref="SaveFilesAsync"/> test makes
+    /// for a commit on top of <see cref="Sha1"/>: base commit (with its tree),
+    /// tree POST, commit POST, and the ref PATCH moving the branch to
+    /// <see cref="CommitSha"/>. A test overrides one route to make it fail.
+    /// </summary>
+    private void RouteGitDataCommit()
+    {
+        Route(
+            "/repos/o/r/git/commits/" + Sha1,
+            () => FakeHttpHandler.Json($$$"""{"sha":"{{{Sha1}}}","tree":{"sha":"{{{BaseTreeSha}}}"}}"""));
+        Route("/repos/o/r/git/trees", () => FakeHttpHandler.Json($$"""{"sha":"{{NewTreeSha}}"}"""));
+        Route("/repos/o/r/git/commits", () => FakeHttpHandler.Json($$"""{"sha":"{{CommitSha}}"}"""));
+        Route("/repos/o/r/git/refs/heads/main", () => FakeHttpHandler.Json("{}"));
+    }
 
     /// <summary>
     /// Signed in with the keymap's branch already downloaded at commit

@@ -34,6 +34,9 @@ public interface IMainWindowShell
     /// <summary>Run the layout wizard; the saved layout, or null on cancel.</summary>
     Task<LayoutWizardResult?> RunLayoutWizardAsync(LayoutWizardContext context);
 
+    /// <summary>Run the live-features setup wizard; true when it saved changes.</summary>
+    Task<bool> RunModuleSetupAsync(ModuleSetupContext context);
+
     /// <summary>Run the GitHub sign-in / repo / keymap picker; the chosen keymap, or null.</summary>
     Task<GitHubOpenSelection?> PickGitHubKeymapAsync(Func<IReadOnlyCollection<string>> attachedHidNames);
 

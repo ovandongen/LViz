@@ -7,6 +7,7 @@ using LViz.App.Services;
 using LViz.App.Services.GitHub;
 using LViz.App.ViewModels;
 using LViz.Core.Layout;
+using LViz.Core.Persistence;
 using LViz.Core.Settings;
 
 namespace LViz.App.Views;
@@ -146,6 +147,30 @@ internal sealed class AvaloniaMainWindowShell : IMainWindowShell
             Topmost = owner.Topmost,
         };
         return await dlg.ShowDialog<LayoutWizardResult?>(owner);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> RunModuleSetupAsync(ModuleSetupContext context)
+    {
+        var owner = Owner;
+        var dlgVm = new ModuleSetupViewModel(
+            context,
+            _services.GetRequiredService<IGitHubKeymapService>(),
+            _services.GetRequiredService<KeymapBackupStore>(),
+            Guid.NewGuid)
+        {
+            // The Done step opens the config's GitHub Actions page.
+            OpenUrl = url => _services.GetRequiredService<IHostActionExecutor>().Launch(url),
+        };
+        // The check step reads (and for GitHub fetches) the config straight away.
+        _ = dlgVm.StartAsync();
+        var dlg = new ModuleSetupWindow
+        {
+            DataContext = dlgVm,
+            Topmost = owner.Topmost,
+        };
+        // Closing with the window's ✕ yields the default bool — false.
+        return await dlg.ShowDialog<bool>(owner);
     }
 
     /// <inheritdoc />

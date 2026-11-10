@@ -87,6 +87,11 @@ public class SettingsViewModelMainPropertyCoverageTests
         // Picker item visibility, main window only ("Edit layout…" flyout item).
         "CanEditLayout",
 
+        // Live-features (module setup) affordances, main-window-only state:
+        // the flyout item and the status-bar hint.
+        "CanSetUpLiveFeatures",
+        "ShowLiveFeaturesHint",
+
         // Recents flyout child view-model, bound directly in the main window's
         // load menu; settings never renders recents.
         "Recents",

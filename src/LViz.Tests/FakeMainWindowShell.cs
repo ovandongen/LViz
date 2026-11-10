@@ -22,6 +22,7 @@ internal sealed class FakeMainWindowShell : IMainWindowShell
     public bool ClipboardAvailable { get; set; } = true;
     public Exception? ClipboardFailure { get; set; }
     public LayoutWizardResult? WizardAnswer { get; set; }
+    public bool ModuleSetupAnswer { get; set; }
     public GitHubOpenSelection? GitHubAnswer { get; set; }
     public UserLayoutFile? EditLayoutAnswer { get; set; }
     public LabelEditAnswer<KeyLabelOverride>? KeyLabelAnswer { get; set; }
@@ -29,6 +30,7 @@ internal sealed class FakeMainWindowShell : IMainWindowShell
 
     public List<string> CopiedTexts { get; } = [];
     public List<LayoutWizardContext> WizardContexts { get; } = [];
+    public List<ModuleSetupContext> ModuleSetupContexts { get; } = [];
     public List<LayoutEditContext> EditLayoutContexts { get; } = [];
     public List<(int Layer, int Key, string Hint, KeyLabelOverride? Existing)> KeyLabelRequests { get; } = [];
     public List<(string Key, string DefaultLabel, ComboLabelOverride? Existing)> ComboLabelRequests { get; } = [];
@@ -59,6 +61,12 @@ internal sealed class FakeMainWindowShell : IMainWindowShell
     {
         WizardContexts.Add(context);
         return Task.FromResult(WizardAnswer);
+    }
+
+    public Task<bool> RunModuleSetupAsync(ModuleSetupContext context)
+    {
+        ModuleSetupContexts.Add(context);
+        return Task.FromResult(ModuleSetupAnswer);
     }
 
     public Task<GitHubOpenSelection?> PickGitHubKeymapAsync(Func<IReadOnlyCollection<string>> attachedHidNames)

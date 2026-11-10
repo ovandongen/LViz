@@ -13,8 +13,6 @@ public sealed class Glove80Profile() : DtsiKeyboardProfile(
     id: "Glove80",
     displayName: "Moergo Glove80",
     keyCount: 80,
-    vendorId: ZmkHidIds.VendorId,
-    productId: ZmkHidIds.ProductId,
     hidNameSubstring: "Glove80",
     dtsiResourceName: "LViz.Core.Resources.glove80.dtsi",
     midlineCentiU: 850,
