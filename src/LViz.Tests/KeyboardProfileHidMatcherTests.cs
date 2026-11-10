@@ -5,10 +5,10 @@ namespace LViz.Tests;
 
 /// <summary>
 /// Verifies the per-profile HID device matcher used to scope Raw HID
-/// discovery to whichever keyboard the user has selected. All ZMK boards
-/// register under the same VID/PID (0x16C0/0x27DB — the shared
-/// pid.codes ZMK identifier), so the matcher has to combine the IDs with
-/// a case-insensitive **substring** match on the product name.
+/// discovery to whichever keyboard the user has selected. ZMK boards share
+/// two VID/PID pairs (MoErgo's 0x16C0/0x27DB and upstream ZMK's default
+/// 0x1D50/0x615E), so the matcher has to combine the IDs with a
+/// case-insensitive **substring** match on the product name.
 /// <para>Substring (rather than prefix) is necessary because Linux's
 /// hidraw layer prepends the manufacturer name — the device shows up as
 /// e.g. <c>"foostan Corne Left"</c> there. macOS and Windows expose the
@@ -45,6 +45,23 @@ public class KeyboardProfileHidMatcherTests
         var p = new CorneProfile();
         Assert.False(p.MatchesHidDevice(0x046D, ZmkPid, "Corne"));   // wrong VID
         Assert.False(p.MatchesHidDevice(ZmkVid, 0x1234, "Corne"));   // wrong PID
+    }
+
+    [Fact]
+    public void Matches_UpstreamZmkIds()
+    {
+        // Upstream ZMK's default USB identifier (a Cosmos82 on zmkfirmware
+        // v0.3 reports 1D50:615E); only the MoErgo pair matched before.
+        var p = new CorneProfile();
+        Assert.True(p.MatchesHidDevice(0x1D50, 0x615E, "Corne"));
+    }
+
+    [Fact]
+    public void DoesNotMatch_AMixedIdPair()
+    {
+        var p = new CorneProfile();
+        Assert.False(p.MatchesHidDevice(0x16C0, 0x615E, "Corne"));
+        Assert.False(p.MatchesHidDevice(0x1D50, 0x27DB, "Corne"));
     }
 
     [Fact]

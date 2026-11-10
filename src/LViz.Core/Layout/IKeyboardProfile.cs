@@ -34,9 +34,9 @@ public interface IKeyboardProfile
     /// from a different connected board (e.g. Go60 plugged in alongside a
     /// Glove80 — without this filter, layer reports would cross-contaminate).
     /// <para>
-    /// Both Moergo boards register under the shared pid.codes ZMK identifier
-    /// (VID 0x16C0 / PID 0x27DB), so the implementation also has to compare
-    /// the product name. Use a *case-insensitive prefix* match — the suffix
+    /// ZMK boards share two VID/PID pairs (<see cref="ZmkHidIds"/>: MoErgo's
+    /// 0x16C0/0x27DB and upstream ZMK's 0x1D50/0x615E), so the implementation
+    /// also has to compare the product name. Use a *case-insensitive prefix* match — the suffix
     /// differs by transport (USB exposes "Go60 Left" because the cable side
     /// is the host; BLE exposes "Go60" because only the central is visible)
     /// and could change between firmware revisions.

@@ -655,9 +655,13 @@ LViz-specific (extend this list as we hit more):
   GHSA-xrw6-gwf8-vvr9). Don't downgrade. If Avalonia ever bumps its own
   pin past 0.21.3, drop the override.
 - **HID profile matching is by name substring**
-  (`DtsiKeyboardProfile.hidNameSubstring`), not VID/PID alone — multiple
-  ZMK boards share the pid.codes VID/PID. When adding a board, pick a
-  substring distinct enough not to collide with siblings.
+  (`DtsiKeyboardProfile.hidNameSubstring`), not VID/PID alone — ZMK boards
+  share two VID/PID pairs, both accepted by `ZmkHidIds.Matches`: MoErgo's
+  `0x16C0/0x27DB` and upstream ZMK's default `0x1D50/0x615E` (Cosmos,
+  Slabwing). Accepting only the MoErgo pair left every upstream board
+  "searching" while the capability bus opened it as a foreign device. When
+  adding a board, pick a substring distinct enough not to collide with
+  siblings.
 - **macOS Velopack `.pkg` is unsigned → Gatekeeper blocks first install.**
   Expected behavior until we ship a Developer ID cert (deferred — see
   velopack plan). User bypass: System Settings → Privacy & Security →

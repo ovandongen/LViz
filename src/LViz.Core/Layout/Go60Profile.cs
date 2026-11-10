@@ -10,8 +10,6 @@ public sealed class Go60Profile() : DtsiKeyboardProfile(
     id: "GO60",
     displayName: "Moergo GO60",
     keyCount: 60,
-    vendorId: ZmkHidIds.VendorId,
-    productId: ZmkHidIds.ProductId,
     hidNameSubstring: "Go60",
     dtsiResourceName: "LViz.Core.Resources.go60.dtsi",
     midlineCentiU: 850,

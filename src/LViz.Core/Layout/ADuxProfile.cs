@@ -11,8 +11,6 @@ public sealed class ADuxProfile() : DtsiKeyboardProfile(
     id: "a_dux",
     displayName: "a_dux (34)",
     keyCount: 34,
-    vendorId: ZmkHidIds.VendorId,
-    productId: ZmkHidIds.ProductId,
     hidNameSubstring: "a_dux",
     dtsiResourceName: "LViz.Core.Resources.a_dux.dtsi",
     midlineCentiU: 600,

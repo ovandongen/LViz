@@ -70,8 +70,7 @@ public sealed class UserLayoutProfile : IKeyboardProfile
     public IReadOnlyList<KeyPosition> Keys { get; }
 
     public bool MatchesHidDevice(int vendorId, int productId, string? productName) =>
-        vendorId == ZmkHidIds.VendorId
-        && productId == ZmkHidIds.ProductId
+        ZmkHidIds.Matches(vendorId, productId)
         && NameMatches(productName);
 
     /// <summary>

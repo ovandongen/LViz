@@ -11,8 +11,6 @@ public sealed class SofleProfile() : DtsiKeyboardProfile(
     id: "Sofle",
     displayName: "Sofle (60)",
     keyCount: 60,
-    vendorId: ZmkHidIds.VendorId,
-    productId: ZmkHidIds.ProductId,
     hidNameSubstring: "Sofle",
     dtsiResourceName: "LViz.Core.Resources.sofle.dtsi",
     midlineCentiU: 700,

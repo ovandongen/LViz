@@ -10,8 +10,6 @@ public sealed class Lily58Profile() : DtsiKeyboardProfile(
     id: "Lily58",
     displayName: "Lily58 (58)",
     keyCount: 58,
-    vendorId: ZmkHidIds.VendorId,
-    productId: ZmkHidIds.ProductId,
     // Use "Lily58" (not "Lily") so we don't collide with other Lily-prefixed
     // ZMK boards under the shared VID/PID.
     hidNameSubstring: "Lily58",

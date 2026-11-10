@@ -10,8 +10,6 @@ public sealed class CorneProfile() : DtsiKeyboardProfile(
     id: "Corne",
     displayName: "Corne (6-col)",
     keyCount: 42,
-    vendorId: ZmkHidIds.VendorId,
-    productId: ZmkHidIds.ProductId,
     hidNameSubstring: "Corne",
     dtsiResourceName: "LViz.Core.Resources.corne.dtsi",
     midlineCentiU: 700,

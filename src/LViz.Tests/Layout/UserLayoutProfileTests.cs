@@ -151,4 +151,14 @@ public sealed class UserLayoutProfileTests
         Assert.False(profile.MatchesHidDevice(ZmkHidIds.VendorId + 1, ZmkHidIds.ProductId, "Slabwing BLE"));
         Assert.False(profile.MatchesHidDevice(ZmkHidIds.VendorId, ZmkHidIds.ProductId, "Glove80"));
     }
+
+    [Fact]
+    public void MatchesHidDevice_AcceptsUpstreamZmkIds()
+    {
+        // What a Cosmos82 on upstream ZMK reports: 1D50:615E "Cosmos82".
+        var profile = new UserLayoutProfile(Layout(name: "Cosmos82", hidName: "Cosmos82"));
+
+        Assert.True(profile.MatchesHidDevice(ZmkHidIds.UpstreamVendorId, ZmkHidIds.UpstreamProductId, "Cosmos82"));
+        Assert.False(profile.MatchesHidDevice(ZmkHidIds.UpstreamVendorId, ZmkHidIds.UpstreamProductId, "Glove80"));
+    }
 }
