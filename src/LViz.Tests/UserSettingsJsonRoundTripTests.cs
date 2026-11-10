@@ -551,4 +551,33 @@ public class UserSettingsJsonRoundTripTests
             if (File.Exists(path)) File.Delete(path);
         }
     }
+
+    [Fact]
+    public void Load_MissingDismissedLiveFeatureHints_ResolvesToEmpty()
+    {
+        // Settings files written before the live-features hint exist carry no
+        // DismissedLiveFeatureHints key. The default initializer kicks in.
+        var json = """{"SchemaVersion": 1, "Keyboard": "GO60"}""";
+
+        var parsed = JsonSerializer.Deserialize<UserSettings>(json, Options);
+
+        Assert.NotNull(parsed);
+        Assert.Empty(parsed!.DismissedLiveFeatureHints);
+    }
+
+    [Fact]
+    public void RoundTrip_PreservesDismissedLiveFeatureHints()
+    {
+        var original = new UserSettings
+        {
+            Keyboard = "Corne",
+            DismissedLiveFeatureHints = ["/home/u/zmk-config", "github:ovandongen/zmk-config-slabwing:main"],
+        };
+
+        var json = JsonSerializer.Serialize(original, Options);
+        var parsed = JsonSerializer.Deserialize<UserSettings>(json, Options);
+
+        Assert.NotNull(parsed);
+        Assert.Equal(original.DismissedLiveFeatureHints, parsed!.DismissedLiveFeatureHints);
+    }
 }

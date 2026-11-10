@@ -30,6 +30,13 @@ public sealed class GitHubRepoCacheTests : IDisposable
     private static readonly GitHubKeymapRef Keymap =
         new("o", "r", "main", "config/cosmos82.keymap");
 
+    /// <summary>The two files a module-setup commit would write.</summary>
+    private static readonly GitHubFileWrite[] ModuleFiles =
+    [
+        new("config/west.yml", "west body"),
+        new("build.yaml", "shield: lviz"),
+    ];
+
     private readonly string _root = Path.Combine(
         Path.GetTempPath(), $"lviz-repo-cache-tests-{Guid.NewGuid():N}");
     private readonly FakeHttpHandler _handler = new();
@@ -342,6 +349,63 @@ public sealed class GitHubRepoCacheTests : IDisposable
         Assert.NotNull(local);
         Assert.Equal(Path.Combine(_root, "o", "r", "main", "config", "new", "x.keymap"), local);
         Assert.Equal("fresh", File.ReadAllText(local!));
+    }
+
+    // ---- ApplyCommittedFiles ----
+
+    [Fact]
+    public async Task ApplyCommittedFiles_ParentMatchesCached_WritesAllFilesAndRecordsCommit()
+    {
+        var cache = await CachedAtSha1Async();
+        var folder = cache.FolderFor("o", "r", "main");
+
+        cache.ApplyCommittedFiles(
+            "o", "r", "main", ModuleFiles, new GitHubTreeCommitResult(Sha2, Sha1));
+
+        Assert.Equal("west body", File.ReadAllText(Path.Combine(folder, "config", "west.yml")));
+        Assert.Equal("shield: lviz", File.ReadAllText(Path.Combine(folder, "build.yaml")));
+        Assert.Equal(Sha2, cache.CachedSha("o", "r", "main"));
+
+        // Both files landed, the untouched keymap stayed, nothing else appeared.
+        Assert.Equal(
+            new[]
+            {
+                GitHubRepoCache.InfoFileName,
+                "build.yaml",
+                Path.Combine("config", "cosmos82.keymap"),
+                Path.Combine("config", "west.yml"),
+            },
+            ListedFiles(folder));
+    }
+
+    [Fact]
+    public async Task ApplyCommittedFiles_ParentIsAnotherCommit_WritesFilesAndKeepsCachedSha()
+    {
+        var cache = await CachedAtSha1Async();
+        var folder = cache.FolderFor("o", "r", "main");
+        var infoBefore = InfoText(folder);
+
+        // Someone else committed in between: the wizard sees its own files, and
+        // the untouched SHA makes the next refresh re-download the branch.
+        cache.ApplyCommittedFiles(
+            "o", "r", "main", ModuleFiles, new GitHubTreeCommitResult(Sha2, Sha3));
+
+        Assert.Equal("west body", File.ReadAllText(Path.Combine(folder, "config", "west.yml")));
+        Assert.Equal("shield: lviz", File.ReadAllText(Path.Combine(folder, "build.yaml")));
+        Assert.Equal(Sha1, cache.CachedSha("o", "r", "main"));
+        Assert.Equal(infoBefore, InfoText(folder));
+    }
+
+    [Fact]
+    public void ApplyCommittedFiles_NoCachedFolder_CreatesNothing()
+    {
+        var cache = new GitHubRepoCache(_root);
+
+        cache.ApplyCommittedFiles(
+            "o", "r", "main", ModuleFiles, new GitHubTreeCommitResult(Sha2, Sha1));
+
+        Assert.False(Directory.Exists(_root));
+        Assert.False(Directory.Exists(cache.FolderFor("o", "r", "main")));
     }
 
     // ---- DeleteAll ----

@@ -1,6 +1,7 @@
 using System.Formats.Tar;
 using System.Globalization;
 using System.IO.Compression;
+using System.Text;
 using System.Text.Json;
 using LViz.Core.Diagnostics;
 using LViz.Core.Persistence;
@@ -80,15 +81,20 @@ public sealed class GitHubRepoCache
         return File.Exists(path) ? path : null;
     }
 
-    /// <summary>
-    /// Where <paramref name="keymap"/>'s file lives inside its branch folder,
-    /// whether or not anything is there. The repo-root-relative path is split
-    /// so <c>/</c> becomes this OS's separator.
-    /// </summary>
+    /// <inheritdoc cref="CachedPathFor(string,string,string,string)"/>
     private string CachedPathFor(GitHubKeymapRef keymap) =>
+        CachedPathFor(keymap.Owner, keymap.Repo, keymap.Branch, keymap.Path);
+
+    /// <summary>
+    /// Where a repo-root-relative path lives inside the branch folder of
+    /// <c>owner/repo</c> at <paramref name="branch"/>, whether or not anything
+    /// is there. The <c>/</c>-separated path is split so <c>/</c> becomes this
+    /// OS's separator.
+    /// </summary>
+    private string CachedPathFor(string owner, string repo, string branch, string relativePath) =>
         Path.Combine(
-            FolderFor(keymap.Owner, keymap.Repo, keymap.Branch),
-            Path.Combine(keymap.Path.Split('/')));
+            FolderFor(owner, repo, branch),
+            Path.Combine(relativePath.Split('/')));
 
     /// <summary>
     /// The commit SHA the cached folder was downloaded at, or null when
@@ -223,9 +229,60 @@ public sealed class GitHubRepoCache
     /// costs a re-download.
     /// </para>
     /// </summary>
-    public void ApplyCommittedFile(GitHubKeymapRef keymap, byte[] content, GitHubCommitResult commit)
+    public void ApplyCommittedFile(GitHubKeymapRef keymap, byte[] content, GitHubCommitResult commit) =>
+        ApplyCommit(
+            keymap.Owner, keymap.Repo, keymap.Branch,
+            new[] { (keymap.Path, content) },
+            commit.CommitSha, commit.ParentSha,
+            $"apply committed file {keymap}");
+
+    /// <summary>
+    /// <see cref="ApplyCommittedFile"/> for a multi-file Git Data commit: every
+    /// file of <paramref name="files"/> replaces its path inside the branch
+    /// folder (text written as UTF-8 without BOM, subfolders created), and the
+    /// recorded SHA moves to <paramref name="commit"/>'s commit only when its
+    /// parent is the commit the folder was downloaded at. Same rules, same
+    /// logged silence on IO trouble, same "never downloaded → nothing
+    /// created".
+    /// </summary>
+    public void ApplyCommittedFiles(
+        string owner,
+        string repo,
+        string branch,
+        IReadOnlyList<GitHubFileWrite> files,
+        GitHubTreeCommitResult commit)
     {
-        var folder = FolderFor(keymap.Owner, keymap.Repo, keymap.Branch);
+        var writes = new List<(string Path, byte[] Content)>(files.Count);
+        foreach (var file in files)
+        {
+            // GetBytes never prepends the preamble: the cache holds BOM-less UTF-8.
+            writes.Add((file.Path, Encoding.UTF8.GetBytes(file.Content)));
+        }
+
+        ApplyCommit(
+            owner, repo, branch, writes,
+            commit.CommitSha, commit.ParentSha,
+            $"apply committed files {owner}/{repo}:{branch}");
+    }
+
+    /// <summary>
+    /// The body of both <c>ApplyCommitted*</c> methods: replace every file in
+    /// the branch folder, and move the recorded SHA to
+    /// <paramref name="commitSha"/> only when <paramref name="parentSha"/> is
+    /// exactly the commit the folder was downloaded at. A branch that was
+    /// never downloaded is left untouched; IO trouble is logged under
+    /// <c>GitHub</c> with <paramref name="logSubject"/>, never thrown.
+    /// </summary>
+    private void ApplyCommit(
+        string owner,
+        string repo,
+        string branch,
+        IReadOnlyList<(string Path, byte[] Content)> files,
+        string commitSha,
+        string? parentSha,
+        string logSubject)
+    {
+        var folder = FolderFor(owner, repo, branch);
         if (!Directory.Exists(folder))
         {
             return;
@@ -233,23 +290,25 @@ public sealed class GitHubRepoCache
 
         try
         {
-            var target = CachedPathFor(keymap);
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            AtomicFile.WriteAllBytes(target, content);
+            foreach (var (path, content) in files)
+            {
+                var target = CachedPathFor(owner, repo, branch, path);
+                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                AtomicFile.WriteAllBytes(target, content);
+            }
 
             // Only a commit on top of exactly what we hold proves the rest of
             // the folder is still current.
-            if (commit.ParentSha is not null
-                && commit.ParentSha == CachedSha(keymap.Owner, keymap.Repo, keymap.Branch))
+            if (parentSha is not null && parentSha == CachedSha(owner, repo, branch))
             {
-                AtomicFile.WriteAllText(Path.Combine(folder, InfoFileName), InfoJson(commit.CommitSha));
+                AtomicFile.WriteAllText(Path.Combine(folder, InfoFileName), InfoJson(commitSha));
             }
         }
         catch (Exception ex)
         {
             // Broad on purpose: the save itself succeeded, so a cache we
             // cannot update must never surface as an error.
-            DiagnosticLog.Warn("GitHub", $"apply committed file {keymap}: {ex.Message}");
+            DiagnosticLog.Warn("GitHub", $"{logSubject}: {ex.Message}");
         }
     }
 

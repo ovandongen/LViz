@@ -212,6 +212,55 @@ public sealed class GitHubKeymapService(
     }
 
     /// <inheritdoc/>
+    public async Task<GitHubSaveResult> SaveFilesAsync(
+        string owner,
+        string repo,
+        string branch,
+        string baseCommitSha,
+        IReadOnlyList<GitHubFileWrite> files,
+        string message,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            await EnsureRestoredAsync(ct);
+            if (!IsSignedIn)
+            {
+                return new GitHubSaveResult.Failed(GitHubErrorKind.Unauthorized, "Not signed in");
+            }
+
+            // Fetched here and never held, like every other call.
+            var accessToken = await session.GetAccessTokenAsync(ct);
+
+            var result = await client.CommitFilesAsync(
+                accessToken, owner, repo, branch, baseCommitSha, files, message, ct);
+
+            cache.ApplyCommittedFiles(owner, repo, branch, files, result);
+            return new GitHubSaveResult.Saved(result.CommitSha);
+        }
+        catch (GitHubApiException ex) when (ex.Kind == GitHubErrorKind.Conflict)
+        {
+            // Nothing was written; the wizard reloads the branch and checks
+            // again — there is no overwrite for this flow.
+            return new GitHubSaveResult.Conflict();
+        }
+        catch (GitHubApiException ex)
+        {
+            return new GitHubSaveResult.Failed(ex.Kind, ex.Message);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Only the repo, branch and error text — never file contents.
+            DiagnosticLog.Warn("GitHub", $"Save files {owner}/{repo}:{branch}: {ex.Message}");
+            return new GitHubSaveResult.Failed(GitHubErrorKind.Unexpected, ex.Message);
+        }
+    }
+
+    /// <inheritdoc/>
     public string? LocalPathFor(GitHubKeymapRef keymap) => cache.LocalPathFor(keymap);
 
     /// <inheritdoc/>

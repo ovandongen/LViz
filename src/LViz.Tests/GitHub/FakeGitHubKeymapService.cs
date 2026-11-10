@@ -42,6 +42,8 @@ public sealed class FakeGitHubKeymapService : IGitHubKeymapService
         _ => throw new NotSupportedException();
     public Func<GitHubKeymapRef, byte[], string, string, bool, Task<GitHubSaveResult>> OnSave { get; set; } =
         (_, _, _, _, _) => throw new NotSupportedException();
+    public Func<string, string, string, string, IReadOnlyList<GitHubFileWrite>, string, Task<GitHubSaveResult>>
+        OnSaveFiles { get; set; } = (_, _, _, _, _, _) => throw new NotSupportedException();
     public Func<GitHubKeymapRef, string?> OnLocalPathFor { get; set; } = _ => null;
     public Func<string, string, string, string> OnCacheFolderFor { get; set; } =
         (owner, repo, branch) =>
@@ -107,6 +109,20 @@ public sealed class FakeGitHubKeymapService : IGitHubKeymapService
     {
         Calls.Add(nameof(SaveAsync));
         return OnSave(keymap, content, baseBlobSha, message, overwrite);
+    }
+
+    public Task<GitHubSaveResult> SaveFilesAsync(
+        string owner,
+        string repo,
+        string branch,
+        string baseCommitSha,
+        IReadOnlyList<GitHubFileWrite> files,
+        string message,
+        CancellationToken ct = default)
+    {
+        // "SaveFiles", not the full method name, is what the wizard's card pins.
+        Calls.Add("SaveFiles");
+        return OnSaveFiles(owner, repo, branch, baseCommitSha, files, message);
     }
 
     public string? LocalPathFor(GitHubKeymapRef keymap)

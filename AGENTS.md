@@ -65,7 +65,9 @@ src/
                  (Keymap/Editing/), picking catalogs (Keymap/Catalog/),
                  atomic writes, keymap saver + backups (Persistence/),
                  Raw HID profile matching, settings, diagnostics, GitHub
-                 client, login session and repo cache (GitHub/). No Avalonia.
+                 client, login session and repo cache (GitHub/), zmk-config
+                 readers, writers, inspector and module setup plan
+                 (ZmkConfig/). No Avalonia.
   LViz.Tests/  → xUnit fixtures; headless Avalonia view tests in Rendering/.
 external/
   zmk-hid-protocol/   → submodule. Raw HID transport + report parser, and
@@ -532,6 +534,24 @@ After creating or editing a view, rebuild the App project before trusting a
   `KeymapBackupStore` (`ApplicationData/LViz/keymap-backups/<16-hex sha256 of
   the full path>/`, `source.txt` names the file, newest 20 kept) and writes
   atomically. Use one `KeymapBackupStore` root: another root starts a new history.
+- **zmk-config module setup: `Core/ZmkConfig/` patches text, never through a
+  YAML library.** The readers (`ZmkWestManifestText`, `ZmkBuildMatrixText`,
+  `ZmkConfText`, shared `ZmkYamlLines`/`ZmkYamlList`) take block-style YAML
+  only and throw `ZmkConfigFormatException` (1-based line) on anything else;
+  their records carry 0-based line indexes. The writers
+  (`ZmkWestManifestWriter`, `ZmkConfWriter`, `ZmkBuildMatrixWriter`) depend on
+  the readers, only add, keep comments and line endings, and re-parse as a
+  guard. `ZmkConfigInspector.Inspect` never throws for content: problems are
+  `Blockers`, and a blocker fires only when its own file was readable.
+  `ZmkModuleSetupPlan.Build` is the one save pipeline (refusals → writers →
+  re-inspect, which must read `SetUp`). The `raw_hid_adapter` shield counts on
+  any build entry, not only the detected central: the wizard lets the user
+  pick the other half. The wizard (`ModuleSetupViewModel`,
+  `ModuleSetupWindow`) saves through `IGitHubKeymapService.SaveFilesAsync`
+  (one Git Data commit) or `ConfigFileSaver` (checks every file first, then
+  backups + `FileRollback`); there is no overwrite, a conflict only offers
+  Reload. LViz prefers `ovandongen/zmk-raw-hid` because it is tested with it,
+  not because zzeneg's is broken: keep user-facing text neutral.
 
 ## Before writing code
 
@@ -812,6 +832,23 @@ LViz-specific (extend this list as we hit more):
   recents moved to `KeymapLibrary`). Reach the helper through a `using` alias
   in such a class. Same applies to any new Core helper whose name matches a
   settings property (e.g. `HiddenLayers`).
+
+- **`ItemsControl.DisplayMemberBinding` takes a binding**:
+  `DisplayMemberBinding="{Binding Text}"`; a bare `"Text"` fails the XAML
+  compile (AVLN3000).
+
+- **`File.ReadAllText` strips a BOM.** Assert "UTF-8 without BOM" with
+  `File.ReadAllBytes`.
+
+- **`Directory.CreateDirectory` over an existing file** throws `IOException`
+  on macOS/Linux and `UnauthorizedAccessException` on Windows; a test that
+  wants a write to fail accepts both.
+
+- **CommunityToolkit `RelayCommand.Execute` ignores `CanExecute`.** Only the
+  bound control is disabled; a test can drive a gated command directly.
+
+- **`FakeGitHubKeymapService.NotSupported<T>` fits only 0-arg handlers**; a
+  multi-arg handler defaults to `(_, …) => throw new NotSupportedException()`.
 
 - **`KeyBinding` record equality does not compare `Params` contents** (it
   compares the list reference). Compare with `KeyBinding.SameAs`, in code and

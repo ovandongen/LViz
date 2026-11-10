@@ -1,0 +1,196 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LViz.App.ViewModels"
+        xmlns:conv="using:LViz.App.Converters"
+        xmlns:loc="using:LViz.App.Localization"
+        xmlns:svc="using:LViz.App.Services"
+        x:Class="LViz.App.Views.ModuleSetupWindow"
+        x:DataType="vm:ModuleSetupViewModel"
+        Title="{Binding [ModuleSetup_Title], Source={x:Static loc:Loc.Instance}}"
+        Width="640" Height="560"
+        MinWidth="520" MinHeight="440"
+        WindowStartupLocation="CenterOwner"
+        Background="{x:Static svc:AppTheme.BgBaseBrush}">
+
+    <DockPanel Margin="16">
+
+        <!-- Bottom bar: error text left; Reload / Close / Back / Next / Save /
+             Finish right. One step group per visibility (the VM's CanExecute
+             gates when Next/Back/Save are enabled): Close is the plain Cancel
+             until Done, where the accent Finish button takes its place;
+             Back hides on Check and Done; Next hides on Review and Done;
+             Save is accent on Review; Reload only appears after a conflict.
+             Back/Next share a panel because IsVisible bindings cannot
+             combine two conditions. -->
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto" Margin="0,12,0,0">
+            <TextBlock Grid.Column="0"
+                       Text="{Binding ErrorMessage}"
+                       Foreground="{x:Static svc:AppTheme.AccentRedBrush}"
+                       FontSize="12" TextWrapping="Wrap"
+                       VerticalAlignment="Center"
+                       IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <Button Grid.Column="1"
+                    Content="{Binding [ModuleSetup_Reload], Source={x:Static loc:Loc.Instance}}"
+                    Command="{Binding ReloadCommand}"
+                    Margin="8,0,0,0"
+                    IsVisible="{Binding ShowReload}" />
+            <Button Grid.Column="2"
+                    Content="{Binding [Wizard_Cancel], Source={x:Static loc:Loc.Instance}}"
+                    Command="{Binding CloseCommand}"
+                    Margin="8,0,0,0"
+                    IsVisible="{Binding !IsDoneStep}" />
+            <StackPanel Grid.Column="3" Orientation="Horizontal"
+                        IsVisible="{Binding !IsDoneStep}">
+                <Button Content="{Binding [Wizard_Back], Source={x:Static loc:Loc.Instance}}"
+                        Command="{Binding BackCommand}"
+                        Margin="8,0,0,0"
+                        IsVisible="{Binding !IsCheckStep}" />
+                <Button Content="{Binding [Wizard_Next], Source={x:Static loc:Loc.Instance}}"
+                        Command="{Binding NextCommand}"
+                        Margin="8,0,0,0"
+                        IsVisible="{Binding !IsReviewStep}" />
+            </StackPanel>
+            <Button Grid.Column="4"
+                    Content="{Binding [ModuleSetup_Save], Source={x:Static loc:Loc.Instance}}"
+                    Command="{Binding SaveCommand}"
+                    Margin="8,0,0,0"
+                    Classes="accent"
+                    IsDefault="True"
+                    IsVisible="{Binding IsReviewStep}" />
+            <Button Grid.Column="5"
+                    Content="{Binding [ModuleSetup_Finish], Source={x:Static loc:Loc.Instance}}"
+                    Command="{Binding CloseCommand}"
+                    Margin="8,0,0,0"
+                    Classes="accent"
+                    IsVisible="{Binding IsDoneStep}" />
+        </Grid>
+
+        <!-- Check — what LViz found in the config, its blockers, and the
+             notice for an already-set-up or other-fork config. -->
+        <StackPanel IsVisible="{Binding IsCheckStep}" Spacing="6">
+            <TextBlock Text="{Binding [ModuleSetup_CheckHeader], Source={x:Static loc:Loc.Instance}}"
+                       FontSize="14" FontWeight="SemiBold" Foreground="{x:Static svc:AppTheme.TextBrush}" />
+            <TextBlock Text="{Binding [ModuleSetup_CheckIntro], Source={x:Static loc:Loc.Instance}}"
+                       FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.TextBrush}" />
+            <ItemsControl ItemsSource="{Binding FactLines}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                        <TextBlock Text="{Binding}"
+                                   FontSize="12" TextWrapping="Wrap"
+                                   Foreground="{x:Static svc:AppTheme.TextBrush}" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{Binding StatusMessage}"
+                       FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.TextSubtleBrush}"
+                       IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <TextBlock Text="{Binding BlockerMessage}"
+                       FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.AccentRedBrush}"
+                       IsVisible="{Binding BlockerMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <TextBlock Text="{Binding [ModuleSetup_Reading], Source={x:Static loc:Loc.Instance}}"
+                       FontSize="12" Foreground="{x:Static svc:AppTheme.TextSubtleBrush}"
+                       IsVisible="{Binding IsBusy}" />
+        </StackPanel>
+
+        <!-- Choose — the central half (split boards only) and the live
+             features to install; emit hides under the Advanced expander. -->
+        <StackPanel IsVisible="{Binding IsChooseStep}" Spacing="8">
+            <TextBlock Text="{Binding [ModuleSetup_ChooseHeader], Source={x:Static loc:Loc.Instance}}"
+                       FontSize="14" FontWeight="SemiBold" Foreground="{x:Static svc:AppTheme.TextBrush}" />
+            <StackPanel Spacing="4" IsVisible="{Binding IsSplit}">
+                <TextBlock Text="{Binding [ModuleSetup_CentralLabel], Source={x:Static loc:Loc.Instance}}"
+                           FontSize="11" Foreground="{x:Static svc:AppTheme.TextSubtleBrush}" />
+                <ComboBox ItemsSource="{Binding CentralOptions}"
+                          SelectedItem="{Binding SelectedCentral, Mode=TwoWay}"
+                          DisplayMemberBinding="{Binding Text}"
+                          HorizontalAlignment="Left" MinWidth="280" />
+                <TextBlock Text="{Binding CentralHint}"
+                           FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.TextSubtleBrush}"
+                           IsVisible="{Binding CentralHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+            <CheckBox Content="{Binding [ModuleSetup_FeatureRgb], Source={x:Static loc:Loc.Instance}}"
+                      IsChecked="{Binding Rgb, Mode=TwoWay}"
+                      IsVisible="{Binding ShowRgb}" />
+            <CheckBox Content="{Binding [ModuleSetup_FeatureSignal], Source={x:Static loc:Loc.Instance}}"
+                      IsChecked="{Binding Signal, Mode=TwoWay}" />
+            <Expander IsExpanded="{Binding ShowAdvanced, Mode=TwoWay}"
+                      Header="{Binding [ModuleSetup_Advanced], Source={x:Static loc:Loc.Instance}}">
+                <CheckBox Content="{Binding [ModuleSetup_FeatureEmit], Source={x:Static loc:Loc.Instance}}"
+                          IsChecked="{Binding Emit, Mode=TwoWay}"
+                          Margin="0,6,0,0" />
+            </Expander>
+        </StackPanel>
+
+        <!-- Review — the plan's per-file diffs; Save applies them all at once. -->
+        <DockPanel IsVisible="{Binding IsReviewStep}">
+            <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,8">
+                <TextBlock Text="{Binding [ModuleSetup_ReviewHeader], Source={x:Static loc:Loc.Instance}}"
+                           FontSize="14" FontWeight="SemiBold" Foreground="{x:Static svc:AppTheme.TextBrush}" />
+                <TextBlock Text="{Binding ForkNotice}"
+                           FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.TextSubtleBrush}"
+                           IsVisible="{Binding ForkNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <TextBlock Text="{Binding RevisionWarning}"
+                           FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.AccentYellowBrush}"
+                           IsVisible="{Binding RevisionWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+            <ScrollViewer>
+                <ItemsControl ItemsSource="{Binding Files}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ModuleSetupFileView">
+                            <StackPanel Spacing="2" Margin="0,0,0,10">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="{Binding Path}"
+                                               FontFamily="Menlo, Consolas, monospace"
+                                               FontSize="12" FontWeight="SemiBold"
+                                               Foreground="{x:Static svc:AppTheme.TextBrush}" />
+                                    <TextBlock Text="{Binding [ModuleSetup_NewFile], Source={x:Static loc:Loc.Instance}}"
+                                               FontSize="11" Foreground="{x:Static svc:AppTheme.TextSubtleBrush}"
+                                               IsVisible="{Binding IsNew}" />
+                                </StackPanel>
+                                <ItemsControl ItemsSource="{Binding Lines}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ModuleSetupDiffLine">
+                                            <TextBlock Text="{Binding Text}"
+                                                       FontFamily="Menlo, Consolas, monospace"
+                                                       FontSize="11" TextWrapping="Wrap"
+                                                       Foreground="{Binding Converter={x:Static conv:ModuleSetupDiffLineBrushConverter.Instance}}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </DockPanel>
+
+        <!-- Done — what to do next (GitHub build or manual push, flash the
+             central half) and whether the board has started reporting in. -->
+        <StackPanel IsVisible="{Binding IsDoneStep}" Spacing="8">
+            <TextBlock Text="{Binding [ModuleSetup_DoneHeader], Source={x:Static loc:Loc.Instance}}"
+                       FontSize="14" FontWeight="SemiBold" Foreground="{x:Static svc:AppTheme.TextBrush}" />
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsGitHub}">
+                <TextBlock Text="{Binding [ModuleSetup_DoneBuildGitHub], Source={x:Static loc:Loc.Instance}}"
+                           FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.TextBrush}"
+                           VerticalAlignment="Center" />
+                <Button Classes="link"
+                        Content="{Binding [ModuleSetup_OpenActions], Source={x:Static loc:Loc.Instance}}"
+                        Command="{Binding OpenActionsCommand}"
+                        VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Text="{Binding [ModuleSetup_DoneBuildLocal], Source={x:Static loc:Loc.Instance}}"
+                       FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.TextBrush}"
+                       IsVisible="{Binding !IsGitHub}" />
+            <TextBlock Text="{Binding [ModuleSetup_DoneFlash], Source={x:Static loc:Loc.Instance}}"
+                       FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.TextSubtleBrush}" />
+            <TextBlock Text="{Binding [ModuleSetup_BoardWaiting], Source={x:Static loc:Loc.Instance}}"
+                       FontSize="12" Foreground="{x:Static svc:AppTheme.TextSubtleBrush}"
+                       IsVisible="{Binding !IsBoardConnected}" />
+            <TextBlock Text="{Binding [ModuleSetup_BoardConnected], Source={x:Static loc:Loc.Instance}}"
+                       FontSize="12" Foreground="{x:Static svc:AppTheme.AccentGreenBrush}"
+                       IsVisible="{Binding IsBoardConnected}" />
+        </StackPanel>
+
+    </DockPanel>
+
+</Window>

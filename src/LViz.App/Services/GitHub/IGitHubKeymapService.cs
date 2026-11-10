@@ -14,7 +14,7 @@ namespace LViz.App.Services.GitHub;
 /// GitHub failure and propagates a cancelled token, except
 /// <see cref="OpenAsync"/> (which reports through <see cref="GitHubOpenResult"/>
 /// so offline fallback can ride along) and
-/// <see cref="SaveAsync"/> (which reports through
+/// <see cref="SaveAsync"/> / <see cref="SaveFilesAsync"/> (which report through
 /// <see cref="GitHubSaveResult"/> so a conflict is a result the editor can act
 /// on), plus <see cref="LocalPathFor"/> /
 /// <see cref="CacheFolderFor"/> (no I/O beyond a file check).
@@ -93,6 +93,32 @@ public interface IGitHubKeymapService
         bool overwrite,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Commits all of <paramref name="files"/> as one commit on top of
+    /// <paramref name="baseCommitSha"/> on <c>owner/repo</c>'s
+    /// <paramref name="branch"/> with <paramref name="message"/>, reports the
+    /// outcome through <see cref="GitHubSaveResult"/>, and — after a commit —
+    /// brings the local cache copies of the written files in step.
+    ///
+    /// <para>
+    /// <see cref="GitHubSaveResult.Conflict"/> means the branch no longer
+    /// points at <paramref name="baseCommitSha"/> and nothing was written.
+    /// There is no overwrite here: the caller reloads the branch and checks
+    /// again.
+    /// </para>
+    /// </summary>
+    /// <param name="baseCommitSha">The commit the branch must still point at.</param>
+    /// <param name="files">Files to write, in order; at least one, no path twice.</param>
+    /// <param name="message">Commit message.</param>
+    Task<GitHubSaveResult> SaveFilesAsync(
+        string owner,
+        string repo,
+        string branch,
+        string baseCommitSha,
+        IReadOnlyList<GitHubFileWrite> files,
+        string message,
+        CancellationToken ct = default);
+
     /// <summary>The locally cached copy of this keymap, or null when it is not on disk.</summary>
     string? LocalPathFor(GitHubKeymapRef keymap);
 
@@ -122,22 +148,25 @@ public abstract record GitHubOpenResult
 }
 
 /// <summary>
-/// The outcome of <see cref="IGitHubKeymapService.SaveAsync"/>: the commit
-/// GitHub accepted, the file having changed under us, or the kind and message
-/// of what went wrong.
+/// The outcome of <see cref="IGitHubKeymapService.SaveAsync"/> /
+/// <see cref="IGitHubKeymapService.SaveFilesAsync"/>: the commit GitHub
+/// accepted, the target having changed under us, or the kind and message of
+/// what went wrong.
 /// </summary>
 public abstract record GitHubSaveResult
 {
     /// <summary>
-    /// GitHub committed the file as <see cref="CommitSha"/>; the local cache
-    /// copy was brought in step with it.
+    /// GitHub committed the file(s) as <see cref="CommitSha"/>; the local
+    /// cache copies were brought in step with it.
     /// </summary>
     public sealed record Saved(string CommitSha) : GitHubSaveResult;
 
     /// <summary>
-    /// The file on the branch no longer matches the blob SHA the save was
-    /// attempted against — nothing was committed. Saving again with
-    /// <c>overwrite</c> replaces GitHub's version.
+    /// What the save was attempted against no longer matches the branch —
+    /// nothing was committed. <see cref="IGitHubKeymapService.SaveAsync"/>
+    /// can retry with <c>overwrite</c>;
+    /// <see cref="IGitHubKeymapService.SaveFilesAsync"/> has no overwrite, so
+    /// the caller reloads and checks again.
     /// </summary>
     public sealed record Conflict : GitHubSaveResult;
 

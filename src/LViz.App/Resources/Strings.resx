@@ -1375,6 +1375,14 @@
     <value>Create a layout for this keymap…</value>
     <comment/>
   </data>
+  <data name="Status_LiveFeaturesLink" xml:space="preserve">
+    <value>Set up live features for this config…</value>
+    <comment/>
+  </data>
+  <data name="Status_LiveFeaturesDismiss" xml:space="preserve">
+    <value>Hide this hint for this config</value>
+    <comment/>
+  </data>
   <data name="EditLayout_TitleFormat" xml:space="preserve">
     <value>Edit layout: {0}</value>
     <comment/>
@@ -1453,6 +1461,10 @@
   </data>
   <data name="RecentKeymaps_OpenFromGitHub" xml:space="preserve">
     <value>Open from GitHub…</value>
+    <comment/>
+  </data>
+  <data name="RecentKeymaps_SetUpLiveFeatures" xml:space="preserve">
+    <value>Set up live features…</value>
     <comment/>
   </data>
   <data name="GitHub_WindowTitle" xml:space="preserve">
@@ -3093,6 +3105,210 @@
   </data>
   <data name="Edit_ComboMenuDelete" xml:space="preserve">
     <value>Delete</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Unknown" xml:space="preserve">
+    <value>unknown</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FactZmk" xml:space="preserve">
+    <value>ZMK: {0} {1}</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FactSplit" xml:space="preserve">
+    <value>Split keyboard</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FactUnibody" xml:space="preserve">
+    <value>One-piece keyboard</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FactCentral" xml:space="preserve">
+    <value>Central half: {0} ({1})</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FactCentralUnknown" xml:space="preserve">
+    <value>Central half: you choose it in the next step</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ReasonRepoKconfig" xml:space="preserve">
+    <value>set in your shield's Kconfig</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ReasonLeftNaming" xml:space="preserve">
+    <value>the left half, by convention</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ReasonUnibody" xml:space="preserve">
+    <value>the only build</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FactStatusNotSetUp" xml:space="preserve">
+    <value>Live-feature modules: not set up yet</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FactStatusSetUp" xml:space="preserve">
+    <value>Live-feature modules: set up</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FactStatusNeedsFork" xml:space="preserve">
+    <value>Live-feature modules: set up, with zzeneg's zmk-raw-hid</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_AlreadySetUp" xml:space="preserve">
+    <value>This config already has the live-feature modules. Nothing to do.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_NeedsForkNotice" xml:space="preserve">
+    <value>This config uses zzeneg's zmk-raw-hid. LViz switches it to ovandongen/zmk-raw-hid, the version LViz is tested with.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_CentralHintGuessed" xml:space="preserve">
+    <value>LViz assumes the left half is the central. Change it if your board uses the other half.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_CentralHintPick" xml:space="preserve">
+    <value>Pick the half that connects to your computer (the central).</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Blocker_NoWestManifest" xml:space="preserve">
+    <value>No config/west.yml found.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Blocker_NoBuildMatrix" xml:space="preserve">
+    <value>No build.yaml found.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Blocker_NoZmkProject" xml:space="preserve">
+    <value>west.yml has no zmk project.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Blocker_NoBuildEntries" xml:space="preserve">
+    <value>build.yaml has no builds.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Blocker_Dongle" xml:space="preserve">
+    <value>This looks like a dongle setup, which LViz can't set up yet.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Blocker_Unreadable" xml:space="preserve">
+    <value>LViz can't read this file: {0}</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ErrorRead" xml:space="preserve">
+    <value>Couldn't read the config: {0}</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ErrorPlan" xml:space="preserve">
+    <value>LViz can't prepare these changes: {0}</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_RevisionUnknown" xml:space="preserve">
+    <value>LViz hasn't been tested with ZMK {0} {1} yet, so it uses the modules' main branch. If the firmware build fails, please report it.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ForkNotice" xml:space="preserve">
+    <value>zmk-raw-hid is switched from zzeneg to ovandongen.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ConflictGitHub" xml:space="preserve">
+    <value>The config changed on GitHub since LViz read it. Reload to check it again.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ConflictLocal" xml:space="preserve">
+    <value>The config files changed on disk since LViz read them. Reload to check them again.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ErrorSave" xml:space="preserve">
+    <value>Couldn't save the config: {0}</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Title" xml:space="preserve">
+    <value>Set up live features</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_CheckHeader" xml:space="preserve">
+    <value>Your zmk-config</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_CheckIntro" xml:space="preserve">
+    <value>Live features (the board following your layer, key presses, commands from LViz) need two firmware modules. LViz adds them to your config.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Reading" xml:space="preserve">
+    <value>Reading the config…</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ChooseHeader" xml:space="preserve">
+    <value>Choose</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_CentralLabel" xml:space="preserve">
+    <value>Central half</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FeatureRgb" xml:space="preserve">
+    <value>RGB lighting control</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FeatureSignal" xml:space="preserve">
+    <value>Signal keys (keys that trigger actions in LViz)</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Advanced" xml:space="preserve">
+    <value>Advanced</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FeatureEmit" xml:space="preserve">
+    <value>Emit keys (keys that send commands to other devices, such as a trackball)</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ReviewHeader" xml:space="preserve">
+    <value>These changes will be saved</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_NewFile" xml:space="preserve">
+    <value>(new file)</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_DoneHeader" xml:space="preserve">
+    <value>Saved</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_DoneBuildGitHub" xml:space="preserve">
+    <value>GitHub is building the new firmware now.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_OpenActions" xml:space="preserve">
+    <value>Open the build on GitHub</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_DoneBuildLocal" xml:space="preserve">
+    <value>Commit and push your config to GitHub to build the new firmware.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_DoneFlash" xml:space="preserve">
+    <value>Flash the new firmware onto the central half by hand, this once. The other half doesn't need it.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_BoardWaiting" xml:space="preserve">
+    <value>Waiting for the board…</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_BoardConnected" xml:space="preserve">
+    <value>The board reports in: live features work.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Finish" xml:space="preserve">
+    <value>Done</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Save" xml:space="preserve">
+    <value>Save</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Reload" xml:space="preserve">
+    <value>Reload</value>
     <comment/>
   </data>
 </root>

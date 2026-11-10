@@ -12,7 +12,8 @@ namespace LViz.Core.GitHub;
 /// <see cref="GetString"/>, <see cref="GetInt64"/>); <c>.Auth</c> the OAuth
 /// device flow, refresh and login lookup; <c>.Repos</c> installed repos,
 /// branches and a branch's head commit; <c>.Contents</c> the tarball download,
-/// committing one file and reading a file's blob SHA.
+/// committing one file and reading a file's blob SHA; <c>.GitData</c>
+/// committing several files as one commit (Git Data API).
 ///
 /// <para>
 /// The device flow needs only the App's public client id — no client secret,

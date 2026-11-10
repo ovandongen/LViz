@@ -312,4 +312,12 @@ public record UserSettings
     /// Settings so users can see when the last check ran.
     /// </summary>
     public DateTime? LastUpdateCheckUtc { get; init; }
+
+    /// <summary>
+    /// Config keys whose live-features hint the user hid. A local zmk-config
+    /// is keyed by its full root path, a GitHub one by
+    /// <c>github:{owner}/{repo}:{branch}</c>. Global, not per-profile — the
+    /// hint belongs to the config, not to a board profile.
+    /// </summary>
+    public List<string> DismissedLiveFeatureHints { get; init; } = new();
 }

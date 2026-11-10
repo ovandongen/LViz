@@ -1375,6 +1375,14 @@
     <value>Maak een layout voor deze keymap…</value>
     <comment/>
   </data>
+  <data name="Status_LiveFeaturesLink" xml:space="preserve">
+    <value>Live-functies instellen voor deze config…</value>
+    <comment/>
+  </data>
+  <data name="Status_LiveFeaturesDismiss" xml:space="preserve">
+    <value>Verberg deze tip voor deze config</value>
+    <comment/>
+  </data>
   <data name="EditLayout_TitleFormat" xml:space="preserve">
     <value>Layout bewerken: {0}</value>
     <comment/>
@@ -1453,6 +1461,10 @@
   </data>
   <data name="RecentKeymaps_OpenFromGitHub" xml:space="preserve">
     <value>Openen vanaf GitHub…</value>
+    <comment/>
+  </data>
+  <data name="RecentKeymaps_SetUpLiveFeatures" xml:space="preserve">
+    <value>Live-functies instellen…</value>
     <comment/>
   </data>
   <data name="GitHub_WindowTitle" xml:space="preserve">
@@ -3093,6 +3105,210 @@
   </data>
   <data name="Edit_ComboMenuDelete" xml:space="preserve">
     <value>Verwijderen</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Unknown" xml:space="preserve">
+    <value>onbekend</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FactZmk" xml:space="preserve">
+    <value>ZMK: {0} {1}</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FactSplit" xml:space="preserve">
+    <value>Gesplitst toetsenbord</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FactUnibody" xml:space="preserve">
+    <value>Toetsenbord uit één stuk</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FactCentral" xml:space="preserve">
+    <value>Centrale helft: {0} ({1})</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FactCentralUnknown" xml:space="preserve">
+    <value>Centrale helft: die kies je in de volgende stap</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ReasonRepoKconfig" xml:space="preserve">
+    <value>ingesteld in de Kconfig van je shield</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ReasonLeftNaming" xml:space="preserve">
+    <value>de linkerhelft, volgens de gewoonte</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ReasonUnibody" xml:space="preserve">
+    <value>de enige build</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FactStatusNotSetUp" xml:space="preserve">
+    <value>Modules voor live-functies: nog niet ingesteld</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FactStatusSetUp" xml:space="preserve">
+    <value>Modules voor live-functies: ingesteld</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FactStatusNeedsFork" xml:space="preserve">
+    <value>Modules voor live-functies: ingesteld, met zmk-raw-hid van zzeneg</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_AlreadySetUp" xml:space="preserve">
+    <value>Deze config heeft de modules voor live-functies al. Er is niets te doen.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_NeedsForkNotice" xml:space="preserve">
+    <value>Deze config gebruikt zmk-raw-hid van zzeneg. LViz zet die om naar ovandongen/zmk-raw-hid, de versie waarmee LViz getest is.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_CentralHintGuessed" xml:space="preserve">
+    <value>LViz neemt aan dat de linkerhelft de centrale is. Pas het aan als je bord de andere helft gebruikt.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_CentralHintPick" xml:space="preserve">
+    <value>Kies de helft die met je computer verbindt (de centrale).</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Blocker_NoWestManifest" xml:space="preserve">
+    <value>Geen config/west.yml gevonden.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Blocker_NoBuildMatrix" xml:space="preserve">
+    <value>Geen build.yaml gevonden.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Blocker_NoZmkProject" xml:space="preserve">
+    <value>west.yml heeft geen zmk-project.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Blocker_NoBuildEntries" xml:space="preserve">
+    <value>build.yaml heeft geen builds.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Blocker_Dongle" xml:space="preserve">
+    <value>Dit lijkt een opstelling met dongle; die kan LViz nog niet instellen.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Blocker_Unreadable" xml:space="preserve">
+    <value>LViz kan dit bestand niet lezen: {0}</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ErrorRead" xml:space="preserve">
+    <value>Kon de config niet lezen: {0}</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ErrorPlan" xml:space="preserve">
+    <value>LViz kan deze wijzigingen niet voorbereiden: {0}</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_RevisionUnknown" xml:space="preserve">
+    <value>LViz is nog niet getest met ZMK {0} {1}, dus gebruikt het de main-branch van de modules. Mislukt de firmware-build, meld het dan.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ForkNotice" xml:space="preserve">
+    <value>zmk-raw-hid wordt omgezet van zzeneg naar ovandongen.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ConflictGitHub" xml:space="preserve">
+    <value>De config is op GitHub gewijzigd sinds LViz hem las. Laad opnieuw om hem nog eens te controleren.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ConflictLocal" xml:space="preserve">
+    <value>De configbestanden zijn op schijf gewijzigd sinds LViz ze las. Laad opnieuw om ze nog eens te controleren.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ErrorSave" xml:space="preserve">
+    <value>Kon de config niet opslaan: {0}</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Title" xml:space="preserve">
+    <value>Live-functies instellen</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_CheckHeader" xml:space="preserve">
+    <value>Je zmk-config</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_CheckIntro" xml:space="preserve">
+    <value>Live-functies (het bord volgt je laag, toetsaanslagen, opdrachten vanuit LViz) hebben twee firmwaremodules nodig. LViz voegt ze toe aan je config.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Reading" xml:space="preserve">
+    <value>De config wordt gelezen…</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ChooseHeader" xml:space="preserve">
+    <value>Kiezen</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_CentralLabel" xml:space="preserve">
+    <value>Centrale helft</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FeatureRgb" xml:space="preserve">
+    <value>Bediening van de RGB-verlichting</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FeatureSignal" xml:space="preserve">
+    <value>Signaaltoetsen (toetsen die acties in LViz starten)</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Advanced" xml:space="preserve">
+    <value>Geavanceerd</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FeatureEmit" xml:space="preserve">
+    <value>Emit-toetsen (toetsen die opdrachten naar andere apparaten sturen, zoals een trackball)</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_ReviewHeader" xml:space="preserve">
+    <value>Deze wijzigingen worden opgeslagen</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_NewFile" xml:space="preserve">
+    <value>(nieuw bestand)</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_DoneHeader" xml:space="preserve">
+    <value>Opgeslagen</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_DoneBuildGitHub" xml:space="preserve">
+    <value>GitHub bouwt nu de nieuwe firmware.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_OpenActions" xml:space="preserve">
+    <value>Open de build op GitHub</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_DoneBuildLocal" xml:space="preserve">
+    <value>Commit en push je config naar GitHub om de nieuwe firmware te bouwen.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_DoneFlash" xml:space="preserve">
+    <value>Flash de nieuwe firmware deze ene keer met de hand op de centrale helft. De andere helft heeft hem niet nodig.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_BoardWaiting" xml:space="preserve">
+    <value>Wachten op het bord…</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_BoardConnected" xml:space="preserve">
+    <value>Het bord meldt zich: live-functies werken.</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Finish" xml:space="preserve">
+    <value>Klaar</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Save" xml:space="preserve">
+    <value>Opslaan</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_Reload" xml:space="preserve">
+    <value>Opnieuw laden</value>
     <comment/>
   </data>
 </root>

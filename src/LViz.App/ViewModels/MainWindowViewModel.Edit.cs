@@ -57,6 +57,8 @@ public partial class MainWindowViewModel
         LayerTabs.SetEditing(value);
         StartEditCommand.NotifyCanExecuteChanged();
         DiscardEditCommand.NotifyCanExecuteChanged();
+        // Both live-features affordances step aside while editing.
+        RefreshLiveFeatures();
     }
 
     /// <summary>
