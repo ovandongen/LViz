@@ -588,7 +588,12 @@ After creating or editing a view, rebuild the App project before trusting a
   snapshot the drives, optional `0xB0`, wait for a *new* bootloader drive,
   refuse a drive whose label names the other side (`Uf2Drive.Side`,
   MoErgo's `…LHBOOT`/`…RHBOOT`), copy with a plain `FileStream`, wait for the
-  drive to go, and for the central wait for its config ID. Its waits count
+  drive to go, and for the central wait for its config ID. The firmware
+  takes `0xB0` over USB or Bluetooth but refuses it unless the central's USB
+  HID is up, and zmk-raw-hid sends replies on both transports; so
+  `KeyboardBus.Usb` means "the central is on USB", and a Bluetooth endpoint
+  with a USB twin (same ids and product name) counts as USB
+  (`KeyboardFlashAccess.BusFor`). Its waits count
   the injected delay, not the clock, so tests run them instantly.
   `FlashWindow.OnClosed` calls `FlashViewModel.CancelWork()`: a run left
   going would copy its file onto the next bootloader drive with no window

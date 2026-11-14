@@ -6,19 +6,24 @@ using ZmkHidProtocol.Transport;
 namespace LViz.App.Services.Flashing;
 
 /// <summary>
-/// How the connected keyboard is attached, as far as the flash flow cares:
-/// the bootloader command is refused over Bluetooth, and flashing itself only
-/// works when the board is on USB.
+/// How the connected keyboard (the central) is attached, as far as the flash
+/// flow cares. The firmware accepts the bootloader command over either
+/// transport but refuses it unless the central's USB HID is up, so what
+/// counts is whether the central is plugged in with USB, not which interface
+/// LViz happens to talk through.
 /// </summary>
 public enum KeyboardBus
 {
     /// <summary>No keyboard is connected.</summary>
     None,
 
-    /// <summary>Connected over USB — flashing is possible.</summary>
+    /// <summary>
+    /// The central is on USB: LViz talks to it over USB, or over Bluetooth
+    /// while the same keyboard also shows a USB endpoint.
+    /// </summary>
     Usb,
 
-    /// <summary>Connected over Bluetooth — the firmware refuses <c>0xB0</c>.</summary>
+    /// <summary>Only on Bluetooth (no USB endpoint of this keyboard) — the firmware refuses <c>0xB0</c>.</summary>
     Bluetooth,
 
     /// <summary>Connected, but hidapi can't tell (or found no entry for the open path).</summary>
@@ -39,9 +44,10 @@ public interface IKeyboardFlashAccess
     bool IsConnected { get; }
 
     /// <summary>
-    /// Transport of the connected keyboard; <see cref="KeyboardBus.None"/> when
-    /// not connected. Re-evaluated on every read — the board may be replugged
-    /// or switch to Bluetooth between two reads.
+    /// Whether the connected keyboard is on USB (see <see cref="KeyboardBus"/>:
+    /// a central plugged in with USB counts even while LViz talks to it over
+    /// Bluetooth); <see cref="KeyboardBus.None"/> when not connected.
+    /// Re-evaluated on every read — the cable may come or go between two reads.
     /// </summary>
     KeyboardBus Bus { get; }
 
@@ -123,27 +129,59 @@ public sealed class KeyboardFlashAccess(
     }
 
     /// <summary>
-    /// hidapi bus of the device whose path is <paramref name="path"/>: first
-    /// matching enumerate entry, USB / Bluetooth mapped, everything else
-    /// (I2C/Spi, no entry, a failed enumerate) → <see cref="KeyboardBus.Unknown"/>.
+    /// The bus of the keyboard whose open hidapi path is <paramref name="path"/>,
+    /// from one enumeration under <see cref="HidGlobalLock.Gate"/>; a failed
+    /// enumeration is <see cref="KeyboardBus.Unknown"/>. See <see cref="BusFor"/>.
     /// </summary>
     private static KeyboardBus LookUpBus(string path)
     {
         try
         {
-            List<DeviceInfo> devices;
-            lock (HidGlobalLock.Gate) devices = Hid.Enumerate().ToList();
-            return devices.FirstOrDefault(d => string.Equals(d.Path, path, StringComparison.Ordinal))?.BusType switch
+            List<HidEntry> entries;
+            lock (HidGlobalLock.Gate)
             {
-                BusType.Usb => KeyboardBus.Usb,
-                BusType.Bluetooth => KeyboardBus.Bluetooth,
-                _ => KeyboardBus.Unknown,
-            };
+                entries = Hid.Enumerate()
+                    .Select(d => new HidEntry(d.Path, d.VendorId, d.ProductId, d.ProductString, d.BusType))
+                    .ToList();
+            }
+
+            return BusFor(path, entries);
         }
         catch (Exception ex)
         {
             DiagnosticLog.Warn("Flash", $"hidapi bus lookup failed: {ex.Message}");
             return KeyboardBus.Unknown;
         }
+    }
+
+    /// <summary>One hidapi enumeration entry, as much as <see cref="BusFor"/> reads.</summary>
+    internal sealed record HidEntry(string Path, ushort VendorId, ushort ProductId, string? Product, BusType Bus);
+
+    /// <summary>
+    /// The keyboard's bus from an enumeration: the open path's own entry on USB
+    /// is <see cref="KeyboardBus.Usb"/>. On Bluetooth it is still USB when the
+    /// same keyboard (same vendor and product id and product name) also shows a
+    /// USB entry: a central that is paired and plugged in at once appears twice,
+    /// and LViz may well talk to it over the Bluetooth one, while the firmware
+    /// only asks whether its USB HID is up. No entry for the path, or another
+    /// bus, is <see cref="KeyboardBus.Unknown"/>.
+    /// </summary>
+    internal static KeyboardBus BusFor(string path, IReadOnlyList<HidEntry> entries)
+    {
+        var open = entries.FirstOrDefault(e => string.Equals(e.Path, path, StringComparison.Ordinal));
+        if (open is null)
+            return KeyboardBus.Unknown;
+        if (open.Bus == BusType.Usb)
+            return KeyboardBus.Usb;
+
+        var usbTwin = entries.Any(e =>
+            e.Bus == BusType.Usb
+            && e.VendorId == open.VendorId
+            && e.ProductId == open.ProductId
+            && string.Equals(e.Product, open.Product, StringComparison.Ordinal));
+        if (usbTwin)
+            return KeyboardBus.Usb;
+
+        return open.Bus == BusType.Bluetooth ? KeyboardBus.Bluetooth : KeyboardBus.Unknown;
     }
 }
