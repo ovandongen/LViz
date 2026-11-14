@@ -20,7 +20,7 @@ intact. Forked from [moergo-layer-viz](https://github.com/ovandongen/moergo-laye
 and generalized so the engine can host arbitrary ZMK boards. **Seven
 profiles ship today:** Corne 6-col, Glove80, GO60, Kyria, Lily58, Sofle,
 A-Dux (`Core/Layout/*Profile.cs`, registered in `KeyboardProfileRegistry`).
-Current release: v3.0.0 on `main`.
+Current release: v3.1.0 on `main`.
 
 The HID transport lives in `external/zmk-hid-protocol` (git submodule).
 Boards have to advertise the Raw HID interface (usage page `0xFF60`,
