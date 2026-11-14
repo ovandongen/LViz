@@ -142,7 +142,10 @@ public abstract record KeymapEditCompletion
     /// the edit and reload what was written.</summary>
     /// <param name="Plan">The plan that was written.</param>
     /// <param name="ReloadPath">The file to load afterwards.</param>
-    public sealed record Saved(KeymapSavePlan Plan, string ReloadPath) : KeymapEditCompletion;
+    /// <param name="CommitSha">The commit SHA a GitHub save created, for the
+    /// firmware build watch; <see langword="null"/> for a local file.</param>
+    public sealed record Saved(KeymapSavePlan Plan, string ReloadPath, string? CommitSha = null)
+        : KeymapEditCompletion;
 
     /// <summary>The user answered a save conflict with "reload": drop the edit
     /// and show the target as it stands.</summary>

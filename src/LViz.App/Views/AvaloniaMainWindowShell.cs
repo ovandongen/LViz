@@ -4,8 +4,10 @@ using Avalonia.Platform.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using LViz.App.Localization;
 using LViz.App.Services;
+using LViz.App.Services.Flashing;
 using LViz.App.Services.GitHub;
 using LViz.App.ViewModels;
+using LViz.Core.Firmware;
 using LViz.Core.Layout;
 using LViz.Core.Persistence;
 using LViz.Core.Settings;
@@ -171,6 +173,55 @@ internal sealed class AvaloniaMainWindowShell : IMainWindowShell
         };
         // Closing with the window's ✕ yields the default bool — false.
         return await dlg.ShowDialog<bool>(owner);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> RunFlashAsync(FlashContext context)
+    {
+        var owner = Owner;
+        var dlgVm = new FlashViewModel(
+            context,
+            _services.GetRequiredService<IFirmwareBuildService>(),
+            _services.GetRequiredService<FirmwareFlashHistory>(),
+            _services.GetRequiredService<IKeyboardFlashAccess>(),
+            _services.GetRequiredService<FlashRun>())
+        {
+            OpenUrl = url => _services.GetRequiredService<IHostActionExecutor>().Launch(url),
+            CopyToClipboard = async text => await CopyTextAsync(text),
+            PickUf2File = PickUf2FileAsync,
+        };
+        // The source step reads the config and looks the build up straight away.
+        _ = dlgVm.StartAsync();
+        var dlg = new FlashWindow
+        {
+            DataContext = dlgVm,
+            Topmost = owner.Topmost,
+        };
+        // Closing with the window's ✕ yields the default bool — false.
+        return await dlg.ShowDialog<bool>(owner);
+    }
+
+    /// <inheritdoc />
+    public async Task<string?> PickUf2FileAsync()
+    {
+        var file = await Owner.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = Loc.Instance["Flash_PickFileTitle"],
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType(Loc.Instance["Flash_FileTypeUf2"])
+                {
+                    // .uf2 has no registered UTI on macOS, so a bare
+                    // extension filter greys the file out. The image is
+                    // plain binary data — tell the OS to treat it as such.
+                    Patterns = ["*.uf2"],
+                    MimeTypes = ["application/octet-stream"],
+                    AppleUniformTypeIdentifiers = ["public.data"],
+                },
+            ],
+        });
+        return file.Count > 0 ? file[0].TryGetLocalPath() : null;
     }
 
     /// <inheritdoc />

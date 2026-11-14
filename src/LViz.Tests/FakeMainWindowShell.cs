@@ -23,6 +23,8 @@ internal sealed class FakeMainWindowShell : IMainWindowShell
     public Exception? ClipboardFailure { get; set; }
     public LayoutWizardResult? WizardAnswer { get; set; }
     public bool ModuleSetupAnswer { get; set; }
+    public bool FlashAnswer { get; set; }
+    public string? Uf2Path { get; set; }
     public GitHubOpenSelection? GitHubAnswer { get; set; }
     public UserLayoutFile? EditLayoutAnswer { get; set; }
     public LabelEditAnswer<KeyLabelOverride>? KeyLabelAnswer { get; set; }
@@ -31,6 +33,7 @@ internal sealed class FakeMainWindowShell : IMainWindowShell
     public List<string> CopiedTexts { get; } = [];
     public List<LayoutWizardContext> WizardContexts { get; } = [];
     public List<ModuleSetupContext> ModuleSetupContexts { get; } = [];
+    public List<FlashContext> FlashContexts { get; } = [];
     public List<LayoutEditContext> EditLayoutContexts { get; } = [];
     public List<(int Layer, int Key, string Hint, KeyLabelOverride? Existing)> KeyLabelRequests { get; } = [];
     public List<(string Key, string DefaultLabel, ComboLabelOverride? Existing)> ComboLabelRequests { get; } = [];
@@ -68,6 +71,14 @@ internal sealed class FakeMainWindowShell : IMainWindowShell
         ModuleSetupContexts.Add(context);
         return Task.FromResult(ModuleSetupAnswer);
     }
+
+    public Task<bool> RunFlashAsync(FlashContext context)
+    {
+        FlashContexts.Add(context);
+        return Task.FromResult(FlashAnswer);
+    }
+
+    public Task<string?> PickUf2FileAsync() => Task.FromResult(Uf2Path);
 
     public Task<GitHubOpenSelection?> PickGitHubKeymapAsync(Func<IReadOnlyCollection<string>> attachedHidNames)
     {

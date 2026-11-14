@@ -13,8 +13,9 @@ namespace LViz.App.Views;
 /// this code-behind turns into <c>Close(saved)</c> — so <c>ShowDialog</c>
 /// returns exactly that, and closing with the window's ✕ gives false. While
 /// the window is open, a one-second timer keeps the Done step's board status
-/// fresh, because <see cref="ModuleSetupViewModel.IsBoardConnected"/> never
-/// updates by itself.
+/// fresh by re-asking the board for its config ID, because
+/// <see cref="ModuleSetupViewModel.IsBoardConnected"/> never updates by
+/// itself.
 /// </summary>
 public partial class ModuleSetupWindow : Window
 {
@@ -28,7 +29,7 @@ public partial class ModuleSetupWindow : Window
         _boardTimer.Tick += (_, _) =>
         {
             if (_boundVm is { IsDoneStep: true } vm)
-                vm.RefreshBoardStatus();
+                _ = vm.RefreshBoardStatusAsync();
         };
         Opened += (_, _) => _boardTimer.Start();
 

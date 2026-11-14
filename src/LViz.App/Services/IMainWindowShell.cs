@@ -37,6 +37,12 @@ public interface IMainWindowShell
     /// <summary>Run the live-features setup wizard; true when it saved changes.</summary>
     Task<bool> RunModuleSetupAsync(ModuleSetupContext context);
 
+    /// <summary>Opens the modal flash window on the context; true when at least one half was flashed.</summary>
+    Task<bool> RunFlashAsync(FlashContext context);
+
+    /// <summary>File picker for a .uf2 firmware file; null when cancelled.</summary>
+    Task<string?> PickUf2FileAsync();
+
     /// <summary>Run the GitHub sign-in / repo / keymap picker; the chosen keymap, or null.</summary>
     Task<GitHubOpenSelection?> PickGitHubKeymapAsync(Func<IReadOnlyCollection<string>> attachedHidNames);
 

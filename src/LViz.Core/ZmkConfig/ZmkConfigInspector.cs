@@ -110,7 +110,12 @@ public static class ZmkConfigInspector
             rawHidProject is null ? null : west!.OwnerOf(rawHidProject),
             StatusOf(west, rawHidProject, hidVizProject, settings, entries),
             BuildBlockers(hasWest, matrixPath is not null, matrix, entries, west, unreadableDetail),
-            unreadableDetail);
+            unreadableDetail,
+            new ZmkLiveFeatures(
+                IsYes(settings, "CONFIG_HID_VIZ_RGB"),
+                IsYes(settings, "CONFIG_HID_VIZ_SIGNAL"),
+                IsYes(settings, "CONFIG_HID_VIZ_EMIT"),
+                IsYes(settings, "CONFIG_HID_VIZ_SYSTEM")));
     }
 
     /// <summary>

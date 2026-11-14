@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LViz.App.Localization;
 using LViz.Core.Diagnostics;
+using LViz.Core.GitHub;
 using LViz.Core.Keymap.Editing;
 using LViz.Core.Keymap.Parser;
 using LViz.Core.Settings;
@@ -197,6 +198,19 @@ public partial class MainWindowViewModel
                 ApplyActiveLayer(LayerTabs.NearestShownLayer(layer));
                 StatusMessage = Loc.Instance.Format(
                     "Status_EditSavedFormat", Path.GetFileName(saved.ReloadPath));
+
+                // A save to GitHub just pushed a commit; follow its firmware
+                // build so the status bar can offer it once the Actions run
+                // is green. (The reload already re-ran RefreshLiveFeatures, so
+                // the watch survives only if it belongs to the loaded config.)
+                if (saved.CommitSha is { } sha
+                    && GitHubKeymapRef.TryParse(_loadedEntry, out var commitRef))
+                {
+                    _firmwareWatcher?.Watch(
+                        $"github:{commitRef.Owner}/{commitRef.Repo}:{commitRef.Branch}",
+                        commitRef.Owner, commitRef.Repo, commitRef.Branch, sha);
+                    RefreshFirmwareStatus();
+                }
 
                 if (notices.Count > 0)
                     await _editDialogs.ShowLayerSettingsNoticesAsync(notices.Select(NoticeLine).ToList());

@@ -5,9 +5,10 @@ using System.Text;
 namespace LViz.Core.Persistence;
 
 /// <summary>
-/// Pre-save snapshots of locally opened keymap files. Every save first copies
-/// the file as it sits on disk into <c>{root}/{key}/{utc stamp}.keymap</c> and
-/// keeps the newest <see cref="Keep"/> per keymap file, older ones are deleted.
+/// Pre-save snapshots of locally opened files. Every save first copies
+/// the file as it sits on disk into <c>{root}/{key}/{utc stamp}</c> plus the
+/// source file's own extension and keeps the newest <see cref="Keep"/> per
+/// file, older ones are deleted.
 /// </summary>
 /// <remarks>
 /// The folder name is a hash of the full path rather than the file name, so it stays
@@ -24,7 +25,7 @@ public sealed class KeymapBackupStore(string root, Func<DateTimeOffset>? now = n
     /// <summary>Inside a backup folder: the full path of the keymap the snapshots came from.</summary>
     public const string SourceFileName = "source.txt";
 
-    /// <summary>Extension of a stored snapshot.</summary>
+    /// <summary>Extension of a keymap's snapshot; other files keep their own.</summary>
     public const string BackupExtension = ".keymap";
 
     /// <summary>Leading hex chars of the SHA-256 of the full path — the folder name.</summary>
@@ -59,13 +60,14 @@ public sealed class KeymapBackupStore(string root, Func<DateTimeOffset>? now = n
             AtomicFile.WriteAllText(source, full);
 
         var stamp = _now().ToUniversalTime().ToString("yyyyMMdd-HHmmss-fff", CultureInfo.InvariantCulture);
-        var target = Path.Combine(folder, stamp + BackupExtension);
+        var ext = ExtensionFor(full);
+        var target = Path.Combine(folder, stamp + ext);
         for (var n = 2; File.Exists(target); n++)
-            target = Path.Combine(folder, $"{stamp}-{n}{BackupExtension}");
+            target = Path.Combine(folder, $"{stamp}-{n}{ext}");
 
         AtomicFile.WriteAllBytes(target, File.ReadAllBytes(full));
 
-        foreach (var stale in BackupsNewestFirst(folder).Skip(Keep))
+        foreach (var stale in BackupsNewestFirst(folder, ext).Skip(Keep))
             File.Delete(stale);
 
         return target;
@@ -74,8 +76,9 @@ public sealed class KeymapBackupStore(string root, Func<DateTimeOffset>? now = n
     /// <summary>Snapshots of this keymap, newest first; empty while it has no folder.</summary>
     public IReadOnlyList<string> List(string keymapPath)
     {
-        var folder = FolderFor(Path.GetFullPath(keymapPath));
-        return Directory.Exists(folder) ? BackupsNewestFirst(folder) : [];
+        var full = Path.GetFullPath(keymapPath);
+        var folder = FolderFor(full);
+        return Directory.Exists(folder) ? BackupsNewestFirst(folder, ExtensionFor(full)) : [];
     }
 
     private string FolderFor(string fullPath) => Path.Combine(Root, KeyFor(fullPath));
@@ -83,15 +86,20 @@ public sealed class KeymapBackupStore(string root, Func<DateTimeOffset>? now = n
     private static string KeyFor(string fullPath) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(fullPath)))[..KeyHexLength];
 
+    /// <summary>The extension a snapshot of this file gets: its own, or <c>.bak</c> when it has none.</summary>
+    private static string ExtensionFor(string fullPath) =>
+        Path.GetExtension(fullPath) is { Length: > 0 } ext ? ext : ".bak";
+
     /// <summary>
-    /// Snapshot paths in one folder, newest first; the time-stamped names sort by time.
+    /// Snapshot paths in one folder that end in <paramref name="extension"/>, newest first;
+    /// the time-stamped names sort by time.
     /// The extension is checked by hand because a Win32 `*.keymap` pattern also matches
     /// through 8.3 short names, which would drag an orphaned `….keymap.tmp` in.
     /// </summary>
-    private static IReadOnlyList<string> BackupsNewestFirst(string folder)
+    private static IReadOnlyList<string> BackupsNewestFirst(string folder, string extension)
     {
         var paths = Directory.GetFiles(folder)
-            .Where(path => Path.GetFileName(path).EndsWith(BackupExtension, StringComparison.Ordinal))
+            .Where(path => Path.GetFileName(path).EndsWith(extension, StringComparison.Ordinal))
             .ToList();
         paths.Sort(static (a, b) => string.CompareOrdinal(Path.GetFileName(a), Path.GetFileName(b)));
         paths.Reverse();

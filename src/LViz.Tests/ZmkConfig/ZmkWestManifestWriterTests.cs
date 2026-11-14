@@ -97,6 +97,84 @@ public class ZmkWestManifestWriterTests
     }
 
     [Fact]
+    public void ForkSwitch_KeepsSameLineComments()
+    {
+        var text = West("zzeneg").Replace("      remote: zzeneg\n", "      remote: zzeneg  # raw HID\n");
+        // the raw-hid revision is the second `revision: main` in the file
+        const string revision = "      revision: main";
+        var first = text.IndexOf(revision, StringComparison.Ordinal);
+        var second = text.IndexOf(revision, first + 1, StringComparison.Ordinal);
+        text = string.Concat(text[..second], revision + " # pin", text[(second + revision.Length)..]);
+
+        var result = ZmkWestManifestWriter.AddModules(text, "main", "main");
+
+        var lines = Lines(result);
+        Assert.Equal(Lines(text).Length, lines.Length); // switch in place, nothing appended or dropped
+        var rawHid = IndexOfLine(lines, "    - name: zmk-raw-hid");
+        Assert.Equal("      remote: ovandongen  # raw HID", lines[rawHid + 1]);
+        Assert.Equal("      revision: main # pin", lines[rawHid + 2]);
+        // the untouched zmk project keeps its plain revision
+        Assert.Equal(revision, lines[IndexOfLine(lines, "    - name: zmk") + 2]);
+    }
+
+    [Fact]
+    public void ForkSwitch_RemoteAndUrl_LeavesOneRemoteLine()
+    {
+        var result = ZmkWestManifestWriter.AddModules(
+            "manifest:\n" +
+            "  remotes:\n" +
+            "    - name: zmkfirmware\n" +
+            "      url-base: https://github.com/zmkfirmware\n" +
+            "    - name: zzeneg\n" +
+            "      url-base: https://github.com/zzeneg\n" +
+            "  projects:\n" +
+            "    - name: zmk\n" +
+            "      remote: zmkfirmware\n" +
+            "      revision: main\n" +
+            "      import: app/west.yml\n" +
+            "    - name: zmk-raw-hid\n" +
+            "      remote: zzeneg\n" +
+            "      url: https://github.com/zzeneg/zmk-raw-hid\n" +
+            "      revision: main\n",
+            "main", "main");
+
+        var lines = Lines(result);
+        var rawHid = IndexOfLine(lines, "    - name: zmk-raw-hid");
+        var item = ItemLines(lines, rawHid);
+        Assert.Equal(["      remote: ovandongen", "      revision: main"], item);
+
+        var parsed = ZmkWestManifestText.Parse(result);
+        Assert.Equal("ovandongen", parsed.OwnerOf(parsed.Project("zmk-raw-hid")!));
+    }
+
+    [Fact]
+    public void ForkSwitch_UrlOnly_BecomesRemote()
+    {
+        var result = ZmkWestManifestWriter.AddModules(
+            "manifest:\n" +
+            "  remotes:\n" +
+            "    - name: zmkfirmware\n" +
+            "      url-base: https://github.com/zmkfirmware\n" +
+            "  projects:\n" +
+            "    - name: zmk\n" +
+            "      remote: zmkfirmware\n" +
+            "      revision: main\n" +
+            "      import: app/west.yml\n" +
+            "    - name: zmk-raw-hid\n" +
+            "      url: https://github.com/zzeneg/zmk-raw-hid\n" +
+            "      revision: main\n",
+            "main", "main");
+
+        var lines = Lines(result);
+        var rawHid = IndexOfLine(lines, "    - name: zmk-raw-hid");
+        Assert.Equal(["      remote: ovandongen", "      revision: main"], ItemLines(lines, rawHid));
+        Assert.DoesNotContain(lines, l => l.TrimStart().StartsWith("url:", StringComparison.Ordinal));
+
+        var parsed = ZmkWestManifestText.Parse(result);
+        Assert.Equal("ovandongen", parsed.OwnerOf(parsed.Project("zmk-raw-hid")!));
+    }
+
+    [Fact]
     public void Glove80_AlreadySetUp_ChangesNothing()
     {
         var text = West("glove80");
@@ -211,5 +289,15 @@ public class ZmkWestManifestWriterTests
         var index = Array.IndexOf(lines, line);
         Assert.True(index >= 0, $"line not found: {line}");
         return index;
+    }
+
+    /// <summary>The key lines of the project item starting at <paramref name="dash"/>:
+    /// its following deeper-indented (6-space) lines.</summary>
+    private static List<string> ItemLines(string[] lines, int dash)
+    {
+        var item = new List<string>();
+        for (var i = dash + 1; i < lines.Length && lines[i].StartsWith("      ", StringComparison.Ordinal); i++)
+            item.Add(lines[i]);
+        return item;
     }
 }

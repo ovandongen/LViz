@@ -49,6 +49,10 @@ public sealed class MainWindowViewModelLiveFeaturesTests : IDisposable
             return _inner.RunModuleSetupAsync(context);
         }
 
+        public Task<bool> RunFlashAsync(FlashContext context) => _inner.RunFlashAsync(context);
+
+        public Task<string?> PickUf2FileAsync() => _inner.PickUf2FileAsync();
+
         public void Quit() => _inner.Quit();
         public void ShowWindow() => _inner.ShowWindow();
         public Task<string?> PickKeymapFileAsync() => _inner.PickKeymapFileAsync();

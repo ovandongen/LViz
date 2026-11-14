@@ -103,6 +103,7 @@
                 <ComboBox ItemsSource="{Binding CentralOptions}"
                           SelectedItem="{Binding SelectedCentral, Mode=TwoWay}"
                           DisplayMemberBinding="{Binding Text}"
+                          IsEnabled="{Binding CanChangeCentral}"
                           HorizontalAlignment="Left" MinWidth="280" />
                 <TextBlock Text="{Binding CentralHint}"
                            FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.TextSubtleBrush}"
@@ -110,13 +111,24 @@
             </StackPanel>
             <CheckBox Content="{Binding [ModuleSetup_FeatureRgb], Source={x:Static loc:Loc.Instance}}"
                       IsChecked="{Binding Rgb, Mode=TwoWay}"
+                      IsEnabled="{Binding !RgbLocked}"
                       IsVisible="{Binding ShowRgb}" />
             <CheckBox Content="{Binding [ModuleSetup_FeatureSignal], Source={x:Static loc:Loc.Instance}}"
-                      IsChecked="{Binding Signal, Mode=TwoWay}" />
+                      IsChecked="{Binding Signal, Mode=TwoWay}"
+                      IsEnabled="{Binding !SignalLocked}" />
+            <StackPanel Spacing="2">
+                <CheckBox Content="{Binding [ModuleSetup_FeatureSystem], Source={x:Static loc:Loc.Instance}}"
+                          IsChecked="{Binding System, Mode=TwoWay}"
+                          IsEnabled="{Binding !SystemLocked}" />
+                <TextBlock Text="{Binding [ModuleSetup_FeatureSystemHint], Source={x:Static loc:Loc.Instance}}"
+                           FontSize="12" TextWrapping="Wrap" Margin="28,0,0,0"
+                           Foreground="{x:Static svc:AppTheme.TextSubtleBrush}" />
+            </StackPanel>
             <Expander IsExpanded="{Binding ShowAdvanced, Mode=TwoWay}"
                       Header="{Binding [ModuleSetup_Advanced], Source={x:Static loc:Loc.Instance}}">
                 <CheckBox Content="{Binding [ModuleSetup_FeatureEmit], Source={x:Static loc:Loc.Instance}}"
                           IsChecked="{Binding Emit, Mode=TwoWay}"
+                          IsEnabled="{Binding !EmitLocked}"
                           Margin="0,6,0,0" />
             </Expander>
         </StackPanel>
@@ -183,12 +195,19 @@
                        IsVisible="{Binding !IsGitHub}" />
             <TextBlock Text="{Binding [ModuleSetup_DoneFlash], Source={x:Static loc:Loc.Instance}}"
                        FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.TextSubtleBrush}" />
-            <TextBlock Text="{Binding [ModuleSetup_BoardWaiting], Source={x:Static loc:Loc.Instance}}"
-                       FontSize="12" Foreground="{x:Static svc:AppTheme.TextSubtleBrush}"
-                       IsVisible="{Binding !IsBoardConnected}" />
-            <TextBlock Text="{Binding [ModuleSetup_BoardConnected], Source={x:Static loc:Loc.Instance}}"
-                       FontSize="12" Foreground="{x:Static svc:AppTheme.AccentGreenBrush}"
-                       IsVisible="{Binding IsBoardConnected}" />
+            <!-- An add-features save keeps the config ID, so the old firmware
+                 already reports it: no board check, just the note to flash. -->
+            <StackPanel Spacing="8" IsVisible="{Binding !IsAddFeaturesSave}">
+                <TextBlock Text="{Binding [ModuleSetup_BoardWaiting], Source={x:Static loc:Loc.Instance}}"
+                           FontSize="12" Foreground="{x:Static svc:AppTheme.TextSubtleBrush}"
+                           IsVisible="{Binding !IsBoardConnected}" />
+                <TextBlock Text="{Binding [ModuleSetup_BoardConnected], Source={x:Static loc:Loc.Instance}}"
+                           FontSize="12" Foreground="{x:Static svc:AppTheme.AccentGreenBrush}"
+                           IsVisible="{Binding IsBoardConnected}" />
+            </StackPanel>
+            <TextBlock Text="{Binding [ModuleSetup_DoneAddFeatures], Source={x:Static loc:Loc.Instance}}"
+                       FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.TextSubtleBrush}"
+                       IsVisible="{Binding IsAddFeaturesSave}" />
         </StackPanel>
 
     </DockPanel>

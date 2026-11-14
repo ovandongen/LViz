@@ -25,10 +25,12 @@ Current release: v3.0.0 on `main`.
 The HID transport lives in `external/zmk-hid-protocol` (git submodule).
 Boards have to advertise the Raw HID interface (usage page `0xFF60`,
 usage `0x61`, 32-byte reports) and emit layer-state (`0xFF`) plus
-key-event (`0xF1`) reports. The simplest firmware path is
-[zzeneg/zmk-raw-hid](https://github.com/zzeneg/zmk-raw-hid) +
+key-event (`0xF1`) reports. The firmware path is
+[ovandongen/zmk-raw-hid](https://github.com/ovandongen/zmk-raw-hid) (LViz
+is tested with this fork of zzeneg's) +
 [ovandongen/zmk-hid-viz](https://github.com/ovandongen/zmk-hid-viz)
-as ZMK modules in the user's `west` manifest.
+as ZMK modules in the user's `west` manifest; the module setup wizard adds
+them to a zmk-config.
 
 **Linux IS a shipped target.** We distribute a Linux binary on the same
 footing as Windows and macOS. The only Linux-specific limitation is the
@@ -39,10 +41,13 @@ failure), but the **HID layer source is a first-class Linux feature**
 and the app runs there. Don't downgrade Linux to "build-only" in csproj,
 release artifacts, or docs.
 
-**No firmware flashing, no keymap editing on-device.** The app reads
-layer-state / key-event reports from the keyboard and pushes
-`SetLayerState` requests back for the app-focus and mouse-layer
-features — that's the full set of side effects on the hardware.
+**Side effects on the hardware are few and fixed; no keymap editing
+on-device.** The app reads layer-state / key-event reports from the
+keyboard, pushes `SetLayerState` requests back for the app-focus and
+mouse-layer features, and flashes firmware: it can send
+`0xB0 core.system.bootloader` (firmware built with "Flash from LViz",
+`CONFIG_HID_VIZ_SYSTEM`) to put a half into its UF2 bootloader, then copies
+a `.uf2` onto the drive that appears. Nothing else is written to a board.
 
 ## Repo layout
 
@@ -54,7 +59,8 @@ src/
                  custom chrome, EN/NL localization, per-key label
                  overrides + FontAwesome icon picker, OS secret stores
                  (Services/Secrets/), GitHub service (Services/GitHub/),
-                 key ring geometry (Ring/). `AppServices.cs` is the
+                 flashing services (Services/Flashing/), key ring
+                 geometry (Ring/). `AppServices.cs` is the
                  composition root; the Avalonia shell, dialog hosts and
                  window lifecycle live in Views/.
   LViz.Core/   → pure .NET — dtsi physical-layout parser, keyboard
@@ -67,7 +73,9 @@ src/
                  Raw HID profile matching, settings, diagnostics, GitHub
                  client, login session and repo cache (GitHub/), zmk-config
                  readers, writers, inspector and module setup plan
-                 (ZmkConfig/). No Avalonia.
+                 (ZmkConfig/), firmware halves, UF2 checks, firmware
+                 cache, flash history and the bootloader command
+                 (Firmware/). No Avalonia.
   LViz.Tests/  → xUnit fixtures; headless Avalonia view tests in Rendering/.
 external/
   zmk-hid-protocol/   → submodule. Raw HID transport + report parser, and
@@ -499,9 +507,14 @@ After creating or editing a view, rebuild the App project before trusting a
   Exception messages are
   `GitHub {METHOD} {path} returned …` (path only) so a token never reaches
   the log; `GitHubTokens.ToString()` omits the tokens. `GitHubSession` owns
-  the login (keychain JSON under `GitHubAppInfo.SecretKey`, refresh under 5
-  minutes left, signs out on a rejected refresh); everything else asks it for
-  a token per call. `ISecretStore` implementations never throw for platform
+  the login (keychain JSON under its `secretKey`, by default
+  `GitHubAppInfo.SecretKey`, refresh under 5 minutes left, signs out on a
+  rejected refresh); everything else asks it for a token per call. A second
+  GitHub App, "LViz for ZMK Builds" (`GitHubBuildsAppInfo`, Actions: read
+  only, key `github-builds`), has its own client and session, built inside
+  the `IFirmwareBuildService` registration and never registered as their own
+  types: Actions runs, artifacts and downloads use it; the compare
+  (`CompareCommitsAsync`, Contents: read) uses the main login. `ISecretStore` implementations never throw for platform
   failures (warn + "unavailable"), picked per OS by `SecretStoreFactory`.
   A GitHub keymap is stored as one `github:owner/repo:branch:path` string
   (`GitHubKeymapRef`) in the same `LayoutJsonPaths`/`RecentKeymapPaths` dicts
@@ -534,6 +547,8 @@ After creating or editing a view, rebuild the App project before trusting a
   `KeymapBackupStore` (`ApplicationData/LViz/keymap-backups/<16-hex sha256 of
   the full path>/`, `source.txt` names the file, newest 20 kept) and writes
   atomically. Use one `KeymapBackupStore` root: another root starts a new history.
+  A snapshot keeps its source's extension (`west.yml` → `<stamp>.yml`, none →
+  `.bak`), and `List`/pruning filter by it.
 - **zmk-config module setup: `Core/ZmkConfig/` patches text, never through a
   YAML library.** The readers (`ZmkWestManifestText`, `ZmkBuildMatrixText`,
   `ZmkConfText`, shared `ZmkYamlLines`/`ZmkYamlList`) take block-style YAML
@@ -552,6 +567,33 @@ After creating or editing a view, rebuild the App project before trusting a
   backups + `FileRollback`); there is no overwrite, a conflict only offers
   Reload. LViz prefers `ovandongen/zmk-raw-hid` because it is tested with it,
   not because zzeneg's is broken: keep user-facing text neutral.
+  A set-up config opens add-only: features already `y` show locked and go to
+  the plan as `false` (the writers never remove), the central is the
+  `raw_hid_adapter` entry, and a plan that adds nothing is refused. The Done
+  step's "board reports in" means the board answers the `0xFA` config-ID
+  query with the config's ID (`ModuleSetupContext.QueryConfigId`), never HID
+  `IsConnected`; after an add-features save (same ID as the old firmware) it
+  asks nothing and tells the user to flash instead.
+- **Flashing: pure decisions in `Core/Firmware/`, devices and GitHub in
+  `App/Services/Flashing/`, the window in `FlashViewModel` (partials `.File`,
+  `.Run`) + `FlashWindow`.** `FirmwareHalves.For(facts)` names the halves,
+  central first (the `raw_hid_adapter` entry, else `CentralIndex`), and the
+  `.uf2` name the stock workflow gives each inside the `firmware` artifact.
+  `FirmwareCache` unpacks a build per commit under
+  `ApplicationData/LViz/firmware/<owner>/<repo>/<sha>/` (readable only with
+  its `.complete` marker, newest 5 per repo, wiped on builds sign-out);
+  `FirmwareFlashHistory` (`firmware/flash-history.json`) records the commit
+  each half was flashed with, keyed by the live-features config key and the
+  role *name* — only GitHub builds, never files. `FlashRun` flashes one half:
+  snapshot the drives, optional `0xB0`, wait for a *new* bootloader drive,
+  refuse a drive whose label names the other side (`Uf2Drive.Side`,
+  MoErgo's `…LHBOOT`/`…RHBOOT`), copy with a plain `FileStream`, wait for the
+  drive to go, and for the central wait for its config ID. Its waits count
+  the injected delay, not the clock, so tests run them instantly.
+  `FlashWindow.OnClosed` calls `FlashViewModel.CancelWork()`: a run left
+  going would copy its file onto the next bootloader drive with no window
+  open. `FirmwareBuildWatcher.Changed` fires on a background thread; the main
+  VM marshals it with `Dispatcher.UIThread.Post`.
 
 ## Before writing code
 
@@ -686,8 +728,9 @@ LViz-specific (extend this list as we hit more):
   inside the lock) and every `ConnectToDevice()` is wrapped in
   `HidGlobalLock.Gate` (submodule, `Transport/HidGlobalLock.cs`). Reads/writes
   on an already-open handle stay lock-free. Any new hidapi enumerate/open call
-  site MUST take this gate. Unit tests can't catch this — it needs real
-  hardware + concurrent loops.
+  site MUST take this gate, App-side ones too (`KeyboardFlashAccess`'s bus
+  lookup): the class is public for that. Unit tests can't catch this — it
+  needs real hardware + concurrent loops.
 
 - **The keyboard must never be opened twice — the capability bus excludes
   it by matcher AND path.** The keyboard is owned by the HID pipeline's
@@ -1031,3 +1074,41 @@ LViz-specific (extend this list as we hit more):
 
 - **A `.keymap` test fixture needs the same binding count on every layer**:
   `KeyboardConfigValidator` rejects the file otherwise.
+
+- **A fake's interface event that is never raised trips CS0067** in the
+  0-warning build: wrap it in `#pragma warning disable/restore CS0067` with a
+  why-comment (`FirmwareBuildWatcherTests.FakeBuilds`).
+
+- **To forward an event, use pass-through accessors**
+  (`event X? E { add => inner.E += value; remove => inner.E -= value; }`, see
+  `FirmwareBuildService.Changed`); in a primary-constructor class a bare `{ }`
+  block after an event declaration parses as its accessor list.
+
+- **Generated `[ObservableProperty]` hooks don't fire when the new value
+  equals the old one.** State that must reset on every user action (re-picking
+  a file with the same name) is reset in the command, not only in the hook.
+
+- **An `ItemsControl` bound to a plain `List<T>` only shows the items present
+  when it is first laid out**; later `Add`s are invisible. Bind an
+  `ObservableCollection<T>` or publish a new list.
+
+- **xUnit here is 2.9.2**: there is no `TestContext.Current` (xUnit v3); pass
+  `CancellationToken.None` explicitly.
+
+- **`ZipArchive` (read mode) closes its entry streams on dispose**: extract
+  inside the `using`, and move or delete the target folders after it, because
+  Windows refuses while the archive is open (`FirmwareCache.Store`).
+
+- **A `[AvaloniaFact]` test of code that marshals with
+  `Dispatcher.UIThread.Post` must pump `Dispatcher.UIThread.RunJobs()`**, and
+  keep the fakes' tasks completed: an `await Task.Delay` loop is parked on the
+  dispatcher's context in these tests.
+
+- **.NET 10 file-based programs (`dotnet run x.cs`) disable reflection-based
+  `System.Text.Json`**; exercise a Core JSON store through the test project
+  instead.
+
+- **`KeyRingOverlayTests.Open_ShowsScrimAndOutline_ThenResizeCancelsAndHidesIt`
+  can flake in a full run** (`PlatformNotSupportedException` in
+  `Dispatcher.PushFrame`) and pass alone; a red run with only that test is
+  not a regression.

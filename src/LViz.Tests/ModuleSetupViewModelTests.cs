@@ -27,7 +27,7 @@ public class ModuleSetupViewModelTests
         new(Path.Combine(Path.GetTempPath(), $"lviz-modsetup-backups-{Guid.NewGuid():N}"));
 
     private static ModuleSetupViewModel LocalVm(string root) =>
-        new(new ModuleSetupContext(root, null, () => false), gitHub: null, FreshBackups(), () => FixedGuid);
+        new(new ModuleSetupContext(root, null, _ => Task.FromResult<string?>(null)), gitHub: null, FreshBackups(), () => FixedGuid);
 
     [Fact]
     public async Task Cosmos82_CheckReportsTheFacts_ThenWalksChooseToReview()
@@ -89,7 +89,39 @@ public class ModuleSetupViewModelTests
     }
 
     [Fact]
-    public async Task Glove80_AlreadySetUp_ReportsAndStops()
+    public async Task Cosmos82_Choose_SystemOffByDefault()
+    {
+        var root = ZmkConfigFixtures.CopyToTemp("cosmos82");
+        try
+        {
+            var vm = LocalVm(root);
+            await vm.StartAsync();
+
+            // A config that is not set up has nothing locked and everything
+            // to choose; flashing still starts off.
+            Assert.False(vm.System);
+            Assert.False(vm.RgbLocked);
+            Assert.False(vm.SignalLocked);
+            Assert.False(vm.EmitLocked);
+            Assert.False(vm.SystemLocked);
+            Assert.True(vm.CanChangeCentral);
+
+            vm.NextCommand.Execute(null); // -> Choose
+            vm.System = true;
+            vm.NextCommand.Execute(null); // -> Review
+
+            Assert.Equal(ModuleSetupStep.Review, vm.Step);
+            var conf = vm.Files.Single(f => f.Path == "config/cosmos82.conf");
+            Assert.Contains(conf.Lines, l => l.IsAdded && l.Text == "+ CONFIG_HID_VIZ_SYSTEM=y");
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public async Task Glove80_SetUp_LocksPresentFeatures()
     {
         var root = ZmkConfigFixtures.CopyToTemp("glove80");
         try
@@ -97,11 +129,13 @@ public class ModuleSetupViewModelTests
             var vm = LocalVm(root);
             await vm.StartAsync();
 
-            Assert.False(vm.CanSetUp);
+            // A set-up config is add-only: Check is passable, Choose gates.
+            Assert.True(vm.CanSetUp);
+            Assert.True(vm.NextCommand.CanExecute(null));
             Assert.Equal(Loc.Instance["ModuleSetup_AlreadySetUp"], vm.StatusMessage);
             Assert.Equal(Loc.Instance["ModuleSetup_FactStatusSetUp"], vm.FactLines[3]);
             // MoErgo boards are treated as having underglow, so the RGB
-            // default rides along even though the wizard stops here.
+            // default rides along.
             Assert.True(vm.ShowRgb);
             Assert.True(vm.Rgb);
             Assert.Equal(
@@ -110,7 +144,82 @@ public class ModuleSetupViewModelTests
                     Loc.Instance["ModuleSetup_ReasonLeftNaming"]),
                 vm.FactLines[2]);
             Assert.Equal(Loc.Instance["ModuleSetup_CentralHintGuessed"], vm.CentralHint);
+
+            vm.NextCommand.Execute(null); // -> Choose
+
+            Assert.Equal(ModuleSetupStep.Choose, vm.Step);
+            // RGB, SIGNAL and EMIT are all y in the fixture: ticked and locked.
+            Assert.True(vm.RgbLocked);
+            Assert.True(vm.SignalLocked);
+            Assert.True(vm.EmitLocked);
+            Assert.True(vm.Rgb);
+            Assert.True(vm.Signal);
+            Assert.True(vm.Emit);
+            // Flashing is not on yet: it is the only thing that can be added.
+            Assert.False(vm.SystemLocked);
+            Assert.False(vm.System);
+            // The central is the raw_hid_adapter entry, and fixed to it.
+            Assert.False(vm.CanChangeCentral);
+            Assert.Equal(0, vm.SelectedCentral!.Index);
+            // Nothing new is ticked: Next stays off.
             Assert.False(vm.NextCommand.CanExecute(null));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public async Task Glove80_SetUp_TickSystem_ReviewsOneConfLine()
+    {
+        var root = ZmkConfigFixtures.CopyToTemp("glove80");
+        try
+        {
+            var vm = LocalVm(root);
+            await vm.StartAsync();
+            vm.NextCommand.Execute(null); // -> Choose
+
+            Assert.False(vm.NextCommand.CanExecute(null));
+            vm.System = true;
+            Assert.True(vm.NextCommand.CanExecute(null));
+
+            vm.NextCommand.Execute(null); // -> Review
+
+            Assert.Equal(ModuleSetupStep.Review, vm.Step);
+            // The west manifest and build matrix already have everything: only the conf changes.
+            Assert.Equal(["config/glove80.conf"], vm.Files.Select(f => f.Path));
+            Assert.Contains(
+                vm.Files.Single().Lines,
+                l => l.IsAdded && !l.IsRemoved && !l.IsGap && l.Text == "+ CONFIG_HID_VIZ_SYSTEM=y");
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public async Task Glove80_SetUp_Save_UsesAddFeaturesMessage()
+    {
+        var root = ZmkConfigFixtures.CopyToTemp("glove80");
+        try
+        {
+            var vm = LocalVm(root);
+            await vm.StartAsync();
+            vm.NextCommand.Execute(null); // -> Choose
+            vm.System = true;
+            vm.NextCommand.Execute(null); // -> Review
+
+            await vm.SaveCommand.ExecuteAsync(null);
+
+            Assert.Equal(ModuleSetupStep.Done, vm.Step);
+            Assert.True(vm.Saved);
+            Assert.EndsWith(
+                "CONFIG_HID_VIZ_SYSTEM=y\n",
+                File.ReadAllText(Path.Combine(root, "config", "glove80.conf")));
+            // The GitHub save of such a plan commits with this message.
+            Assert.Equal("LViz: enable more live features", ModuleSetupViewModel.CommitMessageAddFeatures);
         }
         finally
         {
@@ -235,7 +344,7 @@ public class ModuleSetupViewModelTests
                 },
             };
             var vm = new ModuleSetupViewModel(
-                new ModuleSetupContext(null, new ModuleSetupGitHubTarget("od", "my-config", "main"), () => false),
+                new ModuleSetupContext(null, new ModuleSetupGitHubTarget("od", "my-config", "main"), _ => Task.FromResult<string?>(null)),
                 gitHub,
                 FreshBackups(),
                 () => FixedGuid);
@@ -272,7 +381,7 @@ public class ModuleSetupViewModelTests
             OnFetchRepo = (_, _, _) => throw new GitHubApiException(GitHubErrorKind.Network, "no route"),
         };
         var vm = new ModuleSetupViewModel(
-            new ModuleSetupContext(null, new ModuleSetupGitHubTarget("od", "my-config", "main"), () => false),
+            new ModuleSetupContext(null, new ModuleSetupGitHubTarget("od", "my-config", "main"), _ => Task.FromResult<string?>(null)),
             gitHub,
             FreshBackups(),
             () => FixedGuid);
@@ -288,18 +397,40 @@ public class ModuleSetupViewModelTests
     }
 
     [Fact]
+    public async Task GitHubFetch_DiskError_ShowsReadError()
+    {
+        // Unpacking the branch tarball can fail on the disk, not the API;
+        // that lands in the same read-error text, not an unobserved task.
+        var gitHub = new FakeGitHubKeymapService
+        {
+            OnFetchRepo = (_, _, _) => throw new IOException("disk full"),
+        };
+        var vm = new ModuleSetupViewModel(
+            new ModuleSetupContext(null, new ModuleSetupGitHubTarget("od", "my-config", "main"),
+                _ => Task.FromResult<string?>(null)),
+            gitHub,
+            FreshBackups(),
+            () => FixedGuid);
+        await vm.StartAsync();
+
+        Assert.Equal(Loc.Instance.Format("ModuleSetup_ErrorRead", "disk full"), vm.ErrorMessage);
+        Assert.False(vm.CanSetUp);
+        Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
     public void Ctor_RejectsMissingOrDoubleContextAndGitHubWithoutService()
     {
         Assert.Throws<ArgumentException>(() => new ModuleSetupViewModel(
-            new ModuleSetupContext(null, null, () => false), gitHub: null, FreshBackups(), () => FixedGuid));
+            new ModuleSetupContext(null, null, _ => Task.FromResult<string?>(null)), gitHub: null, FreshBackups(), () => FixedGuid));
 
         var target = new ModuleSetupGitHubTarget("od", "my-config", "main");
         Assert.Throws<ArgumentException>(() => new ModuleSetupViewModel(
-            new ModuleSetupContext("/tmp/whatever", target, () => false),
+            new ModuleSetupContext("/tmp/whatever", target, _ => Task.FromResult<string?>(null)),
             new FakeGitHubKeymapService(), FreshBackups(), () => FixedGuid));
 
         Assert.Throws<ArgumentException>(() => new ModuleSetupViewModel(
-            new ModuleSetupContext(null, target, () => false), gitHub: null, FreshBackups(), () => FixedGuid));
+            new ModuleSetupContext(null, target, _ => Task.FromResult<string?>(null)), gitHub: null, FreshBackups(), () => FixedGuid));
     }
 
     [Fact]
@@ -347,7 +478,7 @@ public class ModuleSetupViewModelTests
     // ---------- review, save and done ----------
 
     [Fact]
-    public async Task Cosmos82_Review_ShowsThePlanDiffs_AndWarnsAboutTheUnknownRevision()
+    public async Task Cosmos82_Review_ShowsThePlanDiffs()
     {
         var root = ZmkConfigFixtures.CopyToTemp("cosmos82");
         try
@@ -369,10 +500,8 @@ public class ModuleSetupViewModelTests
             Assert.Contains(conf.Lines, l => !l.IsAdded && !l.IsRemoved && !l.IsGap && l.Text.StartsWith("  "));
             Assert.All(conf.Lines, l => Assert.True(l.IsGap == (l.Text == "\u2026")));
 
-            // zmkfirmware v0.3 is not a tested pairing, so the warning names it.
-            Assert.Equal(
-                Loc.Instance.Format("ModuleSetup_RevisionUnknown", "zmkfirmware", "v0.3"),
-                vm.RevisionWarning);
+            // zmkfirmware v0.3 is a tested pairing, so no revision warning.
+            Assert.Null(vm.RevisionWarning);
             Assert.Null(vm.ForkNotice);
             Assert.True(vm.SaveCommand.CanExecute(null));
 
@@ -380,6 +509,34 @@ public class ModuleSetupViewModelTests
             Assert.Equal(ModuleSetupStep.Choose, vm.Step);
             Assert.Empty(vm.Files);
             Assert.False(vm.SaveCommand.CanExecute(null));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public async Task UnknownRevision_Review_Warns()
+    {
+        var root = ZmkConfigFixtures.CopyToTemp("cosmos82");
+        try
+        {
+            // The defaults revision the zmk project inherits; the pmw3610
+            // driver keeps its own zmk-0.3 revision.
+            var west = Path.Combine(root, "config", "west.yml");
+            File.WriteAllText(west,
+                File.ReadAllText(west).Replace("    revision: v0.3", "    revision: v0.2"));
+
+            var vm = LocalVm(root);
+            await vm.StartAsync();
+            vm.NextCommand.Execute(null); // -> Choose
+            vm.NextCommand.Execute(null); // -> Review
+
+            Assert.Equal(ModuleSetupStep.Review, vm.Step);
+            Assert.Equal(
+                Loc.Instance.Format("ModuleSetup_RevisionUnknown", "zmkfirmware", "v0.2"),
+                vm.RevisionWarning);
         }
         finally
         {
@@ -501,7 +658,7 @@ public class ModuleSetupViewModelTests
                 },
             };
             var vm = new ModuleSetupViewModel(
-                new ModuleSetupContext(null, new ModuleSetupGitHubTarget("od", "my-config", "main"), () => false),
+                new ModuleSetupContext(null, new ModuleSetupGitHubTarget("od", "my-config", "main"), _ => Task.FromResult<string?>(null)),
                 gitHub,
                 FreshBackups(),
                 () => FixedGuid);
@@ -548,7 +705,7 @@ public class ModuleSetupViewModelTests
                     Task.FromResult<GitHubSaveResult>(new GitHubSaveResult.Conflict()),
             };
             var vm = new ModuleSetupViewModel(
-                new ModuleSetupContext(null, new ModuleSetupGitHubTarget("od", "my-config", "main"), () => false),
+                new ModuleSetupContext(null, new ModuleSetupGitHubTarget("od", "my-config", "main"), _ => Task.FromResult<string?>(null)),
                 gitHub,
                 FreshBackups(),
                 () => FixedGuid);
@@ -582,7 +739,7 @@ public class ModuleSetupViewModelTests
                     Task.FromResult<GitHubSaveResult>(new GitHubSaveResult.Failed(GitHubErrorKind.Network, "x")),
             };
             var vm = new ModuleSetupViewModel(
-                new ModuleSetupContext(null, new ModuleSetupGitHubTarget("od", "my-config", "main"), () => false),
+                new ModuleSetupContext(null, new ModuleSetupGitHubTarget("od", "my-config", "main"), _ => Task.FromResult<string?>(null)),
                 gitHub,
                 FreshBackups(),
                 () => FixedGuid);
@@ -607,25 +764,107 @@ public class ModuleSetupViewModelTests
     }
 
     [Fact]
-    public void RefreshBoardStatus_FollowsTheContextFlag()
+    public async Task RefreshBoardStatus_TrueOnlyForTheExpectedConfigId()
     {
-        var connected = false;
-        var vm = new ModuleSetupViewModel(
-            new ModuleSetupContext(ZmkConfigFixtures.Root("cosmos82"), null, () => connected),
-            gitHub: null,
-            FreshBackups(),
-            () => FixedGuid);
+        // A config without an id: the wizard writes its GUID, so that GUID
+        // alone is "the board reporting in".
+        var root = ZmkConfigFixtures.CopyToTemp("cosmos82");
+        try
+        {
+            string? reported = null;
+            var vm = new ModuleSetupViewModel(
+                new ModuleSetupContext(root, null, _ => Task.FromResult(reported)),
+                gitHub: null,
+                FreshBackups(),
+                () => FixedGuid);
+            await vm.StartAsync();
+            vm.NextCommand.Execute(null); // -> Choose
+            vm.NextCommand.Execute(null); // -> Review
+            await vm.SaveCommand.ExecuteAsync(null); // -> Done, FinishSave
 
-        vm.RefreshBoardStatus();
-        Assert.False(vm.IsBoardConnected);
+            Assert.Equal(ModuleSetupStep.Done, vm.Step);
+            Assert.False(vm.IsAddFeaturesSave); // a first setup writes a new id the board can report
 
-        connected = true;
-        vm.RefreshBoardStatus();
-        Assert.True(vm.IsBoardConnected);
+            reported = null;
+            await vm.RefreshBoardStatusAsync();
+            Assert.False(vm.IsBoardConnected);
 
-        connected = false;
-        vm.RefreshBoardStatus();
-        Assert.False(vm.IsBoardConnected);
+            reported = "something-else";
+            await vm.RefreshBoardStatusAsync();
+            Assert.False(vm.IsBoardConnected);
+
+            reported = FixedGuid.ToString("D");
+            await vm.RefreshBoardStatusAsync();
+            Assert.True(vm.IsBoardConnected);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public async Task AddFeaturesSave_SkipsTheBoardCheck_AndAsksToFlash()
+    {
+        // The glove80 fixture already carries CONFIG_HID_VIZ_CONFIG_ID, so the
+        // plan writes no new id and the old firmware reports the same one:
+        // the Done step can't tell old from new, so it doesn't ask.
+        var root = ZmkConfigFixtures.CopyToTemp("glove80");
+        try
+        {
+            var queries = 0;
+            var vm = new ModuleSetupViewModel(
+                new ModuleSetupContext(root, null, _ =>
+                {
+                    queries++;
+                    return Task.FromResult<string?>("123e4567-e89b-12d3-a456-426614174000");
+                }),
+                gitHub: null,
+                FreshBackups(),
+                () => FixedGuid);
+            await vm.StartAsync();
+            vm.NextCommand.Execute(null); // -> Choose
+            vm.System = true;
+            vm.NextCommand.Execute(null); // -> Review
+            await vm.SaveCommand.ExecuteAsync(null); // -> Done
+
+            await vm.RefreshBoardStatusAsync();
+            Assert.True(vm.IsDoneStep);
+            Assert.True(vm.IsAddFeaturesSave);
+            Assert.False(vm.IsBoardConnected);
+            Assert.Equal(0, queries);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public async Task RefreshBoardStatus_QueryThrows_IsFalse()
+    {
+        var root = ZmkConfigFixtures.CopyToTemp("cosmos82");
+        try
+        {
+            var vm = new ModuleSetupViewModel(
+                new ModuleSetupContext(root, null,
+                    _ => throw new InvalidOperationException("no transport")),
+                gitHub: null,
+                FreshBackups(),
+                () => FixedGuid);
+            await vm.StartAsync();
+            vm.NextCommand.Execute(null);
+            vm.NextCommand.Execute(null);
+            await vm.SaveCommand.ExecuteAsync(null); // FinishSave swallows it too
+
+            Assert.Equal(ModuleSetupStep.Done, vm.Step);
+            await vm.RefreshBoardStatusAsync(); // the throw stays inside the method
+            Assert.False(vm.IsBoardConnected);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
     }
 
     [Fact]

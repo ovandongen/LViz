@@ -31,6 +31,8 @@ public class PipelineRunnerTests
         { log.Add($"activate:{layerIndex}"); return Task.FromResult(new ControlResult(ControlOutcome.Confirmed)); }
         public Task<ControlResult> DeactivateLayerAsync(ICapabilityDevice target, byte layerIndex, CancellationToken ct = default)
         { log.Add($"deactivate:{layerIndex}"); return Task.FromResult(new ControlResult(ControlOutcome.Confirmed)); }
+        public Task<ControlResult> EnterBootloaderAsync(ICapabilityDevice target, byte targetHalf, CancellationToken ct = default)
+        { log.Add($"bootloader:{targetHalf}"); return Task.FromResult(new ControlResult(ControlOutcome.Confirmed)); }
     }
 
     private static (PipelineRunner Runner, List<string> Log, FakeCapabilityRouter Router) Build(

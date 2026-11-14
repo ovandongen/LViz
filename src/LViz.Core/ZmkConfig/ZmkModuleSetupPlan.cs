@@ -8,7 +8,8 @@ namespace LViz.Core.ZmkConfig;
 /// <param name="Rgb">Switch on <c>CONFIG_HID_VIZ_RGB</c> (only honoured when the config has underglow).</param>
 /// <param name="Signal">Switch on <c>CONFIG_HID_VIZ_SIGNAL</c>.</param>
 /// <param name="Emit">Switch on <c>CONFIG_HID_VIZ_EMIT</c>.</param>
-public sealed record ZmkModuleChoices(int CentralIndex, bool Rgb, bool Signal, bool Emit);
+/// <param name="System">Switch on <c>CONFIG_HID_VIZ_SYSTEM</c> (flashing from LViz).</param>
+public sealed record ZmkModuleChoices(int CentralIndex, bool Rgb, bool Signal, bool Emit, bool System = false);
 
 /// <summary>
 /// One file the setup writes: its '/'-separated path in the config, the text
@@ -42,11 +43,13 @@ public sealed record ZmkModuleSetupPlan(
 
     /// <summary>
     /// Turns the inspected files, the facts and the user's choices into the
-    /// files to save. Refuses a blocked or already-set-up config and an
-    /// unknown central. The result is guarded: applying every change and
-    /// inspecting the outcome must leave the config set up and unblocked.
+    /// files to save. Refuses a blocked config, an unknown central, a
+    /// set-up config whose central does not carry the raw-hid adapter, and
+    /// choices that would add nothing the config does not already have.
+    /// The result is guarded: applying every change and inspecting the
+    /// outcome must leave the config set up and unblocked.
     /// </summary>
-    /// <exception cref="ArgumentException">the config is blocked, already set up, or the central is not a build entry.</exception>
+    /// <exception cref="ArgumentException">the config is blocked; the central is not a build entry or — on a set-up config — carries no <c>raw_hid_adapter</c>; or every chosen feature is already switched on.</exception>
     /// <exception cref="InvalidOperationException">the patched config is not set up (plan bug or hopeless config).</exception>
     public static ZmkModuleSetupPlan Build(
         ZmkConfigFileSet files,
@@ -57,12 +60,13 @@ public sealed record ZmkModuleSetupPlan(
         if (facts.Blockers.Count > 0)
             throw new ArgumentException(
                 $"the zmk-config is blocked: {string.Join(", ", facts.Blockers)}", nameof(facts));
-        if (facts.Status == ZmkModuleStatus.SetUp)
-            throw new ArgumentException("the modules are already set up", nameof(facts));
         var central = facts.Entries.FirstOrDefault(e => e.Index == choices.CentralIndex);
         if (central is null)
             throw new ArgumentException(
                 $"{choices.CentralIndex} is not a build entry of this config", nameof(choices));
+        if (facts.Status == ZmkModuleStatus.SetUp && !central.Shields.Contains(RawHidAdapterShield))
+            throw new ArgumentException(
+                "on a set-up config the central is the entry with raw_hid_adapter", nameof(choices));
 
         var revision = ZmkModuleRevisions.For(facts.ZmkOwner, facts.ZmkRevision);
         var changes = new List<ZmkConfigFileChange>();
@@ -76,11 +80,15 @@ public sealed record ZmkModuleSetupPlan(
         AddIfChanged(changes, buildPath, buildOld,
             ZmkBuildMatrixWriter.AddShield(buildOld, choices.CentralIndex, RawHidAdapterShield));
 
-        var confPath = ConfPath(facts, central);
+        var confPath = ConfPath(files, facts, central);
         files.Files.TryGetValue(confPath, out var confOld);
         var newConfigId = facts.ConfigId is null ? newGuid().ToString("D") : null;
         var confNew = ZmkConfWriter.Apply(confOld, Settings(facts, choices, newConfigId));
         AddIfChanged(changes, confPath, confOld, confNew);
+
+        if (changes.Count == 0)
+            throw new ArgumentException(
+                "nothing to add: the config already has every chosen feature", nameof(choices));
 
         Guard(files, changes);
 
@@ -88,12 +96,28 @@ public sealed record ZmkModuleSetupPlan(
     }
 
     /// <summary>
-    /// The .conf the options go into: the config's only one, else
+    /// The .conf the options go into: on a set-up config the last (ordinal
+    /// path order) one that sets <c>CONFIG_HID_VIZ=y</c> — the file the
+    /// modules were set up in, falling back to the rule below when none
+    /// does; otherwise the config's only one, else
     /// <c>config/&lt;base&gt;.conf</c> from the central's first non-adapter
     /// shield (else its board) minus one side suffix.
     /// </summary>
-    private static string ConfPath(ZmkConfigFacts facts, ZmkBuildEntry central)
+    private static string ConfPath(ZmkConfigFileSet files, ZmkConfigFacts facts, ZmkBuildEntry central)
     {
+        if (facts.Status == ZmkModuleStatus.SetUp)
+        {
+            // ConfPaths are sorted ordinal: the loop keeps the last hit.
+            string? setUpConf = null;
+            foreach (var path in facts.ConfPaths)
+                if (string.Equals(
+                        ZmkConfText.Get(ZmkConfText.Parse(files.Files[path]), "CONFIG_HID_VIZ"),
+                        "y", StringComparison.OrdinalIgnoreCase))
+                    setUpConf = path;
+            if (setUpConf is not null)
+                return setUpConf;
+        }
+
         if (facts.ConfPaths.Count == 1)
             return facts.ConfPaths[0];
 
@@ -124,6 +148,8 @@ public sealed record ZmkModuleSetupPlan(
             settings.Add(new KeyValuePair<string, string>("CONFIG_HID_VIZ_SIGNAL", "y"));
         if (choices.Emit)
             settings.Add(new KeyValuePair<string, string>("CONFIG_HID_VIZ_EMIT", "y"));
+        if (choices.System)
+            settings.Add(new KeyValuePair<string, string>("CONFIG_HID_VIZ_SYSTEM", "y"));
         if (newConfigId is not null)
             settings.Add(new KeyValuePair<string, string>("CONFIG_HID_VIZ_CONFIG_ID", $"\"{newConfigId}\""));
         return settings;

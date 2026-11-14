@@ -51,6 +51,9 @@ public enum ZmkConfigBlocker
     Unreadable,
 }
 
+/// <summary>Which live-feature options the merged <c>.conf</c> settings set to <c>y</c>.</summary>
+public sealed record ZmkLiveFeatures(bool Rgb, bool Signal, bool Emit, bool System);
+
 /// <summary>
 /// What LViz needs to know about a zmk-config root: its ZMK source, whether
 /// it is split and which build entry is the central, whether the modules are
@@ -72,6 +75,7 @@ public enum ZmkConfigBlocker
 /// <param name="Status">Whether the modules are set up.</param>
 /// <param name="Blockers">Why the config cannot be used as it stands; empty when it can.</param>
 /// <param name="UnreadableDetail">The reader's message behind <see cref="ZmkConfigBlocker.Unreadable"/>, else null.</param>
+/// <param name="Features">Which live-feature options the merged <c>.conf</c> settings set to <c>y</c>.</param>
 public sealed record ZmkConfigFacts(
     string Root,
     string? BuildMatrixPath,
@@ -87,4 +91,5 @@ public sealed record ZmkConfigFacts(
     string? RawHidOwner,
     ZmkModuleStatus Status,
     IReadOnlyList<ZmkConfigBlocker> Blockers,
-    string? UnreadableDetail);
+    string? UnreadableDetail,
+    ZmkLiveFeatures Features);

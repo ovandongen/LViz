@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using LViz.App.Localization;
 using LViz.App.Services;
+using LViz.App.Services.Flashing;
 using LViz.App.Services.GitHub;
 using LViz.App.Services.Hotkeys;
 using LViz.App.Services.MouseIdle;
@@ -8,6 +9,7 @@ using LViz.App.Services.Secrets;
 using LViz.App.ViewModels;
 using LViz.App.Views;
 using LViz.Core.Diagnostics;
+using LViz.Core.Firmware;
 using LViz.Core.GitHub;
 using LViz.Core.Persistence;
 using LViz.Core.Settings;
@@ -112,6 +114,43 @@ internal static class AppServices
         services.AddSingleton(_ => new KeymapBackupStore(KeymapBackupStore.DefaultRoot));
         services.AddSingleton<IKeymapEditDialogs, AvaloniaKeymapEditDialogs>();
 
+        // Firmware flashing: the local firmware cache and flash history, the
+        // builds service with its own login for the second App (its client
+        // and session are internal to the service — never registered as
+        // their own types, and its login lives under its own secret key),
+        // the watcher the status-bar firmware line reads, and the pieces the
+        // flash window runs on. IKeyboardFlashAccess reaches the device stack
+        // through the main view-model; it is only ever resolved when the
+        // flash window opens, which is after the view-model exists.
+        services.AddSingleton(_ => new FirmwareCache(FirmwareCache.DefaultRoot));
+        services.AddSingleton(_ => new FirmwareFlashHistory(FirmwareFlashHistory.DefaultPath));
+        services.AddSingleton<IFirmwareBuildService>(sp =>
+        {
+            var buildsClient = new GitHubClient(
+                sp.GetRequiredService<HttpClient>(),
+                GitHubBuildsAppInfo.ClientId,
+                $"LViz/{typeof(GitHubKeymapService).Assembly.GetName().Version}");
+            return new FirmwareBuildService(
+                buildsClient,
+                new GitHubSession(
+                    buildsClient,
+                    sp.GetRequiredService<ISecretStore>(),
+                    secretKey: GitHubBuildsAppInfo.SecretKey),
+                sp.GetRequiredService<GitHubClient>(),
+                sp.GetRequiredService<GitHubSession>(),
+                sp.GetRequiredService<FirmwareCache>());
+        });
+        services.AddSingleton(sp => new FirmwareBuildWatcher(sp.GetRequiredService<IFirmwareBuildService>()));
+        services.AddSingleton<IKeyboardFlashAccess>(sp =>
+        {
+            var vm = sp.GetRequiredService<MainWindowViewModel>();
+            return new KeyboardFlashAccess(
+                vm.Devices.Hid, vm.Devices.Router, sp.GetRequiredService<ICapabilityControl>());
+        });
+        services.AddTransient(sp => new FlashRun(
+            sp.GetRequiredService<IKeyboardFlashAccess>(),
+            new Uf2DriveWatcher(new SystemUf2DriveSource())));
+
         // Window lifecycle + the shell the view-model opens windows through;
         // both look the main window and view-model up at call time.
         services.AddSingleton(sp => new MainWindowLifecycle(
@@ -133,6 +172,7 @@ internal static class AppServices
                 sp.GetRequiredService<IHostActionExecutor>(),
                 sp.GetRequiredService<ICapabilityControl>(),
                 sp.GetRequiredService<IGitHubKeymapService>(),
+                sp.GetRequiredService<FirmwareBuildWatcher>(),
                 sp.GetService<IActiveWindowMonitor>(),
                 sp.GetService<IMouseIdleMonitor>()));
 

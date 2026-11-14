@@ -1,4 +1,5 @@
 using LViz.Core.Diagnostics;
+using LViz.Core.Firmware;
 using ZmkHidProtocol.Capabilities;
 using ZmkHidProtocol.Protocol;
 
@@ -61,6 +62,9 @@ public interface ICapabilityControl
 
     /// <summary>deactivate (0xF2): deactivate one layer. Confirm-flagged — awaits the 0xF7 ack.</summary>
     Task<ControlResult> DeactivateLayerAsync(ICapabilityDevice target, byte layerIndex, CancellationToken cancellationToken = default);
+
+    /// <summary>core.system.bootloader (0xB0): reboot the central (<see cref="BootloaderCommand.CentralTarget"/>) or peripheral slot <paramref name="targetHalf"/> into its UF2 bootloader. Confirm-flagged — awaits the 0xF7 ack. For a peripheral, Confirmed only means queued on the split link.</summary>
+    Task<ControlResult> EnterBootloaderAsync(ICapabilityDevice target, byte targetHalf, CancellationToken cancellationToken = default);
 }
 
 public sealed class CapabilityControl : ICapabilityControl
@@ -90,6 +94,9 @@ public sealed class CapabilityControl : ICapabilityControl
 
     public Task<ControlResult> DeactivateLayerAsync(ICapabilityDevice target, byte layerIndex, CancellationToken cancellationToken = default)
         => SendConfirmableAsync(target, reference => ActionReportBuilder.DeactivateLayer(reference, layerIndex), cancellationToken);
+
+    public Task<ControlResult> EnterBootloaderAsync(ICapabilityDevice target, byte targetHalf, CancellationToken cancellationToken = default)
+        => SendConfirmableAsync(target, reference => BootloaderCommand.Build(reference, targetHalf), cancellationToken);
 
     private static async Task<ControlResult> SendFireAndForgetAsync(ICapabilityDevice target, byte[] report, CancellationToken cancellationToken)
     {

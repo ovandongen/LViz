@@ -1,0 +1,246 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LViz.App.ViewModels"
+        xmlns:conv="using:LViz.App.Converters"
+        xmlns:loc="using:LViz.App.Localization"
+        xmlns:svc="using:LViz.App.Services"
+        x:Class="LViz.App.Views.FlashWindow"
+        x:DataType="vm:FlashViewModel"
+        Title="{Binding [Flash_Title], Source={x:Static loc:Loc.Instance}}"
+        Width="640" Height="560"
+        MinWidth="520" MinHeight="440"
+        WindowStartupLocation="CenterOwner"
+        Background="{x:Static svc:AppTheme.BgBaseBrush}">
+
+    <DockPanel Margin="16">
+
+        <!-- Bottom bar: error text left; Close / Next (Source) or
+             Close / Back / Next (Halves) right. Close stays visible on
+             every step; Back belongs to Halves only. Next belongs to two
+             steps but IsVisible bindings cannot combine two conditions, so
+             each step hosts its own copy of the button (as in
+             ModuleSetupWindow) — both drive the same gated NextCommand. -->
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,12,0,0">
+            <TextBlock Grid.Column="0"
+                       Text="{Binding ErrorMessage}"
+                       Foreground="{x:Static svc:AppTheme.AccentRedBrush}"
+                       FontSize="12" TextWrapping="Wrap"
+                       VerticalAlignment="Center"
+                       IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <Button Grid.Column="1"
+                    Content="{Binding [Flash_Close], Source={x:Static loc:Loc.Instance}}"
+                    Command="{Binding CloseCommand}"
+                    Margin="8,0,0,0" />
+            <StackPanel Grid.Column="2" Orientation="Horizontal"
+                        IsVisible="{Binding IsSourceStep}">
+                <Button Content="{Binding [Flash_Next], Source={x:Static loc:Loc.Instance}}"
+                        Command="{Binding NextCommand}"
+                        Margin="8,0,0,0"
+                        Classes="accent"
+                        IsDefault="True" />
+            </StackPanel>
+            <StackPanel Grid.Column="3" Orientation="Horizontal"
+                        IsVisible="{Binding IsHalvesStep}">
+                <Button Content="{Binding [Flash_Back], Source={x:Static loc:Loc.Instance}}"
+                        Command="{Binding BackCommand}"
+                        Margin="8,0,0,0" />
+                <Button Content="{Binding [Flash_Next], Source={x:Static loc:Loc.Instance}}"
+                        Command="{Binding NextCommand}"
+                        Margin="8,0,0,0"
+                        Classes="accent"
+                        IsDefault="True" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Source — the GitHub build (sign-in, build line, its buttons) or,
+             in file mode, the local .uf2 with its half and warnings. -->
+        <StackPanel IsVisible="{Binding IsSourceStep}" Spacing="8">
+            <TextBlock Text="{Binding [Flash_SourceHeader], Source={x:Static loc:Loc.Instance}}"
+                       FontSize="14" FontWeight="SemiBold" Foreground="{x:Static svc:AppTheme.TextBrush}" />
+
+            <StackPanel Spacing="6" IsVisible="{Binding !IsFileMode}">
+                <StackPanel Spacing="6" IsVisible="{Binding IsSignInNeeded}">
+                    <TextBlock Text="{Binding [Flash_SignInIntro], Source={x:Static loc:Loc.Instance}}"
+                               FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.TextBrush}" />
+                    <Button Content="{Binding [Flash_SignIn], Source={x:Static loc:Loc.Instance}}"
+                            Command="{Binding SignInCommand}"
+                            HorizontalAlignment="Left" />
+                    <StackPanel Orientation="Horizontal" Spacing="8"
+                                IsVisible="{Binding IsWaitingForSignIn}">
+                        <TextBlock Text="{Binding UserCode}"
+                                   FontSize="20" FontWeight="SemiBold"
+                                   FontFamily="Menlo, Consolas, monospace"
+                                   Foreground="{x:Static svc:AppTheme.TextBrush}"
+                                   VerticalAlignment="Center" />
+                        <Button Content="{Binding [Flash_CopyCode], Source={x:Static loc:Loc.Instance}}"
+                                Command="{Binding CopyCodeCommand}" />
+                        <Button Content="{Binding [Flash_OpenPage], Source={x:Static loc:Loc.Instance}}"
+                                Command="{Binding OpenVerificationPageCommand}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Spacing="6" IsVisible="{Binding !IsSignInNeeded}">
+                    <StackPanel Orientation="Horizontal" Spacing="8"
+                                IsVisible="{Binding LoginText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Text="{Binding LoginText}"
+                                   FontSize="12" Foreground="{x:Static svc:AppTheme.TextBrush}"
+                                   VerticalAlignment="Center" />
+                        <Button Classes="link"
+                                Content="{Binding [Flash_SignOut], Source={x:Static loc:Loc.Instance}}"
+                                Command="{Binding SignOutCommand}"
+                                VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding BuildText}"
+                               FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.TextBrush}"
+                               IsVisible="{Binding BuildText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Text="{Binding NewerRunNote}"
+                               FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.TextSubtleBrush}"
+                               IsVisible="{Binding NewerRunNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="{Binding [Flash_Refresh], Source={x:Static loc:Loc.Instance}}"
+                                Command="{Binding RefreshBuildCommand}"
+                                IsVisible="{Binding ShowRefresh}" />
+                        <Button Content="{Binding [Flash_OpenRun], Source={x:Static loc:Loc.Instance}}"
+                                Command="{Binding OpenRunCommand}"
+                                IsVisible="{Binding ShowOpenRun}" />
+                        <!-- Retry re-runs the lookup right next to the Install
+                             link it follows — the App got installed, look again. -->
+                        <Button Content="{Binding [Flash_Install], Source={x:Static loc:Loc.Instance}}"
+                                Command="{Binding InstallCommand}"
+                                IsVisible="{Binding ShowInstall}" />
+                        <Button Content="{Binding [Flash_Retry], Source={x:Static loc:Loc.Instance}}"
+                                Command="{Binding RetryCommand}"
+                                IsVisible="{Binding ShowInstall}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <TextBlock Text="{Binding [Flash_Downloading], Source={x:Static loc:Loc.Instance}}"
+                           FontSize="12" Foreground="{x:Static svc:AppTheme.TextSubtleBrush}"
+                           IsVisible="{Binding IsBusy}" />
+
+                <Button Classes="link"
+                        Content="{Binding [Flash_UseFile], Source={x:Static loc:Loc.Instance}}"
+                        Command="{Binding UseFileCommand}"
+                        HorizontalAlignment="Left" />
+            </StackPanel>
+
+            <StackPanel Spacing="6" IsVisible="{Binding IsFileMode}">
+                <TextBlock Text="{Binding FileNotice}"
+                           FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.TextSubtleBrush}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="{Binding [Flash_PickFile], Source={x:Static loc:Loc.Instance}}"
+                            Command="{Binding PickFileCommand}" />
+                    <TextBlock Text="{Binding FileName}"
+                               FontSize="12" Foreground="{x:Static svc:AppTheme.TextBrush}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{Binding [Flash_FileHalfLabel], Source={x:Static loc:Loc.Instance}}"
+                               FontSize="11" Foreground="{x:Static svc:AppTheme.TextSubtleBrush}" />
+                    <ComboBox ItemsSource="{Binding FileHalves}"
+                              SelectedItem="{Binding SelectedFileHalf, Mode=TwoWay}"
+                              DisplayMemberBinding="{Binding Label}"
+                              HorizontalAlignment="Left" MinWidth="280" />
+                </StackPanel>
+                <StackPanel Spacing="4" IsVisible="{Binding ShowFileWarning}">
+                    <TextBlock Text="{Binding [Flash_FileWarningNoSupport], Source={x:Static loc:Loc.Instance}}"
+                               FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.AccentYellowBrush}" />
+                    <CheckBox Content="{Binding [Flash_FileWarningAccept], Source={x:Static loc:Loc.Instance}}"
+                              IsChecked="{Binding FileWarningAccepted, Mode=TwoWay}" />
+                </StackPanel>
+                <Button Classes="link"
+                        Content="{Binding [Flash_UseBuild], Source={x:Static loc:Loc.Instance}}"
+                        Command="{Binding UseBuildCommand}"
+                        HorizontalAlignment="Left"
+                        IsVisible="{Binding CanUseBuild}" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Halves — which halves go; the tick with its pre-selection hint. -->
+        <StackPanel IsVisible="{Binding IsHalvesStep}" Spacing="6">
+            <TextBlock Text="{Binding [Flash_HalvesHeader], Source={x:Static loc:Loc.Instance}}"
+                       FontSize="14" FontWeight="SemiBold" Foreground="{x:Static svc:AppTheme.TextBrush}" />
+            <ItemsControl ItemsSource="{Binding HalfRows}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:FlashHalfRow">
+                        <StackPanel>
+                            <CheckBox Content="{Binding Label}"
+                                      IsChecked="{Binding IsChecked, Mode=TwoWay}" />
+                            <TextBlock Text="{Binding Hint}"
+                                       FontSize="12" TextWrapping="Wrap"
+                                       Margin="28,0,0,8"
+                                       Foreground="{x:Static svc:AppTheme.TextSubtleBrush}"
+                                       IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+
+        <!-- Flash — the current half: instructions, run progress, failure.
+             One panel per FlashHalfStage, picked by name through the
+             equality converter. -->
+        <StackPanel IsVisible="{Binding IsFlashStep}" Spacing="6">
+            <TextBlock Text="{Binding FlashHeaderText}"
+                       FontSize="14" FontWeight="SemiBold" Foreground="{x:Static svc:AppTheme.TextBrush}" />
+
+            <StackPanel Spacing="6"
+                        IsVisible="{Binding Stage, Converter={x:Static conv:EqualityToBoolConverter.Instance}, ConverterParameter=Prepare}">
+                <TextBlock Text="{Binding PrepareText}"
+                           FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.TextBrush}" />
+                <TextBlock Text="{Binding ReasonText}"
+                           FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.TextSubtleBrush}"
+                           IsVisible="{Binding ReasonText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="{Binding [Flash_Start], Source={x:Static loc:Loc.Instance}}"
+                            Command="{Binding StartCommand}"
+                            Classes="accent"
+                            IsVisible="{Binding CanStart}" />
+                    <Button Content="{Binding [Flash_Manual], Source={x:Static loc:Loc.Instance}}"
+                            Command="{Binding ManualCommand}" />
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Spacing="6"
+                        IsVisible="{Binding Stage, Converter={x:Static conv:EqualityToBoolConverter.Instance}, ConverterParameter=Running}">
+                <TextBlock Text="{Binding ProgressText}"
+                           FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.TextBrush}" />
+                <TextBlock Text="{Binding ManualHintText}"
+                           FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.AccentYellowBrush}"
+                           IsVisible="{Binding ManualHintText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <Button Content="{Binding [Flash_Cancel], Source={x:Static loc:Loc.Instance}}"
+                        Command="{Binding CancelFlashCommand}"
+                        HorizontalAlignment="Left" />
+            </StackPanel>
+
+            <StackPanel Spacing="6"
+                        IsVisible="{Binding Stage, Converter={x:Static conv:EqualityToBoolConverter.Instance}, ConverterParameter=Failed}">
+                <TextBlock Text="{Binding FailureText}"
+                           FontSize="12" TextWrapping="Wrap" Foreground="{x:Static svc:AppTheme.AccentRedBrush}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="{Binding [Flash_Retry], Source={x:Static loc:Loc.Instance}}"
+                            Command="{Binding RetryHalfCommand}" />
+                    <Button Content="{Binding [Flash_Skip], Source={x:Static loc:Loc.Instance}}"
+                            Command="{Binding SkipHalfCommand}" />
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Done — one line per half that ended, in run order. -->
+        <StackPanel IsVisible="{Binding IsDoneStep}" Spacing="6">
+            <TextBlock Text="{Binding [Flash_DoneHeader], Source={x:Static loc:Loc.Instance}}"
+                       FontSize="14" FontWeight="SemiBold" Foreground="{x:Static svc:AppTheme.TextBrush}" />
+            <ItemsControl ItemsSource="{Binding DoneLines}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                        <TextBlock Text="{Binding}"
+                                   FontSize="12" TextWrapping="Wrap"
+                                   Foreground="{x:Static svc:AppTheme.TextBrush}" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+
+    </DockPanel>
+
+</Window>

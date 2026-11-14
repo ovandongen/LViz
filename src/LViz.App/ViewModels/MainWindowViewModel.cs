@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LViz.App.Localization;
 using LViz.App.Services;
+using LViz.App.Services.Flashing;
 using LViz.App.Services.GitHub;
 using LViz.App.Services.MouseIdle;
 using LViz.Core.Diagnostics;
@@ -57,6 +58,12 @@ public partial class MainWindowViewModel : ObservableObject
     // don't wire it — GitHub entries then only ever load from nothing and a
     // click on one toasts "GitHub is not available".
     private readonly IGitHubKeymapService? _gitHub;
+
+    // Follows the Actions build of the commit LViz just saved to a GitHub
+    // zmk-config so the status bar can offer the firmware. Null in tests that
+    // don't wire it; its Changed event fires on a background thread and is
+    // marshalled in the constructor.
+    private readonly FirmwareBuildWatcher? _firmwareWatcher;
     private readonly IKeymapEditDialogs _editDialogs;
     private readonly IMainWindowShell _shell;
 
@@ -311,6 +318,7 @@ public partial class MainWindowViewModel : ObservableObject
         IHostActionExecutor hostActionExecutor,
         ICapabilityControl capabilityControl,
         IGitHubKeymapService? gitHub,
+        FirmwareBuildWatcher? firmwareWatcher,
         IActiveWindowMonitor? activeWindowMonitor,
         IMouseIdleMonitor? mouseIdleMonitor)
     {
@@ -320,6 +328,9 @@ public partial class MainWindowViewModel : ObservableObject
         _shell = shell;
         _keymap = keymapState;
         _gitHub = gitHub;
+        _firmwareWatcher = firmwareWatcher;
+        if (_firmwareWatcher is not null)
+            _firmwareWatcher.Changed += () => Avalonia.Threading.Dispatcher.UIThread.Post(RefreshFirmwareStatus);
         _keymapBackups = keymapBackups;
         var s = settingsService.Load();
         _profile = KeyboardProfileRegistry.TryResolve(s.Keyboard, out var p) ? p : new CorneProfile();

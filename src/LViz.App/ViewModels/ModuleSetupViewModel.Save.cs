@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LViz.App.Localization;
 using LViz.App.Services.GitHub;
+using LViz.Core.Diagnostics;
 using LViz.Core.GitHub;
 using LViz.Core.Persistence;
 using LViz.Core.ZmkConfig;
@@ -33,6 +34,9 @@ public sealed partial class ModuleSetupViewModel
 {
     /// <summary>The commit message of the GitHub save — English, like the keymap commits.</summary>
     public const string CommitMessage = "LViz: add live-feature modules (zmk-raw-hid, zmk-hid-viz)";
+
+    /// <summary>The commit message when the modules were already set up and only features are added.</summary>
+    public const string CommitMessageAddFeatures = "LViz: enable more live features";
 
     /// <summary>What Review shows and Save writes; built by <see cref="GoToReview"/>.</summary>
     private ZmkModuleSetupPlan? _plan;
@@ -71,7 +75,12 @@ public sealed partial class ModuleSetupViewModel
             plan = ZmkModuleSetupPlan.Build(
                 files,
                 facts,
-                new ZmkModuleChoices(central.Index, Rgb && ShowRgb, Signal, Emit),
+                new ZmkModuleChoices(
+                    central.Index,
+                    Rgb && ShowRgb && !RgbLocked,
+                    Signal && !SignalLocked,
+                    Emit && !EmitLocked,
+                    System: System && !SystemLocked),
                 _newGuid);
         }
         catch (Exception e) when (e is ArgumentException or InvalidOperationException)
@@ -138,7 +147,8 @@ public sealed partial class ModuleSetupViewModel
                     .Select(c => new GitHubFileWrite(c.RelativePath, c.NewText))
                     .ToList();
                 var result = await _gitHub!.SaveFilesAsync(
-                    target.Owner, target.Repo, target.Branch, _baseSha!, writes, CommitMessage);
+                    target.Owner, target.Repo, target.Branch, _baseSha!, writes,
+                    _facts?.Status == ZmkModuleStatus.SetUp ? CommitMessageAddFeatures : CommitMessage);
                 switch (result)
                 {
                     case GitHubSaveResult.Saved:
@@ -183,8 +193,9 @@ public sealed partial class ModuleSetupViewModel
     private void FinishSave()
     {
         Saved = true;
+        IsAddFeaturesSave = _facts?.Status == ZmkModuleStatus.SetUp;
         Step = ModuleSetupStep.Done;
-        RefreshBoardStatus();
+        _ = RefreshBoardStatusAsync();
     }
 
     /// <summary>The conflict's only escape: no overwrite — read the config again from Check.</summary>
@@ -205,12 +216,61 @@ public sealed partial class ModuleSetupViewModel
             ? $"https://github.com/{target.Owner}/{target.Repo}/actions"
             : null;
 
-    /// <summary>True while the keyboard reports in; the window ticks <see cref="RefreshBoardStatus"/>.</summary>
+    /// <summary>
+    /// True once the board reports the config ID this config carries — the one
+    /// the wizard just wrote, else the one the config already had; the window
+    /// ticks <see cref="RefreshBoardStatusAsync"/>.
+    /// </summary>
     [ObservableProperty]
     private bool _isBoardConnected;
 
-    /// <summary>Re-reads whether the board is plugged in; the window calls this on a timer.</summary>
-    public void RefreshBoardStatus() => IsBoardConnected = _context.IsBoardConnected();
+    /// <summary>
+    /// The save only added features to a config that was already set up. Its
+    /// config ID didn't change, so the board reports it with the old firmware
+    /// too: the Done step can't tell when the new firmware is on, skips the
+    /// board check and asks to flash it instead.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isAddFeaturesSave;
+
+    // One config-ID query in flight at a time; a tick arriving during one is
+    // dropped, not queued behind it.
+    private bool _boardQueryRunning;
+
+    /// <summary>
+    /// Asks the board for its config ID and lands in <see cref="IsBoardConnected"/>
+    /// whether it reports the ID this config carries; the window calls this on
+    /// a timer. A query already running returns at once; one that throws counts
+    /// as no answer. After an add-features save it asks nothing (see
+    /// <see cref="IsAddFeaturesSave"/>).
+    /// </summary>
+    public async Task RefreshBoardStatusAsync()
+    {
+        if (_boardQueryRunning || IsAddFeaturesSave)
+            return;
+        _boardQueryRunning = true;
+        try
+        {
+            string? reported;
+            try
+            {
+                reported = await _context.QueryConfigId(CancellationToken.None);
+            }
+            catch (Exception e)
+            {
+                DiagnosticLog.Warn("ModuleSetup", $"Querying the board's config ID failed: {e.Message}");
+                reported = null;
+            }
+
+            var expected = _plan?.NewConfigId ?? _facts?.ConfigId;
+            IsBoardConnected = expected is not null
+                && string.Equals(reported, expected, StringComparison.Ordinal);
+        }
+        finally
+        {
+            _boardQueryRunning = false;
+        }
+    }
 
     /// <summary>Opens a URL in the browser; the shell wires it, tests collect the call.</summary>
     public Action<string>? OpenUrl { get; set; }

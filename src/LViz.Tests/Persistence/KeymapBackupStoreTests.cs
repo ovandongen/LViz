@@ -149,6 +149,43 @@ public sealed class KeymapBackupStoreTests : IDisposable
         Assert.Equal(Stamp + ".keymap", Name(store.Backup(keymap)));
     }
 
+    [Fact]
+    public void Backup_YamlFile_KeepsItsExtension()
+    {
+        var west = Keymap("west.yml", "manifest:\n  projects:\n");
+        var store = new KeymapBackupStore(_root, () => Clock);
+
+        var backup = store.Backup(west);
+
+        Assert.Equal(Stamp + ".yml", Name(backup));
+        Assert.Equal(new[] { backup }, store.List(west));
+    }
+
+    [Fact]
+    public void Backup_FileWithoutExtension_UsesBak()
+    {
+        var makefile = Keymap("Makefile", "all:\n\techo done\n");
+        var store = new KeymapBackupStore(_root, () => Clock);
+
+        var backup = store.Backup(makefile);
+
+        Assert.Equal(Stamp + ".bak", Name(backup));
+        Assert.Equal(new[] { backup }, store.List(makefile));
+    }
+
+    [Fact]
+    public void List_OnlyReturnsTheSourcesExtension()
+    {
+        var west = Keymap("west.yml", "manifest:\n");
+        var store = new KeymapBackupStore(_root, () => Clock);
+        var backup = store.Backup(west);
+        // Another source's snapshots share the root, never the folder — and a stray
+        // file with a different extension is not this one's history.
+        File.WriteAllText(Path.Combine(Folder(west), "x.keymap"), "stray");
+
+        Assert.Equal(new[] { backup }, store.List(west));
+    }
+
     private string Keymap(string name, string content)
     {
         var path = Path.Combine(_src, name);

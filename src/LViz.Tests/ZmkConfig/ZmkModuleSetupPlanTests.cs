@@ -34,7 +34,7 @@ public class ZmkModuleSetupPlanTests
         Assert.Equal(
             ["config/west.yml", "build.yaml", "config/cosmos82.conf"],
             plan.Changes.Select(c => c.RelativePath));
-        Assert.Equal(new ZmkModuleRevision("main", "main", false), plan.Revision);
+        Assert.Equal(new ZmkModuleRevision("main", "main", true), plan.Revision);
         Assert.Equal(TestGuidString, plan.NewConfigId);
         Assert.False(plan.SwitchesToFork);
 
@@ -120,13 +120,71 @@ public class ZmkModuleSetupPlanTests
     }
 
     [Fact]
-    public void Glove80_AlreadySetUp_Refuses()
+    public void Glove80_SetUp_AddsSystemOnly()
     {
         var (files, facts) = Load("glove80");
         Assert.Equal(ZmkModuleStatus.SetUp, facts.Status);
 
+        var plan = ZmkModuleSetupPlan.Build(
+            files, facts, new ZmkModuleChoices(0, false, false, false, System: true), NewGuid);
+
+        Assert.Equal(["config/glove80.conf"], plan.Changes.Select(c => c.RelativePath));
+        var conf = Change(plan, "config/glove80.conf");
+        Assert.Equal(conf.OldText + "\n\n# LViz live features\nCONFIG_HID_VIZ_SYSTEM=y\n", conf.NewText);
+        Assert.Null(plan.NewConfigId);
+        Assert.False(plan.SwitchesToFork);
+    }
+
+    [Fact]
+    public void Glove80_SetUp_NothingNew_Throws()
+    {
+        var (files, facts) = Load("glove80");
+
+        // RGB, SIGNAL and EMIT are all already y on this fixture: nothing to add.
+        var e = Assert.Throws<ArgumentException>(
+            () => ZmkModuleSetupPlan.Build(files, facts, new ZmkModuleChoices(0, true, true, true), NewGuid));
+
+        Assert.Contains("nothing to add", e.Message);
+    }
+
+    [Fact]
+    public void Glove80_SetUp_WrongCentral_Throws()
+    {
+        var (files, facts) = Load("glove80");
+
+        // Entry 1 (glove80_rh) carries no raw_hid_adapter: it is not the central half.
         Assert.Throws<ArgumentException>(
-            () => ZmkModuleSetupPlan.Build(files, facts, new ZmkModuleChoices(0, false, false, false), NewGuid));
+            () => ZmkModuleSetupPlan.Build(
+                files, facts, new ZmkModuleChoices(1, false, false, false, System: true), NewGuid));
+    }
+
+    [Fact]
+    public void Glove80_SetUp_PicksTheConfWithHidViz()
+    {
+        // An extra, alphabetically earlier conf without the modules must not
+        // take the options: the set-up conf (the one with CONFIG_HID_VIZ=y) does.
+        var files = ZmkConfigFileSet.Read(ZmkConfigFixtures.Root("glove80"))
+            .With("config/aaa.conf", "CONFIG_ZMK_SLEEP=y\n");
+        var facts = ZmkConfigInspector.Inspect(files);
+        Assert.Equal(ZmkModuleStatus.SetUp, facts.Status);
+
+        var plan = ZmkModuleSetupPlan.Build(
+            files, facts, new ZmkModuleChoices(0, false, false, false, System: true), NewGuid);
+
+        Assert.Equal(["config/glove80.conf"], plan.Changes.Select(c => c.RelativePath));
+    }
+
+    [Fact]
+    public void Cosmos82_WithSystem_WritesSystemLine()
+    {
+        var (files, facts) = Load("cosmos82");
+
+        var plan = ZmkModuleSetupPlan.Build(
+            files, facts, new ZmkModuleChoices(1, false, true, false, System: true), NewGuid);
+
+        Assert.Contains(
+            "CONFIG_HID_VIZ_SIGNAL=y\nCONFIG_HID_VIZ_SYSTEM=y\nCONFIG_HID_VIZ_CONFIG_ID=",
+            Change(plan, "config/cosmos82.conf").NewText);
     }
 
     [Fact]
@@ -240,10 +298,21 @@ public class ZmkModuleSetupPlanTests
             conf.NewText);
     }
 
-    [Fact]
-    public void For_MoergoMain_IsKnown_EverythingElse_IsNot()
+    [Theory]
+    [InlineData("zmkfirmware", "v0.3", true)]
+    [InlineData("zmkfirmware", "main", true)]
+    [InlineData("moergo-sc", "main", true)]
+    [InlineData("ZMKFIRMWARE", "V0.3", true)]
+    [InlineData("zmkfirmware", "v0.2", false)]
+    [InlineData("zmkfirmware", null, false)]
+    [InlineData(null, "main", false)]
+    [InlineData("someone", "main", false)]
+    public void For_TestedPairs_AreKnown_EverythingElseIsNot(string? owner, string? revision, bool known)
     {
-        Assert.True(ZmkModuleRevisions.For("moergo-sc", "main").Known);
-        Assert.False(ZmkModuleRevisions.For("zmkfirmware", "v0.3").Known);
+        var actual = ZmkModuleRevisions.For(owner, revision);
+
+        Assert.Equal(known, actual.Known);
+        Assert.Equal("main", actual.RawHid);
+        Assert.Equal("main", actual.HidViz);
     }
 }

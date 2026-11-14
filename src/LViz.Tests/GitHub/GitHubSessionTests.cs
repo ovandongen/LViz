@@ -6,8 +6,9 @@ namespace LViz.Tests.GitHub;
 
 /// <summary>
 /// <see cref="GitHubSession"/>: restoring the stored login, handing out a
-/// valid access token (refreshing near expiry, single-flight), and signing
-/// out. Runs on <see cref="InMemorySecretStore"/> and a real
+/// valid access token (refreshing near expiry, single-flight), signing out,
+/// and keeping two sessions under different secret keys apart. Runs on
+/// <see cref="InMemorySecretStore"/> and a real
 /// <see cref="GitHubClient"/> over <see cref="FakeHttpHandler"/>, with a
 /// mutable clock so expiry maths is exact and nothing touches the network.
 /// </summary>
@@ -271,6 +272,63 @@ public class GitHubSessionTests
         Assert.Equal(0, changes);
     }
 
+    // ---- A second App under its own secret key ----
+
+    [Fact]
+    public async Task CustomSecretKey_SignInWritesUnderThatKey()
+    {
+        var builds = BuildsSession();
+
+        await builds.SignInAsync(Tokens(Base.AddHours(8)));
+
+        Assert.NotNull(await _store.ReadAsync(GitHubBuildsAppInfo.SecretKey));
+        Assert.Null(await _store.ReadAsync(GitHubAppInfo.SecretKey));
+    }
+
+    [Fact]
+    public async Task TwoSessions_DoNotTouchEachOthersLogin()
+    {
+        var builds = BuildsSession();
+        await _session.SignInAsync(Tokens(Base.AddHours(8)));
+        await builds.SignInAsync(Tokens(Base.AddHours(8)));
+
+        await builds.SignOutAsync();
+
+        Assert.True(_session.IsSignedIn);
+        Assert.NotNull(await _store.ReadAsync(GitHubAppInfo.SecretKey));
+        Assert.Null(await _store.ReadAsync(GitHubBuildsAppInfo.SecretKey));
+
+        // ... and the other way round.
+        await builds.SignInAsync(Tokens(Base.AddHours(8)));
+        await _session.SignOutAsync();
+
+        Assert.True(builds.IsSignedIn);
+        Assert.NotNull(await _store.ReadAsync(GitHubBuildsAppInfo.SecretKey));
+        Assert.Null(await _store.ReadAsync(GitHubAppInfo.SecretKey));
+    }
+
+    [Fact]
+    public async Task CustomSecretKey_RestoreReadsThatKey()
+    {
+        await _store.WriteAsync(GitHubBuildsAppInfo.SecretKey, Tokens(Base.AddHours(8)).ToJson());
+
+        var builds = BuildsSession();
+        Assert.True(await builds.RestoreAsync());
+        Assert.Equal(Login, builds.Login);
+
+        // The default session on the same store sees nothing of its own.
+        Assert.False(await _session.RestoreAsync());
+        Assert.False(_session.IsSignedIn);
+    }
+
+    [Fact]
+    public void GitHubBuildsAppInfo_InstallUrl_IsItsInstallationPage()
+    {
+        Assert.Equal(
+            "https://github.com/apps/lviz-for-zmk-builds/installations/new",
+            GitHubBuildsAppInfo.InstallUrl);
+    }
+
     // ---- helpers ----
 
     /// <summary>An explicit null access expiry means "never expires"; the refresh token defaults to valid.</summary>
@@ -282,6 +340,14 @@ public class GitHubSessionTests
 
     private Task Store(GitHubTokens tokens) =>
         _store.WriteAsync(GitHubAppInfo.SecretKey, tokens.ToJson());
+
+    /// <summary>A session for the second App: its client id and its secret key on the shared store.</summary>
+    private GitHubSession BuildsSession() =>
+        new(
+            new GitHubClient(new HttpClient(_handler), GitHubBuildsAppInfo.ClientId, UserAgent, () => _now),
+            _store,
+            () => _now,
+            GitHubBuildsAppInfo.SecretKey);
 
     private static string RefreshedJson() =>
         "{\"access_token\":\"" + NewAccessToken + "\",\"expires_in\":28800,"

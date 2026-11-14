@@ -391,8 +391,11 @@ public abstract record KeymapEditSaveOutcome
 {
     private KeymapEditSaveOutcome() { }
 
-    /// <summary>Written; reload the keymap from <paramref name="ReloadPath"/>.</summary>
-    public sealed record Saved(string ReloadPath) : KeymapEditSaveOutcome;
+    /// <summary>Written; reload the keymap from <paramref name="ReloadPath"/>.
+    /// A GitHub save carries the new <paramref name="CommitSha"/> so the main
+    /// window can watch the firmware build of that commit; a local save leaves
+    /// it null.</summary>
+    public sealed record Saved(string ReloadPath, string? CommitSha = null) : KeymapEditSaveOutcome;
 
     /// <summary>The file changed since the edit started; nothing was written.</summary>
     public sealed record Conflict : KeymapEditSaveOutcome;
