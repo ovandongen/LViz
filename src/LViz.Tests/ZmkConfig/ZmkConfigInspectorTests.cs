@@ -79,6 +79,45 @@ public class ZmkConfigInspectorTests
     }
 
     [Fact]
+    public void Glove80_SetUp_LiveFeaturesReadBack()
+    {
+        var facts = Inspect("glove80");
+
+        Assert.Equal(new ZmkLiveFeatures(true, true, true, false), facts.Features);
+    }
+
+    [Fact]
+    public void Cosmos82_Stock_NoLiveFeatureOn()
+    {
+        var facts = Inspect("cosmos82");
+
+        Assert.Equal(new ZmkLiveFeatures(false, false, false, false), facts.Features);
+    }
+
+    [Fact]
+    public void Glove80_SystemSwitchedOn_ReadsBack()
+    {
+        var files = ZmkConfigFileSet.Read(ZmkConfigFixtures.Root("glove80"))
+            .With("config/glove80.conf",
+                ZmkConfigFixtures.Read("glove80", "config/glove80.conf") + "\nCONFIG_HID_VIZ_SYSTEM=y\n");
+
+        var facts = ZmkConfigInspector.Inspect(files);
+
+        Assert.True(facts.Features.System);
+    }
+
+    [Fact]
+    public void LaterConfSwitchesRgbOff_WinsOverTheSetUpConf()
+    {
+        var files = ZmkConfigFileSet.Read(ZmkConfigFixtures.Root("glove80"))
+            .With("config/zzz.conf", "CONFIG_HID_VIZ_RGB=n\n");
+
+        var facts = ZmkConfigInspector.Inspect(files);
+
+        Assert.False(facts.Features.Rgb);
+    }
+
+    [Fact]
     public void Zzeneg_SetUpWithTheOtherFork_NeedsFork()
     {
         var facts = Inspect("zzeneg");

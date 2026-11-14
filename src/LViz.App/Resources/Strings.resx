@@ -1383,6 +1383,26 @@
     <value>Hide this hint for this config</value>
     <comment/>
   </data>
+  <data name="Status_FirmwareBuilding" xml:space="preserve">
+    <value>Building firmware…</value>
+    <comment/>
+  </data>
+  <data name="Status_FirmwareReady" xml:space="preserve">
+    <value>Firmware ready: Flash</value>
+    <comment/>
+  </data>
+  <data name="Status_FirmwareFailed" xml:space="preserve">
+    <value>Firmware build failed</value>
+    <comment/>
+  </data>
+  <data name="Status_FirmwareFlash" xml:space="preserve">
+    <value>Flash the new firmware</value>
+    <comment/>
+  </data>
+  <data name="Status_FirmwareDismiss" xml:space="preserve">
+    <value>Hide</value>
+    <comment/>
+  </data>
   <data name="EditLayout_TitleFormat" xml:space="preserve">
     <value>Edit layout: {0}</value>
     <comment/>
@@ -1465,6 +1485,10 @@
   </data>
   <data name="RecentKeymaps_SetUpLiveFeatures" xml:space="preserve">
     <value>Set up live features…</value>
+    <comment/>
+  </data>
+  <data name="RecentKeymaps_FlashKeyboard" xml:space="preserve">
+    <value>Flash keyboard…</value>
     <comment/>
   </data>
   <data name="GitHub_WindowTitle" xml:space="preserve">
@@ -3156,7 +3180,7 @@
     <comment/>
   </data>
   <data name="ModuleSetup_AlreadySetUp" xml:space="preserve">
-    <value>This config already has the live-feature modules. Nothing to do.</value>
+    <value>This config already has the live-feature modules. You can add the features it doesn't have yet.</value>
     <comment/>
   </data>
   <data name="ModuleSetup_NeedsForkNotice" xml:space="preserve">
@@ -3263,6 +3287,14 @@
     <value>Emit keys (keys that send commands to other devices, such as a trackball)</value>
     <comment/>
   </data>
+  <data name="ModuleSetup_FeatureSystem" xml:space="preserve">
+    <value>Flash from LViz</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FeatureSystemHint" xml:space="preserve">
+    <value>Lets LViz put the keyboard into its bootloader, so you can install new firmware from LViz without pressing a reset or bootloader key. Any program on a computer the keyboard is plugged into could then do the same, which is why it's off unless you turn it on. Without it LViz can still flash, but you start the bootloader by hand.</value>
+    <comment/>
+  </data>
   <data name="ModuleSetup_ReviewHeader" xml:space="preserve">
     <value>These changes will be saved</value>
     <comment/>
@@ -3291,6 +3323,9 @@
     <value>Flash the new firmware onto the central half by hand, this once. The other half doesn't need it.</value>
     <comment/>
   </data>
+  <data name="ModuleSetup_DoneAddFeatures" xml:space="preserve">
+    <value>Your board already reports in with this config, so LViz can't tell when the new firmware is on. Flash it to get the added features.</value>
+  </data>
   <data name="ModuleSetup_BoardWaiting" xml:space="preserve">
     <value>Waiting for the board…</value>
     <comment/>
@@ -3309,6 +3344,321 @@
   </data>
   <data name="ModuleSetup_Reload" xml:space="preserve">
     <value>Reload</value>
+    <comment/>
+  </data>
+  <data name="Flash_Title" xml:space="preserve">
+    <value>Flash keyboard</value>
+    <comment/>
+  </data>
+  <data name="Flash_SourceHeader" xml:space="preserve">
+    <value>What to flash</value>
+    <comment/>
+  </data>
+  <data name="Flash_SignInIntro" xml:space="preserve">
+    <value>To download firmware builds, sign in to the second LViz GitHub app, "LViz for ZMK Builds". It can only read your Actions builds.</value>
+    <comment/>
+  </data>
+  <data name="Flash_SignIn" xml:space="preserve">
+    <value>Sign in to GitHub</value>
+    <comment/>
+  </data>
+  <data name="Flash_SignInCode" xml:space="preserve">
+    <value>Enter this code on GitHub: {0}</value>
+    <comment/>
+  </data>
+  <data name="Flash_CopyCode" xml:space="preserve">
+    <value>Copy code</value>
+    <comment/>
+  </data>
+  <data name="Flash_OpenPage" xml:space="preserve">
+    <value>Open GitHub</value>
+    <comment/>
+  </data>
+  <data name="Flash_SignedInAs" xml:space="preserve">
+    <value>Builds: signed in as {0}</value>
+    <comment/>
+  </data>
+  <data name="Flash_SignOut" xml:space="preserve">
+    <value>Sign out</value>
+    <comment/>
+  </data>
+  <data name="Flash_BuildReady" xml:space="preserve">
+    <value>Build of {0}: {1} ({2})</value>
+    <comment/>
+  </data>
+  <data name="Flash_NewerRunPending" xml:space="preserve">
+    <value>A newer build is still running.</value>
+    <comment/>
+  </data>
+  <data name="Flash_BuildRunning" xml:space="preserve">
+    <value>The firmware is still being built.</value>
+    <comment/>
+  </data>
+  <data name="Flash_BuildFailed" xml:space="preserve">
+    <value>The firmware build failed.</value>
+    <comment/>
+  </data>
+  <data name="Flash_BuildNoFirmware" xml:space="preserve">
+    <value>This build has no firmware to download.</value>
+    <comment/>
+  </data>
+  <data name="Flash_BuildNoRun" xml:space="preserve">
+    <value>There's no firmware build for this yet.</value>
+    <comment/>
+  </data>
+  <data name="Flash_BuildNotInstalled" xml:space="preserve">
+    <value>"LViz for ZMK Builds" can't see this repository yet. Install it on the repository, then try again.</value>
+    <comment/>
+  </data>
+  <data name="Flash_Install" xml:space="preserve">
+    <value>Install on GitHub</value>
+    <comment/>
+  </data>
+  <data name="Flash_Retry" xml:space="preserve">
+    <value>Try again</value>
+    <comment/>
+  </data>
+  <data name="Flash_Refresh" xml:space="preserve">
+    <value>Check again</value>
+    <comment/>
+  </data>
+  <data name="Flash_OpenRun" xml:space="preserve">
+    <value>Open the build on GitHub</value>
+    <comment/>
+  </data>
+  <data name="Flash_UseFile" xml:space="preserve">
+    <value>Use a file instead…</value>
+    <comment/>
+  </data>
+  <data name="Flash_UseBuild" xml:space="preserve">
+    <value>Use the GitHub build</value>
+    <comment/>
+  </data>
+  <data name="Flash_ErrorNoHalves" xml:space="preserve">
+    <value>LViz can't tell which halves this config builds, so it can't flash it.</value>
+    <comment/>
+  </data>
+  <data name="Flash_ErrorRead" xml:space="preserve">
+    <value>Couldn't read the config: {0}</value>
+    <comment/>
+  </data>
+  <data name="Flash_ErrorMissingFile" xml:space="preserve">
+    <value>The build has no file {0}. It has: {1}</value>
+    <comment/>
+  </data>
+  <data name="Flash_ErrorDownload" xml:space="preserve">
+    <value>Downloading the firmware failed: {0}</value>
+    <comment/>
+  </data>
+  <data name="Flash_ErrorExpired" xml:space="preserve">
+    <value>This build's firmware has expired on GitHub. Push a change or re-run the build.</value>
+    <comment/>
+  </data>
+  <data name="Flash_Downloading" xml:space="preserve">
+    <value>Downloading the firmware…</value>
+    <comment/>
+  </data>
+  <data name="Flash_HalvesHeader" xml:space="preserve">
+    <value>Which halves to flash</value>
+    <comment/>
+  </data>
+  <data name="Flash_HintPeripheralNeeded" xml:space="preserve">
+    <value>Changed since this half was last flashed.</value>
+    <comment/>
+  </data>
+  <data name="Flash_HintPeripheralNotNeeded" xml:space="preserve">
+    <value>Nothing changed for this half since its last flash.</value>
+    <comment/>
+  </data>
+  <data name="Flash_HintPeripheralUnknown" xml:space="preserve">
+    <value>LViz doesn't know what's on this half yet. Only tick it if you changed more than the keymap.</value>
+    <comment/>
+  </data>
+  <data name="Flash_HalfLeft" xml:space="preserve">
+    <value>Left half</value>
+    <comment/>
+  </data>
+  <data name="Flash_HalfRight" xml:space="preserve">
+    <value>Right half</value>
+    <comment/>
+  </data>
+  <data name="Flash_HalfCentral" xml:space="preserve">
+    <value>Central half</value>
+    <comment/>
+  </data>
+  <data name="Flash_HalfOther" xml:space="preserve">
+    <value>Other half</value>
+    <comment/>
+  </data>
+  <data name="Flash_HalfKeyboard" xml:space="preserve">
+    <value>Keyboard</value>
+    <comment/>
+  </data>
+  <data name="Flash_HalfWithCentral" xml:space="preserve">
+    <value>{0} (central)</value>
+    <comment/>
+  </data>
+  <data name="Flash_Next" xml:space="preserve">
+    <value>Next</value>
+    <comment/>
+  </data>
+  <data name="Flash_Back" xml:space="preserve">
+    <value>Back</value>
+    <comment/>
+  </data>
+  <data name="Flash_Close" xml:space="preserve">
+    <value>Close</value>
+    <comment/>
+  </data>
+  <data name="Flash_PickFile" xml:space="preserve">
+    <value>Choose a .uf2 file…</value>
+    <comment/>
+  </data>
+  <data name="Flash_FileHalfLabel" xml:space="preserve">
+    <value>Flash this file onto</value>
+    <comment/>
+  </data>
+  <data name="Flash_FileNotice" xml:space="preserve">
+    <value>The file has to be built from a config with LViz's modules (zmk-raw-hid, zmk-hid-viz) and "Flash from LViz" turned on. Otherwise live features and flashing from LViz stop working after this flash.</value>
+    <comment/>
+  </data>
+  <data name="Flash_FileWarningNoSupport" xml:space="preserve">
+    <value>This file doesn't look like it was built with flashing from LViz. After flashing it, LViz can't put the keyboard into its bootloader any more, and live features may stop working.</value>
+    <comment/>
+  </data>
+  <data name="Flash_FileWarningAccept" xml:space="preserve">
+    <value>Flash it anyway</value>
+    <comment/>
+  </data>
+  <data name="Flash_ErrorNotUf2" xml:space="preserve">
+    <value>That isn't a UF2 firmware file.</value>
+    <comment/>
+  </data>
+  <data name="Flash_FlashHeader" xml:space="preserve">
+    <value>Flashing: {0}</value>
+    <comment/>
+  </data>
+  <data name="Flash_SideLeft" xml:space="preserve">
+    <value>the left half</value>
+    <comment/>
+  </data>
+  <data name="Flash_SideRight" xml:space="preserve">
+    <value>the right half</value>
+    <comment/>
+  </data>
+  <data name="Flash_SideCentral" xml:space="preserve">
+    <value>the central half</value>
+    <comment/>
+  </data>
+  <data name="Flash_SideOther" xml:space="preserve">
+    <value>the other half</value>
+    <comment/>
+  </data>
+  <data name="Flash_SideKeyboard" xml:space="preserve">
+    <value>the keyboard</value>
+    <comment/>
+  </data>
+  <data name="Flash_PrepareCentral" xml:space="preserve">
+    <value>Keep {0} plugged into this computer with USB, then click Start.</value>
+    <comment/>
+  </data>
+  <data name="Flash_PreparePeripheral" xml:space="preserve">
+    <value>Plug {0} into this computer with a second USB cable, and keep {1} plugged in as well. Then click Start.</value>
+    <comment/>
+  </data>
+  <data name="Flash_PrepareManual" xml:space="preserve">
+    <value>Plug {0} into this computer with USB and put it in its bootloader: press its bootloader key or double-tap its reset button.</value>
+    <comment/>
+  </data>
+  <data name="Flash_ReasonNotConnected" xml:space="preserve">
+    <value>LViz doesn't see the keyboard right now.</value>
+    <comment/>
+  </data>
+  <data name="Flash_ReasonBluetooth" xml:space="preserve">
+    <value>The keyboard is connected over Bluetooth. Starting the bootloader from LViz needs USB.</value>
+    <comment/>
+  </data>
+  <data name="Flash_ReasonNoSupport" xml:space="preserve">
+    <value>The firmware on the keyboard can't be put into its bootloader from LViz ("Flash from LViz" is off).</value>
+    <comment/>
+  </data>
+  <data name="Flash_Start" xml:space="preserve">
+    <value>Start</value>
+    <comment/>
+  </data>
+  <data name="Flash_Manual" xml:space="preserve">
+    <value>I'll do it by hand</value>
+    <comment/>
+  </data>
+  <data name="Flash_Triggering" xml:space="preserve">
+    <value>Putting {0} into its bootloader…</value>
+    <comment/>
+  </data>
+  <data name="Flash_WaitingForDrive" xml:space="preserve">
+    <value>Waiting for the drive of {0}…</value>
+    <comment/>
+  </data>
+  <data name="Flash_ManualHint" xml:space="preserve">
+    <value>No drive yet. Put {0} into its bootloader by hand: press its bootloader key or double-tap its reset button.</value>
+    <comment/>
+  </data>
+  <data name="Flash_MountHint" xml:space="preserve">
+    <value>If the drive doesn't show up, mount it in your file manager.</value>
+    <comment/>
+  </data>
+  <data name="Flash_Copying" xml:space="preserve">
+    <value>Copying the firmware…</value>
+    <comment/>
+  </data>
+  <data name="Flash_WaitingForRestart" xml:space="preserve">
+    <value>Waiting for {0} to restart…</value>
+    <comment/>
+  </data>
+  <data name="Flash_CheckingBoard" xml:space="preserve">
+    <value>Waiting for the keyboard to report in…</value>
+    <comment/>
+  </data>
+  <data name="Flash_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment/>
+  </data>
+  <data name="Flash_FailedCopy" xml:space="preserve">
+    <value>Copying the firmware failed: {0}</value>
+    <comment/>
+  </data>
+  <data name="Flash_FailedNotAccepted" xml:space="preserve">
+    <value>The half didn't take the file; its drive is still there. Is this the right firmware for this board?</value>
+    <comment/>
+  </data>
+  <data name="Flash_FailedWrongHalf" xml:space="preserve">
+    <value>The drive that appeared, {0}, belongs to the other half, so LViz copied nothing. Reset that half to leave its bootloader, then put {1} into its bootloader and try again.</value>
+  </data>
+  <data name="Flash_Skip" xml:space="preserve">
+    <value>Skip</value>
+    <comment/>
+  </data>
+  <data name="Flash_DoneHeader" xml:space="preserve">
+    <value>Done</value>
+    <comment/>
+  </data>
+  <data name="Flash_DoneFlashed" xml:space="preserve">
+    <value>{0}: flashed.</value>
+    <comment/>
+  </data>
+  <data name="Flash_DoneNotReported" xml:space="preserve">
+    <value>{0}: flashed, but the keyboard hasn't reported in yet.</value>
+    <comment/>
+  </data>
+  <data name="Flash_DoneSkipped" xml:space="preserve">
+    <value>{0}: skipped.</value>
+    <comment/>
+  </data>
+  <data name="Flash_PickFileTitle" xml:space="preserve">
+    <value>Choose a firmware file</value>
+    <comment/>
+  </data>
+  <data name="Flash_FileTypeUf2" xml:space="preserve">
+    <value>UF2 firmware</value>
     <comment/>
   </data>
 </root>

@@ -26,7 +26,7 @@ public class ModuleSetupWindowTests
 
     private static ModuleSetupViewModel CosmosVm(string root) =>
         new(
-            new ModuleSetupContext(root, null, () => false),
+            new ModuleSetupContext(root, null, _ => Task.FromResult<string?>(null)),
             gitHub: null,
             new KeymapBackupStore(Path.Combine(Path.GetTempPath(), $"lviz-modsetup-win-{Guid.NewGuid():N}")),
             () => FixedGuid);

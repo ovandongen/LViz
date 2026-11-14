@@ -1,0 +1,115 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using LViz.App.Localization;
+using LViz.App.Services.Flashing;
+
+namespace LViz.App.ViewModels;
+
+/// <summary>
+/// The flashing entry points: the keymap flyout's "Flash keyboard…" and the
+/// status-bar line that follows the firmware build of the commit LViz just
+/// saved to a GitHub zmk-config. Both open the flash window through
+/// <see cref="IMainWindowShell.RunFlashAsync"/>; the status line reads the
+/// <see cref="FirmwareBuildWatcher"/>, which only ever watches the loaded
+/// config's key and never opens anything by itself.
+/// </summary>
+public partial class MainWindowViewModel
+{
+    // The status line as RefreshFirmwareStatus() last read it. Written on the
+    // UI thread only: the watcher raises Changed on a background thread and
+    // the constructor marshals every raise through the dispatcher.
+    [ObservableProperty] private string? _firmwareStatusText;
+    [ObservableProperty] private bool _showFirmwareStatus;
+    [ObservableProperty] private bool _isFirmwareStatusLink;
+
+    /// <summary>A zmk-config was found for the loaded keymap and no keymap
+    /// edit is open — the flyout item shows and the command can run. A local
+    /// config opens the flash window in file mode (no GitHub target).</summary>
+    public bool CanFlashKeyboard => _liveFeaturesContext is not null && !IsEditing;
+
+    /// <summary>Opens the flash window on the loaded config: its newest
+    /// branch build when the config is on GitHub, file mode when it is local.
+    /// A finished flash (the window closed as saved) clears the build watch —
+    /// what was built is now on the board.</summary>
+    [RelayCommand(CanExecute = nameof(CanFlashKeyboard))]
+    private async Task FlashKeyboardAsync()
+    {
+        if (_liveFeaturesContext is null) return;
+        if (await _shell.RunFlashAsync(new FlashContext(
+                _liveFeaturesKey!, _liveFeaturesRoot!, _liveFeaturesFlashTarget, null)))
+        {
+            _firmwareWatcher?.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Repaints the status line from <see cref="FirmwareBuildWatcher.Current"/>:
+    /// it shows only while the watch belongs to the loaded config's key and no
+    /// edit is open, and never for <see cref="FirmwareWatchState.Hidden"/>.
+    /// Waiting/Running is a plain "building" line; Ready, Failed and
+    /// SignInNeeded are links (see <see cref="FirmwareStatusAsync"/>).
+    /// </summary>
+    private void RefreshFirmwareStatus()
+    {
+        var current = _firmwareWatcher?.Current;
+        if (current is null
+            || !string.Equals(current.ConfigKey, _liveFeaturesKey, StringComparison.Ordinal)
+            || IsEditing
+            || current.State == FirmwareWatchState.Hidden)
+        {
+            ShowFirmwareStatus = false;
+            FirmwareStatusText = null;
+            IsFirmwareStatusLink = false;
+            return;
+        }
+
+        FirmwareStatusText = current.State switch
+        {
+            FirmwareWatchState.Waiting or FirmwareWatchState.Running
+                => Loc.Instance["Status_FirmwareBuilding"],
+            FirmwareWatchState.Ready => Loc.Instance["Status_FirmwareReady"],
+            FirmwareWatchState.Failed => Loc.Instance["Status_FirmwareFailed"],
+            FirmwareWatchState.SignInNeeded => Loc.Instance["Status_FirmwareFlash"],
+            _ => null,
+        };
+        IsFirmwareStatusLink = current.State
+            is FirmwareWatchState.Ready
+            or FirmwareWatchState.Failed
+            or FirmwareWatchState.SignInNeeded;
+        ShowFirmwareStatus = FirmwareStatusText is not null;
+    }
+
+    /// <summary>What a click on the status line does: Ready and SignInNeeded
+    /// open the flash window on the watched commit's build (a finished flash
+    /// clears the watch); Failed opens the failed run on GitHub so the user
+    /// can read why. Waiting/Running is not a link and does nothing.</summary>
+    [RelayCommand]
+    private async Task FirmwareStatusAsync()
+    {
+        if (_firmwareWatcher?.Current is not { } current) return;
+        if (!string.Equals(current.ConfigKey, _liveFeaturesKey, StringComparison.Ordinal)
+            || IsEditing)
+        {
+            return;
+        }
+
+        switch (current.State)
+        {
+            case FirmwareWatchState.Ready or FirmwareWatchState.SignInNeeded:
+                if (_liveFeaturesKey is not { } key || _liveFeaturesRoot is not { } root) return;
+                if (await _shell.RunFlashAsync(
+                        new FlashContext(key, root, _liveFeaturesFlashTarget, current.Sha)))
+                {
+                    _firmwareWatcher?.Clear();
+                }
+                break;
+            case FirmwareWatchState.Failed:
+                if (current.RunUrl is { } url) _hostActionExecutor.Launch(url);
+                break;
+        }
+    }
+
+    /// <summary>✕ next to the status line: stop watching and hide it.</summary>
+    [RelayCommand]
+    private void DismissFirmwareStatus() => _firmwareWatcher?.Clear();
+}

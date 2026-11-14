@@ -1383,6 +1383,26 @@
     <value>Verberg deze tip voor deze config</value>
     <comment/>
   </data>
+  <data name="Status_FirmwareBuilding" xml:space="preserve">
+    <value>Firmware wordt gebouwd…</value>
+    <comment/>
+  </data>
+  <data name="Status_FirmwareReady" xml:space="preserve">
+    <value>Firmware klaar: flashen</value>
+    <comment/>
+  </data>
+  <data name="Status_FirmwareFailed" xml:space="preserve">
+    <value>Firmwarebuild mislukt</value>
+    <comment/>
+  </data>
+  <data name="Status_FirmwareFlash" xml:space="preserve">
+    <value>Nieuwe firmware flashen</value>
+    <comment/>
+  </data>
+  <data name="Status_FirmwareDismiss" xml:space="preserve">
+    <value>Verbergen</value>
+    <comment/>
+  </data>
   <data name="EditLayout_TitleFormat" xml:space="preserve">
     <value>Layout bewerken: {0}</value>
     <comment/>
@@ -1465,6 +1485,10 @@
   </data>
   <data name="RecentKeymaps_SetUpLiveFeatures" xml:space="preserve">
     <value>Live-functies instellen…</value>
+    <comment/>
+  </data>
+  <data name="RecentKeymaps_FlashKeyboard" xml:space="preserve">
+    <value>Toetsenbord flashen…</value>
     <comment/>
   </data>
   <data name="GitHub_WindowTitle" xml:space="preserve">
@@ -3156,7 +3180,7 @@
     <comment/>
   </data>
   <data name="ModuleSetup_AlreadySetUp" xml:space="preserve">
-    <value>Deze config heeft de modules voor live-functies al. Er is niets te doen.</value>
+    <value>Deze config heeft de modules voor live-functies al. Je kunt de functies toevoegen die hij nog niet heeft.</value>
     <comment/>
   </data>
   <data name="ModuleSetup_NeedsForkNotice" xml:space="preserve">
@@ -3263,6 +3287,14 @@
     <value>Emit-toetsen (toetsen die opdrachten naar andere apparaten sturen, zoals een trackball)</value>
     <comment/>
   </data>
+  <data name="ModuleSetup_FeatureSystem" xml:space="preserve">
+    <value>Flashen vanuit LViz</value>
+    <comment/>
+  </data>
+  <data name="ModuleSetup_FeatureSystemHint" xml:space="preserve">
+    <value>Laat LViz het toetsenbord in de bootloader zetten, zodat je nieuwe firmware vanuit LViz installeert zonder op een reset- of bootloadertoets te drukken. Elk programma op een computer waar het toetsenbord op aangesloten is, kan dat dan ook. Daarom staat het uit tot je het aanzet. Zonder deze optie kan LViz nog steeds flashen, maar start je de bootloader zelf.</value>
+    <comment/>
+  </data>
   <data name="ModuleSetup_ReviewHeader" xml:space="preserve">
     <value>Deze wijzigingen worden opgeslagen</value>
     <comment/>
@@ -3291,6 +3323,9 @@
     <value>Flash de nieuwe firmware deze ene keer met de hand op de centrale helft. De andere helft heeft hem niet nodig.</value>
     <comment/>
   </data>
+  <data name="ModuleSetup_DoneAddFeatures" xml:space="preserve">
+    <value>Je toetsenbord meldt zich al met deze config, dus LViz kan niet zien wanneer de nieuwe firmware erop staat. Flash hem om de toegevoegde functies te krijgen.</value>
+  </data>
   <data name="ModuleSetup_BoardWaiting" xml:space="preserve">
     <value>Wachten op het bord…</value>
     <comment/>
@@ -3309,6 +3344,321 @@
   </data>
   <data name="ModuleSetup_Reload" xml:space="preserve">
     <value>Opnieuw laden</value>
+    <comment/>
+  </data>
+  <data name="Flash_Title" xml:space="preserve">
+    <value>Toetsenbord flashen</value>
+    <comment/>
+  </data>
+  <data name="Flash_SourceHeader" xml:space="preserve">
+    <value>Wat er geflasht wordt</value>
+    <comment/>
+  </data>
+  <data name="Flash_SignInIntro" xml:space="preserve">
+    <value>Log in bij de tweede GitHub-app van LViz, "LViz for ZMK Builds", om firmwarebuilds te downloaden. Die kan alleen je Actions-builds lezen.</value>
+    <comment/>
+  </data>
+  <data name="Flash_SignIn" xml:space="preserve">
+    <value>Inloggen bij GitHub</value>
+    <comment/>
+  </data>
+  <data name="Flash_SignInCode" xml:space="preserve">
+    <value>Vul deze code in op GitHub: {0}</value>
+    <comment/>
+  </data>
+  <data name="Flash_CopyCode" xml:space="preserve">
+    <value>Code kopiëren</value>
+    <comment/>
+  </data>
+  <data name="Flash_OpenPage" xml:space="preserve">
+    <value>GitHub openen</value>
+    <comment/>
+  </data>
+  <data name="Flash_SignedInAs" xml:space="preserve">
+    <value>Builds: ingelogd als {0}</value>
+    <comment/>
+  </data>
+  <data name="Flash_SignOut" xml:space="preserve">
+    <value>Uitloggen</value>
+    <comment/>
+  </data>
+  <data name="Flash_BuildReady" xml:space="preserve">
+    <value>Build van {0}: {1} ({2})</value>
+    <comment/>
+  </data>
+  <data name="Flash_NewerRunPending" xml:space="preserve">
+    <value>Er loopt nog een nieuwere build.</value>
+    <comment/>
+  </data>
+  <data name="Flash_BuildRunning" xml:space="preserve">
+    <value>De firmware wordt nog gebouwd.</value>
+    <comment/>
+  </data>
+  <data name="Flash_BuildFailed" xml:space="preserve">
+    <value>De firmwarebuild is mislukt.</value>
+    <comment/>
+  </data>
+  <data name="Flash_BuildNoFirmware" xml:space="preserve">
+    <value>Deze build heeft geen firmware om te downloaden.</value>
+    <comment/>
+  </data>
+  <data name="Flash_BuildNoRun" xml:space="preserve">
+    <value>Hiervoor is nog geen firmwarebuild.</value>
+    <comment/>
+  </data>
+  <data name="Flash_BuildNotInstalled" xml:space="preserve">
+    <value>"LViz for ZMK Builds" ziet deze repository nog niet. Installeer de app op de repository en probeer het opnieuw.</value>
+    <comment/>
+  </data>
+  <data name="Flash_Install" xml:space="preserve">
+    <value>Installeren op GitHub</value>
+    <comment/>
+  </data>
+  <data name="Flash_Retry" xml:space="preserve">
+    <value>Opnieuw proberen</value>
+    <comment/>
+  </data>
+  <data name="Flash_Refresh" xml:space="preserve">
+    <value>Opnieuw kijken</value>
+    <comment/>
+  </data>
+  <data name="Flash_OpenRun" xml:space="preserve">
+    <value>Build op GitHub openen</value>
+    <comment/>
+  </data>
+  <data name="Flash_UseFile" xml:space="preserve">
+    <value>Liever een bestand gebruiken…</value>
+    <comment/>
+  </data>
+  <data name="Flash_UseBuild" xml:space="preserve">
+    <value>De GitHub-build gebruiken</value>
+    <comment/>
+  </data>
+  <data name="Flash_ErrorNoHalves" xml:space="preserve">
+    <value>LViz kan niet zien welke helften deze config bouwt, dus kan hij hem niet flashen.</value>
+    <comment/>
+  </data>
+  <data name="Flash_ErrorRead" xml:space="preserve">
+    <value>Kon de config niet lezen: {0}</value>
+    <comment/>
+  </data>
+  <data name="Flash_ErrorMissingFile" xml:space="preserve">
+    <value>De build heeft geen bestand {0}. Wel: {1}</value>
+    <comment/>
+  </data>
+  <data name="Flash_ErrorDownload" xml:space="preserve">
+    <value>Het downloaden van de firmware is mislukt: {0}</value>
+    <comment/>
+  </data>
+  <data name="Flash_ErrorExpired" xml:space="preserve">
+    <value>De firmware van deze build is op GitHub verlopen. Push een wijziging of start de build opnieuw.</value>
+    <comment/>
+  </data>
+  <data name="Flash_Downloading" xml:space="preserve">
+    <value>Firmware downloaden…</value>
+    <comment/>
+  </data>
+  <data name="Flash_HalvesHeader" xml:space="preserve">
+    <value>Welke helften geflasht worden</value>
+    <comment/>
+  </data>
+  <data name="Flash_HintPeripheralNeeded" xml:space="preserve">
+    <value>Gewijzigd sinds deze helft voor het laatst geflasht is.</value>
+    <comment/>
+  </data>
+  <data name="Flash_HintPeripheralNotNeeded" xml:space="preserve">
+    <value>Niets gewijzigd voor deze helft sinds de laatste flash.</value>
+    <comment/>
+  </data>
+  <data name="Flash_HintPeripheralUnknown" xml:space="preserve">
+    <value>LViz weet nog niet wat er op deze helft staat. Vink hem alleen aan als je meer dan de keymap hebt gewijzigd.</value>
+    <comment/>
+  </data>
+  <data name="Flash_HalfLeft" xml:space="preserve">
+    <value>Linkerhelft</value>
+    <comment/>
+  </data>
+  <data name="Flash_HalfRight" xml:space="preserve">
+    <value>Rechterhelft</value>
+    <comment/>
+  </data>
+  <data name="Flash_HalfCentral" xml:space="preserve">
+    <value>Centrale helft</value>
+    <comment/>
+  </data>
+  <data name="Flash_HalfOther" xml:space="preserve">
+    <value>Andere helft</value>
+    <comment/>
+  </data>
+  <data name="Flash_HalfKeyboard" xml:space="preserve">
+    <value>Toetsenbord</value>
+    <comment/>
+  </data>
+  <data name="Flash_HalfWithCentral" xml:space="preserve">
+    <value>{0} (centraal)</value>
+    <comment/>
+  </data>
+  <data name="Flash_Next" xml:space="preserve">
+    <value>Volgende</value>
+    <comment/>
+  </data>
+  <data name="Flash_Back" xml:space="preserve">
+    <value>Terug</value>
+    <comment/>
+  </data>
+  <data name="Flash_Close" xml:space="preserve">
+    <value>Sluiten</value>
+    <comment/>
+  </data>
+  <data name="Flash_PickFile" xml:space="preserve">
+    <value>Kies een .uf2-bestand…</value>
+    <comment/>
+  </data>
+  <data name="Flash_FileHalfLabel" xml:space="preserve">
+    <value>Dit bestand flashen op</value>
+    <comment/>
+  </data>
+  <data name="Flash_FileNotice" xml:space="preserve">
+    <value>Het bestand moet gebouwd zijn uit een config met de modules van LViz (zmk-raw-hid, zmk-hid-viz) en "Flashen vanuit LViz" aan. Anders werken live-functies en flashen vanuit LViz na deze flash niet meer.</value>
+    <comment/>
+  </data>
+  <data name="Flash_FileWarningNoSupport" xml:space="preserve">
+    <value>Dit bestand lijkt niet gebouwd met flashen vanuit LViz. Na het flashen kan LViz het toetsenbord niet meer in de bootloader zetten, en werken live-functies misschien niet meer.</value>
+    <comment/>
+  </data>
+  <data name="Flash_FileWarningAccept" xml:space="preserve">
+    <value>Toch flashen</value>
+    <comment/>
+  </data>
+  <data name="Flash_ErrorNotUf2" xml:space="preserve">
+    <value>Dat is geen UF2-firmwarebestand.</value>
+    <comment/>
+  </data>
+  <data name="Flash_FlashHeader" xml:space="preserve">
+    <value>Flashen: {0}</value>
+    <comment/>
+  </data>
+  <data name="Flash_SideLeft" xml:space="preserve">
+    <value>de linkerhelft</value>
+    <comment/>
+  </data>
+  <data name="Flash_SideRight" xml:space="preserve">
+    <value>de rechterhelft</value>
+    <comment/>
+  </data>
+  <data name="Flash_SideCentral" xml:space="preserve">
+    <value>de centrale helft</value>
+    <comment/>
+  </data>
+  <data name="Flash_SideOther" xml:space="preserve">
+    <value>de andere helft</value>
+    <comment/>
+  </data>
+  <data name="Flash_SideKeyboard" xml:space="preserve">
+    <value>het toetsenbord</value>
+    <comment/>
+  </data>
+  <data name="Flash_PrepareCentral" xml:space="preserve">
+    <value>Houd {0} met USB aangesloten op deze computer en klik dan op Start.</value>
+    <comment/>
+  </data>
+  <data name="Flash_PreparePeripheral" xml:space="preserve">
+    <value>Sluit {0} met een tweede USB-kabel aan op deze computer en houd {1} ook aangesloten. Klik dan op Start.</value>
+    <comment/>
+  </data>
+  <data name="Flash_PrepareManual" xml:space="preserve">
+    <value>Sluit {0} met USB aan op deze computer en zet hem in de bootloader: druk op de bootloadertoets of druk twee keer snel op de resetknop.</value>
+    <comment/>
+  </data>
+  <data name="Flash_ReasonNotConnected" xml:space="preserve">
+    <value>LViz ziet het toetsenbord nu niet.</value>
+    <comment/>
+  </data>
+  <data name="Flash_ReasonBluetooth" xml:space="preserve">
+    <value>Het toetsenbord is via Bluetooth verbonden. De bootloader vanuit LViz starten kan alleen via USB.</value>
+    <comment/>
+  </data>
+  <data name="Flash_ReasonNoSupport" xml:space="preserve">
+    <value>De firmware op het toetsenbord kan niet vanuit LViz in de bootloader gezet worden ("Flashen vanuit LViz" staat uit).</value>
+    <comment/>
+  </data>
+  <data name="Flash_Start" xml:space="preserve">
+    <value>Start</value>
+    <comment/>
+  </data>
+  <data name="Flash_Manual" xml:space="preserve">
+    <value>Ik doe het zelf</value>
+    <comment/>
+  </data>
+  <data name="Flash_Triggering" xml:space="preserve">
+    <value>Bezig om {0} in de bootloader te zetten…</value>
+    <comment/>
+  </data>
+  <data name="Flash_WaitingForDrive" xml:space="preserve">
+    <value>Wachten op de schijf van {0}…</value>
+    <comment/>
+  </data>
+  <data name="Flash_ManualHint" xml:space="preserve">
+    <value>Nog geen schijf. Zet {0} zelf in de bootloader: druk op de bootloadertoets of druk twee keer snel op de resetknop.</value>
+    <comment/>
+  </data>
+  <data name="Flash_MountHint" xml:space="preserve">
+    <value>Verschijnt de schijf niet, koppel hem dan aan in je bestandsbeheerder.</value>
+    <comment/>
+  </data>
+  <data name="Flash_Copying" xml:space="preserve">
+    <value>Firmware kopiëren…</value>
+    <comment/>
+  </data>
+  <data name="Flash_WaitingForRestart" xml:space="preserve">
+    <value>Wachten tot {0} opnieuw opstart…</value>
+    <comment/>
+  </data>
+  <data name="Flash_CheckingBoard" xml:space="preserve">
+    <value>Wachten tot het toetsenbord zich meldt…</value>
+    <comment/>
+  </data>
+  <data name="Flash_Cancel" xml:space="preserve">
+    <value>Annuleren</value>
+    <comment/>
+  </data>
+  <data name="Flash_FailedCopy" xml:space="preserve">
+    <value>Het kopiëren van de firmware is mislukt: {0}</value>
+    <comment/>
+  </data>
+  <data name="Flash_FailedNotAccepted" xml:space="preserve">
+    <value>De helft heeft het bestand niet aangenomen; de schijf is er nog. Is dit de juiste firmware voor dit bord?</value>
+    <comment/>
+  </data>
+  <data name="Flash_FailedWrongHalf" xml:space="preserve">
+    <value>De schijf die verscheen, {0}, hoort bij de andere helft, dus LViz heeft niets gekopieerd. Reset die helft zodat hij de bootloader verlaat, zet dan {1} in de bootloader en probeer het opnieuw.</value>
+  </data>
+  <data name="Flash_Skip" xml:space="preserve">
+    <value>Overslaan</value>
+    <comment/>
+  </data>
+  <data name="Flash_DoneHeader" xml:space="preserve">
+    <value>Klaar</value>
+    <comment/>
+  </data>
+  <data name="Flash_DoneFlashed" xml:space="preserve">
+    <value>{0}: geflasht.</value>
+    <comment/>
+  </data>
+  <data name="Flash_DoneNotReported" xml:space="preserve">
+    <value>{0}: geflasht, maar het toetsenbord heeft zich nog niet gemeld.</value>
+    <comment/>
+  </data>
+  <data name="Flash_DoneSkipped" xml:space="preserve">
+    <value>{0}: overgeslagen.</value>
+    <comment/>
+  </data>
+  <data name="Flash_PickFileTitle" xml:space="preserve">
+    <value>Kies een firmwarebestand</value>
+    <comment/>
+  </data>
+  <data name="Flash_FileTypeUf2" xml:space="preserve">
+    <value>UF2-firmware</value>
     <comment/>
   </data>
 </root>

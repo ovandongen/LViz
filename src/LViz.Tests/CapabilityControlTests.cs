@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using LViz.App.Services;
+using LViz.Core.Firmware;
 using ZmkHidProtocol.Capabilities;
 using ZmkHidProtocol.Protocol;
 using Xunit;
@@ -149,5 +150,54 @@ public class CapabilityControlTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => control.ActivateLayerAsync(device, layerIndex: 1, cts.Token));
+    }
+
+    // ─── core.system.bootloader (0xB0) ───────────────────────────────────────
+
+    [Fact]
+    public async Task EnterBootloader_SendsThePacket_ConfirmResolves()
+    {
+        var device = new FakeDevice();
+        var control = LongTimeout();
+
+        var pending = control.EnterBootloaderAsync(device, BootloaderCommand.CentralTarget);
+        var sent = Assert.Single(device.Sent);
+        var reference = RefOf(sent); // the tracker's ref, read back from bytes 1-2
+        Assert.Equal(BootloaderCommand.Build(reference, BootloaderCommand.CentralTarget), sent);
+
+        device.RaiseReport(Confirm(reference, ok: true));
+        var result = await pending;
+
+        Assert.Equal(ControlOutcome.Confirmed, result.Outcome);
+        Assert.True(result.Success);
+        Assert.False(device.HasReportSubscribers); // unsubscribed in finally
+    }
+
+    [Fact]
+    public async Task EnterBootloader_NotOk_Fails()
+    {
+        var device = new FakeDevice();
+        var control = LongTimeout();
+
+        var pending = control.EnterBootloaderAsync(device, targetHalf: 0);
+        device.RaiseReport(Confirm(RefOf(device.Sent[0]), ok: false));
+
+        var result = await pending;
+        Assert.Equal(ControlOutcome.Failed, result.Outcome);
+        Assert.False(result.Success);
+        Assert.False(device.HasReportSubscribers);
+    }
+
+    [Fact]
+    public async Task EnterBootloader_NoReply_TimesOut()
+    {
+        var device = new FakeDevice();
+        var control = new CapabilityControl(TimeSpan.FromMilliseconds(50));
+
+        var result = await control.EnterBootloaderAsync(device, BootloaderCommand.CentralTarget);
+
+        Assert.Equal(ControlOutcome.TimedOut, result.Outcome);
+        Assert.False(result.Success);
+        Assert.False(device.HasReportSubscribers); // unsubscribed even on timeout
     }
 }

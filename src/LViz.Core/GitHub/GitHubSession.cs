@@ -9,8 +9,11 @@ namespace LViz.Core.GitHub;
 /// <see cref="GitHubClient"/> when it is about to expire), and signs out.
 ///
 /// <para>
-/// The login lives as <see cref="GitHubTokens.ToJson"/> under
-/// <see cref="GitHubAppInfo.SecretKey"/>. A store that cannot persist it (a
+/// The login lives as <see cref="GitHubTokens.ToJson"/> under the secret key
+/// given to the constructor, by default <see cref="GitHubAppInfo.SecretKey"/>
+/// — a session for the second App (
+/// <see cref="GitHubBuildsAppInfo.SecretKey"/>) keeps its login next to the
+/// first one, never on top of it. A store that cannot persist it (a
 /// Linux box without a keychain, backed by
 /// <see cref="Persistence.InMemorySecretStore"/>) still keeps the login for
 /// this process — that is what <see cref="IsPersisted"/> reports, so the UI
@@ -27,13 +30,18 @@ namespace LViz.Core.GitHub;
 /// Nothing here ever logs a token; diagnostics carry the login only.
 /// </para>
 /// </summary>
-public sealed class GitHubSession(GitHubClient client, ISecretStore store, Func<DateTimeOffset>? now = null)
+public sealed class GitHubSession(
+    GitHubClient client,
+    ISecretStore store,
+    Func<DateTimeOffset>? now = null,
+    string? secretKey = null)
 {
     /// <summary>An access token with less than this left is refreshed instead of returned.</summary>
     private static readonly TimeSpan RefreshMargin = TimeSpan.FromMinutes(5);
 
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly Func<DateTimeOffset> _now = now ?? UtcNow;
+    private readonly string _secretKey = secretKey ?? GitHubAppInfo.SecretKey;
     private GitHubTokens? _tokens;
 
     /// <summary>True while a login is held (persisted or session-only).</summary>
@@ -67,7 +75,7 @@ public sealed class GitHubSession(GitHubClient client, ISecretStore store, Func<
             return true;
         }
 
-        var stored = GitHubTokens.TryFromJson(await store.ReadAsync(GitHubAppInfo.SecretKey, ct));
+        var stored = GitHubTokens.TryFromJson(await store.ReadAsync(_secretKey, ct));
         if (stored is null)
         {
             return false;
@@ -76,7 +84,7 @@ public sealed class GitHubSession(GitHubClient client, ISecretStore store, Func<
         if (Expired(stored.AccessTokenExpiresAt) && !RefreshUsable(stored))
         {
             DiagnosticLog.Info("GitHub", $"Stored session for {stored.Login} can no longer refresh, discarding it");
-            await store.DeleteAsync(GitHubAppInfo.SecretKey, ct);
+            await store.DeleteAsync(_secretKey, ct);
             return false;
         }
 
@@ -95,7 +103,7 @@ public sealed class GitHubSession(GitHubClient client, ISecretStore store, Func<
     public async Task SignInAsync(GitHubTokens tokens, CancellationToken ct = default)
     {
         _tokens = tokens;
-        IsPersisted = await store.WriteAsync(GitHubAppInfo.SecretKey, tokens.ToJson(), ct);
+        IsPersisted = await store.WriteAsync(_secretKey, tokens.ToJson(), ct);
 
         DiagnosticLog.Info("GitHub", $"Signed in as {tokens.Login} (persisted: {IsPersisted})");
         Changed?.Invoke(this, EventArgs.Empty);
@@ -142,7 +150,7 @@ public sealed class GitHubSession(GitHubClient client, ISecretStore store, Func<
             }
 
             _tokens = refreshed;
-            IsPersisted = await store.WriteAsync(GitHubAppInfo.SecretKey, refreshed.ToJson(), ct);
+            IsPersisted = await store.WriteAsync(_secretKey, refreshed.ToJson(), ct);
 
             DiagnosticLog.Info("GitHub", $"Refreshed the access token for {refreshed.Login} (persisted: {IsPersisted})");
             return refreshed.AccessToken;
@@ -167,7 +175,7 @@ public sealed class GitHubSession(GitHubClient client, ISecretStore store, Func<
 
         _tokens = null;
         IsPersisted = false;
-        await store.DeleteAsync(GitHubAppInfo.SecretKey, ct);
+        await store.DeleteAsync(_secretKey, ct);
 
         if (wasSignedIn)
         {

@@ -55,6 +55,8 @@ public class DeviceRoutingViewModelTests
         { Calls.Add(("activate", target, layerIndex, 0)); return Task.FromResult(Result); }
         public Task<ControlResult> DeactivateLayerAsync(ICapabilityDevice target, byte layerIndex, CancellationToken ct = default)
         { Calls.Add(("deactivate", target, layerIndex, 0)); return Task.FromResult(Result); }
+        public Task<ControlResult> EnterBootloaderAsync(ICapabilityDevice target, byte targetHalf, CancellationToken ct = default)
+        { Calls.Add(("bootloader", target, targetHalf, 0)); return Task.FromResult(Result); }
     }
 
     private static Capability Triggers(string id) => new(CapabilityRole.Triggers, CapabilityTier.Core, false, id);

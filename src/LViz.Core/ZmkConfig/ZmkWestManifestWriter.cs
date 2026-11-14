@@ -4,10 +4,11 @@ namespace LViz.Core.ZmkConfig;
 /// Patches a zmk-config <c>config/west.yml</c> so it pulls in LViz's two
 /// modules — <c>zmk-raw-hid</c> and <c>zmk-hid-viz</c> — from Olaf's GitHub:
 /// LViz is tested with the ovandongen fork of raw-hid, so a
-/// <c>zmk-raw-hid</c> from another owner is switched over to it. The writer only ever adds lines or
-/// rewrites the ones that serve those two projects and their remote —
-/// comments, layout and every other item stay byte-identical — and re-parses
-/// its own result as a bug guard.
+/// <c>zmk-raw-hid</c> from another owner is switched over to it. The writer only ever adds lines,
+/// rewrites the ones that serve those two projects and their remote, and drops
+/// a switched-over project's redundant <c>url:</c> line — same-line comments,
+/// layout and every other item stay byte-identical — and re-parses its own
+/// result as a bug guard.
 /// </summary>
 public static class ZmkWestManifestWriter
 {
@@ -72,14 +73,16 @@ public static class ZmkWestManifestWriter
     /// The pending edits of one <see cref="AddModules"/> call, addressed by the
     /// 0-based line numbers of the parsed manifest. Insertions sharing an
     /// anchor keep their call order; <see cref="Apply"/> handles anchors
-    /// bottom-up so earlier line numbers stay valid.
+    /// bottom-up so earlier line numbers stay valid. A deleted line drops out;
+    /// insertions anchored on it take its place.
     /// </summary>
     private sealed class Patch(ZmkWestManifest Manifest, string Cr)
     {
         private readonly Dictionary<int, string> _replacements = [];
         private readonly Dictionary<int, List<string>> _insertions = [];
+        private readonly HashSet<int> _deletions = [];
 
-        public bool IsEmpty => _replacements.Count == 0 && _insertions.Count == 0;
+        public bool IsEmpty => _replacements.Count == 0 && _insertions.Count == 0 && _deletions.Count == 0;
 
         /// <summary>
         /// The remote feeding <see cref="OwnerUrlBase"/>: reused when some
@@ -128,9 +131,11 @@ public static class ZmkWestManifestWriter
 
         /// <summary>
         /// Appends <c>zmk-raw-hid</c> after the last project when absent;
-        /// switches its <c>remote:</c>/<c>url:</c> to <paramref name="remoteName"/>
-        /// and its <c>revision:</c> to <paramref name="revision"/> when it comes
-        /// from someone else; leaves an Olaf-sourced item exactly as it is.
+        /// switches its <c>remote:</c> to <paramref name="remoteName"/> (a
+        /// second <c>url:</c> line goes with it, a lone <c>url:</c> becomes
+        /// the remote reference) and its <c>revision:</c> to
+        /// <paramref name="revision"/> when it comes from someone else;
+        /// leaves an Olaf-sourced item exactly as it is.
         /// </summary>
         public void ApplyRawHid(string remoteName, string revision)
         {
@@ -150,11 +155,16 @@ public static class ZmkWestManifestWriter
 
             var hasRemote = rawHid.KeyLines.TryGetValue("remote", out var remoteLine);
             var hasUrl = rawHid.KeyLines.TryGetValue("url", out var urlLine);
-            if (hasRemote)
+            if (hasRemote && hasUrl)
+            {
                 ReplaceKey(remoteLine, "remote", "remote", remoteName);
-            if (hasUrl)
+                Delete(urlLine); // two remote: lines would be untidy; the url one goes
+            }
+            else if (hasRemote)
+                ReplaceKey(remoteLine, "remote", "remote", remoteName);
+            else if (hasUrl)
                 ReplaceKey(urlLine, "url", "remote", remoteName); // the url line becomes the remote reference
-            if (!hasRemote && !hasUrl)
+            else
                 // The owner came from the default remote: pin this item to ours.
                 InsertAfter(rawHid.StartLine, Spaces(rawHid.KeyIndent) + $"remote: {remoteName}");
 
@@ -185,12 +195,23 @@ public static class ZmkWestManifestWriter
             {
                 if (_replacements.TryGetValue(i, out var replacement))
                     lines[i] = replacement;
-                if (!_insertions.TryGetValue(i, out var added))
+                var deleted = _deletions.Contains(i);
+                if (_insertions.TryGetValue(i, out var added))
+                {
+                    if (!deleted && i == Manifest.Lines.Length - 1 && Cr.Length > 0
+                        && ZmkYamlLines.IsContent(lines[i]) && !lines[i].EndsWith('\r'))
+                        lines[i] += "\r"; // this last line got a successor, so it needs its line ending back
+                    lines.InsertRange(i + 1, added);
+                }
+                if (!deleted)
                     continue;
-                if (i == Manifest.Lines.Length - 1 && Cr.Length > 0
-                    && ZmkYamlLines.IsContent(lines[i]) && !lines[i].EndsWith('\r'))
-                    lines[i] += "\r"; // this last line got a successor, so it needs its line ending back
-                lines.InsertRange(i + 1, added);
+                lines.RemoveAt(i);
+                if (i == Manifest.Lines.Length - 1 && Cr.Length > 0 && lines.Count > 0)
+                {
+                    var last = lines[^1];
+                    if (ZmkYamlLines.IsContent(last) && last.EndsWith('\r'))
+                        lines[^1] = last[..^1]; // this line is the last one now, so its ending goes away
+                }
             }
             return [.. lines];
         }
@@ -219,17 +240,21 @@ public static class ZmkWestManifestWriter
                 list.Add(text + Cr);
         }
 
+        private void Delete(int line) => _deletions.Add(line);
+
         /// <summary>
         /// Rewrites the key line so it reads <c>newKey: value</c>, keeping the
-        /// line's indent and everything before the old key (its dash, a tab)
-        /// and its line ending.
+        /// line's indent and everything before the old key (its dash, a tab),
+        /// its same-line comment and its line ending.
         /// </summary>
         private void ReplaceKey(int line, string oldKey, string newKey, string value)
         {
             var original = Manifest.Lines[line];
             var at = original.IndexOf(oldKey + ":", StringComparison.Ordinal);
             var prefix = at >= 0 ? original[..at] : original[..ZmkYamlLines.Indent(original)];
-            _replacements[line] = prefix + newKey + ": " + value + (original.EndsWith('\r') ? "\r" : "");
+            var body = original.EndsWith('\r') ? original[..^1] : original;
+            var tail = body[ZmkYamlLines.StripComment(body).Length..]; // the whitespace + '#…' part, or empty
+            _replacements[line] = prefix + newKey + ": " + value + tail + (original.EndsWith('\r') ? "\r" : "");
         }
 
         private static string Spaces(int indent) => new(' ', indent);

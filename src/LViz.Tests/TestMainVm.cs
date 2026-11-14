@@ -1,4 +1,5 @@
 using LViz.App.Services;
+using LViz.App.Services.Flashing;
 using LViz.App.Services.GitHub;
 using LViz.App.Services.MouseIdle;
 using LViz.App.ViewModels;
@@ -27,7 +28,8 @@ internal static class TestMainVm
         IMouseIdleMonitor? mouseIdleMonitor = null,
         ICapabilityControl? capabilityControl = null,
         IHostActionExecutor? hostActionExecutor = null,
-        Func<string, bool>? fileExists = null)
+        Func<string, bool>? fileExists = null,
+        FirmwareBuildWatcher? firmwareWatcher = null)
     {
         var vm = new MainWindowViewModel(
             settings,
@@ -39,6 +41,7 @@ internal static class TestMainVm
             hostActionExecutor ?? new HostActionExecutor(),
             capabilityControl ?? new CapabilityControl(),
             gitHub,
+            firmwareWatcher,
             activeWindowMonitor,
             mouseIdleMonitor);
         if (fileExists is not null)

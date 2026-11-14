@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LViz.App.Localization;
 using LViz.App.Services.GitHub;
+using LViz.Core.Diagnostics;
 using LViz.Core.GitHub;
 using LViz.Core.Persistence;
 using LViz.Core.ZmkConfig;
@@ -14,12 +15,13 @@ public sealed record ModuleSetupGitHubTarget(string Owner, string Repo, string B
 /// <summary>
 /// What to set up: a local zmk-config root or a GitHub target — exactly one
 /// of the two, checked by the view-model's constructor — plus a way to ask
-/// whether the keyboard is plugged in (the Done step shows it).
+/// the board to report itself (the Done step shows it).
 /// </summary>
+/// <param name="QueryConfigId">asks the keyboard for its config ID (0xFA); null when no board answers.</param>
 public sealed record ModuleSetupContext(
     string? LocalRoot,
     ModuleSetupGitHubTarget? GitHub,
-    Func<bool> IsBoardConnected);
+    Func<CancellationToken, Task<string?>> QueryConfigId);
 
 /// <summary>The wizard's steps.</summary>
 public enum ModuleSetupStep
@@ -48,6 +50,9 @@ public sealed record ModuleSetupCentralOption(int Index, string Text);
 /// </summary>
 public sealed partial class ModuleSetupViewModel : ObservableObject
 {
+    /// <summary>The shield whose build entry is the central of a set-up config.</summary>
+    private const string RawHidAdapterShield = "raw_hid_adapter";
+
     private readonly ModuleSetupContext _context;
     private readonly IGitHubKeymapService? _gitHub;
 
@@ -129,7 +134,7 @@ public sealed partial class ModuleSetupViewModel : ObservableObject
     [ObservableProperty]
     private string? _statusMessage;
 
-    /// <summary>No blockers and not yet set up — what lets the user press Next.</summary>
+    /// <summary>No blockers — what lets the user press Next on Check.</summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(NextCommand))]
     private bool _canSetUp;
@@ -155,13 +160,41 @@ public sealed partial class ModuleSetupViewModel : ObservableObject
     private bool _showRgb;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(NextCommand))]
     private bool _rgb;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(NextCommand))]
     private bool _signal;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(NextCommand))]
     private bool _emit;
+
+    /// <summary>Flash the keyboard's bootloader from LViz (<c>CONFIG_HID_VIZ_SYSTEM</c>); off by default.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(NextCommand))]
+    private bool _system;
+
+    /// <summary>The feature is already <c>y</c> in the config: its checkbox shows ticked and disabled.</summary>
+    [ObservableProperty]
+    private bool _rgbLocked;
+
+    /// <inheritdoc cref="RgbLocked"/>
+    [ObservableProperty]
+    private bool _signalLocked;
+
+    /// <inheritdoc cref="RgbLocked"/>
+    [ObservableProperty]
+    private bool _emitLocked;
+
+    /// <inheritdoc cref="RgbLocked"/>
+    [ObservableProperty]
+    private bool _systemLocked;
+
+    /// <summary>False on a set-up config, whose central is fixed to the <c>raw_hid_adapter</c> entry.</summary>
+    [ObservableProperty]
+    private bool _canChangeCentral;
 
     /// <summary>Reveals the emit checkbox under "Advanced".</summary>
     [ObservableProperty]
@@ -198,6 +231,14 @@ public sealed partial class ModuleSetupViewModel : ObservableObject
                     CanSetUp = false;
                     return;
                 }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                    // Not an API failure — unpacking the branch tarball hit the disk.
+                    DiagnosticLog.Warn("ModuleSetup", $"Reading the fetched GitHub config failed: {e.Message}");
+                    ErrorMessage = Loc.Instance.Format("ModuleSetup_ErrorRead", e.Message);
+                    CanSetUp = false;
+                    return;
+                }
             }
             else
             {
@@ -226,7 +267,7 @@ public sealed partial class ModuleSetupViewModel : ObservableObject
             BlockerMessage = facts.Blockers.Count == 0
                 ? null
                 : string.Join("\n", facts.Blockers.Select(b => BlockerText(b, facts.UnreadableDetail)));
-            CanSetUp = facts.Blockers.Count == 0 && facts.Status != ZmkModuleStatus.SetUp;
+            CanSetUp = facts.Blockers.Count == 0;
 
             StatusMessage = facts.Status switch
             {
@@ -235,8 +276,18 @@ public sealed partial class ModuleSetupViewModel : ObservableObject
                 _ => null,
             };
 
+            // A set-up config is add-only: its central is the raw_hid_adapter
+            // entry, and every switch starts at what the config already has,
+            // locked where it is already on.
+            var setUp = facts.Status == ZmkModuleStatus.SetUp;
+            var centralIndex = setUp
+                ? facts.Entries.FirstOrDefault(e => e.Shields.Contains(RawHidAdapterShield))?.Index
+                  ?? facts.CentralIndex
+                : facts.CentralIndex;
+
             CentralOptions = options;
-            SelectedCentral = options.FirstOrDefault(o => o.Index == facts.CentralIndex);
+            SelectedCentral = options.FirstOrDefault(o => o.Index == centralIndex);
+            CanChangeCentral = !setUp;
             IsSplit = facts.IsSplit;
             CentralHint = facts.CentralReason switch
             {
@@ -245,9 +296,14 @@ public sealed partial class ModuleSetupViewModel : ObservableObject
                 _ => null,
             };
             ShowRgb = facts.HasUnderglow;
-            Rgb = ShowRgb;
-            Signal = true;
-            Emit = false;
+            RgbLocked = setUp && ShowRgb && facts.Features.Rgb;
+            SignalLocked = setUp && facts.Features.Signal;
+            EmitLocked = setUp && facts.Features.Emit;
+            SystemLocked = setUp && facts.Features.System;
+            Rgb = setUp ? RgbLocked : ShowRgb;
+            Signal = !setUp || SignalLocked;
+            Emit = EmitLocked;
+            System = SystemLocked;
             ShowAdvanced = false;
         }
         finally
@@ -303,9 +359,18 @@ public sealed partial class ModuleSetupViewModel : ObservableObject
     private bool CanNext() => Step switch
     {
         ModuleSetupStep.Check => CanSetUp && !IsBusy,
-        ModuleSetupStep.Choose => SelectedCentral is not null,
+        ModuleSetupStep.Choose => SelectedCentral is not null
+            && (_facts?.Status != ZmkModuleStatus.SetUp || HasNewFeature),
         _ => false,
     };
+
+    /// <summary>A ticked feature the config does not have yet — what a
+    /// set-up config needs before Next leads to Review.</summary>
+    private bool HasNewFeature =>
+        (Rgb && ShowRgb && !RgbLocked)
+        || (Signal && !SignalLocked)
+        || (Emit && !EmitLocked)
+        || (System && !SystemLocked);
 
     [RelayCommand(CanExecute = nameof(CanNext))]
     private void Next()

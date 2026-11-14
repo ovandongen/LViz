@@ -83,7 +83,8 @@ public sealed partial class KeymapEditViewModel
 
                 if (outcome is KeymapEditSaveOutcome.Saved saved)
                 {
-                    await RaiseCompletedAsync(new KeymapEditCompletion.Saved(plan, saved.ReloadPath));
+                    await RaiseCompletedAsync(new KeymapEditCompletion.Saved(
+                        plan, saved.ReloadPath, saved.CommitSha));
                     return;
                 }
 
@@ -192,7 +193,7 @@ public sealed partial class KeymapEditViewModel
             case GitHubSaveResult.Saved committed:
                 DiagnosticLog.Info("Editor", $"Committed {Source.Entry} to GitHub as {committed.CommitSha}.");
                 return new KeymapEditSaveOutcome.Saved(
-                    _gitHub.LocalPathFor(Source.GitHub!) ?? Source.LocalPath);
+                    _gitHub.LocalPathFor(Source.GitHub!) ?? Source.LocalPath, committed.CommitSha);
 
             case GitHubSaveResult.Failed failure:
                 return new KeymapEditSaveOutcome.Failed(GitHubOpenViewModel.MessageFor(

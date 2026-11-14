@@ -910,7 +910,7 @@ public class KeymapEditViewModelTests
 
             var outcome = await vm.SaveAsync(plan, overwrite: false);
 
-            Assert.Equal(new KeymapEditSaveOutcome.Saved("/cache/x.keymap"), outcome);
+            Assert.Equal(new KeymapEditSaveOutcome.Saved("/cache/x.keymap", "abc"), outcome);
             Assert.Equal(vm.Source.GitHub, savedRef);
             Assert.Equal(new UTF8Encoding(false).GetBytes(plan.NewSource), savedContent);
             Assert.False(savedContent!.AsSpan().StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }));
@@ -979,7 +979,8 @@ public class KeymapEditViewModelTests
 
             var outcome = await vm.SaveAsync(plan, overwrite: false);
 
-            Assert.Equal(new KeymapEditSaveOutcome.Saved(path), outcome);
+            // The commit's SHA rides along for the firmware build watch.
+            Assert.Equal(new KeymapEditSaveOutcome.Saved(path, "abc"), outcome);
         }
         finally
         {

@@ -92,6 +92,13 @@ public class SettingsViewModelMainPropertyCoverageTests
         "CanSetUpLiveFeatures",
         "ShowLiveFeaturesHint",
 
+        // Main-window flashing affordance: the flyout item and the firmware
+        // build status line.
+        "CanFlashKeyboard",
+        "FirmwareStatusText",
+        "ShowFirmwareStatus",
+        "IsFirmwareStatusLink",
+
         // Recents flyout child view-model, bound directly in the main window's
         // load menu; settings never renders recents.
         "Recents",
