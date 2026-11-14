@@ -1,5 +1,6 @@
 using LViz.Core.Diagnostics;
 using LViz.Core.Firmware;
+using LViz.Core.ZmkConfig;
 
 namespace LViz.App.Services.Flashing;
 
@@ -249,11 +250,27 @@ public sealed class FlashRun(
 
         Report(FlashPhase.CheckingBoard, false, null, drive.Label);
         var waited = TimeSpan.Zero;
+        string? lastOther = null;
         while (waited < ReportWait)
         {
-            var reported = expectedConfigId is not null
-                ? string.Equals(await keyboard.QueryConfigIdAsync(ct), expectedConfigId, StringComparison.Ordinal)
-                : keyboard.IsConnected;
+            bool reported;
+            if (expectedConfigId is not null)
+            {
+                // The 0xFA reply carries at most 31 characters (see ZmkConfigId).
+                var id = await keyboard.QueryConfigIdAsync(ct);
+                reported = ZmkConfigId.Matches(id, expectedConfigId);
+                if (!reported && id is not null && id != lastOther)
+                {
+                    lastOther = id;
+                    DiagnosticLog.Info(
+                        "Flash", $"half {half.Role}/{half.Side}: the board reports config ID '{id}', expected '{expectedConfigId}'");
+                }
+            }
+            else
+            {
+                reported = keyboard.IsConnected;
+            }
+
             if (reported)
             {
                 DiagnosticLog.Info("Flash", $"half {half.Role}/{half.Side}: the board reported in — flashed");

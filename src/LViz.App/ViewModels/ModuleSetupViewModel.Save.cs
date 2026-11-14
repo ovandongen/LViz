@@ -263,8 +263,8 @@ public sealed partial class ModuleSetupViewModel
             }
 
             var expected = _plan?.NewConfigId ?? _facts?.ConfigId;
-            IsBoardConnected = expected is not null
-                && string.Equals(reported, expected, StringComparison.Ordinal);
+            // The 0xFA reply carries at most 31 characters: a GUID comes back cut.
+            IsBoardConnected = ZmkConfigId.Matches(reported, expected);
         }
         finally
         {

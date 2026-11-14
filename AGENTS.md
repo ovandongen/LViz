@@ -588,7 +588,12 @@ After creating or editing a view, rebuild the App project before trusting a
   snapshot the drives, optional `0xB0`, wait for a *new* bootloader drive,
   refuse a drive whose label names the other side (`Uf2Drive.Side`,
   MoErgo's `…LHBOOT`/`…RHBOOT`), copy with a plain `FileStream`, wait for the
-  drive to go, and for the central wait for its config ID. Its waits count
+  drive to go, and for the central wait for its config ID. The firmware
+  takes `0xB0` over USB or Bluetooth but refuses it unless the central's USB
+  HID is up, and zmk-raw-hid sends replies on both transports; so
+  `KeyboardBus.Usb` means "the central is on USB", and a Bluetooth endpoint
+  with a USB twin (same ids and product name) counts as USB
+  (`KeyboardFlashAccess.BusFor`). Its waits count
   the injected delay, not the clock, so tests run them instantly.
   `FlashWindow.OnClosed` calls `FlashViewModel.CancelWork()`: a run left
   going would copy its file onto the next bootloader drive with no window
@@ -791,7 +796,10 @@ LViz-specific (extend this list as we hit more):
   test never listens on the pipe. `MainWindowViewModel.Devices` exposes it, so reach
   `Devices.Hid`, `Devices.Push`, … instead of adding VM pass-throughs.
   `DeviceStackTests` pins the order with recording doubles (the bus slot is
-  unrecorded: `RawHidDeviceBus` is sealed).
+  unrecorded: `RawHidDeviceBus` is sealed). The bus only rescans the router
+  for *its* devices, and the keyboard is not one of them, so `DeviceStack`
+  rescans the router whenever the keyboard connects: a keyboard back with
+  new firmware must not keep its old manifest in the inventory.
 
 - **App exit unconditionally forces the keyboard to base layer 0 — don't
   weaken it back to a conditional revert.** The board can't tell LViz has quit,
@@ -1074,6 +1082,11 @@ LViz-specific (extend this list as we hit more):
 
 - **A `.keymap` test fixture needs the same binding count on every layer**:
   `KeyboardConfigValidator` rejects the file otherwise.
+
+- **The board's `0xFA` config-ID reply holds at most 31 characters**
+  (one report minus the opcode): a GUID config ID comes back cut, while the
+  manifest carries it whole. Compare a reported ID only through
+  `ZmkConfigId.Matches`, never with `string.Equals`.
 
 - **A fake's interface event that is never raised trips CS0067** in the
   0-warning build: wrap it in `#pragma warning disable/restore CS0067` with a

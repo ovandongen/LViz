@@ -138,6 +138,48 @@ public class KeyboardFlashAccessTests
         Assert.Equal(KeyboardBus.Bluetooth, bus);
     }
 
+    // ─── BusFor: the rule over one hidapi enumeration ────────────────────────
+
+    private static KeyboardFlashAccess.HidEntry Entry(
+        string path, HidApi.BusType bus, string product = "Cosmos82", ushort vid = 0x1D50, ushort pid = 0x615E) =>
+        new(path, vid, pid, product, bus);
+
+    [Fact]
+    public void BusFor_OpenEntryOnUsb_IsUsb() =>
+        Assert.Equal(KeyboardBus.Usb, KeyboardFlashAccess.BusFor("usb", [Entry("usb", HidApi.BusType.Usb)]));
+
+    [Fact]
+    public void BusFor_BluetoothWithAUsbTwin_IsUsb()
+    {
+        // A central that is paired and plugged in at once shows up twice, and
+        // LViz may talk to it over Bluetooth; the firmware only needs USB up.
+        var entries = new[] { Entry("ble", HidApi.BusType.Bluetooth), Entry("usb", HidApi.BusType.Usb) };
+
+        Assert.Equal(KeyboardBus.Usb, KeyboardFlashAccess.BusFor("ble", entries));
+    }
+
+    [Fact]
+    public void BusFor_BluetoothOnly_IsBluetooth() =>
+        Assert.Equal(KeyboardBus.Bluetooth, KeyboardFlashAccess.BusFor("ble", [Entry("ble", HidApi.BusType.Bluetooth)]));
+
+    [Fact]
+    public void BusFor_UsbEntryOfAnotherKeyboard_DoesNotCount()
+    {
+        // Upstream ZMK boards share 1D50:615E: only the same product name is a twin.
+        var entries = new[]
+        {
+            Entry("ble", HidApi.BusType.Bluetooth),
+            Entry("other", HidApi.BusType.Usb, product: "Slabwing"),
+            Entry("moergo", HidApi.BusType.Usb, vid: 0x16C0, pid: 0x27DB),
+        };
+
+        Assert.Equal(KeyboardBus.Bluetooth, KeyboardFlashAccess.BusFor("ble", entries));
+    }
+
+    [Fact]
+    public void BusFor_NoEntryForThePath_IsUnknown() =>
+        Assert.Equal(KeyboardBus.Unknown, KeyboardFlashAccess.BusFor("gone", [Entry("usb", HidApi.BusType.Usb)]));
+
     // ─── BootloaderPeripheralSlots ───────────────────────────────────────────
 
     [Fact]

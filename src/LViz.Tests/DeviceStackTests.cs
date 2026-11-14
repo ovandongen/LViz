@@ -25,10 +25,17 @@ public class DeviceStackTests
 #pragma warning disable CS0067
         public event Action<int>? ActiveLayerChanged;
         public event Action<int, bool>? KeyPositionEvent;
-        public event Action? ConnectionChanged;
         public event Action<ReadOnlyMemory<byte>>? ReportReceived;
 #pragma warning restore CS0067
-        public bool IsConnected => false;
+        public event Action? ConnectionChanged;
+        public bool IsConnected { get; private set; }
+
+        /// <summary>What the HID source does when the keyboard comes or goes.</summary>
+        public void SetConnected(bool connected)
+        {
+            IsConnected = connected;
+            ConnectionChanged?.Invoke();
+        }
         public string? OpenDevicePath => null;
         public IDeviceMatcher KeyboardMatcher { get; } = new KeyboardProfileMatcherStub();
         public string SourceLabel => "";
@@ -106,14 +113,42 @@ public class DeviceStackTests
         public Task RunAsync(ActionPipeline pipeline, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
-    private static (DeviceStack Stack, Log Log) Build()
+    private static (DeviceStack Stack, Log Log) Build() => Build(out _);
+
+    private static (DeviceStack Stack, Log Log) Build(out RecHid hid)
     {
         var log = new Log();
+        hid = new RecHid(log);
         var stack = new DeviceStack(
-            new RecHid(log), new RawHidDeviceBus(), new RecRouter(log), new NoPipelines(),
+            hid, new RawHidDeviceBus(), new RecRouter(log), new NoPipelines(),
             new RecSignals(log), new RecIpc(log), new RecPush(log),
             new RecDisposable(log, "appLayer.dispose"));
         return (stack, log);
+    }
+
+    [Fact]
+    public void KeyboardConnects_RescansTheRouter_ADisconnectDoesNot()
+    {
+        // A keyboard back with new (just flashed) firmware has a new manifest;
+        // the bus never sees the keyboard, so only this rescan picks it up.
+        var (_, log) = Build(out var hid);
+
+        hid.SetConnected(false);
+        Assert.Empty(log.Entries);
+
+        hid.SetConnected(true);
+        Assert.Equal(["router.rescan"], log.Entries);
+    }
+
+    [Fact]
+    public void Dispose_StopsRescanningOnKeyboardConnects()
+    {
+        var (stack, log) = Build(out var hid);
+        stack.Dispose();
+        log.Entries.Clear();
+
+        hid.SetConnected(true);
+        Assert.Empty(log.Entries);
     }
 
     [Fact]
