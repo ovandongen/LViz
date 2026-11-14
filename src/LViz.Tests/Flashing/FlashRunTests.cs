@@ -201,6 +201,21 @@ public sealed class FlashRunTests
     }
 
     [Fact]
+    public async Task CentralReportsItsGuidCut_ToTheReplySize_IsFlashed()
+    {
+        // zmk-hid-viz's 0xFA reply holds 31 characters, so a GUID config ID
+        // always comes back cut; that is the board reporting in.
+        const string guid = "5a75ba84-85bd-4694-8bb2-d4242e5d3e87";
+        var h = new Harness(NoDrives, WithDrive, NoDrives);
+        h.Keyboard.ConfigIds.Enqueue(guid[..31]);
+
+        var result = await h.FlashAsync(Central, useTrigger: true, guid);
+
+        Assert.Equal(FlashOutcome.Flashed, result.Outcome);
+        Assert.Equal(1, h.Keyboard.ConfigIdCalls);
+    }
+
+    [Fact]
     public async Task CentralNeverReports_FlashedNotReportedAfterEveryPoll()
     {
         var h = new Harness(NoDrives, WithDrive, NoDrives);

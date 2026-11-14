@@ -796,6 +796,11 @@ public class ModuleSetupViewModelTests
             reported = FixedGuid.ToString("D");
             await vm.RefreshBoardStatusAsync();
             Assert.True(vm.IsBoardConnected);
+
+            // What the firmware really sends: the 0xFA reply holds 31 characters.
+            reported = FixedGuid.ToString("D")[..31];
+            await vm.RefreshBoardStatusAsync();
+            Assert.True(vm.IsBoardConnected);
         }
         finally
         {

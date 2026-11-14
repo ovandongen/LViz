@@ -1083,6 +1083,11 @@ LViz-specific (extend this list as we hit more):
 - **A `.keymap` test fixture needs the same binding count on every layer**:
   `KeyboardConfigValidator` rejects the file otherwise.
 
+- **The board's `0xFA` config-ID reply holds at most 31 characters**
+  (one report minus the opcode): a GUID config ID comes back cut, while the
+  manifest carries it whole. Compare a reported ID only through
+  `ZmkConfigId.Matches`, never with `string.Equals`.
+
 - **A fake's interface event that is never raised trips CS0067** in the
   0-warning build: wrap it in `#pragma warning disable/restore CS0067` with a
   why-comment (`FirmwareBuildWatcherTests.FakeBuilds`).
