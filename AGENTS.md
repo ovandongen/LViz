@@ -791,7 +791,10 @@ LViz-specific (extend this list as we hit more):
   test never listens on the pipe. `MainWindowViewModel.Devices` exposes it, so reach
   `Devices.Hid`, `Devices.Push`, … instead of adding VM pass-throughs.
   `DeviceStackTests` pins the order with recording doubles (the bus slot is
-  unrecorded: `RawHidDeviceBus` is sealed).
+  unrecorded: `RawHidDeviceBus` is sealed). The bus only rescans the router
+  for *its* devices, and the keyboard is not one of them, so `DeviceStack`
+  rescans the router whenever the keyboard connects: a keyboard back with
+  new firmware must not keep its old manifest in the inventory.
 
 - **App exit unconditionally forces the keyboard to base layer 0 — don't
   weaken it back to a conditional revert.** The board can't tell LViz has quit,

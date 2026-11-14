@@ -1,4 +1,5 @@
 using LViz.App.Services.MouseIdle;
+using LViz.Core.Diagnostics;
 using LViz.Core.Layout;
 using LViz.Core.Settings;
 using ZmkHidProtocol.ActiveWindow;
@@ -62,6 +63,37 @@ public sealed class DeviceStack : IDisposable
         Push = push;
         _appLayerDispatcher = appLayerDispatcher;
         AttachedHidNames = () => BusDeviceNames;
+        Hid.ConnectionChanged += OnKeyboardConnectionChanged;
+    }
+
+    /// <summary>
+    /// The bus rescans the router when one of its devices comes or goes, but
+    /// the keyboard is not on the bus: without this, a keyboard that comes
+    /// back with new firmware (just flashed) keeps the manifest of the old one
+    /// in the inventory, and e.g. the flash window reads "Flash from LViz is
+    /// off" from it. Fires on the HID source's thread; the router serializes
+    /// scans and retries a manifest read that loses the reconnect race.
+    /// </summary>
+    private void OnKeyboardConnectionChanged()
+    {
+        if (Hid.IsConnected)
+            _ = RescanAfterKeyboardConnectAsync();
+    }
+
+    private async Task RescanAfterKeyboardConnectAsync()
+    {
+        try
+        {
+            await Router.RescanAsync().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // The stack stopped in between; Start scans afresh.
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLog.Warn("CapRoute", $"rescan after the keyboard connected failed: {ex.Message}");
+        }
     }
 
     /// <param name="getRenderedLayer">The layer the view is showing; both push engines read it lazily.</param>
@@ -179,6 +211,7 @@ public sealed class DeviceStack : IDisposable
         _signals.Dispose();
         // Router before the bus and HID: it unsubscribes from the keyboard
         // adapter (which rides HID's report stream) and the bus devices.
+        Hid.ConnectionChanged -= OnKeyboardConnectionChanged;
         Router.Dispose();
         _bus.Dispose();
         Hid.Dispose();
