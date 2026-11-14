@@ -143,17 +143,44 @@ public sealed class Uf2DrivesTests
     // --- Snapshot / PollInterval / the live source ---
 
     [Fact]
-    public void Snapshot_CurrentRoots()
+    public async Task Snapshot_CurrentRoots()
     {
         var source = new QueueSource();
         source.Enqueue(B, A);
         var watcher = new Uf2DriveWatcher(source);
 
-        var roots = watcher.Snapshot();
+        var roots = await watcher.SnapshotAsync();
 
         Assert.Equal(2, roots.Count);
         Assert.Contains(A, roots);
         Assert.Contains(B, roots);
+    }
+
+    [Fact]
+    public async Task HungListing_DoesNotBlockTheCaller_AndCancelStopsTheWait()
+    {
+        // A mount that hangs on access (a stalled network share) blocks the
+        // listing: the caller gets its task back at once, and a cancel ends
+        // the wait while the listing is still stuck.
+        using var release = new ManualResetEventSlim();
+        var watcher = new Uf2DriveWatcher(new HangingSource(release));
+        using var cts = new CancellationTokenSource();
+
+        var wait = watcher.WaitForNewAsync(new HashSet<string>(), Timeout.InfiniteTimeSpan, cts.Token);
+        Assert.False(wait.IsCompleted);
+
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => wait);
+        release.Set();
+    }
+
+    private sealed class HangingSource(ManualResetEventSlim release) : IUf2DriveSource
+    {
+        public IReadOnlyList<Uf2Drive> List()
+        {
+            release.Wait(TimeSpan.FromSeconds(10));
+            return [];
+        }
     }
 
     [Fact]

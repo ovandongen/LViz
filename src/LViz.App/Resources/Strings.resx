@@ -3454,6 +3454,10 @@
     <value>This build's firmware has expired on GitHub. Push a change or re-run the build.</value>
     <comment/>
   </data>
+  <data name="Flash_LookingUp" xml:space="preserve">
+    <value>Looking up the build…</value>
+    <comment/>
+  </data>
   <data name="Flash_Downloading" xml:space="preserve">
     <value>Downloading the firmware…</value>
     <comment/>

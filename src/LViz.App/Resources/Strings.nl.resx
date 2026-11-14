@@ -3454,6 +3454,10 @@
     <value>De firmware van deze build is op GitHub verlopen. Push een wijziging of start de build opnieuw.</value>
     <comment/>
   </data>
+  <data name="Flash_LookingUp" xml:space="preserve">
+    <value>Build opzoeken…</value>
+    <comment/>
+  </data>
   <data name="Flash_Downloading" xml:space="preserve">
     <value>Firmware downloaden…</value>
     <comment/>

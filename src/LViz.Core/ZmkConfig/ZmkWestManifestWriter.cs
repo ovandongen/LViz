@@ -191,10 +191,13 @@ public static class ZmkWestManifestWriter
         public string[] Apply()
         {
             var lines = new List<string>(Manifest.Lines);
+            // Replacements first: the pass below may strip the line ending of
+            // a line above a deleted last line, and a replacement applied to
+            // that line afterwards would bring the ending back.
+            foreach (var (line, replacement) in _replacements)
+                lines[line] = replacement;
             for (var i = Manifest.Lines.Length - 1; i >= 0; i--)
             {
-                if (_replacements.TryGetValue(i, out var replacement))
-                    lines[i] = replacement;
                 var deleted = _deletions.Contains(i);
                 if (_insertions.TryGetValue(i, out var added))
                 {

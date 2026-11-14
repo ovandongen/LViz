@@ -33,6 +33,7 @@ public sealed class MainWindowViewModelFlashingTests : IDisposable
     private const string Branch = "main";
     private const string GitHubKey = $"github:{Owner}/{Repo}:{Branch}";
     private const string Sha = "aa11aa22aa33aa44aa55aa66aa77aa88aa99aa00";
+    private const string OtherSha = "bb11bb22bb33bb44bb55bb66bb77bb88bb99bb00";
     private const string RunUrl = $"https://github.com/{Owner}/{Repo}/actions/runs/101";
 
     // Same in-memory settings fake as the live-features tests.
@@ -278,6 +279,80 @@ public sealed class MainWindowViewModelFlashingTests : IDisposable
 
         Assert.Null(watcher.Current);
         Assert.False(vm.ShowFirmwareStatus);
+    }
+
+    [AvaloniaFact]
+    public void SignInNeeded_ShowsOncePerConfig_LaterSavesStayQuiet()
+    {
+        var builds = new FakeBuilds { SignedIn = false };
+        var watcher = NewWatcher(builds);
+        var copy = GitHubCopy(out var entry);
+        var gitHub = new FakeGitHubKeymapService { OnCacheFolderFor = (_, _, _) => copy };
+        var settings = new InMemorySettingsService();
+        var vm = TestMainVm.Create(settings, gitHub: gitHub, firmwareWatcher: watcher);
+        vm.LoadLayoutFromPath(Path.Combine(copy, "config", "slabwing.keymap"), entry);
+
+        watcher.Watch(GitHubKey, Owner, Repo, Branch, Sha);
+        FlushDispatcher();
+
+        Assert.True(vm.ShowFirmwareStatus);
+        Assert.True(vm.IsFirmwareStatusLink);
+        Assert.Equal(Loc.Instance["Status_FirmwareFlash"], vm.FirmwareStatusText);
+        Assert.Equal([GitHubKey], settings.Current.FirmwareSignInHintsShown);
+
+        // A repaint of the same watch keeps it (an edit opening and closing).
+        vm.LoadLayoutFromPath(Path.Combine(copy, "config", "slabwing.keymap"), entry);
+        FlushDispatcher();
+        Assert.True(vm.ShowFirmwareStatus);
+
+        // The next save's watch stays quiet: the config has never been flashed from LViz.
+        watcher.Watch(GitHubKey, Owner, Repo, Branch, OtherSha);
+        FlushDispatcher();
+        Assert.Equal(FirmwareWatchState.SignInNeeded, watcher.Current?.State);
+        Assert.False(vm.ShowFirmwareStatus);
+        Assert.Equal([GitHubKey], settings.Current.FirmwareSignInHintsShown);
+    }
+
+    [AvaloniaFact]
+    public void SignInNeeded_ConfigFlashedBefore_ShowsOnEverySave()
+    {
+        var builds = new FakeBuilds { SignedIn = false };
+        var watcher = NewWatcher(builds);
+        var copy = GitHubCopy(out var entry);
+        var gitHub = new FakeGitHubKeymapService { OnCacheFolderFor = (_, _, _) => copy };
+        var settings = new InMemorySettingsService
+        {
+            Current = new UserSettings { FirmwareSignInHintsShown = [GitHubKey], FlashedConfigs = [GitHubKey] },
+        };
+        var vm = TestMainVm.Create(settings, gitHub: gitHub, firmwareWatcher: watcher);
+        vm.LoadLayoutFromPath(Path.Combine(copy, "config", "slabwing.keymap"), entry);
+
+        watcher.Watch(GitHubKey, Owner, Repo, Branch, Sha);
+        FlushDispatcher();
+        Assert.True(vm.ShowFirmwareStatus);
+
+        watcher.Watch(GitHubKey, Owner, Repo, Branch, OtherSha);
+        FlushDispatcher();
+        Assert.True(vm.ShowFirmwareStatus);
+    }
+
+    [AvaloniaFact]
+    public async Task AFlash_RecordsTheConfigAsFlashedFromLViz_ACancelledWindowDoesNot()
+    {
+        var copy = GitHubCopy(out var entry);
+        var gitHub = new FakeGitHubKeymapService { OnCacheFolderFor = (_, _, _) => copy };
+        var shell = new FakeMainWindowShell { FlashAnswer = false };
+        var settings = new InMemorySettingsService();
+        var vm = TestMainVm.Create(settings, gitHub: gitHub, shell: shell);
+        vm.LoadLayoutFromPath(Path.Combine(copy, "config", "slabwing.keymap"), entry);
+
+        await vm.FlashKeyboardCommand.ExecuteAsync(null);
+        Assert.Empty(settings.Current.FlashedConfigs);
+
+        shell.FlashAnswer = true;
+        await vm.FlashKeyboardCommand.ExecuteAsync(null);
+        await vm.FlashKeyboardCommand.ExecuteAsync(null);
+        Assert.Equal([GitHubKey], settings.Current.FlashedConfigs);
     }
 
     // ---- instant build answers ----

@@ -76,6 +76,8 @@
                                 Command="{Binding CopyCodeCommand}" />
                         <Button Content="{Binding [Flash_OpenPage], Source={x:Static loc:Loc.Instance}}"
                                 Command="{Binding OpenVerificationPageCommand}" />
+                        <Button Content="{Binding [Flash_Cancel], Source={x:Static loc:Loc.Instance}}"
+                                Command="{Binding CancelSignInCommand}" />
                     </StackPanel>
                 </StackPanel>
 
@@ -114,9 +116,9 @@
                     </StackPanel>
                 </StackPanel>
 
-                <TextBlock Text="{Binding [Flash_Downloading], Source={x:Static loc:Loc.Instance}}"
+                <TextBlock Text="{Binding BusyText}"
                            FontSize="12" Foreground="{x:Static svc:AppTheme.TextSubtleBrush}"
-                           IsVisible="{Binding IsBusy}" />
+                           IsVisible="{Binding BusyText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
                 <Button Classes="link"
                         Content="{Binding [Flash_UseFile], Source={x:Static loc:Loc.Instance}}"

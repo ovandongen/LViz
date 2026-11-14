@@ -165,7 +165,7 @@ public sealed class FlashRun(
     {
         // Snapshot before the trigger: a drive already mounted here can never
         // count as "the half rebooted into its bootloader".
-        var before = drives.Snapshot();
+        var before = await drives.SnapshotAsync(ct);
 
         void Report(FlashPhase phase, bool showManualHint, string? triggerProblem, string? driveLabel = null)
         {

@@ -132,7 +132,9 @@ public partial class MainWindowViewModel
                 _firmwareWatcher.Watch(
                     _liveFeaturesKey!, target.Owner, target.Repo, target.Branch, cache.Sha);
             }
-            catch (GitHubApiException ex)
+            // The fetch may write the branch cache, so a disk error is as
+            // possible as a GitHub one; either only costs the build watch.
+            catch (Exception ex) when (ex is GitHubApiException or IOException or UnauthorizedAccessException)
             {
                 DiagnosticLog.Warn("Flash", $"Reading the branch head after module setup failed: {ex.Message}");
             }

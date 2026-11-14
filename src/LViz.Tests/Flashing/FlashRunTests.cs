@@ -241,7 +241,9 @@ public sealed class FlashRunTests
         h.Source.CancelWith = cts;
         h.Source.CancelOnCall = 3;
 
-        await Assert.ThrowsAsync<OperationCanceledException>(
+        // Any OperationCanceledException: the watcher's listing wait throws
+        // its TaskCanceledException subtype.
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => h.FlashAsync(Peripheral, useTrigger: false, null, cts.Token));
     }
 

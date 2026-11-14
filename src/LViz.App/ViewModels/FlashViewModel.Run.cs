@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LViz.App.Localization;
@@ -31,11 +32,9 @@ public sealed partial class FlashViewModel
     }
 
     // The run over the plan: _queue is _plan re-ordered peripheral-first,
-    // _queueIndex the half on screen, _doneLines one line per half that
-    // ended (flashed, not reported or skipped) in run order.
+    // _queueIndex the half on screen.
     private readonly List<(FirmwareHalf Half, byte[] Bytes)> _queue = [];
     private int _queueIndex;
-    private readonly List<string> _doneLines = [];
     private bool _anyFlashed;
 
     // The current half's cancellation; replaced per run like _signInCts.
@@ -74,8 +73,11 @@ public sealed partial class FlashViewModel
     [ObservableProperty]
     private string _flashHeaderText = string.Empty;
 
-    /// <summary>One line per half that ended, in run order; the Done step's body.</summary>
-    public IReadOnlyList<string> DoneLines => _doneLines;
+    /// <summary>
+    /// One line per half that ended (flashed, not reported or skipped), in run
+    /// order; the Done step's body.
+    /// </summary>
+    public ObservableCollection<string> DoneLines { get; } = [];
 
     /// <summary>The half being prepared or run; null once the queue is through.</summary>
     private (FirmwareHalf Half, byte[] Bytes)? CurrentHalf =>
@@ -90,7 +92,7 @@ public sealed partial class FlashViewModel
         _queue.Clear();
         _queue.AddRange(_plan.OrderByDescending(p => p.Half.Role == FirmwareHalfRole.Peripheral));
         _queueIndex = 0;
-        _doneLines.Clear();
+        DoneLines.Clear();
         _anyFlashed = false;
         if (_queue.Count > 0)
         {
@@ -235,7 +237,7 @@ public sealed partial class FlashViewModel
     [RelayCommand(CanExecute = nameof(CanSkipHalf))]
     private void SkipHalf()
     {
-        _doneLines.Add(Loc.Instance.Format("Flash_DoneSkipped", CurrentHalfLabel));
+        DoneLines.Add(Loc.Instance.Format("Flash_DoneSkipped", CurrentHalfLabel));
         Advance();
     }
 
@@ -264,7 +266,7 @@ public sealed partial class FlashViewModel
                 case FlashOutcome.FlashedNotReported:
                     _anyFlashed = true;
                     RecordHistory(item.Half);
-                    _doneLines.Add(Loc.Instance.Format(
+                    DoneLines.Add(Loc.Instance.Format(
                         result.Outcome == FlashOutcome.Flashed ? "Flash_DoneFlashed" : "Flash_DoneNotReported",
                         CurrentHalfLabel));
                     Advance();

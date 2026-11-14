@@ -257,6 +257,49 @@ public class ZmkWestManifestWriterTests
     }
 
     [Fact]
+    public void CrlfFile_DeletingTheLastLine_LeavesTheNewLastLineWithoutAnEnding()
+    {
+        // The url: line of a switched zmk-raw-hid is the file's last line (CRLF,
+        // no trailing newline) and goes; zmk-hid-viz is already there, so
+        // nothing is inserted after it. The revision line becomes the last
+        // line and must lose its \r, as the file had no final line ending.
+        var crlf = (
+            "manifest:\n" +
+            "  remotes:\n" +
+            "    - name: zmkfirmware\n" +
+            "      url-base: https://github.com/zmkfirmware\n" +
+            "    - name: zzeneg\n" +
+            "      url-base: https://github.com/zzeneg\n" +
+            "    - name: ovandongen\n" +
+            "      url-base: https://github.com/ovandongen\n" +
+            "  projects:\n" +
+            "    - name: zmk\n" +
+            "      remote: zmkfirmware\n" +
+            "      revision: main\n" +
+            "      import: app/west.yml\n" +
+            "    - name: zmk-hid-viz\n" +
+            "      remote: ovandongen\n" +
+            "      revision: main\n" +
+            "    - name: zmk-raw-hid\n" +
+            "      remote: zzeneg\n" +
+            "      revision: main\n" +
+            "      url: https://github.com/zzeneg/zmk-raw-hid").Replace("\n", "\r\n");
+
+        var result = ZmkWestManifestWriter.AddModules(crlf, "main", "main");
+
+        Assert.EndsWith(
+            "    - name: zmk-raw-hid\r\n" +
+            "      remote: ovandongen\r\n" +
+            "      revision: main",
+            result);
+        Assert.DoesNotContain("url: https://github.com/zzeneg", result);
+        Assert.All(Lines(result)[..^1], line => Assert.EndsWith("\r", line));
+
+        var parsed = ZmkWestManifestText.Parse(result);
+        Assert.Equal("ovandongen", parsed.OwnerOf(parsed.Project("zmk-raw-hid")!));
+    }
+
+    [Fact]
     public void WithoutProjectsSection_ThrowsTheFormatException()
     {
         var ex = Assert.Throws<ZmkConfigFormatException>(

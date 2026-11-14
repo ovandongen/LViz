@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LViz.App.Localization;
 using LViz.App.Services.Flashing;
+using LViz.Core.Settings;
 
 namespace LViz.App.ViewModels;
 
@@ -22,6 +23,12 @@ public partial class MainWindowViewModel
     [ObservableProperty] private bool _showFirmwareStatus;
     [ObservableProperty] private bool _isFirmwareStatusLink;
 
+    // The watch whose SignInNeeded link RefreshFirmwareStatus decided to show.
+    // The decision is made once per watch, because showing it records the
+    // config as reminded (FirmwareSignInHintsShown), and a later repaint of the
+    // same watch must keep showing it.
+    private FirmwareWatchStatus? _shownSignInWatch;
+
     /// <summary>A zmk-config was found for the loaded keymap and no keymap
     /// edit is open — the flyout item shows and the command can run. A local
     /// config opens the flash window in file mode (no GitHub target).</summary>
@@ -35,11 +42,44 @@ public partial class MainWindowViewModel
     private async Task FlashKeyboardAsync()
     {
         if (_liveFeaturesContext is null) return;
-        if (await _shell.RunFlashAsync(new FlashContext(
+        if (await RunFlashWindowAsync(new FlashContext(
                 _liveFeaturesKey!, _liveFeaturesRoot!, _liveFeaturesFlashTarget, null)))
         {
             _firmwareWatcher?.Clear();
         }
+    }
+
+    /// <summary>
+    /// Opens the flash window and returns whether it flashed. The window needs
+    /// the keyboard connection (the bootloader command, the central's report
+    /// in), which live highlighting owns: with highlighting off, the device
+    /// stack runs for the window's lifetime only. A flash marks the config as
+    /// one the user flashes from LViz (<see cref="UserSettings.FlashedConfigs"/>).
+    /// </summary>
+    private async Task<bool> RunFlashWindowAsync(FlashContext context)
+    {
+        var startedForFlash = !IsLiveHighlightingEnabled;
+        if (startedForFlash) StartKeyEventTracking();
+        bool flashed;
+        try
+        {
+            flashed = await _shell.RunFlashAsync(context);
+        }
+        finally
+        {
+            // No layer reset as the toggle does: with highlighting off the
+            // board view never followed the keyboard, so there is nothing to undo.
+            if (startedForFlash && !IsLiveHighlightingEnabled) StopKeyEventTracking();
+        }
+
+        if (flashed)
+        {
+            PersistSetting(s => s.FlashedConfigs.Contains(context.ConfigKey)
+                ? s
+                : s with { FlashedConfigs = [.. s.FlashedConfigs, context.ConfigKey] });
+        }
+
+        return flashed;
     }
 
     /// <summary>
@@ -55,7 +95,8 @@ public partial class MainWindowViewModel
         if (current is null
             || !string.Equals(current.ConfigKey, _liveFeaturesKey, StringComparison.Ordinal)
             || IsEditing
-            || current.State == FirmwareWatchState.Hidden)
+            || current.State == FirmwareWatchState.Hidden
+            || (current.State == FirmwareWatchState.SignInNeeded && !ShowSignInLink(current)))
         {
             ShowFirmwareStatus = false;
             FirmwareStatusText = null;
@@ -79,6 +120,22 @@ public partial class MainWindowViewModel
         ShowFirmwareStatus = FirmwareStatusText is not null;
     }
 
+    /// <summary>
+    /// Whether the SignInNeeded link may show for this watch: always for a
+    /// config the user has flashed from LViz; otherwise only the first time
+    /// for that config, which is recorded so later saves stay quiet.
+    /// </summary>
+    private bool ShowSignInLink(FirmwareWatchStatus watch)
+    {
+        if (watch == _shownSignInWatch) return true;
+        var settings = _settingsService.Load();
+        if (settings.FlashedConfigs.Contains(watch.ConfigKey)) return true;
+        if (settings.FirmwareSignInHintsShown.Contains(watch.ConfigKey)) return false;
+        PersistSetting(s => s with { FirmwareSignInHintsShown = [.. s.FirmwareSignInHintsShown, watch.ConfigKey] });
+        _shownSignInWatch = watch;
+        return true;
+    }
+
     /// <summary>What a click on the status line does: Ready and SignInNeeded
     /// open the flash window on the watched commit's build (a finished flash
     /// clears the watch); Failed opens the failed run on GitHub so the user
@@ -97,7 +154,7 @@ public partial class MainWindowViewModel
         {
             case FirmwareWatchState.Ready or FirmwareWatchState.SignInNeeded:
                 if (_liveFeaturesKey is not { } key || _liveFeaturesRoot is not { } root) return;
-                if (await _shell.RunFlashAsync(
+                if (await RunFlashWindowAsync(
                         new FlashContext(key, root, _liveFeaturesFlashTarget, current.Sha)))
                 {
                     _firmwareWatcher?.Clear();

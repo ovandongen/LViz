@@ -9,11 +9,19 @@ namespace LViz.Core.GitHub;
 /// The only class in LViz that talks HTTP to GitHub, split by API area:
 /// this file holds the shared request plumbing (<see cref="ApiRequest"/>,
 /// <see cref="SendAsync"/>, <see cref="SendForJsonAsync"/>,
-/// <see cref="GetString"/>, <see cref="GetInt64"/>); <c>.Auth</c> the OAuth
-/// device flow, refresh and login lookup; <c>.Repos</c> installed repos,
-/// branches and a branch's head commit; <c>.Contents</c> the tarball download,
-/// committing one file and reading a file's blob SHA; <c>.GitData</c>
-/// committing several files as one commit (Git Data API).
+/// and the JSON readers <see cref="GetString"/>, <see cref="GetInt64"/>,
+/// <see cref="TryGetArray"/> and friends); <c>.Auth</c> the OAuth device flow,
+/// refresh and login lookup; <c>.Repos</c> installed repos, branches and a
+/// branch's head commit; <c>.Contents</c> the tarball download, committing one
+/// file and reading a file's blob SHA; <c>.GitData</c> committing several
+/// files as one commit (Git Data API); <c>.Actions</c> workflow runs, their
+/// artifacts and the artifact download; <c>.Compare</c> the files changed
+/// between two commits.
+///
+/// <para>
+/// One class serves both GitHub Apps: each login (LViz, and "LViz for ZMK
+/// Builds" for the Actions calls) gets its own instance with its own client id.
+/// </para>
 ///
 /// <para>
 /// The device flow needs only the App's public client id — no client secret,
@@ -326,4 +334,23 @@ public sealed partial class GitHubClient
             && value.ValueKind == JsonValueKind.Array
             ? value.EnumerateArray()
             : [];
+
+    /// <summary>
+    /// An array property as elements, or false when the answer is not an
+    /// object or lacks that array — how a "returned no X" refusal is told
+    /// apart from an empty list.
+    /// </summary>
+    private static bool TryGetArray(JsonElement obj, string name, out IEnumerable<JsonElement> elements)
+    {
+        if (obj.ValueKind == JsonValueKind.Object
+            && obj.TryGetProperty(name, out var value)
+            && value.ValueKind == JsonValueKind.Array)
+        {
+            elements = value.EnumerateArray();
+            return true;
+        }
+
+        elements = [];
+        return false;
+    }
 }

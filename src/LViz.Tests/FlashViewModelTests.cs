@@ -228,6 +228,44 @@ public sealed class FlashViewModelTests : IDisposable
         Assert.Null(vm.BuildText);
     }
 
+    [Fact]
+    public async Task Start_TokenRejected_GoesToTheSignInPanel()
+    {
+        // The builds token was valid when restored but GitHub refuses it now
+        // (revoked, App uninstalled): the way out is signing in again.
+        _builds.FindError = new GitHubApiException(GitHubErrorKind.Unauthorized, "bad credentials");
+        var vm = GitHubVm();
+
+        await vm.StartAsync();
+
+        Assert.True(vm.IsSignInNeeded);
+        Assert.Null(vm.LoginText);
+        Assert.Null(vm.BuildText);
+        Assert.Equal(T("GitHub_SignInAgain"), vm.ErrorMessage);
+        Assert.False(vm.NextCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task BusyText_NamesTheLookupThenTheDownload()
+    {
+        _builds.Build = ReadyBuild(pending: false);
+        _builds.Download = new FirmwareDownloadResult.Done([Uf2(CentralFile), Uf2(PeripheralFile)]);
+        var vm = GitHubVm();
+        var seen = new List<string?>();
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(FlashViewModel.BusyText))
+            {
+                seen.Add(vm.BusyText);
+            }
+        };
+
+        await vm.StartAsync();
+        await vm.NextCommand.ExecuteAsync(null);
+
+        Assert.Equal([T("Flash_LookingUp"), null, T("Flash_Downloading"), null], seen);
+    }
+
     // --- source → halves ---
 
     [Fact]

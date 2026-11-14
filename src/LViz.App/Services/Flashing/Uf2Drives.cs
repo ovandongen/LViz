@@ -181,6 +181,11 @@ public sealed class SystemUf2DriveSource : IUf2DriveSource
 /// injected <paramref name="delay"/>, not by the wall clock (the same trick
 /// as <c>GitHubClient.WaitForDeviceAuthorizationAsync</c>), so a test whose
 /// delay returns instantly still gets a bounded loop.
+///
+/// <para>Every listing runs on the thread pool: the flash window awaits the
+/// watcher on the UI thread, and a mount that hangs on access (a stalled
+/// network share under <c>/Volumes</c>) must stall only that listing, never
+/// the window. A cancelled wait stops waiting for a listing in flight.</para>
 /// </summary>
 /// <param name="source">Where to list the mounted bootloader drives.</param>
 /// <param name="delay">How to wait between polls; tests inject an instant one.</param>
@@ -192,13 +197,17 @@ public sealed class Uf2DriveWatcher(IUf2DriveSource source, Func<TimeSpan, Cance
     private readonly Func<TimeSpan, CancellationToken, Task> _delay = delay ?? Task.Delay;
 
     /// <summary>The roots of the currently mounted drives, for a later <see cref="WaitForNewAsync"/>.</summary>
-    public IReadOnlySet<string> Snapshot()
+    public async Task<IReadOnlySet<string>> SnapshotAsync(CancellationToken ct = default)
     {
         var roots = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var drive in source.List())
+        foreach (var drive in await ListAsync(ct))
             roots.Add(drive.RootPath);
         return roots;
     }
+
+    /// <summary>One listing of the source, off the caller's thread (see the class remarks).</summary>
+    private Task<IReadOnlyList<Uf2Drive>> ListAsync(CancellationToken ct) =>
+        Task.Run(source.List, ct).WaitAsync(ct);
 
     /// <summary>
     /// The first drive whose root is not in <paramref name="before"/> — a
@@ -245,7 +254,7 @@ public sealed class Uf2DriveWatcher(IUf2DriveSource source, Func<TimeSpan, Cance
         {
             ct.ThrowIfCancellationRequested();
 
-            var (hit, value) = probe(source.List());
+            var (hit, value) = probe(await ListAsync(ct));
             if (hit)
                 return (true, value);
             if (timeout != Timeout.InfiniteTimeSpan && waited >= timeout)

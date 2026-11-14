@@ -320,4 +320,18 @@ public record UserSettings
     /// hint belongs to the config, not to a board profile.
     /// </summary>
     public List<string> DismissedLiveFeatureHints { get; init; } = new();
+
+    /// <summary>
+    /// Config keys (as <see cref="DismissedLiveFeatureHints"/>) whose "Flash
+    /// the new firmware" status link was already shown once while the builds
+    /// login was missing. Such a config stays quiet after a save until it is in
+    /// <see cref="FlashedConfigs"/>.
+    /// </summary>
+    public List<string> FirmwareSignInHintsShown { get; init; } = new();
+
+    /// <summary>
+    /// Config keys flashed from LViz at least once (a GitHub build or a file).
+    /// For these the status link asks for the builds sign-in after every save.
+    /// </summary>
+    public List<string> FlashedConfigs { get; init; } = new();
 }

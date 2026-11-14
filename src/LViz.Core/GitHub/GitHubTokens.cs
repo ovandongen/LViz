@@ -6,7 +6,9 @@ namespace LViz.Core.GitHub;
 /// <summary>
 /// A signed-in GitHub login: the device-flow tokens plus the user's handle,
 /// serialized as one JSON string into the <see cref="Persistence.ISecretStore"/>
-/// under <see cref="GitHubAppInfo.SecretKey"/>.
+/// under the owning <see cref="GitHubSession"/>'s secret key:
+/// <see cref="GitHubAppInfo.SecretKey"/> for the main login,
+/// <see cref="GitHubBuildsAppInfo.SecretKey"/> for the builds login.
 ///
 /// <para>
 /// A <c>null</c> expiry means the token does not expire. The token values

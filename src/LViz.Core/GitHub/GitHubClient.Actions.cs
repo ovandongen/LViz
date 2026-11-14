@@ -204,25 +204,6 @@ public sealed partial class GitHubClient
     }
 
     /// <summary>
-    /// An array property as elements, or false when the answer is not an
-    /// object or lacks that array — how a "returned no X" refusal is told
-    /// apart from an empty list.
-    /// </summary>
-    private static bool TryGetArray(JsonElement obj, string name, out IEnumerable<JsonElement> elements)
-    {
-        if (obj.ValueKind == JsonValueKind.Object
-            && obj.TryGetProperty(name, out var value)
-            && value.ValueKind == JsonValueKind.Array)
-        {
-            elements = value.EnumerateArray();
-            return true;
-        }
-
-        elements = [];
-        return false;
-    }
-
-    /// <summary>
     /// An API timestamp parsed with the invariant culture;
     /// <see cref="DateTimeOffset.MinValue"/> when missing or unparsable.
     /// </summary>

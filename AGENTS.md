@@ -598,7 +598,14 @@ After creating or editing a view, rebuild the App project before trusting a
   `FlashWindow.OnClosed` calls `FlashViewModel.CancelWork()`: a run left
   going would copy its file onto the next bootloader drive with no window
   open. `FirmwareBuildWatcher.Changed` fires on a background thread; the main
-  VM marshals it with `Dispatcher.UIThread.Post`.
+  VM marshals it with `Dispatcher.UIThread.Post`. The main VM opens the window
+  only through `RunFlashWindowAsync`, which runs the device stack for the
+  window's lifetime when live highlighting is off (the window needs the
+  keyboard) and records a flashed config in `UserSettings.FlashedConfigs`.
+  The "Flash the new firmware" link for a missing builds login
+  (`SignInNeeded`) shows once per config (`FirmwareSignInHintsShown`), then
+  only for configs in `FlashedConfigs`. `Uf2DriveWatcher` lists drives on the
+  thread pool: a hung mount must not freeze the window.
 
 ## Before writing code
 

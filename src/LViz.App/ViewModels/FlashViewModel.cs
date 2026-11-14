@@ -166,6 +166,13 @@ public sealed partial class FlashViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(NextCommand))]
     private bool _isBusy;
 
+    /// <summary>
+    /// What the busy work is, under the source step: the build lookup (which
+    /// includes restoring the login) or the download; null when idle.
+    /// </summary>
+    [ObservableProperty]
+    private string? _busyText;
+
     /// <summary>What went wrong; red text in the window's bottom bar.</summary>
     [ObservableProperty]
     private string? _errorMessage;
@@ -235,6 +242,7 @@ public sealed partial class FlashViewModel : ObservableObject
     {
         ErrorMessage = null;
         IsBusy = true;
+        BusyText = Loc.Instance["Flash_LookingUp"];
         try
         {
             ZmkConfigFacts facts;
@@ -277,6 +285,7 @@ public sealed partial class FlashViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+            BusyText = null;
         }
     }
 
@@ -406,6 +415,7 @@ public sealed partial class FlashViewModel : ObservableObject
 
         ErrorMessage = null;
         IsBusy = true;
+        BusyText = Loc.Instance["Flash_LookingUp"];
         try
         {
             _build = await _builds.FindBuildAsync(
@@ -415,6 +425,16 @@ public sealed partial class FlashViewModel : ObservableObject
                 _context.Sha is null ? target.Branch : null);
             ApplyBuild();
         }
+        catch (GitHubApiException e) when (e.Kind == GitHubErrorKind.Unauthorized)
+        {
+            // GitHub rejected the builds token (revoked, or the App was
+            // uninstalled): the way out is signing in again, so show the
+            // sign-in panel with the reason above it.
+            LoginText = null;
+            ClearBuild();
+            IsSignInNeeded = true;
+            ErrorMessage = GitHubOpenViewModel.MessageFor(e);
+        }
         catch (GitHubApiException e)
         {
             ErrorMessage = GitHubOpenViewModel.MessageFor(e);
@@ -422,6 +442,7 @@ public sealed partial class FlashViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+            BusyText = null;
             NextCommand.NotifyCanExecuteChanged();
         }
     }
@@ -568,6 +589,7 @@ public sealed partial class FlashViewModel : ObservableObject
 
         ErrorMessage = null;
         IsBusy = true;
+        BusyText = Loc.Instance["Flash_Downloading"];
         try
         {
             var download = await _builds.DownloadAsync(target.Owner, target.Repo, run.HeadSha, artifactId);
@@ -639,6 +661,7 @@ public sealed partial class FlashViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+            BusyText = null;
             NextCommand.NotifyCanExecuteChanged();
         }
     }
