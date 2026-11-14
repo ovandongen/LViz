@@ -21,6 +21,10 @@ the changes, and save. LViz writes a real `.keymap` file: it changes only
 the bindings, layers and combos you edited and leaves the rest of the file
 as it was, including comments, formatting and your `#define` names.
 
+Since v3.1, LViz also sets up the firmware side: a wizard adds the Raw HID
+modules to your zmk-config, and LViz flashes the firmware GitHub builds from
+it onto your board, half by half.
+
 It is still the overlay it was in v2: it labels the keys from your
 keymap, follows the active layer over Raw HID, draws combos on top, and
 lets you override any key label by hand. On the two Moergo boards (Glove80 /
@@ -43,16 +47,17 @@ all from scripts. See the
 
 ## Status
 
-LViz 3 is in daily use on macOS, Windows and Linux. The keymap editor is
-new in this release, so keep your keymap under version control (or rely
-on the local backups) and report anything odd on the
-[issue tracker](https://github.com/ovandongen/LViz/issues).
+LViz 3 is in daily use on macOS, Windows and Linux. Keep your keymap under
+version control (or rely on the local backups) and report anything odd on
+the [issue tracker](https://github.com/ovandongen/LViz/issues).
 
 **Firmware.** The editor works on the `.keymap` file alone and needs no
 firmware changes. The live features (active layer, key-press highlighting,
 auto-switch and the mouse-idle layer push) need the Raw HID firmware modules
-described under [Firmware](#firmware). A guided setup for those modules,
-including flashing, is planned for the next release.
+described under [Firmware](#firmware). **Set up live features…** in the
+Load keymap menu adds them to your zmk-config for you, and **Flash
+keyboard…** installs the result. Both are new in v3.1 and have been tried on
+only a few boards so far, so please report how they work on yours.
 
 **Not editable yet:**
 
@@ -75,8 +80,16 @@ including flashing, is planned for the next release.
   `#define` macros aren't expanded, and recursive custom-behavior resolution
   and `/delete-node/` aren't supported. Saving refuses a layer that calls a
   function-like macro and names its line, rather than guessing.
+- Live-features setup refuses dongle configs (a dongle as the central) for
+  now.
+- Flashing copies `.uf2` files onto the UF2 bootloader drive (nice!nano,
+  MoErgo and similar). Boards that flash another way (DFU, serial) aren't
+  supported. Starting the bootloader from LViz needs the central on USB; over
+  Bluetooth only, you put the half into its bootloader by hand.
 - Linux: no global show/hide hotkey (it needs per-WM cooperation that isn't
-  shipped). A locked Secret Service keyring isn't unlocked for you, so the
+  shipped). LViz finds a bootloader drive under `/media`, `/run/media` or
+  `/mnt`; if your desktop doesn't mount it by itself, mount it in your file
+  manager. A locked Secret Service keyring isn't unlocked for you, so the
   GitHub sign-in then lasts only until LViz quits.
 
 ## Supported boards
@@ -163,11 +176,47 @@ template to copy.
 - Sign in with GitHub (device code, via the "LViz for ZMK" GitHub App; LViz
   only sees the repositories you install it on). The login is kept in the OS
   keychain.
+- Flashing a GitHub build uses a second App, **"LViz for ZMK Builds"**, with
+  only **Actions: read**: it can see your workflow runs and download their
+  firmware, nothing else. You sign in to it, and install it on the repo, only
+  when you first flash from LViz; the main App never gets Actions access.
+  Its login is kept in the keychain apart from the main one. Signing out of it
+  (in the flash window) also deletes the downloaded firmware.
 - **Open from GitHub…** in the Load keymap menu: pick a repository and branch, and
   LViz lists the keymaps it finds with the board each one fits.
 - Repos are cached locally, so keymaps open offline. At startup, on a board
   switch and on Reload, LViz checks GitHub in the background and loads a
   newer commit when there is one.
+
+### Live features and flashing
+
+- **Set up live features…** (Load keymap menu, or the status-bar hint that
+  shows when the loaded keymap's zmk-config has no modules yet). The wizard
+  reads your config, local or on GitHub, and adds what live features need:
+  the two modules in `west.yml`, the `raw_hid_adapter` shield on the central
+  half in `build.yaml`, and the settings in your `.conf`. You pick the
+  features (RGB control, signal keys, emit keys, **Flash from LViz**), review
+  every change as a diff, and save: as one commit on GitHub, or to the local
+  files with a backup. Comments and layout in those files stay as they were.
+  A config that already has the modules opens with the missing features to
+  add.
+- **Flash keyboard…** (Load keymap menu) installs the firmware:
+  - from GitHub: the newest successful GitHub Actions build of the branch.
+    This needs a second, read-only sign-in (see
+    [GitHub zmk-config](#github-zmk-config));
+  - or a `.uf2` file you pick, for a local config or any other build.
+    LViz warns when a file for the central half lacks flashing support.
+- **Halves.** LViz knows from your config which half is the central. The
+  central is always ticked; the other half only when the config changed
+  more than the keymap since you last flashed it from LViz.
+- **Per half:** with **Flash from LViz** in the firmware, **Start** puts the
+  half into its bootloader. Otherwise you press its bootloader key or
+  double-tap reset. LViz waits for the bootloader drive, copies the file,
+  and checks that the board comes back with the new firmware. It won't copy
+  onto a drive that names the other half (MoErgo boards).
+- **Build status.** After you save to a GitHub zmk-config, the status bar
+  follows the firmware build: *Building firmware…*, then *Firmware ready:
+  Flash* or *Firmware build failed* (a click opens the run on GitHub).
 
 ### Layouts
 
@@ -267,15 +316,44 @@ endpoint and emit layer-state (`0xFF`) and key-event (`0xF1`)
 reports; the protocol reference lives in
 [external/zmk-hid-protocol](external/zmk-hid-protocol).
 
-Simplest setup is to add two modules to your ZMK `west` manifest:
+Two ZMK modules provide this:
 
-- [zzeneg/zmk-raw-hid](https://github.com/zzeneg/zmk-raw-hid) — exposes
-  the Raw HID endpoint over USB and BLE.
+- [ovandongen/zmk-raw-hid](https://github.com/ovandongen/zmk-raw-hid) —
+  exposes the Raw HID endpoint over USB and BLE. It is a fork of
+  [zzeneg/zmk-raw-hid](https://github.com/zzeneg/zmk-raw-hid), and the
+  version LViz is tested with.
 - [ovandongen/zmk-hid-viz](https://github.com/ovandongen/zmk-hid-viz) —
   generates the layer-state and key-event reports, and implements the
   push-layer commands that auto-switch and mouse-layer push send back.
 
-…and enable `CONFIG_RAW_HID=y` in your shield config.
+The easy way is **Set up live features…** in LViz (see
+[Live features and flashing](#live-features-and-flashing)): it adds both
+modules to your `west.yml`, the `raw_hid_adapter` shield to the central
+half's build, and `CONFIG_RAW_HID=y` / `CONFIG_HID_VIZ=y` (plus the features
+you pick) to your `.conf`. A config that uses zzeneg's module is switched to
+the fork. Then let GitHub build the firmware and flash it.
+
+### Flash from LViz and its trade-off
+
+The **Flash from LViz** feature (`CONFIG_HID_VIZ_SYSTEM`) lets LViz put the
+keyboard into its bootloader with a Raw HID command, so you don't have to
+reach for a reset or bootloader key.
+
+It isn't a single byte that a stray report could hit by chance. The firmware
+acts on the command only when it carries a fixed 6-byte code and a matching
+checksum, with the rest of the report empty, and ignores anything else
+without a reply. The reset command uses a different code, so one can't turn
+into the other. The command is also refused unless the half is plugged in with
+USB. Putting the keyboard into its bootloader by accident is very unlikely.
+
+The trade-off is deliberate use: the code is public, so **any program on a
+computer the keyboard is plugged into can send the same command**, and a
+board in its bootloader takes whatever firmware is copied onto its drive.
+Without the feature, that needs a key press on the board. So it is **off
+unless you tick it** in the wizard.
+Without it, LViz still flashes; you start the bootloader by hand. To turn it
+off again, remove `CONFIG_HID_VIZ_SYSTEM=y` from your `.conf` (the wizard only
+adds settings, it never removes them), rebuild and flash.
 
 That covers the **layer overlay**, which is the ZMK side. The **capability bus**
 (device routing, pointing, RGB, signals) is firmware-agnostic: any device that
