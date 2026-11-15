@@ -1,15 +1,11 @@
 using Avalonia.Input;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
-using Microsoft.Extensions.DependencyInjection;
 using LViz.App.Localization;
 using LViz.App.Services;
-using LViz.App.Services.Flashing;
 using LViz.App.Services.GitHub;
 using LViz.App.ViewModels;
-using LViz.Core.Firmware;
 using LViz.Core.Layout;
-using LViz.Core.Persistence;
 using LViz.Core.Settings;
 
 namespace LViz.App.Views;
@@ -18,21 +14,36 @@ namespace LViz.App.Views;
 /// The real <see cref="IMainWindowShell"/>: every window and dialog the main
 /// view-model opens, modal over (or beside) the application's main window. The
 /// owner is looked up at call time (<see cref="MainWindowOwner"/>); the
-/// container is only asked for the Settings and GitHub pieces when one opens.
+/// Settings, module-setup and flash view-models arrive as factories and are
+/// built only when their window opens.
 /// </summary>
 internal sealed class AvaloniaMainWindowShell : IMainWindowShell
 {
-    private readonly IServiceProvider _services;
     private readonly MainWindowLifecycle _lifecycle;
+    private readonly IGitHubKeymapService _gitHub;
+    private readonly IHostActionExecutor _hostActions;
+    private readonly Func<SettingsViewModel> _createSettings;
+    private readonly Func<ModuleSetupContext, ModuleSetupViewModel> _createModuleSetup;
+    private readonly Func<FlashContext, FlashViewModel> _createFlash;
 
     // Single non-modal Settings window. Re-clicking the toolbar button brings
     // the existing window to front rather than spawning a new one.
     private SettingsWindow? _settingsWindow;
 
-    public AvaloniaMainWindowShell(IServiceProvider services, MainWindowLifecycle lifecycle)
+    public AvaloniaMainWindowShell(
+        MainWindowLifecycle lifecycle,
+        IGitHubKeymapService gitHub,
+        IHostActionExecutor hostActions,
+        Func<SettingsViewModel> createSettings,
+        Func<ModuleSetupContext, ModuleSetupViewModel> createModuleSetup,
+        Func<FlashContext, FlashViewModel> createFlash)
     {
-        _services = services;
         _lifecycle = lifecycle;
+        _gitHub = gitHub;
+        _hostActions = hostActions;
+        _createSettings = createSettings;
+        _createModuleSetup = createModuleSetup;
+        _createFlash = createFlash;
     }
 
     private static MainWindow Owner => MainWindowOwner.Current;
@@ -99,8 +110,8 @@ internal sealed class AvaloniaMainWindowShell : IMainWindowShell
             return;
         }
         var owner = Owner;
-        var viewModel = _services.GetRequiredService<MainWindowViewModel>();
-        var settingsVm = _services.GetRequiredService<SettingsViewModel>();
+        var settingsVm = _createSettings();
+        var preferences = settingsVm.MainViewModel.Preferences;
         var window = new SettingsWindow
         {
             DataContext = settingsVm,
@@ -113,12 +124,12 @@ internal sealed class AvaloniaMainWindowShell : IMainWindowShell
         void SyncTopmost(object? _, System.ComponentModel.PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(WindowPreferencesViewModel.IsAlwaysOnTop))
-                window.Topmost = viewModel.Preferences.IsAlwaysOnTop;
+                window.Topmost = preferences.IsAlwaysOnTop;
         }
-        viewModel.Preferences.PropertyChanged += SyncTopmost;
+        preferences.PropertyChanged += SyncTopmost;
         window.Closed += (_, _) =>
         {
-            viewModel.Preferences.PropertyChanged -= SyncTopmost;
+            preferences.PropertyChanged -= SyncTopmost;
             settingsVm.Dispose();
             _settingsWindow = null;
         };
@@ -155,15 +166,9 @@ internal sealed class AvaloniaMainWindowShell : IMainWindowShell
     public async Task<bool> RunModuleSetupAsync(ModuleSetupContext context)
     {
         var owner = Owner;
-        var dlgVm = new ModuleSetupViewModel(
-            context,
-            _services.GetRequiredService<IGitHubKeymapService>(),
-            _services.GetRequiredService<KeymapBackupStore>(),
-            Guid.NewGuid)
-        {
-            // The Done step opens the config's GitHub Actions page.
-            OpenUrl = url => _services.GetRequiredService<IHostActionExecutor>().Launch(url),
-        };
+        var dlgVm = _createModuleSetup(context);
+        // The Done step opens the config's GitHub Actions page.
+        dlgVm.OpenUrl = _hostActions.Launch;
         // The check step reads (and for GitHub fetches) the config straight away.
         _ = dlgVm.StartAsync();
         var dlg = new ModuleSetupWindow
@@ -179,17 +184,10 @@ internal sealed class AvaloniaMainWindowShell : IMainWindowShell
     public async Task<bool> RunFlashAsync(FlashContext context)
     {
         var owner = Owner;
-        var dlgVm = new FlashViewModel(
-            context,
-            _services.GetRequiredService<IFirmwareBuildService>(),
-            _services.GetRequiredService<FirmwareFlashHistory>(),
-            _services.GetRequiredService<IKeyboardFlashAccess>(),
-            _services.GetRequiredService<FlashRun>())
-        {
-            OpenUrl = url => _services.GetRequiredService<IHostActionExecutor>().Launch(url),
-            CopyToClipboard = async text => await CopyTextAsync(text),
-            PickUf2File = PickUf2FileAsync,
-        };
+        var dlgVm = _createFlash(context);
+        dlgVm.OpenUrl = _hostActions.Launch;
+        dlgVm.CopyToClipboard = async text => await CopyTextAsync(text);
+        dlgVm.PickUf2File = PickUf2FileAsync;
         // The source step reads the config and looks the build up straight away.
         _ = dlgVm.StartAsync();
         var dlg = new FlashWindow
@@ -228,9 +226,9 @@ internal sealed class AvaloniaMainWindowShell : IMainWindowShell
     public async Task<GitHubOpenSelection?> PickGitHubKeymapAsync(Func<IReadOnlyCollection<string>> attachedHidNames)
     {
         var owner = Owner;
-        var ghVm = new GitHubOpenViewModel(_services.GetRequiredService<IGitHubKeymapService>())
+        var ghVm = new GitHubOpenViewModel(_gitHub)
         {
-            OpenUrl = url => _services.GetRequiredService<IHostActionExecutor>().Launch(url),
+            OpenUrl = _hostActions.Launch,
             AttachedHidNames = attachedHidNames,
         };
         var dlg = new GitHubOpenWindow

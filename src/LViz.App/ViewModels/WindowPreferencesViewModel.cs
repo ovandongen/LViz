@@ -74,7 +74,7 @@ public partial class WindowPreferencesViewModel : ObservableObject
     public event Action<string>? HotkeyKeyChanged;
 
     /// <summary>Read-through to the persisted modifier name. Not user-editable today; keeps the hotkey-rewire call site in App self-contained.</summary>
-    public string HotkeyModifiers => _settings.Load().HotkeyModifiers;
+    public string HotkeyModifiers => _settings.Current.HotkeyModifiers;
 
     /// <summary>
     /// True when the board renders Windows-style modifier glyphs (⊞ Alt Ctrl ⇧)

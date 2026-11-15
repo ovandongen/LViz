@@ -5,15 +5,12 @@ using LViz.App.Localization;
 using LViz.App.Services;
 using LViz.App.Services.Flashing;
 using LViz.App.Services.GitHub;
-using LViz.App.Services.MouseIdle;
 using LViz.Core.Diagnostics;
 using LViz.Core.Keymap;
 using LViz.Core.Layout;
 using LViz.Core.Models;
 using LViz.Core.Persistence;
 using LViz.Core.Settings;
-using ZmkHidProtocol.ActiveWindow;
-using ZmkHidProtocol.Protocol;
 
 namespace LViz.App.ViewModels;
 
@@ -139,16 +136,6 @@ public partial class MainWindowViewModel : ObservableObject
 
     partial void OnIsHidSourceActiveChanged(bool value) => OnPropertyChanged(nameof(IsAppRulesTabVisible));
 
-    /// <summary>
-    /// Cross-device capability router — the device inventory + routing table the
-    /// Settings UI binds to directly (no MainVM pass-through). Lives as long as
-    /// the VM; active only while HID tracking is on.
-    /// </summary>
-    public ICapabilityRouter CapabilityRouter => Devices.Router;
-
-    /// <summary>True when ≥2 protocol-capable devices expose a routable trigger→handler pair.</summary>
-    public bool IsDeviceRoutingAvailable => Devices.Router.IsRoutingAvailable;
-
     [ObservableProperty] private bool _isLiveHighlightingEnabled;
     [ObservableProperty] private bool _isAutoLayerSwitchEnabled;
     [ObservableProperty] private bool _hasLayoutLoaded;
@@ -176,6 +163,13 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ActiveLayerTintColor))]
     private int _activeLayerIndex;
+
+    // The shown layer as a plain object the device stack's push engines read
+    // from their own threads; no closure over this view-model.
+    private readonly ShownLayer _shownLayer;
+    internal ShownLayer ShownLayer => _shownLayer;
+
+    partial void OnActiveLayerIndexChanged(int value) => _shownLayer.Index = value;
 
     /// <summary>Palette color for the active layer — used as the press-highlight pulse fill.</summary>
     public string ActiveLayerTintColor => LayerTabs.ColorFor(ActiveLayerIndex);
@@ -316,11 +310,10 @@ public partial class MainWindowViewModel : ObservableObject
         IKeymapEditDialogs editDialogs,
         IMainWindowShell shell,
         IHostActionExecutor hostActionExecutor,
-        ICapabilityControl capabilityControl,
         IGitHubKeymapService? gitHub,
         FirmwareBuildWatcher? firmwareWatcher,
-        IActiveWindowMonitor? activeWindowMonitor,
-        IMouseIdleMonitor? mouseIdleMonitor)
+        DeviceStack devices,
+        ShownLayer shownLayer)
     {
         _settingsService = settingsService;
         Library = new KeymapLibrary(settingsService, gitHub);
@@ -332,8 +325,8 @@ public partial class MainWindowViewModel : ObservableObject
         if (_firmwareWatcher is not null)
             _firmwareWatcher.Changed += () => Avalonia.Threading.Dispatcher.UIThread.Post(RefreshFirmwareStatus);
         _keymapBackups = keymapBackups;
-        var s = settingsService.Load();
-        _profile = KeyboardProfileRegistry.TryResolve(s.Keyboard, out var p) ? p : new CorneProfile();
+        var s = settingsService.Current;
+        _profile = KeyboardProfileRegistry.ResolveOrDefault(s.Keyboard);
         Recents = new RecentKeymapsViewModel(
             Library,
             () => _profile.Id,
@@ -383,12 +376,11 @@ public partial class MainWindowViewModel : ObservableObject
         ComboLabelOverrides.SetOverrides(s.ComboLabelOverrides);
 
         _hostActionExecutor = hostActionExecutor;
-        Devices = DeviceStack.Create(
-            _profile, settingsService, () => ActiveLayerIndex,
-            activeWindowMonitor, mouseIdleMonitor, capabilityControl, _hostActionExecutor);
+        Devices = devices;
+        _shownLayer = shownLayer;
+        _shownLayer.Index = ActiveLayerIndex;
         Devices.Hid.ActiveLayerChanged += OnActiveLayerChanged;
         Devices.Hid.ConnectionChanged += OnActiveSourceChanged;
-        Devices.Router.RoutesChanged += OnCapabilityRoutesChanged;
         Devices.Push.KeyPositionForUi += OnKeyPositionForHighlight;
         // Transparent-key exit predicate reads the currently-loaded config at
         // call time, so swapping layouts or profiles needs no re-binding.
@@ -491,41 +483,6 @@ public partial class MainWindowViewModel : ObservableObject
         if (_keymap.HasLayout) ApplyActiveLayer(ActiveLayerIndex);
         OnPropertyChanged(nameof(ActiveLayerTintColor));
     }
-
-    /// <summary>Routes a layer push through the HID pipeline. Test-tab plumbing for SettingsViewModel.</summary>
-    public void PushLayerToKeyboard(int index) => Devices.Hid.PushLayer(index);
-
-    /// <summary>
-    /// Runs an action pipeline off the UI thread (steps await I/O + delays).
-    /// The Test button in the pipeline editor calls this with the in-progress
-    /// (possibly unsaved) pipeline, so testing exercises the real runner without
-    /// persisting first. Same path an inbound signal.fire takes.
-    /// </summary>
-    public void RunPipeline(ActionPipeline pipeline)
-    {
-        _ = Task.Run(async () =>
-        {
-            try { await Devices.Pipelines.RunAsync(pipeline).ConfigureAwait(false); }
-            catch (Exception ex) { DiagnosticLog.Warn("Pipeline", $"test run '{pipeline.Name}' failed: {ex.Message}"); }
-        });
-    }
-
-    /// <summary>
-    /// Sends a 0xFD GetDeviceInfo request and awaits the 0xFE reply.
-    /// Returns null when no HID is connected, on timeout, or on transport
-    /// failure. Test-tab plumbing only.
-    /// </summary>
-    public Task<DeviceInfo?> QueryDeviceInfoAsync(TimeSpan timeout, CancellationToken ct) =>
-        Devices.Hid.QueryDeviceInfoAsync(timeout, ct);
-
-    /// <summary>
-    /// Sends a 0xFB GetConfigId request and awaits the 0xFA reply.
-    /// Returns null when no HID is connected, on timeout, or on transport
-    /// failure. Empty string means the firmware has no
-    /// CONFIG_HID_VIZ_CONFIG_ID set. Test-tab plumbing only.
-    /// </summary>
-    public Task<string?> QueryConfigIdAsync(TimeSpan timeout, CancellationToken ct) =>
-        Devices.Hid.QueryConfigIdAsync(timeout, ct);
 
     private void ApplyActiveLayer(int index)
     {
@@ -651,12 +608,6 @@ public partial class MainWindowViewModel : ObservableObject
         Avalonia.Threading.Dispatcher.UIThread.Post(() => ApplyActiveLayer(layer));
     }
 
-    // RoutesChanged fires on a background scan thread; marshal the availability
-    // notification onto the UI thread so bindings update safely. The inventory
-    // itself is read on demand from the router (immutable snapshot).
-    private void OnCapabilityRoutesChanged()
-        => Avalonia.Threading.Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(IsDeviceRoutingAvailable)));
-
     private void OnActiveSourceChanged()
     {
         var hidActive = Devices.Hid.IsConnected;
@@ -688,9 +639,9 @@ public partial class MainWindowViewModel : ObservableObject
         ApplyActiveLayer(0);
     }
 
-    // Thin wrapper over the shared SettingsServiceExtensions.Update so every
+    // Thin wrapper over ISettingsService.Update so every
     // MainVM persist names the "MainVM" diagnostic subsystem in one place; the
-    // load→mutate→save + error-swallow lives in the extension.
+    // member owns the load→mutate→save + error-swallow.
     private void PersistSetting(Func<UserSettings, UserSettings> update) =>
         _settingsService.Update(update, "MainVM");
 }

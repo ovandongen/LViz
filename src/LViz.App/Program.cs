@@ -63,7 +63,7 @@ class Program
             {
                 try
                 {
-                    renderMode = new SettingsService().Load().RenderingMode;
+                    renderMode = new SettingsService().Current.RenderingMode;
                     source = "settings.json";
                 }
                 catch

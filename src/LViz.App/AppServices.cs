@@ -11,6 +11,7 @@ using LViz.App.Views;
 using LViz.Core.Diagnostics;
 using LViz.Core.Firmware;
 using LViz.Core.GitHub;
+using LViz.Core.Layout;
 using LViz.Core.Persistence;
 using LViz.Core.Settings;
 using ZmkHidProtocol.ActiveWindow;
@@ -21,24 +22,23 @@ namespace LViz.App;
 /// Composition root for App-level services. Anything new gets registered
 /// here as the canonical pattern; no inline <c>new</c> in <c>App.axaml.cs</c>.
 ///
-/// <para>Phase B (interface extraction) is complete for
-/// <see cref="IGlobalHotkeyService"/>, <see cref="ILayerPushCoordinator"/>,
-/// <see cref="IMouseLayerEngine"/>, and <see cref="IKeyHighlightTracker"/>.
-/// Those four are not registered in the container because they each need
-/// state owned by <see cref="ViewModels.MainWindowViewModel"/> at
-/// construction time (initial profile, <c>getRenderedLayer</c> closure, or
-/// the live <c>Keys</c> collection). They remain MainVM-scoped, but the
-/// interface extraction means anything that <i>consumes</i> them
-/// (SettingsViewModel, tests, future split-out engines) can hold the
-/// abstraction.</para>
-///
-/// <para>Phase D registers <see cref="MainWindowViewModel"/> as a
-/// singleton and <see cref="SettingsViewModel"/> as transient — App.axaml
-/// resolves both through the container instead of new'ing them inline.</para>
+/// <para>Every service the app uses is registered here, including
+/// <see cref="ShownLayer"/> and the <see cref="DeviceStack"/> built once as
+/// a singleton through <see cref="DeviceStack.Create"/> (nothing is started
+/// at registration: <c>App.axaml.cs</c> calls
+/// <see cref="DeviceStack.StartIpc"/> once on the resolved stack).
+/// <see cref="MainWindowViewModel"/> is registered as a singleton and
+/// <see cref="SettingsViewModel"/> as transient;
+/// <see cref="AvaloniaMainWindowShell"/> gets its services by name and the
+/// view-models of the windows it opens as factories, each running only when
+/// its window opens.</para>
 ///
 /// <para>Disposal: the provider owns the singletons it constructs.
 /// App.axaml disposes the provider on <c>desktop.Exit</c>; individual
-/// per-service Exit handlers are no longer required.</para>
+/// per-service Exit handlers are no longer required. The main view-model
+/// also disposes the device stack at quit;
+/// <see cref="DeviceStack.Dispose"/> is idempotent, so the provider's later
+/// pass is a no-op.</para>
 /// </summary>
 internal static class AppServices
 {
@@ -55,8 +55,7 @@ internal static class AppServices
         // App-originated capability control (layer + pointing actions, confirm
         // plane). Stateless, so it lives in the container — unlike the capability
         // *router*, which needs the live keyboard pipeline + device bus and is
-        // therefore MainWindowViewModel-scoped (same reason as the four
-        // interfaces noted below).
+        // therefore built inside the DeviceStack singleton below.
         services.AddSingleton<ICapabilityControl>(_ => new CapabilityControl());
 
         // Host-process spawner for the Launch/Shell action-pipeline steps.
@@ -82,6 +81,28 @@ internal static class AppServices
         }
         if (activeWindowMonitor is not null)
             services.AddSingleton(activeWindowMonitor);
+
+        // The device stack: HID pipeline, capability bus + router, action
+        // pipelines, push coordinators and IPC. The container builds it once;
+        // the main view-model receives it and keeps disposing it on quit
+        // (Dispose is idempotent, so the provider's Exit disposal is a
+        // no-op after that). Nothing is started here — App.axaml calls
+        // StartIpc explicitly, so a stack built in a test never listens.
+        // The start profile is resolved with the same expression the view-
+        // model uses, so both begin on the same board.
+        services.AddSingleton<ShownLayer>();
+        services.AddSingleton(sp =>
+        {
+            var settings = sp.GetRequiredService<ISettingsService>();
+            return DeviceStack.Create(
+                KeyboardProfileRegistry.ResolveOrDefault(settings.Current.Keyboard),
+                settings,
+                sp.GetRequiredService<ShownLayer>(),
+                sp.GetService<IActiveWindowMonitor>(),
+                sp.GetService<IMouseIdleMonitor>(),
+                sp.GetRequiredService<ICapabilityControl>(),
+                sp.GetRequiredService<IHostActionExecutor>());
+        });
 
         // Both registered against the same instance the static facade
         // delegates to, so DI consumers and the existing XAML / converter
@@ -119,9 +140,9 @@ internal static class AppServices
         // and session are internal to the service — never registered as
         // their own types, and its login lives under its own secret key),
         // the watcher the status-bar firmware line reads, and the pieces the
-        // flash window runs on. IKeyboardFlashAccess reaches the device stack
-        // through the main view-model; it is only ever resolved when the
-        // flash window opens, which is after the view-model exists.
+        // flash window runs on. IKeyboardFlashAccess takes the device stack
+        // straight from the container; it is only ever resolved when the
+        // flash window opens.
         services.AddSingleton(_ => new FirmwareCache(FirmwareCache.DefaultRoot));
         services.AddSingleton(_ => new FirmwareFlashHistory(FirmwareFlashHistory.DefaultPath));
         services.AddSingleton<IFirmwareBuildService>(sp =>
@@ -143,25 +164,45 @@ internal static class AppServices
         services.AddSingleton(sp => new FirmwareBuildWatcher(sp.GetRequiredService<IFirmwareBuildService>()));
         services.AddSingleton<IKeyboardFlashAccess>(sp =>
         {
-            var vm = sp.GetRequiredService<MainWindowViewModel>();
+            var devices = sp.GetRequiredService<DeviceStack>();
             return new KeyboardFlashAccess(
-                vm.Devices.Hid, vm.Devices.Router, sp.GetRequiredService<ICapabilityControl>());
+                devices.Hid, devices.Router, sp.GetRequiredService<ICapabilityControl>());
         });
         services.AddTransient(sp => new FlashRun(
             sp.GetRequiredService<IKeyboardFlashAccess>(),
             new Uf2DriveWatcher(new SystemUf2DriveSource())));
 
-        // Window lifecycle + the shell the view-model opens windows through;
-        // both look the main window and view-model up at call time.
+        // Window lifecycle + the shell the view-model opens windows through.
+        // The lifecycle looks the main window and view-model up at call time;
+        // the shell takes named services, and the Settings, module-setup and
+        // flash view-models as factories — each runs only when its window
+        // opens, and Settings must stay lazy because it needs the main
+        // view-model, which needs the shell.
         services.AddSingleton(sp => new MainWindowLifecycle(
             sp.GetRequiredService<ISettingsService>(),
             () => sp.GetRequiredService<MainWindowViewModel>()));
         services.AddSingleton<IMainWindowShell>(sp => new AvaloniaMainWindowShell(
-            sp, sp.GetRequiredService<MainWindowLifecycle>()));
+            sp.GetRequiredService<MainWindowLifecycle>(),
+            sp.GetRequiredService<IGitHubKeymapService>(),
+            sp.GetRequiredService<IHostActionExecutor>(),
+            () => sp.GetRequiredService<SettingsViewModel>(),
+            context => new ModuleSetupViewModel(
+                context,
+                sp.GetRequiredService<IGitHubKeymapService>(),
+                sp.GetRequiredService<KeymapBackupStore>(),
+                Guid.NewGuid),
+            context => new FlashViewModel(
+                context,
+                sp.GetRequiredService<IFirmwareBuildService>(),
+                sp.GetRequiredService<FirmwareFlashHistory>(),
+                sp.GetRequiredService<IKeyboardFlashAccess>(),
+                sp.GetRequiredService<FlashRun>())));
 
-        // Every dependency is passed explicitly. The monitors are genuinely
-        // optional: no active-window monitor disables app-focus switching, no
-        // mouse-idle monitor leaves MouseLayer null.
+        // Every dependency is passed explicitly; the device stack and the
+        // shown layer come from the container. The monitors are genuinely
+        // optional and are resolved by the stack's factory: no active-window
+        // monitor disables app-focus switching, no mouse-idle monitor leaves
+        // MouseLayer null.
         services.AddSingleton<MainWindowViewModel>(sp =>
             new MainWindowViewModel(
                 sp.GetRequiredService<ISettingsService>(),
@@ -170,16 +211,16 @@ internal static class AppServices
                 sp.GetRequiredService<IKeymapEditDialogs>(),
                 sp.GetRequiredService<IMainWindowShell>(),
                 sp.GetRequiredService<IHostActionExecutor>(),
-                sp.GetRequiredService<ICapabilityControl>(),
                 sp.GetRequiredService<IGitHubKeymapService>(),
                 sp.GetRequiredService<FirmwareBuildWatcher>(),
-                sp.GetService<IActiveWindowMonitor>(),
-                sp.GetService<IMouseIdleMonitor>()));
+                sp.GetRequiredService<DeviceStack>(),
+                sp.GetRequiredService<ShownLayer>()));
 
         services.AddTransient<SettingsViewModel>(sp =>
             new SettingsViewModel(
                 sp.GetRequiredService<ISettingsService>(),
                 sp.GetRequiredService<MainWindowViewModel>(),
+                sp.GetRequiredService<DeviceStack>(),
                 sp.GetRequiredService<UpdateService>(),
                 sp.GetRequiredService<ICapabilityControl>(),
                 sp.GetRequiredService<ICliToolInstaller>()));

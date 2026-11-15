@@ -20,20 +20,6 @@ namespace LViz.Tests;
 /// </summary>
 public sealed class MainWindowViewModelLiveFeaturesTests : IDisposable
 {
-    // Same in-memory settings fake as MainWindowViewModelGitHubTests: the
-    // stored record survives across VMs, which is what dismissal pins.
-    private sealed class InMemorySettingsService : ISettingsService
-    {
-        public UserSettings Current { get; set; } = new();
-        public int SaveCount { get; private set; }
-        public UserSettings Load() => Current;
-        public void Save(UserSettings settings)
-        {
-            Current = settings;
-            SaveCount++;
-        }
-    }
-
     /// <summary>Wraps the fake shell, runs a mutation on the config before
     /// answering "the wizard saved" — how a test simulates a wizard save
     /// without opening the wizard.</summary>

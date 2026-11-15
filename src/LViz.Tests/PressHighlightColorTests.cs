@@ -6,13 +6,6 @@ namespace LViz.Tests;
 
 public class PressHighlightColorTests
 {
-    private sealed class InMemorySettingsService : ISettingsService
-    {
-        public UserSettings Current { get; set; } = new();
-        public UserSettings Load() => Current;
-        public void Save(UserSettings settings) => Current = settings;
-    }
-
     [Fact]
     public void DefaultHighlightColor_MatchesOriginalYellow()
     {

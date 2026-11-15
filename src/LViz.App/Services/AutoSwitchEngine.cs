@@ -36,7 +36,7 @@ public sealed partial class AutoSwitchEngine : ObservableObject
 
     /// <summary>Raised when the engine decides a different layer should be
     /// active on the keyboard. The host applies it via the firmware command
-    /// channel (see <c>MainWindowViewModel.PushLayerToKeyboard</c>).</summary>
+    /// channel (see <c>IHidPipeline.PushLayer</c>).</summary>
     public event Action<int>? PushLayerRequested;
 
     /// <summary>Raised alongside <see cref="PushLayerRequested"/> as a session
@@ -75,7 +75,7 @@ public sealed partial class AutoSwitchEngine : ObservableObject
 
         RecomputeMatchedRule();
 
-        var s = _settingsService.Load();
+        var s = _settingsService.Current;
         IsEnabled = s.AutoSwitchKeyboardLayer;
         UpdateActiveWindowMonitorGating();
     }
@@ -247,7 +247,7 @@ public sealed partial class AutoSwitchEngine : ObservableObject
     private void ReloadAppLayerRules()
     {
         AppLayerRules.Clear();
-        var s = _settingsService.Load();
+        var s = _settingsService.Current;
         if (s.AppLayerRules.TryGetValue(_profile.Id, out var list))
             foreach (var r in list) AppLayerRules.Add(r);
     }
@@ -261,7 +261,7 @@ public sealed partial class AutoSwitchEngine : ObservableObject
 
     private void ReloadAutoSwitchFallback()
     {
-        var s = _settingsService.Load();
+        var s = _settingsService.Current;
         FallbackMode = s.AutoSwitchFallback.GetForProfile(_profile.Id, AutoSwitchFallbackMode.Base);
         ExitOnTransparentKey = s.AutoSwitchExitOnTransparent.GetForProfile(_profile.Id, false);
         ExitOnEmptyKey = s.AutoSwitchExitOnEmpty.GetForProfile(_profile.Id, false);
@@ -269,7 +269,7 @@ public sealed partial class AutoSwitchEngine : ObservableObject
 
     private void ReloadExitTapKey()
     {
-        var s = _settingsService.Load();
+        var s = _settingsService.Current;
         int? key = s.AutoSwitchExitKey.TryGetValue(_profile.Id, out var stored) && stored >= 0
             ? stored
             : (int?)null;
@@ -283,7 +283,7 @@ public sealed partial class AutoSwitchEngine : ObservableObject
 
     private int? ResolveMouseLayerIndex()
     {
-        var s = _settingsService.Load();
+        var s = _settingsService.Current;
         return s.MouseLayer.TryGetValue(_profile.Id, out var ms) ? ms.MouseLayerIndex : null;
     }
 
@@ -390,8 +390,8 @@ public sealed partial class AutoSwitchEngine : ObservableObject
         else monitor.Stop();
     }
 
-    // Thin wrapper over SettingsServiceExtensions.Update so the "AutoSwitch"
-    // diagnostic subsystem tag is named once; the shared helper owns the
+    // Thin wrapper over ISettingsService.Update so the "AutoSwitch"
+    // diagnostic subsystem tag is named once; the member owns the
     // load→mutate→save and error-swallow.
     private void PersistSetting(Func<UserSettings, UserSettings> update) =>
         _settingsService.Update(update, "AutoSwitch");

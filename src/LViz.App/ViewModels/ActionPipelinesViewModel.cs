@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LViz.App.Localization;
 using LViz.App.Services;
+using LViz.Core.Diagnostics;
 using LViz.Core.Settings;
 using ZmkHidProtocol.Protocol;
 
@@ -25,7 +26,8 @@ public sealed partial class ActionPipelinesViewModel : ObservableObject, IDispos
 {
     private readonly ICapabilityRouter _router;
     private readonly ISettingsService _settings;
-    private readonly MainWindowViewModel _main;
+    private readonly IPipelineRunner _runner;
+    private readonly AutoSwitchEngine _autoSwitch;
     private bool _disposed;
 
     /// <summary>The pipeline library (compact cards).</summary>
@@ -58,11 +60,14 @@ public sealed partial class ActionPipelinesViewModel : ObservableObject, IDispos
     // one binding per (process, moment).
     private IReadOnlyList<AppLayerTriggerOption> _allTriggers = Array.Empty<AppLayerTriggerOption>();
 
-    public ActionPipelinesViewModel(ICapabilityRouter router, ISettingsService settings, MainWindowViewModel main)
+    public ActionPipelinesViewModel(
+        ICapabilityRouter router, ISettingsService settings,
+        IPipelineRunner runner, AutoSwitchEngine autoSwitch)
     {
         _router = router;
         _settings = settings;
-        _main = main;
+        _runner = runner;
+        _autoSwitch = autoSwitch;
 
         StepKinds = new[]
         {
@@ -90,7 +95,7 @@ public sealed partial class ActionPipelinesViewModel : ObservableObject, IDispos
 
     private void SeedFromSettings()
     {
-        var s = _settings.Load();
+        var s = _settings.Current;
         foreach (var p in s.ActionPipelines)
         {
             var row = new PipelineEditRow(p.Name);
@@ -137,7 +142,7 @@ public sealed partial class ActionPipelinesViewModel : ObservableObject, IDispos
             if (!processes.Any(x => string.Equals(x, p, StringComparison.OrdinalIgnoreCase)))
                 processes.Add(p);
         }
-        foreach (var r in _main.AutoSwitch.AppLayerRules) AddProcess(r.ProcessMatch);
+        foreach (var r in _autoSwitch.AppLayerRules) AddProcess(r.ProcessMatch);
         foreach (var b in s.AppLayerBindings) AddProcess(b.ProcessMatch);
 
         var options = new List<AppLayerTriggerOption>();
@@ -173,7 +178,22 @@ public sealed partial class ActionPipelinesViewModel : ObservableObject, IDispos
     {
         var otherPipelines = Pipelines.Where(p => !ReferenceEquals(p, source)).Select(p => p.ToPipeline()).ToList();
         return new EditPipelineDialogViewModel(
-            source?.ToPipeline(), StepKinds, DeviceOptions, PointingActions, otherPipelines, _main.RunPipeline);
+            source?.ToPipeline(), StepKinds, DeviceOptions, PointingActions, otherPipelines, TestRun);
+    }
+
+    /// <summary>
+    /// Runs an action pipeline off the UI thread (steps await I/O + delays).
+    /// The Test button in the pipeline editor calls this with the in-progress
+    /// (possibly unsaved) pipeline, so testing exercises the real runner without
+    /// persisting first. Same path an inbound signal.fire takes.
+    /// </summary>
+    private void TestRun(ActionPipeline pipeline)
+    {
+        _ = Task.Run(async () =>
+        {
+            try { await _runner.RunAsync(pipeline).ConfigureAwait(false); }
+            catch (Exception ex) { DiagnosticLog.Warn("Pipeline", $"test run '{pipeline.Name}' failed: {ex.Message}"); }
+        });
     }
 
     /// <summary>Applies the editor's outcome: Save swaps in the edited copy (or

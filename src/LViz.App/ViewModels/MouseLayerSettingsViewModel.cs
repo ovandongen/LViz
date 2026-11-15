@@ -1,11 +1,13 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using LViz.App.Services;
+using LViz.Core.Layout;
 using LViz.Core.Settings;
 
 namespace LViz.App.ViewModels;
 
 /// <summary>
-/// Mouse-layer tab of the Settings window. Reads/writes
-/// <see cref="MainWindowViewModel.MouseLayer"/> (the engine) directly. Setters
+/// Mouse-layer tab of the Settings window. Reads/writes the injected
+/// <see cref="IMouseLayerEngine"/> directly. Setters
 /// apply immediately (no commit-on-close), the same pattern the auto-switch
 /// fallback uses, since the underlying state is a small self-contained record.
 /// When the engine is absent (tests), the snapshot falls back to the persisted
@@ -14,12 +16,18 @@ namespace LViz.App.ViewModels;
 public sealed partial class MouseLayerSettingsViewModel : ObservableObject
 {
     private readonly ISettingsService _settingsService;
-    private readonly MainWindowViewModel _main;
+    private readonly IMouseLayerEngine? _engine;
+    private readonly LayerTabsViewModel _layerTabs;
+    private readonly Func<IKeyboardProfile> _keyboard;
 
-    public MouseLayerSettingsViewModel(ISettingsService settingsService, MainWindowViewModel main)
+    public MouseLayerSettingsViewModel(
+        ISettingsService settingsService, IMouseLayerEngine? engine,
+        LayerTabsViewModel layerTabs, Func<IKeyboardProfile> keyboard)
     {
         _settingsService = settingsService;
-        _main = main;
+        _engine = engine;
+        _layerTabs = layerTabs;
+        _keyboard = keyboard;
         Reload();
     }
 
@@ -28,7 +36,7 @@ public sealed partial class MouseLayerSettingsViewModel : ObservableObject
     /// <summary>Re-reads the active keyboard's settings (called on keyboard switch).</summary>
     internal void Reload()
     {
-        _snapshot = _main.MouseLayer?.CurrentSettings ?? LoadPersisted();
+        _snapshot = _engine?.CurrentSettings ?? LoadPersisted();
         OnPropertyChanged(nameof(IsEnabled));
         OnPropertyChanged(nameof(SelectedLayer));
         OnPropertyChanged(nameof(IdleTimeoutMs));
@@ -41,15 +49,15 @@ public sealed partial class MouseLayerSettingsViewModel : ObservableObject
     private void Update(MouseLayerSettings next)
     {
         _snapshot = next;
-        _main.MouseLayer?.ApplySettings(next);
+        _engine?.ApplySettings(next);
     }
 
-    /// <summary>Per-profile mouse-layer settings straight from disk — the
+    /// <summary>Per-profile mouse-layer settings from the settings store — the
     /// fallback used when no engine is wired up (tests). Mirrors the load the
     /// engine itself does on construction.</summary>
     private MouseLayerSettings LoadPersisted() =>
-        _settingsService.Load().MouseLayer
-            .GetForProfile(_main.SelectedKeyboard.Id, new MouseLayerSettings());
+        _settingsService.Current.MouseLayer
+            .GetForProfile(_keyboard().Id, new MouseLayerSettings());
 
     public bool IsEnabled
     {
@@ -68,7 +76,7 @@ public sealed partial class MouseLayerSettingsViewModel : ObservableObject
         {
             var idx = _snapshot.MouseLayerIndex;
             if (idx is null) return null;
-            return _main.LayerTabs.Layers.FirstOrDefault(l => l.Index == idx.Value);
+            return _layerTabs.Layers.FirstOrDefault(l => l.Index == idx.Value);
         }
         set
         {

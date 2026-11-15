@@ -20,18 +20,6 @@ namespace LViz.Tests;
 /// </summary>
 public sealed class MainWindowViewModelGitHubTests : IDisposable
 {
-    private sealed class InMemorySettingsService : ISettingsService
-    {
-        public UserSettings Current { get; set; } = new();
-        public int SaveCount { get; private set; }
-        public UserSettings Load() => Current;
-        public void Save(UserSettings settings)
-        {
-            Current = settings;
-            SaveCount++;
-        }
-    }
-
     // Returns a canned result and records state the way the real service does.
     private sealed class FakeKeymapStateService : IKeymapStateService
     {

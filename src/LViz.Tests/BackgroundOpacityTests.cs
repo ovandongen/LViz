@@ -6,13 +6,6 @@ namespace LViz.Tests;
 
 public class BackgroundOpacityTests
 {
-    private sealed class InMemorySettingsService : ISettingsService
-    {
-        public UserSettings Current { get; set; } = new();
-        public UserSettings Load() => Current;
-        public void Save(UserSettings settings) => Current = settings;
-    }
-
     private static MainWindowViewModel NewVm(double opacity) =>
         TestMainVm.Create(new InMemorySettingsService { Current = new UserSettings { BackgroundOpacity = opacity } });
 

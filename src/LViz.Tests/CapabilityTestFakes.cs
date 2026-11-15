@@ -4,12 +4,25 @@ using ZmkHidProtocol.Capabilities;
 
 namespace LViz.Tests;
 
-/// <summary>Settings service over a plain in-memory <see cref="UserSettings"/>.</summary>
+/// <summary>
+/// Settings service over a plain in-memory <see cref="UserSettings"/>: every
+/// <see cref="Update"/> stores the new value, counts itself and raises
+/// <see cref="Changed"/>.
+/// </summary>
 internal sealed class InMemorySettingsService : ISettingsService
 {
     public UserSettings Current { get; set; } = new();
-    public UserSettings Load() => Current;
-    public void Save(UserSettings settings) => Current = settings;
+    public int SaveCount { get; private set; }
+    public event Action<UserSettings, UserSettings>? Changed;
+    public void Update(Func<UserSettings, UserSettings> mutate, string subsystem)
+    {
+        var old = Current;
+        var next = mutate(old);
+        if (next is null || ReferenceEquals(next, old)) return;
+        Current = next;
+        SaveCount++;
+        Changed?.Invoke(old, next);
+    }
 }
 
 /// <summary>

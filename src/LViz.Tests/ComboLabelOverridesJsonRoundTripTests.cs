@@ -31,9 +31,9 @@ public class ComboLabelOverridesJsonRoundTripTests
                 },
             };
             var svc = new SettingsService(path);
-            svc.Save(input);
+            svc.Update(_ => input, "Test");
 
-            var loaded = svc.Load();
+            var loaded = new SettingsService(path).Current;
 
             Assert.True(loaded.ComboLabelOverrides.ContainsKey("Kyria"));
             Assert.Equal("[]", loaded.ComboLabelOverrides["Kyria"]["12,13"].MainLabel);
@@ -52,9 +52,9 @@ public class ComboLabelOverridesJsonRoundTripTests
         try
         {
             var svc = new SettingsService(path);
-            svc.Save(new UserSettings());
+            svc.Update(_ => new UserSettings(), "Test");
 
-            var loaded = svc.Load();
+            var loaded = new SettingsService(path).Current;
 
             Assert.Empty(loaded.ComboLabelOverrides);
         }
@@ -74,7 +74,7 @@ public class ComboLabelOverridesJsonRoundTripTests
         {
             File.WriteAllText(path, """{"SchemaVersion": 1, "Keyboard": "Corne"}""");
             var svc = new SettingsService(path);
-            var loaded = svc.Load();
+            var loaded = svc.Current;
 
             Assert.NotNull(loaded.ComboLabelOverrides);
             Assert.Empty(loaded.ComboLabelOverrides);

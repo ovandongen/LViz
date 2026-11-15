@@ -1,4 +1,3 @@
-using LViz.App.Services;
 using LViz.App.ViewModels;
 using LViz.Core.Layout;
 using LViz.Core.Settings;
@@ -16,20 +15,13 @@ namespace LViz.Tests;
 /// </summary>
 public class MouseLayerSettingsViewModelClampingTests
 {
-    private sealed class InMemorySettingsService : ISettingsService
-    {
-        public UserSettings Current { get; set; } = new();
-        public UserSettings Load() => Current;
-        public void Save(UserSettings settings) => Current = settings;
-    }
-
     private static MouseLayerSettingsViewModel NewVm(UserSettings? seed = null)
     {
         var settings = new InMemorySettingsService { Current = seed ?? new UserSettings { Keyboard = "GO60" } };
         var main = TestMainVm.Create(settings);
         // Mouse layer must be enabled for snapshot updates to flow back through
         // the engine without being short-circuited.
-        var vm = new SettingsViewModel(settings, main, new UpdateService(settings)).MouseLayer;
+        var vm = TestMainVm.CreateSettings(settings, main).MouseLayer;
         vm.IsEnabled = true;
         return vm;
     }

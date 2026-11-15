@@ -68,7 +68,7 @@ public sealed class LayerPushCoordinator : ILayerPushCoordinator
 
     public LayerPushCoordinator(
         IHidPipeline hid,
-        Func<int> getRenderedLayer,
+        ShownLayer shownLayer,
         IKeyboardProfile profile,
         ISettingsService settings,
         IActiveWindowMonitor? activeWindowMonitor,
@@ -80,13 +80,13 @@ public sealed class LayerPushCoordinator : ILayerPushCoordinator
         // AutoSwitch reads "the layer underneath any in-flight mouse-layer
         // push" so its captured PreRuleLayer (and userOverrode comparison)
         // never see the transient mouse layer. When no mouse push is active,
-        // PreMoveLayer is null and we fall through to the rendered layer —
+        // PreMoveLayer is null and we fall through to the shown layer —
         // which is also the right answer for Cmd+Tab focus changes that
         // happen without mouse movement.
         AutoSwitch = new AutoSwitchEngine(
             settings,
             activeWindowMonitor,
-            () => MouseLayer?.PreMoveLayer ?? getRenderedLayer(),
+            () => MouseLayer?.PreMoveLayer ?? shownLayer.Index,
             profile);
         AutoSwitch.PushLayerRequested += OnAutoSwitchPushRequested;
 
@@ -95,7 +95,7 @@ public sealed class LayerPushCoordinator : ILayerPushCoordinator
             MouseLayer = new MouseLayerEngine(
                 settings,
                 mouseIdleMonitor,
-                getRenderedLayer,
+                () => shownLayer.Index,
                 () => _hid.IsConnected,
                 profile);
             MouseLayer.PushLayerRequested += _hid.PushLayer;

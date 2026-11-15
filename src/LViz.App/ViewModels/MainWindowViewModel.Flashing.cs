@@ -128,7 +128,7 @@ public partial class MainWindowViewModel
     private bool ShowSignInLink(FirmwareWatchStatus watch)
     {
         if (watch == _shownSignInWatch) return true;
-        var settings = _settingsService.Load();
+        var settings = _settingsService.Current;
         if (settings.FlashedConfigs.Contains(watch.ConfigKey)) return true;
         if (settings.FirmwareSignInHintsShown.Contains(watch.ConfigKey)) return false;
         PersistSetting(s => s with { FirmwareSignInHintsShown = [.. s.FirmwareSignInHintsShown, watch.ConfigKey] });

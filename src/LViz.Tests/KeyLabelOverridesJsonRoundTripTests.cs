@@ -37,9 +37,9 @@ public class KeyLabelOverridesJsonRoundTripTests
                 },
             };
             var svc = new SettingsService(path);
-            svc.Save(input);
+            svc.Update(_ => input, "Test");
 
-            var loaded = svc.Load();
+            var loaded = new SettingsService(path).Current;
 
             Assert.True(loaded.KeyLabelOverrides.ContainsKey("corne"));
             var got = loaded.KeyLabelOverrides["corne"][3][17];
@@ -70,9 +70,9 @@ public class KeyLabelOverridesJsonRoundTripTests
                 },
             };
             var svc = new SettingsService(path);
-            svc.Save(input);
+            svc.Update(_ => input, "Test");
 
-            var loaded = svc.Load();
+            var loaded = new SettingsService(path).Current;
 
             Assert.Null(loaded.KeyLabelOverrides["x"][0][0].FontSize);
             Assert.False(loaded.KeyLabelOverrides["x"][0][0].Bold);
@@ -90,9 +90,9 @@ public class KeyLabelOverridesJsonRoundTripTests
         try
         {
             var svc = new SettingsService(path);
-            svc.Save(new UserSettings());
+            svc.Update(_ => new UserSettings(), "Test");
 
-            var loaded = svc.Load();
+            var loaded = new SettingsService(path).Current;
 
             Assert.Empty(loaded.KeyLabelOverrides);
         }

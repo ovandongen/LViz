@@ -8,13 +8,6 @@ namespace LViz.Tests;
 
 public class MouseLayerEngineTests
 {
-    private sealed class InMemorySettingsService : ISettingsService
-    {
-        public UserSettings Current { get; set; } = new();
-        public UserSettings Load() => Current;
-        public void Save(UserSettings settings) => Current = settings;
-    }
-
     /// <summary>
     /// Manually-driveable monitor — tests call <see cref="FireMoveStarted"/> /
     /// <see cref="FireMoveStopped"/> to simulate platform-tap output without a

@@ -55,7 +55,7 @@ public interface IMouseLayerEngine : IDisposable
 /// can be made).</para>
 ///
 /// <para><b>Interaction with <see cref="AutoSwitchEngine"/>:</b> both engines
-/// push via the same HID command sink (<c>MainWindowViewModel.PushLayerToKeyboard</c>),
+/// push via the same HID command sink (<c>IHidPipeline.PushLayer</c>),
 /// last-write-wins. AutoSwitch reads the engine's <see cref="PreMoveLayer"/>
 /// when capturing its own PreRuleLayer so a mid-mouse-push focus change
 /// doesn't snapshot the mouse layer as the app rule's "previous".</para>
@@ -74,7 +74,7 @@ public sealed class MouseLayerEngine : IMouseLayerEngine
 
     /// <summary>Raised when the engine wants a layer pushed to the keyboard
     /// via HID. The host applies it via the firmware command channel
-    /// (<c>MainWindowViewModel.PushLayerToKeyboard</c>).</summary>
+    /// (<c>IHidPipeline.PushLayer</c>).</summary>
     public event Action<int>? PushLayerRequested;
 
     public MouseLayerEngine(
@@ -217,7 +217,7 @@ public sealed class MouseLayerEngine : IMouseLayerEngine
 
     private MouseLayerSettings LoadSettingsForProfile(string profileId)
     {
-        var s = _settingsService.Load();
+        var s = _settingsService.Current;
         return s.MouseLayer.GetForProfile(profileId, new MouseLayerSettings());
     }
 
@@ -257,8 +257,8 @@ public sealed class MouseLayerEngine : IMouseLayerEngine
         _preMoveLayer = null;
     }
 
-    // Thin wrapper over SettingsServiceExtensions.Update so the "MouseLayer"
-    // diagnostic subsystem tag is named once; the shared helper owns the
+    // Thin wrapper over ISettingsService.Update so the "MouseLayer"
+    // diagnostic subsystem tag is named once; the member owns the
     // load→mutate→save and error-swallow.
     private void PersistSetting(Func<UserSettings, UserSettings> update) =>
         _settingsService.Update(update, "MouseLayer");

@@ -5,7 +5,9 @@ using LViz.Core.Persistence;
 namespace LViz.Core.Settings;
 
 /// <summary>
-/// Persists user settings as JSON in the application data directory.
+/// Keeps user settings in memory and persists them as JSON in the application
+/// data directory. The file is read once, on the first access; every change
+/// goes through <see cref="Update"/>.
 /// </summary>
 public class SettingsService : ISettingsService
 {
@@ -16,6 +18,8 @@ public class SettingsService : ISettingsService
     };
 
     private readonly string _filePath;
+    private readonly object _gate = new();
+    private volatile UserSettings? _current;
 
     public SettingsService()
         : this(GetDefaultPath())
@@ -28,7 +32,107 @@ public class SettingsService : ISettingsService
         _filePath = filePath;
     }
 
-    public UserSettings Load()
+    public event Action<UserSettings, UserSettings>? Changed;
+
+    public UserSettings Current
+    {
+        get
+        {
+            var cached = _current;
+            if (cached is not null)
+                return cached;
+
+            lock (_gate)
+            {
+                cached = _current;
+                if (cached is null)
+                {
+                    cached = Read();
+                    _current = cached;
+                }
+                return cached;
+            }
+        }
+    }
+
+    public void Update(Func<UserSettings, UserSettings> mutate, string subsystem)
+    {
+        UserSettings previous;
+        UserSettings next;
+
+        try
+        {
+            lock (_gate)
+            {
+                previous = Current;
+
+                try
+                {
+                    next = mutate(previous);
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticLog.Warn(subsystem, $"Persist settings failed: {ex.Message}");
+                    return;
+                }
+
+                if (next is null || ReferenceEquals(next, previous))
+                    return;
+
+                // The value is stored before the write so a failed write costs
+                // only persistence: the change lives for the rest of the session.
+                _current = next;
+                try
+                {
+                    Write(next);
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticLog.Warn(subsystem, $"Persist settings failed: {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Update promises it never throws, and the first read of a damaged
+            // settings file can fail with something Read() does not turn into
+            // defaults (a denied backup, a denied migrated write).
+            DiagnosticLog.Warn(subsystem, $"Persist settings failed: {ex.Message}");
+            return;
+        }
+
+        RaiseChanged(previous, next);
+    }
+
+    /// <summary>
+    /// Runs every handler even when one throws, so a broken subscriber cannot
+    /// keep the others from learning about the change. Outside the lock, so a
+    /// handler is free to read or update the settings.
+    /// </summary>
+    private void RaiseChanged(UserSettings previous, UserSettings next)
+    {
+        var handlers = Changed;
+        if (handlers is null)
+            return;
+
+        foreach (var entry in handlers.GetInvocationList())
+        {
+            try
+            {
+                ((Action<UserSettings, UserSettings>)entry)(previous, next);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLog.Warn("Settings", $"Changed handler failed: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reads the file and interprets it: defaults for a missing, unreadable,
+    /// unparseable or newer-schema file, and the migrated value for an older one.
+    /// </summary>
+    private UserSettings Read()
     {
         if (!File.Exists(_filePath))
             return new UserSettings();
@@ -87,7 +191,7 @@ public class SettingsService : ISettingsService
             var migrated = MigrateSettings(parsed);
             try
             {
-                Save(migrated);
+                Write(migrated);
             }
             catch (IOException ex)
             {
@@ -123,7 +227,7 @@ public class SettingsService : ISettingsService
         };
     }
 
-    public void Save(UserSettings settings)
+    private void Write(UserSettings settings)
     {
         var dir = Path.GetDirectoryName(_filePath);
         if (dir is not null && !Directory.Exists(dir))

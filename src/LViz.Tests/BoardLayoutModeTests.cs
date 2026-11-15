@@ -1,19 +1,11 @@
 using LViz.App.ViewModels;
 using LViz.Core.Layout;
-using LViz.Core.Settings;
 using Xunit;
 
 namespace LViz.Tests;
 
 public class BoardLayoutModeTests
 {
-    private sealed class InMemorySettingsService : ISettingsService
-    {
-        public UserSettings Current { get; set; } = new();
-        public UserSettings Load() => Current;
-        public void Save(UserSettings settings) => Current = settings;
-    }
-
     [Fact]
     public void HorizontalMode_PreservesProfileCanvas()
     {

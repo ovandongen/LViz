@@ -94,7 +94,7 @@ public partial class MainWindowViewModel
                 _liveFeaturesFacts is { } facts
                 && facts.Blockers.Count == 0
                 && facts.Status is ZmkModuleStatus.NotSetUp or ZmkModuleStatus.NeedsFork
-                && !_settingsService.Load().DismissedLiveFeatureHints.Contains(_liveFeaturesKey!);
+                && !_settingsService.Current.DismissedLiveFeatureHints.Contains(_liveFeaturesKey!);
         }
 
         // Another config loaded (or none): a build watch belongs to the config
