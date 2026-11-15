@@ -469,7 +469,7 @@ After creating or editing a view, rebuild the App project before trusting a
 - **Per-key label overrides are scoped `(profileId, layerIndex, keyIndex)`**
   → `KeyLabelOverride` (main label, subscript, top-left badge, FA icon,
   font size, bold). Persisted via `UserSettings.KeyLabelOverrides` through
-  the `PersistSetting → SettingsService.Save → AtomicFile` chain. Empty
+  the `PersistSetting → ISettingsService.Update → AtomicFile` chain. Empty
   overrides auto-prune so absent and "all defaults" are indistinguishable
   on disk. Edit dialog: `Views/EditKeyLabelDialog.axaml`.
 - **FontAwesome icon picker** reflects into the FA NuGet's embedded
@@ -798,10 +798,21 @@ LViz-specific (extend this list as we hit more):
   (App/Services).** `DeviceStack.Create` builds the HID pipeline, capability
   bus and router, pipeline runner, signal and app-layer dispatchers, IPC
   server and push coordinator; `Start`, `Stop(isAppExit)`, `SwitchProfile` and
-  `Dispose` own the order. Building it opens nothing: the CLI pipe opens only
-  in `StartIpc()`, which `App.axaml.cs` calls once, so a view-model built in a
-  test never listens on the pipe. `MainWindowViewModel.Devices` exposes it, so reach
-  `Devices.Hid`, `Devices.Push`, … instead of adding VM pass-throughs.
+  `Dispose` own the order. `AppServices` builds the stack once, as a
+  singleton, with `DeviceStack.Create`; the start board is
+  `KeyboardProfileRegistry.ResolveOrDefault(settings.Current.Keyboard)`, the
+  same expression the main view-model uses, and `App.axaml.cs` loads the user
+  layouts before either runs. Building it opens nothing: the CLI pipe opens
+  only in `StartIpc()`, which `App.axaml.cs` calls once on the resolved
+  stack, so a stack built in a test never listens on the pipe. The push
+  engines read the layer on screen from `ShownLayer`, which
+  `MainWindowViewModel` writes in `OnActiveLayerIndexChanged`. The VM
+  receives the stack as `Devices` and still disposes it in `Shutdown()`,
+  because Quit ends in `Environment.Exit(0)`; `Dispose` is idempotent, so
+  the container disposing it again is harmless. Whatever needs hardware
+  takes the stack, or the part of it that it uses (`IHidPipeline`,
+  `ICapabilityRouter`, `IPipelineRunner`, an engine), never the main
+  view-model and never a new pass-through on it.
   `DeviceStackTests` pins the order with recording doubles (the bus slot is
   unrecorded: `RawHidDeviceBus` is sealed). The bus only rescans the router
   for *its* devices, and the keyboard is not one of them, so `DeviceStack`
@@ -851,15 +862,36 @@ LViz-specific (extend this list as we hit more):
 
 - **`AppServices` is the one composition root.** `MainWindowViewModel` takes
   every collaborator as a required constructor parameter and builds no
-  service itself except `DeviceStack`, which needs the VM's
-  `ActiveLayerIndex`. Its child VMs and `KeymapLibrary` (`Library`), built in
-  the constructor, only wrap what it was given.
-  Only `gitHub`, `activeWindowMonitor` and `mouseIdleMonitor` may be null,
-  each with a meaning (no GitHub service, no app-focus switching, no
+  service itself. Its child VMs and `KeymapLibrary` (`Library`), built in
+  the constructor, only wrap what it was given. Only `gitHub` and
+  `firmwareWatcher` may be null on its constructor (no GitHub service, no
+  firmware build status); the two monitors are optional on the stack's
+  factory instead, each with a meaning (no app-focus switching, no
   `MouseLayer`). Tests build the VM with `TestMainVm.Create(settings, …)`,
   which supplies `FakeMainWindowShell`, `FakeKeymapEditDialogs` and a
-  temp-dir `KeymapBackupStore`; never add a `= null` default or a throwing
-  stand-in to make a test shorter.
+  temp-dir `KeymapBackupStore`, and builds the `DeviceStack` and the
+  `ShownLayer` for it; `TestMainVm.CreateSettings(settings, vm)` builds a
+  `SettingsViewModel`; never add a `= null` default or a throwing stand-in
+  to make a test shorter. `AvaloniaMainWindowShell` takes named
+  dependencies and three factories, not `IServiceProvider`. The Settings
+  tab view-models take the engine, router or runner they use — the
+  auto-switch and mouse tabs also `LayerTabsViewModel` and a
+  `Func<IKeyboardProfile>` — never the main view-model.
+
+- **Settings live in memory, in `ISettingsService`.** `Current` is read from
+  `settings.json` once, on first access, and never re-read; a hand edit of
+  `settings.json` while LViz runs is not picked up. It is shared and must be
+  treated as immutable: never change a list or dictionary reached from it in
+  place. Every change goes through `Update(s => s with { … }, subsystem)`
+  and builds new collections (`PerProfile.*`, `HiddenLayers.With`, a copy
+  constructor). `Update` locks, writes with `AtomicFile`, never throws, and
+  does nothing when the function returns the same instance; a failed write
+  is logged and the value stays in memory. `Changed(old, new)` fires on the
+  caller's thread; a subscriber that touches UI state posts to the UI
+  thread. Tests use the shared `InMemorySettingsService` in
+  `CapabilityTestFakes.cs`; do not declare another one. A test that must see
+  the *file* reads it through a fresh `new SettingsService(path).Current`:
+  `Current` is cached per instance.
 
 - **Main-window actions go through `IMainWindowShell`, never a nullable
   callback on the VM.** Quit, show, file picker, clipboard, Settings,
@@ -940,7 +972,13 @@ LViz-specific (extend this list as we hit more):
   controls.
 
 - **xUnit analyzer warnings break the 0-warning build**: `Assert.Equal(1,
-  x.Count)` must be `Assert.Single(x)` (xUnit2013).
+  x.Count)` must be `Assert.Single(x)` (xUnit2013), and a test never blocks on
+  a task (`Task.WaitAll`, `.Wait()`, xUnit1031): make it `async Task` and
+  `await Task.WhenAll(…)`.
+
+- **The build checks neither unused `using`s nor `<see cref>` targets** (no
+  IDE0005, no `GenerateDocumentationFile`). After deleting code, find a
+  namespace's last user by searching the file, and check a new cref by hand.
 
 - **Don't close an Avalonia flyout synchronously from a button inside it.**
   The button resolves and runs its `Command` *after* its `Click` handler; hiding

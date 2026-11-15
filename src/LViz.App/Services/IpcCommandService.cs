@@ -69,7 +69,7 @@ public sealed class IpcCommandService
         if (string.IsNullOrWhiteSpace(id))
             return "err event requires an id (e.g. 'event ci:ok')";
 
-        var s = _settings.Load();
+        var s = _settings.Current;
         var binding = s.EventBindings.FirstOrDefault(b =>
             string.Equals(b.EventId, id, StringComparison.Ordinal));
         if (binding is null)

@@ -36,9 +36,10 @@ public sealed partial class AboutSettingsViewModel : ObservableObject, IDisposab
         _updateService = updateService;
         _cliToolInstaller = cliToolInstaller;
 
-        // Seed the auto-check toggle from disk so the UI reflects the persisted
-        // value on each Settings open. Setter persists via _settingsService below.
-        var loaded = _settingsService.Load();
+        // Seed the auto-check toggle from the settings store so the UI reflects
+        // the persisted value on each Settings open. Setter persists via
+        // _settingsService below.
+        var loaded = _settingsService.Current;
         _autoCheckForUpdates = loaded.AutoCheckForUpdates;
         _lastUpdateCheckUtc = loaded.LastUpdateCheckUtc;
 

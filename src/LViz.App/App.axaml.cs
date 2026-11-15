@@ -43,7 +43,7 @@ public partial class App : Application
             desktop.Exit += (_, _) => services.Dispose();
 
             var settingsService = services.GetRequiredService<ISettingsService>();
-            var initialSettings = settingsService.Load();
+            var initialSettings = settingsService.Current;
             InitializeSettingsAndLogging(initialSettings);
             LoadUserLayouts();
 
@@ -51,7 +51,7 @@ public partial class App : Application
             var viewModel = services.GetRequiredService<MainWindowViewModel>();
             // The CLI pipe opens here, not in the stack's construction, so a
             // view-model built in a test never listens.
-            viewModel.Devices.StartIpc();
+            services.GetRequiredService<DeviceStack>().StartIpc();
             var mainWindow = new MainWindow { DataContext = viewModel };
             desktop.MainWindow = mainWindow;
 

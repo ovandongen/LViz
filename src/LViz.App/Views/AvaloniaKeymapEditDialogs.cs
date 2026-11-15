@@ -22,7 +22,7 @@ internal sealed class AvaloniaKeymapEditDialogs : IKeymapEditDialogs
 
     private static MainWindow Owner => MainWindowOwner.Current;
 
-    private bool UseRing => _settings.Load().RingKeyEditor;
+    private bool UseRing => _settings.Current.RingKeyEditor;
 
     /// <inheritdoc />
     public Task<ZmkKeyBinding?> EditKeyAsync(KeyDialogRequest request) =>

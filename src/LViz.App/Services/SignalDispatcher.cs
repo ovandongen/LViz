@@ -131,8 +131,9 @@ public sealed class SignalDispatcher : ISignalDispatcher
 
     private void DispatchSignal(byte id, string sourceKey)
     {
-        // Live-read so edits to bindings/pipelines apply without a restart.
-        var settings = _settings.Load();
+        // Reads the store's current value, so edits to bindings/pipelines
+        // apply without a restart.
+        var settings = _settings.Current;
         var binding = settings.SignalBindings.FirstOrDefault(b =>
             b.SignalId == id && string.Equals(b.SourceDeviceKey, sourceKey, StringComparison.Ordinal));
         if (binding is null)

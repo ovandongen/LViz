@@ -84,7 +84,7 @@ public sealed partial class LayerTabsViewModel : ObservableObject
         var km = edit?.Keymap ?? loaded;
         if (km is null) return;
         var layerCount = km.Layers.Count;
-        var hidden = edit is null ? _settings.Load().HiddenLayers : null;
+        var hidden = edit is null ? _settings.Current.HiddenLayers : null;
         foreach (var layer in km.Layers)
         {
             var tab = new LayerViewModel(

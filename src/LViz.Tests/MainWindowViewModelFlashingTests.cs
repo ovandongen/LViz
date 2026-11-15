@@ -36,14 +36,6 @@ public sealed class MainWindowViewModelFlashingTests : IDisposable
     private const string OtherSha = "bb11bb22bb33bb44bb55bb66bb77bb88bb99bb00";
     private const string RunUrl = $"https://github.com/{Owner}/{Repo}/actions/runs/101";
 
-    // Same in-memory settings fake as the live-features tests.
-    private sealed class InMemorySettingsService : ISettingsService
-    {
-        public UserSettings Current { get; set; } = new();
-        public UserSettings Load() => Current;
-        public void Save(UserSettings settings) => Current = settings;
-    }
-
     private sealed class RecordingHostExecutor : IHostActionExecutor
     {
         public List<string> Launches { get; } = [];

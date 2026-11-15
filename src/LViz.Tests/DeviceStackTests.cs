@@ -200,6 +200,20 @@ public class DeviceStackTests
     }
 
     [Fact]
+    public void Dispose_Twice_TearsDownOnce()
+    {
+        // From part 5 on both MainWindowViewModel.Shutdown() and the service
+        // container dispose the stack; the second call must be a no-op.
+        var (stack, log) = Build();
+        stack.Dispose();
+        stack.Dispose();
+        Assert.Equal(
+            ["ipc.dispose", "appLayer.dispose", "push.shutdown", "push.dispose",
+             "signals.dispose", "router.dispose", "hid.dispose"],
+            log.Entries);
+    }
+
+    [Fact]
     public void SwitchProfile_RescopesHidThenRescansRouter()
     {
         var (stack, log) = Build();

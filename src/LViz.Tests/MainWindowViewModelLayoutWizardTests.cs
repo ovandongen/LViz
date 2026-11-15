@@ -6,7 +6,6 @@ using LViz.Core.Keymap;
 using LViz.Core.Keymap.Parser;
 using LViz.Core.Layout;
 using LViz.Core.Models;
-using LViz.Core.Settings;
 using LViz.Tests.GitHub;
 using Xunit;
 
@@ -38,13 +37,6 @@ public sealed class MainWindowViewModelLayoutWizardTests : IDisposable
     {
         foreach (var path in _tempFiles)
             try { File.Delete(path); } catch (IOException) { /* best effort */ }
-    }
-
-    private sealed class InMemorySettingsService : ISettingsService
-    {
-        public UserSettings Current { get; set; } = new();
-        public UserSettings Load() => Current;
-        public void Save(UserSettings settings) => Current = settings;
     }
 
     // Canned load result, swappable between loads so one VM can load twice.

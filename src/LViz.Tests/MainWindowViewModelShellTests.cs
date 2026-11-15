@@ -1,7 +1,6 @@
 using CommunityToolkit.Mvvm.Input;
 using Xunit;
 using LViz.App.ViewModels;
-using LViz.Core.Settings;
 
 namespace LViz.Tests;
 
@@ -9,13 +8,6 @@ namespace LViz.Tests;
 /// the shell, and answers from it are applied by the view-model.</summary>
 public sealed class MainWindowViewModelShellTests
 {
-    private sealed class InMemorySettingsService : ISettingsService
-    {
-        public UserSettings Current { get; set; } = new();
-        public UserSettings Load() => Current;
-        public void Save(UserSettings settings) => Current = settings;
-    }
-
     private static (MainWindowViewModel Vm, FakeMainWindowShell Shell) Build()
     {
         var shell = new FakeMainWindowShell();
@@ -99,5 +91,17 @@ public sealed class MainWindowViewModelShellTests
         vm.Board.ComboLegend.RequestEdit("0,1");
 
         Assert.Empty(shell.ComboLabelRequests);
+    }
+
+    [Fact]
+    public void ActiveLayerIndex_IsMirroredToShownLayer()
+    {
+        // The device stack's push engines read ShownLayer from their own
+        // threads; the view-model keeps it in step with the shown layer.
+        var (vm, _) = Build();
+
+        vm.ActiveLayerIndex = 3;
+
+        Assert.Equal(3, vm.ShownLayer.Index);
     }
 }

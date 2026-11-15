@@ -115,6 +115,20 @@ public sealed class KeyboardProfileRegistryUserLayoutTests
     }
 
     [Fact]
+    public void ResolveOrDefault_KnownId_ReturnsThatProfile()
+    {
+        Assert.IsType<Go60Profile>(KeyboardProfileRegistry.ResolveOrDefault("GO60"));
+    }
+
+    [Fact]
+    public void ResolveOrDefault_UnknownNullOrEmpty_ReturnsCorne()
+    {
+        Assert.IsType<CorneProfile>(KeyboardProfileRegistry.ResolveOrDefault("nope"));
+        Assert.IsType<CorneProfile>(KeyboardProfileRegistry.ResolveOrDefault(null));
+        Assert.IsType<CorneProfile>(KeyboardProfileRegistry.ResolveOrDefault(""));
+    }
+
+    [Fact]
     public void SetUserProfiles_ReplacesInsteadOfAppending()
     {
         var first = new FakeKeyboardProfile("user:first");

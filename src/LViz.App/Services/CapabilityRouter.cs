@@ -160,7 +160,7 @@ public sealed class CapabilityRouter : ICapabilityRouter
 
     public void RefreshConfig()
     {
-        var s = _settings.Load();
+        var s = _settings.Current;
         _routingEnabled = s.DeviceRoutingEnabled;
         _rules = s.RoutingRules is { Count: > 0 } r ? r.ToArray() : Array.Empty<RoutingRule>();
     }

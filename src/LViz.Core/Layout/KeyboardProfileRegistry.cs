@@ -44,6 +44,11 @@ public static class KeyboardProfileRegistry
         return found is not null;
     }
 
+    /// <summary>The profile with this id, or the Corne when the id is unknown,
+    /// null or empty: the board the app starts on.</summary>
+    public static IKeyboardProfile ResolveOrDefault(string? id) =>
+        !string.IsNullOrEmpty(id) && TryResolve(id, out var profile) ? profile : new CorneProfile();
+
     /// <summary>
     /// The profile with exactly <paramref name="keyCount"/> keys, or null.
     /// Several boards can share a key count (Sofle and GO60 both have 60), so

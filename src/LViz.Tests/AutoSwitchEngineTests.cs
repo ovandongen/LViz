@@ -17,13 +17,6 @@ namespace LViz.Tests;
 /// </summary>
 public class AutoSwitchEngineTests
 {
-    private sealed class InMemorySettingsService : ISettingsService
-    {
-        public UserSettings Current { get; set; } = new();
-        public UserSettings Load() => Current;
-        public void Save(UserSettings settings) => Current = settings;
-    }
-
     private static AppLayerRule Rule(string match, int layer) => new(match, layer);
     private static ActiveWindowInfo Window(string process) => new(process, null, null);
 

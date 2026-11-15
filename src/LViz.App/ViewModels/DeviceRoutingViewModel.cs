@@ -44,7 +44,7 @@ public sealed partial class DeviceRoutingViewModel : ObservableObject, IDisposab
 
         // Seed the toggle straight onto the field so construction doesn't
         // round-trip through OnRoutingEnabledChanged (which would persist).
-        _routingEnabled = _settings.Load().DeviceRoutingEnabled;
+        _routingEnabled = _settings.Current.DeviceRoutingEnabled;
 
         _router.RoutesChanged += OnRoutesChanged;
         Rebuild();
@@ -293,7 +293,7 @@ public sealed partial class DeviceRoutingViewModel : ObservableObject, IDisposab
         try
         {
             var inventory = _router.Devices;
-            var rules = _settings.Load().RoutingRules ?? new List<RoutingRule>();
+            var rules = _settings.Current.RoutingRules ?? new List<RoutingRule>();
 
             var previousTargetKey = ControlTarget?.StableKey;
 
@@ -403,7 +403,7 @@ public sealed partial class DeviceRoutingViewModel : ObservableObject, IDisposab
         var displayedKeys = new HashSet<(string, string)>(
             Routes.Select(r => (r.CapabilityId, r.SourceKey)));
 
-        var existing = _settings.Load().RoutingRules ?? new List<RoutingRule>();
+        var existing = _settings.Current.RoutingRules ?? new List<RoutingRule>();
         var newRules = existing
             .Where(r => !displayedKeys.Contains((r.CapabilityId, r.SourceDeviceKey)))
             .ToList();

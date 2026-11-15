@@ -1,13 +1,26 @@
 namespace LViz.Core.Settings;
 
 /// <summary>
-/// Loads and saves user settings.
+/// Owns the user settings: the value in memory and the file behind it.
 /// </summary>
 public interface ISettingsService
 {
-    /// <summary>Loads settings from disk. Returns defaults if file is missing or corrupt.</summary>
-    UserSettings Load();
+    /// <summary>
+    /// The current settings. No disk access after the first read. Treat as
+    /// immutable: change settings only through <see cref="Update"/>.
+    /// </summary>
+    UserSettings Current { get; }
 
-    /// <summary>Saves settings to disk.</summary>
-    void Save(UserSettings settings);
+    /// <summary>
+    /// Applies <paramref name="mutate"/> to <see cref="Current"/> under a lock,
+    /// stores and writes the result, then raises <see cref="Changed"/>.
+    /// Never throws.
+    /// </summary>
+    void Update(Func<UserSettings, UserSettings> mutate, string subsystem);
+
+    /// <summary>
+    /// Raised after a change, with (old, new), on the thread that called
+    /// <see cref="Update"/>.
+    /// </summary>
+    event Action<UserSettings, UserSettings>? Changed;
 }

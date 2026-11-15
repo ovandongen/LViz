@@ -300,7 +300,7 @@ public partial class MainWindowViewModel
         sb.AppendLine("--- Active Settings ---");
         try
         {
-            var settings = _settingsService.Load();
+            var settings = _settingsService.Current;
             var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
             sb.AppendLine(json);
         }

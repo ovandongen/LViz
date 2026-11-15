@@ -21,6 +21,7 @@ namespace LViz.App.ViewModels;
 public partial class SettingsViewModel : ObservableObject, IDisposable
 {
     private readonly MainWindowViewModel _mainViewModel;
+    private readonly DeviceStack _devices;
     private bool _disposed;
 
     /// <summary>
@@ -43,7 +44,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Device Routing tab VM: observes the long-lived
-    /// <see cref="MainWindowViewModel.CapabilityRouter"/> while Settings is open
+    /// <see cref="DeviceStack.Router"/> while Settings is open
     /// (inventory + routing table) and drives app-originated control. Disposed
     /// with this VM so the router doesn't retain a closed window's observer.
     /// </summary>
@@ -51,7 +52,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Action Pipelines tab VM: edits the named pipeline library + signal
-    /// bindings, observing the same <see cref="MainWindowViewModel.CapabilityRouter"/>
+    /// bindings, observing the same <see cref="DeviceStack.Router"/>
     /// for device-step targets. Committed by <see cref="Views.SettingsWindow"/> on close;
     /// disposed with this VM.
     /// </summary>
@@ -60,23 +61,23 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     public SettingsViewModel(
         ISettingsService settingsService,
         MainWindowViewModel mainViewModel,
+        DeviceStack devices,
         UpdateService updateService,
-        ICapabilityControl? capabilityControl = null,
-        ICliToolInstaller? cliToolInstaller = null)
+        ICapabilityControl capabilityControl,
+        ICliToolInstaller cliToolInstaller)
     {
         _mainViewModel = mainViewModel;
+        _devices = devices;
         DeviceRouting = new DeviceRoutingViewModel(
-            mainViewModel.CapabilityRouter,
-            capabilityControl ?? new CapabilityControl(),
-            settingsService);
+            devices.Router, capabilityControl, settingsService);
         ActionPipelines = new ActionPipelinesViewModel(
-            mainViewModel.CapabilityRouter,
-            settingsService,
-            mainViewModel);
-        AutoSwitch = new AutoSwitchSettingsViewModel(mainViewModel);
-        MouseLayer = new MouseLayerSettingsViewModel(settingsService, mainViewModel);
+            devices.Router, settingsService, devices.Pipelines, devices.Push.AutoSwitch);
+        AutoSwitch = new AutoSwitchSettingsViewModel(
+            devices.Push.AutoSwitch, mainViewModel.LayerTabs, () => mainViewModel.SelectedKeyboard);
+        MouseLayer = new MouseLayerSettingsViewModel(
+            settingsService, devices.Push.MouseLayer, mainViewModel.LayerTabs, () => mainViewModel.SelectedKeyboard);
         About = new AboutSettingsViewModel(
-            settingsService, updateService, cliToolInstaller ?? new CliToolInstaller());
+            settingsService, updateService, cliToolInstaller);
         HotkeyKeyChoices = PlatformCapabilities.GetAvailableFKeys(mainViewModel.Preferences.HotkeyKey);
         _mainViewModel.PropertyChanged += OnMainPropertyChanged;
         _mainViewModel.Board.BoardStyle.PropertyChanged += OnBoardStylePropertyChanged;
@@ -96,7 +97,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         set
         {
             if (SetProperty(ref _selectedTestLayer, value) && value is not null)
-                _mainViewModel.PushLayerToKeyboard(value.Index);
+                _devices.Hid.PushLayer(value.Index);
         }
     }
 
@@ -104,7 +105,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     // Result strings show "(not run)" until the user clicks the button,
     // then either the parsed value or a "(no reply)" / "(no device)" hint.
     // 1s timeout matches the firmware's typical reply latency; failure is
-    // logged through DiagnosticLog inside MainWindowViewModel.
+    // logged through DiagnosticLog inside the HID pipeline.
 
     [ObservableProperty] private string _deviceInfoResult = "(not run)";
     [ObservableProperty] private string _configIdResult = "(not run)";
@@ -113,7 +114,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     private async Task QueryDeviceInfoAsync()
     {
         DeviceInfoResult = "(querying…)";
-        var info = await _mainViewModel.QueryDeviceInfoAsync(TimeSpan.FromSeconds(1), CancellationToken.None);
+        var info = await _devices.Hid.QueryDeviceInfoAsync(TimeSpan.FromSeconds(1), CancellationToken.None);
         DeviceInfoResult = info is null
             ? "(no reply)"
             : $"protocol v{info.ProtocolVersion}, name=\"{info.Name}\"";
@@ -123,7 +124,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     private async Task QueryConfigIdAsync()
     {
         ConfigIdResult = "(querying…)";
-        var id = await _mainViewModel.QueryConfigIdAsync(TimeSpan.FromSeconds(1), CancellationToken.None);
+        var id = await _devices.Hid.QueryConfigIdAsync(TimeSpan.FromSeconds(1), CancellationToken.None);
         ConfigIdResult = id is null
             ? "(no reply)"
             : id.Length == 0 ? "(empty)" : id;

@@ -30,6 +30,9 @@ public sealed class DeviceStack : IDisposable
     private readonly ISignalDispatcher _signals;
     private readonly IIpcHost _ipcServer;
     private readonly IDisposable _appLayerDispatcher;
+    // Both the view-model's Shutdown and the service container dispose the
+    // stack from part 5 on, so a second call must be a no-op.
+    private bool _disposed;
 
     public IHidPipeline Hid { get; }
     public ILayerPushCoordinator Push { get; }
@@ -96,11 +99,11 @@ public sealed class DeviceStack : IDisposable
         }
     }
 
-    /// <param name="getRenderedLayer">The layer the view is showing; both push engines read it lazily.</param>
+    /// <param name="shownLayer">The layer the view is showing; both push engines read it lazily.</param>
     public static DeviceStack Create(
         IKeyboardProfile profile,
         ISettingsService settings,
-        Func<int> getRenderedLayer,
+        ShownLayer shownLayer,
         IActiveWindowMonitor? activeWindowMonitor,
         IMouseIdleMonitor? mouseIdleMonitor,
         ICapabilityControl capabilityControl,
@@ -123,7 +126,7 @@ public sealed class DeviceStack : IDisposable
             capabilityControl,
             hostActionExecutor,
             hid.PushLayer,
-            () => settings.Load().ActionPipelines);
+            () => settings.Current.ActionPipelines);
         var signals = new SignalDispatcher(router, settings, runner);
 
         // Host IPC: the CLI ('lviz event …', 'status', 'devices') forwards a line
@@ -135,7 +138,7 @@ public sealed class DeviceStack : IDisposable
         // The coordinator owns AutoSwitch + MouseLayer and the handoff between
         // them; both route their pushes through the HID pipeline.
         var push = new LayerPushCoordinator(
-            hid, getRenderedLayer, profile, settings, activeWindowMonitor, mouseIdleMonitor);
+            hid, shownLayer, profile, settings, activeWindowMonitor, mouseIdleMonitor);
         // App-focus auto-switch lifecycle → action-pipeline. No Start/Stop: the
         // engine only raises while auto-switch is enabled.
         var appLayer = new AppLayerPipelineDispatcher(push.AutoSwitch, settings, runner);
@@ -199,6 +202,8 @@ public sealed class DeviceStack : IDisposable
 
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
         // Stop accepting CLI connections before tearing down the router it queries.
         _ipcServer.Dispose();
         // App-layer dispatcher before the push coordinator: it subscribes to the

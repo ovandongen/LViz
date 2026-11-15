@@ -17,18 +17,6 @@ namespace LViz.Tests;
 /// </summary>
 public class MainWindowViewModelLoadTests
 {
-    private sealed class InMemorySettingsService : ISettingsService
-    {
-        public UserSettings Current { get; set; } = new();
-        public int SaveCount { get; private set; }
-        public UserSettings Load() => Current;
-        public void Save(UserSettings settings)
-        {
-            Current = settings;
-            SaveCount++;
-        }
-    }
-
     // Returns a canned result and records state the way the real service does.
     private sealed class FakeKeymapStateService : IKeymapStateService
     {
@@ -858,7 +846,7 @@ public class MainWindowViewModelLoadTests
             new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
         var vm = TestMainVm.Create(settings, keymapState: ok);
         vm.LoadLayoutFromPath("ok.keymap");
-        var settingsVm = new SettingsViewModel(settings, vm, new UpdateService(settings));
+        var settingsVm = TestMainVm.CreateSettings(settings, vm);
 
         Assert.False(settingsVm.LayerEntries[0].CanHide);
         Assert.True(settingsVm.LayerEntries[1].CanHide);

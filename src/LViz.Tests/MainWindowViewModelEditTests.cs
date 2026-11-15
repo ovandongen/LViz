@@ -26,13 +26,6 @@ namespace LViz.Tests;
 /// </summary>
 public class MainWindowViewModelEditTests : IDisposable
 {
-    private sealed class InMemorySettingsService : ISettingsService
-    {
-        public UserSettings Current { get; set; } = new();
-        public UserSettings Load() => Current;
-        public void Save(UserSettings settings) => Current = settings;
-    }
-
     // Returns a canned result and records state the way the real service does
     // (same shape as MainWindowViewModelLoadTests'); the .json case needs it
     // because a real load of a fake path can only fail.
@@ -881,7 +874,7 @@ public class MainWindowViewModelEditTests : IDisposable
         var vm = NewVm(settings);
         vm.LoadLayoutFromPath(WriteTempKeymap());
         vm.StartEditCommand.Execute(null);
-        var settingsVm = new SettingsViewModel(settings, vm, new UpdateService(settings));
+        var settingsVm = TestMainVm.CreateSettings(settings, vm);
 
         Assert.False(settingsVm.CanPickKeyboard);
         var raised = new List<string?>();
@@ -901,7 +894,7 @@ public class MainWindowViewModelEditTests : IDisposable
         var vm = NewVm(settings);
         vm.LoadLayoutFromPath(WriteTempKeymap());
         vm.StartEditCommand.Execute(null);
-        var settingsVm = new SettingsViewModel(settings, vm, new UpdateService(settings));
+        var settingsVm = TestMainVm.CreateSettings(settings, vm);
 
         var active = vm.SelectedKeyboard!;
         var other = KeyboardProfileRegistry.All.First(p => p.Id != active.Id);

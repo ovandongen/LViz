@@ -30,8 +30,9 @@ public sealed class AppLayerPipelineDispatcher : IDisposable
 
     private void OnTransition(AppLayerMoment moment, AppLayerRule rule)
     {
-        // Live-read so binding/pipeline edits apply without a restart.
-        var settings = _settings.Load();
+        // Reads the store's current value, so binding/pipeline edits apply
+        // without a restart.
+        var settings = _settings.Current;
         var matches = settings.AppLayerBindings.Where(b =>
             b.Moment == moment &&
             (string.IsNullOrEmpty(b.ProcessMatch) ||

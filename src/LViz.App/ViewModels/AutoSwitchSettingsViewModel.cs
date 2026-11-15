@@ -5,31 +5,37 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LViz.App.Localization;
 using LViz.App.Services;
+using LViz.Core.Layout;
 using LViz.Core.Settings;
 
 namespace LViz.App.ViewModels;
 
 /// <summary>
 /// Auto-switch tab of the Settings window: the engine's fallback / exit-key
-/// options (read and written on <see cref="MainWindowViewModel.AutoSwitch"/>
+/// options (read and written on the injected <see cref="AutoSwitchEngine"/>
 /// directly), the app-to-layer rules edit buffer with its live "would fire"
 /// preview, and the running-process picker that feeds the new-rule field.
 /// Rule edits are committed to the engine only by <see cref="CommitAppLayerRules"/>.
 /// </summary>
 public sealed partial class AutoSwitchSettingsViewModel : ObservableObject, IDisposable
 {
-    private readonly MainWindowViewModel _main;
+    private readonly AutoSwitchEngine _engine;
+    private readonly LayerTabsViewModel _layerTabs;
+    private readonly Func<IKeyboardProfile> _keyboard;
     private bool _disposed;
 
-    public AutoSwitchSettingsViewModel(MainWindowViewModel main)
+    public AutoSwitchSettingsViewModel(
+        AutoSwitchEngine engine, LayerTabsViewModel layerTabs, Func<IKeyboardProfile> keyboard)
     {
-        _main = main;
-        _main.AutoSwitch.PropertyChanged += OnEnginePropertyChanged;
+        _engine = engine;
+        _layerTabs = layerTabs;
+        _keyboard = keyboard;
+        _engine.PropertyChanged += OnEnginePropertyChanged;
 
         // Seed the edit buffer from the committed list. The engine owns
         // AutoSwitch.AppLayerRules; this VM reads/writes EditingRules.
         // CommitAppLayerRules() pushes the buffer back on window close.
-        foreach (var r in _main.AutoSwitch.AppLayerRules)
+        foreach (var r in _engine.AppLayerRules)
             EditingRules.Add(r);
         EditingRules.CollectionChanged += OnEditingRulesChanged;
 
@@ -39,15 +45,15 @@ public sealed partial class AutoSwitchSettingsViewModel : ObservableObject, IDis
     // Fallback mode — bound to two radio buttons. Avalonia ToggleButton's
     // IsChecked binds bidirectionally to a bool per radio; both radios share
     // the GroupName so only one is ever true. Each property routes
-    // through MainWindowViewModel.AutoSwitchFallbackMode (persisted per-keyboard).
+    // through the engine's FallbackMode (persisted per-keyboard).
 
     public bool IsFallbackPrevious
     {
-        get => _main.AutoSwitch.FallbackMode == AutoSwitchFallbackMode.Previous;
+        get => _engine.FallbackMode == AutoSwitchFallbackMode.Previous;
         set
         {
             if (!value || IsFallbackPrevious) return;
-            _main.AutoSwitch.FallbackMode = AutoSwitchFallbackMode.Previous;
+            _engine.FallbackMode = AutoSwitchFallbackMode.Previous;
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsFallbackBase));
         }
@@ -55,11 +61,11 @@ public sealed partial class AutoSwitchSettingsViewModel : ObservableObject, IDis
 
     public bool IsFallbackBase
     {
-        get => _main.AutoSwitch.FallbackMode == AutoSwitchFallbackMode.Base;
+        get => _engine.FallbackMode == AutoSwitchFallbackMode.Base;
         set
         {
             if (!value || IsFallbackBase) return;
-            _main.AutoSwitch.FallbackMode = AutoSwitchFallbackMode.Base;
+            _engine.FallbackMode = AutoSwitchFallbackMode.Base;
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsFallbackPrevious));
         }
@@ -73,11 +79,11 @@ public sealed partial class AutoSwitchSettingsViewModel : ObservableObject, IDis
     /// </summary>
     public bool IsExitOnTransparentKey
     {
-        get => _main.AutoSwitch.ExitOnTransparentKey;
+        get => _engine.ExitOnTransparentKey;
         set
         {
-            if (_main.AutoSwitch.ExitOnTransparentKey == value) return;
-            _main.AutoSwitch.ExitOnTransparentKey = value;
+            if (_engine.ExitOnTransparentKey == value) return;
+            _engine.ExitOnTransparentKey = value;
             OnPropertyChanged();
         }
     }
@@ -89,11 +95,11 @@ public sealed partial class AutoSwitchSettingsViewModel : ObservableObject, IDis
     /// </summary>
     public bool IsExitOnEmptyKey
     {
-        get => _main.AutoSwitch.ExitOnEmptyKey;
+        get => _engine.ExitOnEmptyKey;
         set
         {
-            if (_main.AutoSwitch.ExitOnEmptyKey == value) return;
-            _main.AutoSwitch.ExitOnEmptyKey = value;
+            if (_engine.ExitOnEmptyKey == value) return;
+            _engine.ExitOnEmptyKey = value;
             OnPropertyChanged();
         }
     }
@@ -105,7 +111,7 @@ public sealed partial class AutoSwitchSettingsViewModel : ObservableObject, IDis
     {
         get
         {
-            var key = _main.AutoSwitch.ExitTapKey;
+            var key = _engine.ExitTapKey;
             if (key is null) return Loc.Instance["Settings_AutoSwitch_ExitKeysNone"];
             return $"#{key.Value}";
         }
@@ -113,27 +119,27 @@ public sealed partial class AutoSwitchSettingsViewModel : ObservableObject, IDis
 
     /// <summary>True when an exit-tap key is configured for the active
     /// keyboard. Drives the IsEnabled state of the Clear button.</summary>
-    public bool HasExitTap => _main.AutoSwitch.ExitTapKey is not null;
+    public bool HasExitTap => _engine.ExitTapKey is not null;
 
     /// <summary>Snapshot of the currently-configured exit-tap key, used by
     /// the SettingsWindow code-behind to seed the picker dialog.</summary>
-    public int? ExitTapKey => _main.AutoSwitch.ExitTapKey;
+    public int? ExitTapKey => _engine.ExitTapKey;
 
     /// <summary>Applies a freshly-picked exit-tap key. Called by the
     /// SettingsWindow code-behind after the picker dialog closes with an
     /// OK result.</summary>
     public void ApplyExitTapKey(int? index)
     {
-        _main.AutoSwitch.SetExitTapKey(index);
+        _engine.SetExitTapKey(index);
     }
 
     [RelayCommand]
-    private void ClearExitTap() => _main.AutoSwitch.SetExitTapKey(null);
+    private void ClearExitTap() => _engine.SetExitTapKey(null);
 
     /// <summary>Active keyboard profile. The SettingsWindow code-behind reads
     /// this when building an <see cref="ExitKeyPickerViewModel"/> so the
     /// picker renders the keyboard the user is configuring.</summary>
-    public Core.Layout.IKeyboardProfile ActiveKeyboardProfile => _main.SelectedKeyboard;
+    public Core.Layout.IKeyboardProfile ActiveKeyboardProfile => _keyboard();
 
     /// <summary>
     /// In-progress edit buffer for app→layer rules. All add/remove/move
@@ -153,14 +159,14 @@ public sealed partial class AutoSwitchSettingsViewModel : ObservableObject, IDis
     }
 
     /// <summary>
-    /// Pushes the edit buffer back to <see cref="MainWindowViewModel"/> so the
-    /// engine sees the new ruleset and the change is persisted. Called by
+    /// Pushes the edit buffer back to the <see cref="AutoSwitchEngine"/> so
+    /// the new ruleset takes effect and the change is persisted. Called by
     /// <see cref="Views.SettingsWindow"/> on close; same auto-commit UX as the
     /// pre-refactor live writes, just batched.
     /// </summary>
     public void CommitAppLayerRules()
     {
-        _main.AutoSwitch.ApplyAppLayerRules(EditingRules);
+        _engine.ApplyAppLayerRules(EditingRules);
     }
 
     /// <summary>Text typed into the "new rule" process-name field. Capped at
@@ -234,7 +240,7 @@ public sealed partial class AutoSwitchSettingsViewModel : ObservableObject, IDis
     {
         get
         {
-            var match = AppLayerRuleMatcher.Match(_main.AutoSwitch.ActiveWindow, EditingRules);
+            var match = AppLayerRuleMatcher.Match(_engine.ActiveWindow, EditingRules);
             if (match is null) return Loc.Instance["Settings_AutoSwitch_WouldFireNone"];
             return Loc.Instance.Format("Settings_AutoSwitch_WouldFireFormat", FormatLayerLabel(match.LayerIndex));
         }
@@ -245,7 +251,7 @@ public sealed partial class AutoSwitchSettingsViewModel : ObservableObject, IDis
     /// by the rules-list rows and the WouldFire readout.</summary>
     private string FormatLayerLabel(int layerIndex)
     {
-        var layer = _main.LayerTabs.Layers.FirstOrDefault(l => l.Index == layerIndex);
+        var layer = _layerTabs.Layers.FirstOrDefault(l => l.Index == layerIndex);
         if (layer is null) return Loc.Instance["Settings_AutoSwitch_LayerInvalid"];
         return Loc.Instance.Format("Settings_AutoSwitch_LayerFormat", layer.DisplayName, layer.Index);
     }
@@ -382,7 +388,7 @@ public sealed partial class AutoSwitchSettingsViewModel : ObservableObject, IDis
     {
         if (_disposed) return;
         _disposed = true;
-        _main.AutoSwitch.PropertyChanged -= OnEnginePropertyChanged;
+        _engine.PropertyChanged -= OnEnginePropertyChanged;
         EditingRules.CollectionChanged -= OnEditingRulesChanged;
     }
 }

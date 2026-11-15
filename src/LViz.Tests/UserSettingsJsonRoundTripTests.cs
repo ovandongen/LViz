@@ -271,13 +271,13 @@ public class UserSettingsJsonRoundTripTests
                 """);
             var svc = new SettingsService(path);
 
-            var loaded = svc.Load();
+            var loaded = svc.Current;
 
             Assert.Equal(UserSettings.CurrentSchemaVersion, loaded.SchemaVersion);
             Assert.Equal(new[] { "/keymaps/corne.keymap" }, loaded.RecentKeymapPaths["Corne"]);
             Assert.Equal(new[] { "/keymaps/go60.keymap" }, loaded.RecentKeymapPaths["GO60"]);
             // Migration persists, so the upgraded shape survives a reload.
-            var reloaded = svc.Load();
+            var reloaded = new SettingsService(path).Current;
             Assert.Equal(loaded.RecentKeymapPaths["Corne"], reloaded.RecentKeymapPaths["Corne"]);
         }
         finally
@@ -467,7 +467,7 @@ public class UserSettingsJsonRoundTripTests
         try
         {
             var svc = new SettingsService(path);
-            var loaded = svc.Load();
+            var loaded = svc.Current;
 
             Assert.NotNull(loaded);
             Assert.Equal(UserSettings.CurrentSchemaVersion, loaded.SchemaVersion);
@@ -490,7 +490,7 @@ public class UserSettingsJsonRoundTripTests
             File.WriteAllText(path,
                 """{"SchemaVersion": 999, "Keyboard": "Glove80"}""");
             var svc = new SettingsService(path);
-            var loaded = svc.Load();
+            var loaded = svc.Current;
 
             Assert.Equal("Corne", loaded.Keyboard);  // default, not "Glove80"
             Assert.True(File.Exists(backup), "future-versioned settings file must be backed up");
@@ -510,7 +510,7 @@ public class UserSettingsJsonRoundTripTests
         {
             File.WriteAllText(path, "{ this is not valid json");
             var svc = new SettingsService(path);
-            var loaded = svc.Load();
+            var loaded = svc.Current;
 
             Assert.Equal("Corne", loaded.Keyboard);
             Assert.Empty(loaded.MouseLayer);
@@ -538,8 +538,8 @@ public class UserSettingsJsonRoundTripTests
                     ["Glove80"] = new(Enabled: true, MouseLayerIndex: 5, IdleTimeoutMs: 800),
                 },
             };
-            svc.Save(saved);
-            var loaded = svc.Load();
+            svc.Update(_ => saved, "Test");
+            var loaded = new SettingsService(path).Current;
 
             Assert.Equal(saved.Keyboard, loaded.Keyboard);
             Assert.Equal(saved.HotkeyKey, loaded.HotkeyKey);

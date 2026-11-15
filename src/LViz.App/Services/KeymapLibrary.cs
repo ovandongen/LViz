@@ -44,15 +44,15 @@ internal sealed class KeymapLibrary
     /// </summary>
     public Func<string, bool> FileExists { get; set; } = File.Exists;
 
-    /// <summary>Recent entries for a profile, most-recent-first. A snapshot: settings are re-read.</summary>
+    /// <summary>Recent entries for a profile, most-recent-first. A snapshot of the current settings.</summary>
     public IReadOnlyList<string> RecentsFor(string profileId) =>
-        _settings.Load().RecentKeymapPaths.TryGetValue(profileId, out var paths)
+        _settings.Current.RecentKeymapPaths.TryGetValue(profileId, out var paths)
             ? paths
             : Array.Empty<string>();
 
     /// <summary>The entry booked as the profile's last-used keymap, if any.</summary>
     public string? BookedEntry(string profileId) =>
-        _settings.Load().LayoutJsonPaths.TryGetValue(profileId, out var entry) && !string.IsNullOrEmpty(entry)
+        _settings.Current.LayoutJsonPaths.TryGetValue(profileId, out var entry) && !string.IsNullOrEmpty(entry)
             ? entry
             : null;
 
@@ -163,7 +163,7 @@ internal sealed class KeymapLibrary
     {
         path = "";
         entry = "";
-        var s = _settings.Load();
+        var s = _settings.Current;
         if (!s.LayoutJsonPaths.TryGetValue(profileId, out var stored) || string.IsNullOrWhiteSpace(stored))
             return false;
         entry = stored;
