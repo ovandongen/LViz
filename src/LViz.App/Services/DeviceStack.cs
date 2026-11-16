@@ -80,10 +80,12 @@ public sealed class DeviceStack : IDisposable
     private void OnKeyboardConnectionChanged()
     {
         if (Hid.IsConnected)
-            _ = RescanAfterKeyboardConnectAsync();
+            _ = RescanQuietlyAsync("the keyboard connected");
     }
 
-    private async Task RescanAfterKeyboardConnectAsync()
+    /// <summary>A fire-and-forget router rescan: logs a failure instead of
+    /// leaving it to an unobserved task.</summary>
+    private async Task RescanQuietlyAsync(string after)
     {
         try
         {
@@ -95,7 +97,7 @@ public sealed class DeviceStack : IDisposable
         }
         catch (Exception ex)
         {
-            DiagnosticLog.Warn("CapRoute", $"rescan after the keyboard connected failed: {ex.Message}");
+            DiagnosticLog.Warn("CapRoute", $"rescan after {after} failed: {ex.Message}");
         }
     }
 
@@ -200,7 +202,7 @@ public sealed class DeviceStack : IDisposable
     {
         Hid.SetActiveProfile(profile);
         _bus.SetKeyboardMatcher(Hid.KeyboardMatcher);
-        _ = Router.RescanAsync();
+        _ = RescanQuietlyAsync("a board switch");
     }
 
     /// <summary>Names of the devices on the bus, for the Settings routing tab.</summary>

@@ -255,6 +255,20 @@ public sealed class FlashViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Start_FindThrowsOtherError_ShowsItInsteadOfAnEmptyStep()
+    {
+        // StartAsync runs fire-and-forget from the shell: an escape would be lost.
+        _builds.FindError = new InvalidOperationException("reply did not parse");
+        var vm = GitHubVm();
+
+        await vm.StartAsync();
+
+        Assert.Equal(T("GitHub_ErrorUnexpectedFormat").Replace("{0}", "reply did not parse"), vm.ErrorMessage);
+        Assert.False(vm.IsBusy);
+        Assert.Null(vm.BuildText);
+    }
+
+    [Fact]
     public async Task Start_TokenRejected_GoesToTheSignInPanel()
     {
         // The builds token was valid when restored but GitHub refuses it now
@@ -578,7 +592,7 @@ public sealed class FlashViewModelTests : IDisposable
 
         public FirmwareBuild Build = new(FirmwareBuildState.NoRun, null, null, false);
 
-        public GitHubApiException? FindError;
+        public Exception? FindError;
 
         public FirmwareDownloadResult Download = new FirmwareDownloadResult.Done([]);
 

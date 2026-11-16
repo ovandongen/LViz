@@ -387,6 +387,7 @@ public static class ZmkConfigScanner
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
+            // Only a name prefill: an unreadable shields folder means "no name".
             return null;
         }
     }

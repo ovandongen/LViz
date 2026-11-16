@@ -649,6 +649,13 @@ After creating or editing a view, rebuild the App project before trusting a
 - **View-models reach the desktop through `IDesktopInteraction`**
   (`OpenUrl`, `CopyTextAsync`, `PickUf2FileAsync`), passed in their
   constructor; never a settable `Action`/`Func` property.
+- **A fire-and-forget call (`_ = XAsync()`, `_ = Task.Run(…)`) catches its
+  own failures.** Its target logs (`DiagnosticLog`) or shows the failure,
+  since `App`'s `UnobservedTaskException` handler only runs when the GC
+  finalizes the task, if ever. An `async void` UI handler needs no catch:
+  the dispatcher handler in `App.LogUnhandledExceptions` logs it. A
+  `catch (Exception)` either logs, hands the failure back as a result or
+  message, rethrows, or says in a comment why it swallows.
 - **Settings collections are never changed in place.** Readers take
   `ISettingsService.Current`; writers build a new collection inside
   `Update` — the label/colour `With` helpers show the pattern.

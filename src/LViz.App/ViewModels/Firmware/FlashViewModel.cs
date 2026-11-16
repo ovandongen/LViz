@@ -6,6 +6,7 @@ using LViz.App.Localization;
 using LViz.App.Services;
 using LViz.App.Services.Flashing;
 using LViz.App.Services.GitHub;
+using LViz.Core.Diagnostics;
 using LViz.Core.Firmware;
 using LViz.Core.GitHub;
 using LViz.Core.ZmkConfig;
@@ -353,6 +354,14 @@ public sealed partial class FlashViewModel : ObservableObject
         catch (GitHubApiException e)
         {
             ErrorMessage = GitHubErrorText.For(e);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            // Not an API failure (a reply that doesn't parse, a disk error).
+            // StartAsync runs fire-and-forget, so an escape would leave the
+            // source step empty with no line saying why.
+            DiagnosticLog.Warn("Flash", $"Looking up the build failed: {e.Message}");
+            ErrorMessage = Loc.Instance.Format("GitHub_ErrorUnexpectedFormat", e.Message);
         }
         finally
         {

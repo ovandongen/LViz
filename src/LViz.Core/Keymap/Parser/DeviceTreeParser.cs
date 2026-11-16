@@ -215,7 +215,10 @@ public static class DeviceTreeParser
             {
                 if (tokens[pos].Kind == DtTokenKind.Number || tokens[pos].Kind == DtTokenKind.Ident)
                 {
-                    try { bytes.Add(Convert.ToByte(tokens[pos].Text, 16)); } catch { }
+                    // Byte arrays carry nothing the keymap reads: a token that
+                    // isn't a hex byte is skipped rather than failing the file.
+                    try { bytes.Add(Convert.ToByte(tokens[pos].Text, 16)); }
+                    catch (Exception e) when (e is FormatException or OverflowException) { }
                 }
                 pos++;
             }
@@ -263,7 +266,9 @@ public static class DeviceTreeParser
             if (tok.Kind == DtTokenKind.Number)
             {
                 try { cells.Add(new DtCellNumber(DeviceTreeLexer.ParseNumberLiteral(tok.Text), tok.Text)); }
-                catch { cells.Add(new DtCellIdent(tok.Text)); }
+                // Out of int range or not a number after all: keep the text as
+                // an identifier, which the interpreter treats like any symbol.
+                catch (Exception e) when (e is FormatException or OverflowException) { cells.Add(new DtCellIdent(tok.Text)); }
                 pos++;
                 continue;
             }
