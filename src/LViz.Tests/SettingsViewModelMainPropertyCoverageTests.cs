@@ -1,6 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Windows.Input;
 using LViz.App.ViewModels;
@@ -81,17 +79,10 @@ public class SettingsViewModelMainPropertyCoverageTests
         // Picker item visibility, main window only ("Edit layout…" flyout item).
         "CanEditLayout",
 
-        // Live-features (module setup) affordances, main-window-only state:
-        // the flyout item and the status-bar hint.
-        "CanSetUpLiveFeatures",
-        "ShowLiveFeaturesHint",
-
-        // Main-window flashing affordance: the flyout item and the firmware
-        // build status line.
-        "CanFlashKeyboard",
-        "FirmwareStatusText",
-        "ShowFirmwareStatus",
-        "IsFirmwareStatusLink",
+        // The live-features + flashing child VM (flyout items, status-bar
+        // hint, firmware build status line), bound directly as Firmware.X in
+        // the main window; settings never renders it.
+        "Firmware",
 
         // Recents flyout child view-model, bound directly in the main window's
         // load menu; settings never renders recents.

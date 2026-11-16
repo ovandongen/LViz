@@ -58,8 +58,9 @@ public partial class MainWindowViewModel
         LayerTabs.SetEditing(value);
         StartEditCommand.NotifyCanExecuteChanged();
         DiscardEditCommand.NotifyCanExecuteChanged();
-        // Both live-features affordances step aside while editing.
-        RefreshLiveFeatures();
+        // Both live-features affordances and the firmware line step aside
+        // while editing.
+        Firmware.SetEditing(value is not null);
     }
 
     /// <summary>
@@ -201,15 +202,12 @@ public partial class MainWindowViewModel
 
                 // A save to GitHub just pushed a commit; follow its firmware
                 // build so the status bar can offer it once the Actions run
-                // is green. (The reload already re-ran RefreshLiveFeatures, so
+                // is green. (The reload already re-ran the config lookup, so
                 // the watch survives only if it belongs to the loaded config.)
                 if (saved.CommitSha is { } sha
                     && GitHubKeymapRef.TryParse(_loadedEntry, out var commitRef))
                 {
-                    _firmwareWatcher?.Watch(
-                        $"github:{commitRef.Owner}/{commitRef.Repo}:{commitRef.Branch}",
-                        commitRef.Owner, commitRef.Repo, commitRef.Branch, sha);
-                    RefreshFirmwareStatus();
+                    Firmware.WatchSavedCommit(commitRef, sha);
                 }
 
                 if (notices.Count > 0)
@@ -285,10 +283,11 @@ public partial class MainWindowViewModel
     /// Carries this keyboard's persisted per-layer settings across a save that
     /// added, deleted or moved layers: <paramref name="map"/> is the just-closed
     /// edit's <see cref="KeymapEditSession.BaselineLayerMap"/>, applied to the
-    /// settings as they stand at that moment. Every in-memory copy is refreshed
-    /// from the rewritten settings so the UI reads the new numbers — palette and
-    /// key labels wholesale, the auto-switch rules and the mouse layer through
-    /// their engines (which persist their own slice). Returns what the remap
+    /// settings as they stand at that moment. The auto-switch rules and the
+    /// mouse layer are refreshed from the rewritten settings through their
+    /// engines (which persist their own slice); the layer colours and key
+    /// labels need no copy, they are read straight from the settings.
+    /// Returns what the remap
     /// dropped or cannot fix; see <see cref="LayerSettingsRemap"/>.
     /// </summary>
     private IReadOnlyList<LayerSettingsNotice> MoveLayerSettings(IReadOnlyList<int?> map)
@@ -302,8 +301,6 @@ public partial class MainWindowViewModel
         if (remapped is null) return Array.Empty<LayerSettingsNotice>();
 
         var settings = remapped.Settings;
-        LayerColorPalette.SetOverrides(settings.LayerColors);
-        KeyLabelOverrides.SetOverrides(settings.KeyLabelOverrides);
         AutoSwitch.ApplyAppLayerRules(settings.AppLayerRules.TryGetValue(_profile.Id, out var rules)
             ? rules
             : Array.Empty<AppLayerRule>());

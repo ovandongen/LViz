@@ -99,7 +99,13 @@ public sealed class DeviceStack : IDisposable
         }
     }
 
+    /// <param name="profile">The board to open and render.</param>
+    /// <param name="settings">The settings the engines read live.</param>
     /// <param name="shownLayer">The layer the view is showing; both push engines read it lazily.</param>
+    /// <param name="activeWindowMonitor">Auto-switch's foreground-app source; null when the platform has none.</param>
+    /// <param name="mouseIdleMonitor">The mouse layer's idle source; null when none is wired.</param>
+    /// <param name="capabilityControl">What pipeline steps operate bus devices through.</param>
+    /// <param name="hostActionExecutor">Runs host actions for the keyboard's host-role capabilities.</param>
     public static DeviceStack Create(
         IKeyboardProfile profile,
         ISettingsService settings,

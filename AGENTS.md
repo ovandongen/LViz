@@ -19,8 +19,8 @@ locally or committed to a GitHub zmk-config, leaving the rest of the file
 intact. Forked from [moergo-layer-viz](https://github.com/ovandongen/moergo-layer-viz)
 and generalized so the engine can host arbitrary ZMK boards. **Seven
 profiles ship today:** Corne 6-col, Glove80, GO60, Kyria, Lily58, Sofle,
-A-Dux (`Core/Layout/*Profile.cs`, registered in `KeyboardProfileRegistry`).
-Current release: v3.1.0 on `main`.
+A-Dux (`Core/Layout/*Profile.cs`, in the static
+`KeyboardProfileRegistry.Bundled`). Current release: v3.1.0 on `main`.
 
 The HID transport lives in `external/zmk-hid-protocol` (git submodule).
 Boards have to advertise the Raw HID interface (usage page `0xFF60`,
@@ -60,7 +60,10 @@ src/
                  overrides + FontAwesome icon picker, OS secret stores
                  (Services/Secrets/), GitHub service (Services/GitHub/),
                  flashing services (Services/Flashing/), key ring
-                 geometry (Ring/). `AppServices.cs` is the
+                 geometry (Ring/). View-models live in per-feature
+                 subfolders (`Board/`, `Edit/`, `KeyEditor/`, `Settings/`,
+                 `Firmware/`, `GitHub/`, `Wizard/`); the namespace stays
+                 `LViz.App.ViewModels` throughout. `AppServices.cs` is the
                  composition root; the Avalonia shell, dialog hosts and
                  window lifecycle live in Views/.
   LViz.Core/   → pure .NET — dtsi physical-layout parser, keyboard
@@ -99,6 +102,11 @@ dotnet test src/LViz.Tests --filter "FullyQualifiedName~LViz.Tests.Rendering"  #
 dotnet run --project src/LViz.App                  # launch the app
 dotnet build src/LViz.App/LViz.App.csproj -t:Rebuild  # after XAML edits (see below)
 ```
+
+The build is at **0 warnings** and stays there: `src/Directory.Build.props`
++ `src/.editorconfig` make unused `using`s (IDE0005) and broken doc
+comments warnings; missing doc comments (CS1591) are not reported. Fix a
+warning, don't suppress it.
 
 An incremental `dotnet build` can skip Avalonia's XAML compilation and hide
 its errors (the app then fails at runtime with "No precompiled XAML found").
@@ -150,14 +158,19 @@ After creating or editing a view, rebuild the App project before trusting a
   `TabBackground`, hotkey, tray colouring, ring editor, modifier style; each
   persists itself, a modifier-style change raises `ModifierStyleChanged` for
   the relabel, Settings re-raises derived values from
-  `_preferencesPropagators`), `Board`, `LayerTabs`, `Recents`, `Edit`, plus
-  `Devices` (`DeviceStack`). A new window preference goes on `Preferences`,
-  not on the main VM.
+  `_preferencesPropagators`), `Board`, `LayerTabs`, `Recents`, `Edit`,
+  `Firmware` (`FirmwareViewModel`: live features, the firmware build line
+  and flashing), plus `Devices` (`DeviceStack`). A new window preference
+  goes on `Preferences`, not on the main VM.
 - **One board object: `BoardSurfaceViewModel`.** `MainWindowViewModel.Board`,
   `ComboDialogViewModel.Board` and `ExitKeyPickerViewModel.Board` each own one,
   and `BoardView`'s DataContext is that surface (`DataContext="{Binding Board}"`).
   It owns `Keys`/`LeftKeys`/`RightKeys`, `BoardLayout`, `BoardStyle`,
-  `ComboLegend` and the three key callbacks. `Board.SetProfile(profile)`
+  `ComboLegend` and the three key callbacks, and paints its own keys:
+  `Paint(keymap, layerIndex, edit, paint)` colours and labels every key
+  through a `KeyPaintContext(ProfileId, Settings)`; the main VM's
+  `ApplyActiveLayer` decides the layer and builds the context.
+  `Board.SetProfile(profile)`
   rebuilds the keys in place (the legend and press tracker keep the
   collection); a host's key look is the `keyFactory` argument. A null callback
   leaves the press unhandled, which the main window needs for its window drag
@@ -468,7 +481,15 @@ After creating or editing a view, rebuild the App project before trusting a
   toggle re-runs the default rather than ending it.
 - **Per-key label overrides are scoped `(profileId, layerIndex, keyIndex)`**
   → `KeyLabelOverride` (main label, subscript, top-left badge, FA icon,
-  font size, bold). Persisted via `UserSettings.KeyLabelOverrides` through
+  font size, bold). `KeyLabelOverrides`, `ComboLabelOverrides` and
+  `LayerColorPalette` are stateless readers over `UserSettings`: `Get` /
+  `GetColor` for one entry, `With` builders that return a new dictionary.
+  Keys take them through `KeyPaintContext(ProfileId, Settings)`; a key or
+  combo dialog gets the modifier style as a `ModifierStyle` init property
+  on its request (`ModifierStyles.FromSetting`, stamped by
+  `AvaloniaKeymapEditDialogs`), the combo legend through a
+  `Func<ModifierStyle>`. Persisted via `UserSettings.KeyLabelOverrides`
+  through
   the `PersistSetting → ISettingsService.Update → AtomicFile` chain. Empty
   overrides auto-prune so absent and "all defaults" are indistinguishable
   on disk. Edit dialog: `Views/EditKeyLabelDialog.axaml`.
@@ -509,7 +530,13 @@ After creating or editing a view, rebuild the App project before trusting a
   the log; `GitHubTokens.ToString()` omits the tokens. `GitHubSession` owns
   the login (keychain JSON under its `secretKey`, by default
   `GitHubAppInfo.SecretKey`, refresh under 5 minutes left, signs out on a
-  rejected refresh); everything else asks it for a token per call. A second
+  rejected refresh), the restore-once (`EnsureRestoredAsync`) and the
+  device flow (`StartSignInAsync`/`CompleteSignInAsync`, an injectable
+  `delay`); `IGitHubLogin` is the shared login face of
+  `IGitHubKeymapService` and `IFirmwareBuildService`, its UI is the shared
+  `GitHubSignInViewModel` hosted as `SignIn` by the GitHub and flash
+  windows, and failed calls surface through `GitHubErrorText.For`.
+  Everything else asks the session for a token per call. A second
   GitHub App, "LViz for ZMK Builds" (`GitHubBuildsAppInfo`, Actions: read
   only, key `github-builds`), has its own client and session, built inside
   the `IFirmwareBuildService` registration and never registered as their own
@@ -606,6 +633,25 @@ After creating or editing a view, rebuild the App project before trusting a
   (`SignInNeeded`) shows once per config (`FirmwareSignInHintsShown`), then
   only for configs in `FlashedConfigs`. `Uf2DriveWatcher` lists drives on the
   thread pool: a hung mount must not freeze the window.
+  `FirmwareViewModel.SetLoadedKeymap` reads the zmk-config's files on a
+  background task and raises `ShowLiveFeaturesHint` when the newest check
+  is in (older ones are dropped); the flyout items and the status line
+  settle at once. A test awaits `vm.Firmware.InspectionTask` before it
+  asserts the hint after a load, a dismissal or a wizard save.
+- **No global mutable statics.** State lives in an instance the container
+  or a parent view-model owns. Tests run in parallel; keep
+  `src/LViz.Tests/xunit.runner.json` (a fixed `maxParallelThreads`), since
+  without it xUnit sizes its workers to `Environment.ProcessorCount`, which
+  is 1 on a CPU-limited container. An xUnit collection such as
+  `[Collection("Serial")]` is only for tests that share process-wide
+  state (`Loc`'s culture, the real diagnostic log, the headless Avalonia
+  app) — name the state in the test's class comment.
+- **View-models reach the desktop through `IDesktopInteraction`**
+  (`OpenUrl`, `CopyTextAsync`, `PickUf2FileAsync`), passed in their
+  constructor; never a settable `Action`/`Func` property.
+- **Settings collections are never changed in place.** Readers take
+  `ISettingsService.Current`; writers build a new collection inside
+  `Update` — the label/colour `With` helpers show the pattern.
 
 ## Before writing code
 
@@ -674,9 +720,12 @@ Carried over from the upstream Moergo build and still apply verbatim:
   `ApplicationData/LViz/layouts/`** (`UserLayoutStore`), keys in ZMK units
   with an explicit hand per key. A file loads only when its name matches its
   id; a broken file is skipped with a `Layouts` warning, never a crash.
-  `App.axaml.cs` registers them via `KeyboardProfileRegistry.SetUserProfiles`
-  as `UserLayoutProfile`s with ids `user:<id>`, listed after the bundled
-  boards. Key-count auto-switch must go through
+  The container builds the one `KeyboardProfileRegistry` from this folder
+  (`AppServices`), wrapping each file as a `UserLayoutProfile` with id
+  `user:<id>`, listed after the bundled boards; a saved layout joins or is
+  replaced later through `SetUserProfiles` (whole-array replace, see
+  `MainWindowViewModel.ReplaceUserProfile`). Key-count auto-switch must
+  go through
   `KeyboardProfileRegistry.FindByKeyCount`, never `All.FirstOrDefault`: a
   board whose HID name matches a plugged-in keyboard wins a tie (pass the
   names, `Devices.AttachedHidNames`), then user layouts, then
@@ -800,9 +849,10 @@ LViz-specific (extend this list as we hit more):
   server and push coordinator; `Start`, `Stop(isAppExit)`, `SwitchProfile` and
   `Dispose` own the order. `AppServices` builds the stack once, as a
   singleton, with `DeviceStack.Create`; the start board is
-  `KeyboardProfileRegistry.ResolveOrDefault(settings.Current.Keyboard)`, the
-  same expression the main view-model uses, and `App.axaml.cs` loads the user
-  layouts before either runs. Building it opens nothing: the CLI pipe opens
+  `ResolveOrDefault(settings.Current.Keyboard)` on the container's
+  `KeyboardProfileRegistry` — the instance built with the on-disk user
+  layouts, which the main view-model also resolves its start board
+  through. Building it opens nothing: the CLI pipe opens
   only in `StartIpc()`, which `App.axaml.cs` calls once on the resolved
   stack, so a stack built in a test never listens on the pipe. The push
   engines read the layer on screen from `ShownLayer`, which
@@ -857,23 +907,30 @@ LViz-specific (extend this list as we hit more):
   callbacks and collections are skipped; any other new public property needs
   either an entry in `SettingsViewModel._mainPropagators` or its name in
   `IgnoredMainProperties` in that test, with a one-line reason. Main-window-only state (e.g.
-  a child VM such as `Recents` or `LayerTabs`) belongs on the ignore list. Plan for this edit when a
+  a child VM such as `Recents`, `LayerTabs` or `Firmware`) belongs on the
+  ignore list. Plan for this edit when a
   change adds a VM property; it is the one expected change to an existing test.
 
 - **`AppServices` is the one composition root.** `MainWindowViewModel` takes
   every collaborator as a required constructor parameter and builds no
-  service itself. Its child VMs and `KeymapLibrary` (`Library`), built in
-  the constructor, only wrap what it was given. Only `gitHub` and
+  service itself: settings, keymap state, backup store, edit dialogs,
+  shell, host executor, device stack, shown layer and the container's
+  `KeyboardProfileRegistry`. Its child VMs and `KeymapLibrary` (`Library`),
+  built in the constructor, only wrap what it was given. Only `gitHub` and
   `firmwareWatcher` may be null on its constructor (no GitHub service, no
   firmware build status); the two monitors are optional on the stack's
   factory instead, each with a meaning (no app-focus switching, no
   `MouseLayer`). Tests build the VM with `TestMainVm.Create(settings, …)`,
   which supplies `FakeMainWindowShell`, `FakeKeymapEditDialogs` and a
-  temp-dir `KeymapBackupStore`, and builds the `DeviceStack` and the
-  `ShownLayer` for it; `TestMainVm.CreateSettings(settings, vm)` builds a
-  `SettingsViewModel`; never add a `= null` default or a throwing stand-in
-  to make a test shorter. `AvaloniaMainWindowShell` takes named
-  dependencies and three factories, not `IServiceProvider`. The Settings
+  temp-dir `KeymapBackupStore`, builds the `DeviceStack` and the
+  `ShownLayer` for it, and defaults `profiles:` to a bundled-only
+  `KeyboardProfileRegistry`; `TestMainVm.CreateSettings(settings, vm)`
+  builds a `SettingsViewModel`; never add a `= null` default or a throwing
+  stand-in to make a test shorter. `AvaloniaMainWindowShell` takes
+  `MainWindowLifecycle`, `IGitHubKeymapService`, `KeyboardProfileRegistry`
+  and `IDesktopInteraction`, plus the `SettingsViewModel`, module-setup
+  and flash factories — not `IServiceProvider`; `SettingsViewModel` comes
+  from that factory and is never registered in the container. The Settings
   tab view-models take the engine, router or runner they use — the
   auto-switch and mouse tabs also `LayerTabsViewModel` and a
   `Func<IKeyboardProfile>` — never the main view-model.
@@ -894,10 +951,14 @@ LViz-specific (extend this list as we hit more):
   `Current` is cached per instance.
 
 - **Main-window actions go through `IMainWindowShell`, never a nullable
-  callback on the VM.** Quit, show, file picker, clipboard, Settings,
-  shortcuts, layout wizard, GitHub picker, edit layout and the label dialogs
-  are shell methods (App/Services); a dialog method returns its result (null =
-  backed out) and the VM command applies it, so the flow is testable with
+  callback on the VM.** Quit, show, keymap picker, Settings, shortcuts,
+  layout wizard, module setup, flash, GitHub picker, edit layout and the
+  label dialogs are shell methods (App/Services); the browser, clipboard
+  and `.uf2` picker live on `IDesktopInteraction`, which
+  `IMainWindowShell` extends and the GitHub, flash and module-setup
+  view-models take in their constructors. A dialog method returns its
+  result (null = backed out) and the VM command applies it, so the flow
+  is testable with
   `FakeMainWindowShell`. `AvaloniaMainWindowShell` (App/Views, as are the
   other Avalonia types below) is the real one; it and
   `AvaloniaKeymapEditDialogs` find the owner at call time via
@@ -976,9 +1037,11 @@ LViz-specific (extend this list as we hit more):
   a task (`Task.WaitAll`, `.Wait()`, xUnit1031): make it `async Task` and
   `await Task.WhenAll(…)`.
 
-- **The build checks neither unused `using`s nor `<see cref>` targets** (no
-  IDE0005, no `GenerateDocumentationFile`). After deleting code, find a
-  namespace's last user by searching the file, and check a new cref by hand.
+- **The build checks unused `using`s and doc comments** (`src/.editorconfig`
+  sets IDE0005 to warning, `src/Directory.Build.props` sets
+  `GenerateDocumentationFile`): a dead `using` or an unresolvable
+  `<see cref>` is a build warning and the build is 0-warning, so a using
+  left behind by a deletion surfaces by itself. Fix, don't suppress.
 
 - **Don't close an Avalonia flyout synchronously from a button inside it.**
   The button resolves and runs its `Command` *after* its `Click` handler; hiding
@@ -1055,8 +1118,8 @@ LViz-specific (extend this list as we hit more):
   async handler (see `GatingHttpHandler` in `GitHubSessionTests`).
 
 - **A new `GitHubErrorKind` member trips
-  `GitHubOpenViewModelTests.MessageFor_EveryKind_GetsDistinctResolvedText`**:
-  every kind needs its own `MessageFor` text (both `.resx` files).
+  `GitHubErrorTextTests.For_EveryKind_GetsDistinctResolvedText`**:
+  every kind needs its own `GitHubErrorText.For` text (both `.resx` files).
 
 - **A disabled Avalonia control is left out of hit testing**, `GetVisualsAt`
   included: a press on it reaches the parent with the parent as source. Code

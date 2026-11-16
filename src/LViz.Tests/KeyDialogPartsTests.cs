@@ -1,5 +1,6 @@
 using LViz.App.Localization;
 using LViz.App.ViewModels;
+using LViz.Core.Keymap;
 using LViz.Core.Keymap.Catalog;
 using LViz.Core.Keymap.Parser;
 using LViz.Core.Models;
@@ -320,7 +321,7 @@ public class KeyDialogPartsTests
     [Fact]
     public void KeycodeParam_ModifierKind_PickerFirst_AndPickFlowsThrough()
     {
-        var vm = new KeycodeParamViewModel("Hold", ZmkBehaviorParamKind.Modifier, Usage);
+        var vm = new KeycodeParamViewModel("Hold", ZmkBehaviorParamKind.Modifier, Usage, ModifierStyle.Mac);
 
         Assert.Equal("Hold", vm.Label);
         Assert.Equal(ZmkBehaviorParamKind.Modifier, vm.Kind);
@@ -340,7 +341,7 @@ public class KeyDialogPartsTests
     [Fact]
     public void KeycodeParam_KeycodeKind_KeepsUsedCategoryFirst()
     {
-        var vm = new KeycodeParamViewModel("Key", ZmkBehaviorParamKind.Keycode, Usage);
+        var vm = new KeycodeParamViewModel("Key", ZmkBehaviorParamKind.Keycode, Usage, ModifierStyle.Mac);
 
         Assert.True(vm.Picker.Categories[0].IsUsed);
     }

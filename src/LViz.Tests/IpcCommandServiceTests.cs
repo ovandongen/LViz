@@ -10,9 +10,13 @@ namespace LViz.Tests;
 /// (event/status/devices) the running app answers. Mirrors
 /// <see cref="SignalDispatcherTests"/> for the event path (string id instead of
 /// numeric), and checks the introspection commands' ok/payload shape.
+/// The positive wait is generous, as in <see cref="SignalDispatcherTests"/>:
+/// the pipeline run is a Task.Run item that can start seconds late on a
+/// CPU-starved parallel runner.
 /// </summary>
 public class IpcCommandServiceTests
 {
+    private static readonly TimeSpan RunTimeout = TimeSpan.FromSeconds(10);
     private sealed class RecordingRunner : IPipelineRunner
     {
         public List<string> Ran { get; } = new();
@@ -51,7 +55,7 @@ public class IpcCommandServiceTests
         var ack = svc.Handle("event ci:ok");
 
         Assert.Equal("ok", ack);
-        Assert.True(runner.Fired.Wait(TimeSpan.FromSeconds(2)), "bound event should run a pipeline");
+        Assert.True(runner.Fired.Wait(RunTimeout), "bound event should run a pipeline");
         Assert.Equal("flash", Assert.Single(runner.Ran));
     }
 

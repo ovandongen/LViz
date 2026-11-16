@@ -19,7 +19,7 @@ public class KeyLabelFormatterPointingTests
     public void MouseMove_RendersArrowWithMouseBadge(string param, string expected)
     {
         var (label, _, top) = KeyLabelFormatter.FormatBinding(
-            new KeyBinding("&mmv", new[] { param }), targetLayerName: null);
+            new KeyBinding("&mmv", new[] { param }), ModifierStyle.Mac, targetLayerName: null);
         Assert.Equal(expected, label);
         Assert.Equal("Mouse", top);
     }
@@ -32,7 +32,7 @@ public class KeyLabelFormatterPointingTests
     public void MouseScroll_RendersArrowWithScrollBadge(string param, string expected)
     {
         var (label, _, top) = KeyLabelFormatter.FormatBinding(
-            new KeyBinding("&msc", new[] { param }), targetLayerName: null);
+            new KeyBinding("&msc", new[] { param }), ModifierStyle.Mac, targetLayerName: null);
         Assert.Equal(expected, label);
         Assert.Equal("Scroll", top);
     }
@@ -46,7 +46,7 @@ public class KeyLabelFormatterPointingTests
     public void MouseButton_RendersClickLabel(string param, string expected)
     {
         var (label, _, top) = KeyLabelFormatter.FormatBinding(
-            new KeyBinding("&mkp", new[] { param }), targetLayerName: null);
+            new KeyBinding("&mkp", new[] { param }), ModifierStyle.Mac, targetLayerName: null);
         Assert.Equal(expected, label);
         Assert.Equal("Click", top);
     }
@@ -55,7 +55,7 @@ public class KeyLabelFormatterPointingTests
     public void CapsWord_RendersTitleCaseLabel()
     {
         var (label, _, _) = KeyLabelFormatter.FormatBinding(
-            new KeyBinding("&caps_word", Array.Empty<string>()), targetLayerName: null);
+            new KeyBinding("&caps_word", Array.Empty<string>()), ModifierStyle.Mac, targetLayerName: null);
         Assert.Equal("Caps Word", label);
     }
 
@@ -63,7 +63,7 @@ public class KeyLabelFormatterPointingTests
     public void KeyRepeat_RendersRepeatLabel()
     {
         var (label, _, _) = KeyLabelFormatter.FormatBinding(
-            new KeyBinding("&key_repeat", Array.Empty<string>()), targetLayerName: null);
+            new KeyBinding("&key_repeat", Array.Empty<string>()), ModifierStyle.Mac, targetLayerName: null);
         Assert.Equal("Repeat", label);
     }
 }

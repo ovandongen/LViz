@@ -105,7 +105,7 @@ public sealed class GitHubKeymapServiceTests : IDisposable
     {
         // Empty store on purpose: an unsigned-in session re-reads on every
         // RestoreAsync call, so the single read pins THIS service's task
-        // cache, not the session's own signed-in short-circuit.
+        // cache on its session, not the session's signed-in short-circuit.
         var counting = new CountingSecretStore(_store);
         var service = CreateService(counting);
 
@@ -445,7 +445,7 @@ public sealed class GitHubKeymapServiceTests : IDisposable
     [Fact]
     public async Task CompleteSignIn_PollsPendingThenSuccess_SignsInAndStoresTokens()
     {
-        // pending once, then the grant; the service's delay returns instantly.
+        // pending once, then the grant; the session's delay returns instantly.
         var polls = new Queue<Func<HttpResponseMessage>>([
             () => FakeHttpHandler.Json("{\"error\":\"authorization_pending\"}"),
             () => FakeHttpHandler.Json(GrantJson()),
@@ -487,8 +487,10 @@ public sealed class GitHubKeymapServiceTests : IDisposable
 
     /// <summary>A service over this test's handler and cache root, with instant polling.</summary>
     private GitHubKeymapService CreateService(ISecretStore store) =>
-        new(_client, new GitHubSession(_client, store), new GitHubRepoCache(_root),
-            static (_, _) => Task.CompletedTask);
+        new(
+            _client,
+            new GitHubSession(_client, store, delay: static (_, _) => Task.CompletedTask),
+            new GitHubRepoCache(_root));
 
     /// <summary>A live login sitting in the store, as a restored app would find it.</summary>
     private Task StoreSignedInAsync() =>
@@ -513,7 +515,7 @@ public sealed class GitHubKeymapServiceTests : IDisposable
             () => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(payload) });
 
     /// <summary>
-    /// Routes the four Git Data calls a <see cref="SaveFilesAsync"/> test makes
+    /// Routes the four Git Data calls a <see cref="IGitHubKeymapService.SaveFilesAsync"/> test makes
     /// for a commit on top of <see cref="Sha1"/>: base commit (with its tree),
     /// tree POST, commit POST, and the ref PATCH moving the branch to
     /// <see cref="CommitSha"/>. A test overrides one route to make it fail.

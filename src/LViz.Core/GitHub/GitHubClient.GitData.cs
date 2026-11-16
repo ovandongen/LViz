@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace LViz.Core.GitHub;
@@ -36,9 +35,14 @@ public sealed partial class GitHubClient
     /// SHAs are lower-case, which is how GitHub writes them.
     /// </para>
     /// </summary>
+    /// <param name="accessToken">The token for this call.</param>
+    /// <param name="owner">Repository owner.</param>
+    /// <param name="repo">Repository name.</param>
+    /// <param name="branch">Branch to move.</param>
     /// <param name="baseCommitSha">Commit the branch must still point at; must not be blank.</param>
     /// <param name="files">Files to write, in order; at least one, and no path twice.</param>
     /// <param name="message">Commit message; must not be blank.</param>
+    /// <param name="ct">Cancels the request.</param>
     public async Task<GitHubTreeCommitResult> CommitFilesAsync(
         string accessToken,
         string owner,

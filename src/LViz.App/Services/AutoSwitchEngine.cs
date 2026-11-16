@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using LViz.Core.Diagnostics;
-using LViz.Core.Input;
 using LViz.Core.Layout;
 using LViz.Core.Settings;
 using ZmkHidProtocol.ActiveWindow;

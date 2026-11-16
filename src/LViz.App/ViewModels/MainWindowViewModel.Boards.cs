@@ -3,6 +3,7 @@ using LViz.App.Localization;
 using LViz.App.Services;
 using LViz.Core.Diagnostics;
 using LViz.Core.GitHub;
+using LViz.Core.Keymap;
 using LViz.Core.Layout;
 
 namespace LViz.App.ViewModels;
@@ -103,7 +104,7 @@ public partial class MainWindowViewModel
     public LayoutWizardContext GetLayoutWizardContext()
     {
         // One snapshot: All allocates a fresh array per read.
-        var profiles = KeyboardProfileRegistry.All;
+        var profiles = _profiles.All;
         var existingIds = profiles
             .OfType<UserLayoutProfile>()
             .Select(p => p.Source.Id)
@@ -120,7 +121,8 @@ public partial class MainWindowViewModel
                 ? gitHub.CacheFolderFor(keymap.Owner, keymap.Repo, keymap.Branch)
                 : null;
         return new LayoutWizardContext(
-            _keymap.Current, existingIds, deviceNames, UserLayoutStore.DefaultDirectory, gitHubFolder);
+            _keymap.Current, existingIds, deviceNames, UserLayoutStore.DefaultDirectory, gitHubFolder,
+            ModifierStyles.FromSetting(_settingsService.Current.ModifierStyle));
     }
 
     /// <summary>
@@ -131,7 +133,7 @@ public partial class MainWindowViewModel
     /// </summary>
     public LayoutEditContext? GetLayoutEditContext() =>
         _profile is UserLayoutProfile p
-            ? new(p.Source, EditorLabels.For(_keymap.Current, p.KeyCount, p.Id), UserLayoutStore.DefaultDirectory)
+            ? new(p.Source, EditorLabels.For(_keymap.Current, p.KeyCount, new KeyPaintContext(p.Id, _settingsService.Current)), UserLayoutStore.DefaultDirectory)
             : null;
 
     /// <summary>
@@ -142,8 +144,8 @@ public partial class MainWindowViewModel
     private UserLayoutProfile ReplaceUserProfile(UserLayoutFile layout)
     {
         var profile = new UserLayoutProfile(layout);
-        KeyboardProfileRegistry.SetUserProfiles(
-            KeyboardProfileRegistry.All
+        _profiles.SetUserProfiles(
+            _profiles.All
                 .OfType<UserLayoutProfile>()
                 .Where(p => !string.Equals(p.Source.Id, layout.Id, StringComparison.Ordinal))
                 .Append((IKeyboardProfile)profile));

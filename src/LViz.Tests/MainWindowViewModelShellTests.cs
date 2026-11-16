@@ -69,7 +69,7 @@ public sealed class MainWindowViewModelShellTests
 
         await ((IAsyncRelayCommand)vm.CopyDiagnosticsCommand).ExecuteAsync(null);
 
-        Assert.Equal("Could not copy diagnostics: boom", vm.StatusMessage);
+        Assert.Equal("Couldn't copy the diagnostics: boom", vm.StatusMessage);
     }
 
     [Fact]

@@ -137,8 +137,15 @@ public sealed partial class GitHubClient
     /// <see cref="GitHubErrorKind.Unexpected"/>. Returned SHAs are lower-case.
     /// </para>
     /// </summary>
-    /// <param name="message">Commit message; must not be blank.</param>
+    /// <param name="accessToken">The token for this call.</param>
+    /// <param name="owner">Repository owner.</param>
+    /// <param name="repo">Repository name.</param>
+    /// <param name="branch">Branch to commit to.</param>
     /// <param name="path">File path in the repo, e.g. <c>config/glove80.keymap</c>.</param>
+    /// <param name="content">The file's new bytes.</param>
+    /// <param name="baseBlobSha">Blob SHA the replaced blob must still match.</param>
+    /// <param name="message">Commit message; must not be blank.</param>
+    /// <param name="ct">Cancels the request.</param>
     public async Task<GitHubCommitResult> PutFileAsync(
         string accessToken,
         string owner,

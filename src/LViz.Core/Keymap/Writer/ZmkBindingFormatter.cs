@@ -48,6 +48,9 @@ public static class ZmkBindingFormatter
     /// that layer number. No arity checking: the writer validates by
     /// re-parsing the result.
     /// </summary>
+    /// <param name="binding">The binding to render.</param>
+    /// <param name="defines">The file's name/value defines, used to spell
+    /// layer numbers.</param>
     /// <param name="holdTaps">The parsed keymap's hold-taps. A hold-tap's
     /// hold side is the layer param at index 0 and its tap side at index
     /// <c>HoldArity</c>, but only when that side binds a layer behavior with

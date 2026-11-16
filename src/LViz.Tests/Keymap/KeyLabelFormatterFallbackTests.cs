@@ -15,7 +15,7 @@ public class KeyLabelFormatterFallbackTests
     public void UnknownZeroArityBehavior_UnderscoresBecomeSpaces()
     {
         var (label, _, _) = KeyLabelFormatter.FormatBinding(
-            new KeyBinding("&my_macro", Array.Empty<string>()), targetLayerName: null);
+            new KeyBinding("&my_macro", Array.Empty<string>()), ModifierStyle.Mac, targetLayerName: null);
         Assert.Equal("my macro", label);
     }
 
@@ -23,7 +23,7 @@ public class KeyLabelFormatterFallbackTests
     public void UnknownBehaviorWithParams_UnderscoresBecomeSpaces()
     {
         var (label, _, _) = KeyLabelFormatter.FormatBinding(
-            new KeyBinding("&xxx", new[] { "FOO_BAR" }), targetLayerName: null);
+            new KeyBinding("&xxx", new[] { "FOO_BAR" }), ModifierStyle.Mac, targetLayerName: null);
         Assert.Equal("FOO BAR", label);
     }
 }

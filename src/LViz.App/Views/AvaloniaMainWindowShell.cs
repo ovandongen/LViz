@@ -1,5 +1,3 @@
-using Avalonia.Input;
-using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using LViz.App.Localization;
 using LViz.App.Services;
@@ -21,7 +19,8 @@ internal sealed class AvaloniaMainWindowShell : IMainWindowShell
 {
     private readonly MainWindowLifecycle _lifecycle;
     private readonly IGitHubKeymapService _gitHub;
-    private readonly IHostActionExecutor _hostActions;
+    private readonly KeyboardProfileRegistry _profiles;
+    private readonly IDesktopInteraction _desktop;
     private readonly Func<SettingsViewModel> _createSettings;
     private readonly Func<ModuleSetupContext, ModuleSetupViewModel> _createModuleSetup;
     private readonly Func<FlashContext, FlashViewModel> _createFlash;
@@ -33,14 +32,16 @@ internal sealed class AvaloniaMainWindowShell : IMainWindowShell
     public AvaloniaMainWindowShell(
         MainWindowLifecycle lifecycle,
         IGitHubKeymapService gitHub,
-        IHostActionExecutor hostActions,
+        KeyboardProfileRegistry profiles,
+        IDesktopInteraction desktop,
         Func<SettingsViewModel> createSettings,
         Func<ModuleSetupContext, ModuleSetupViewModel> createModuleSetup,
         Func<FlashContext, FlashViewModel> createFlash)
     {
         _lifecycle = lifecycle;
         _gitHub = gitHub;
-        _hostActions = hostActions;
+        _profiles = profiles;
+        _desktop = desktop;
         _createSettings = createSettings;
         _createModuleSetup = createModuleSetup;
         _createFlash = createFlash;
@@ -87,19 +88,10 @@ internal sealed class AvaloniaMainWindowShell : IMainWindowShell
     }
 
     /// <inheritdoc />
-    public async Task<bool> CopyTextAsync(string text)
-    {
-        var owner = Owner;
-        var clipboard = TopLevel.GetTopLevel(owner)?.Clipboard ?? owner.Clipboard;
-        if (clipboard is null) return false;
-        // SetTextAsync silently no-ops on Avalonia 11.3 macOS
-        // when invoked from a borderless transparent window.
-        // The newer SetDataAsync + DataTransfer path writes reliably.
-        var transfer = new DataTransfer();
-        transfer.Add(DataTransferItem.Create(DataFormat.Text, text));
-        await clipboard.SetDataAsync(transfer);
-        return true;
-    }
+    public void OpenUrl(string url) => _desktop.OpenUrl(url);
+
+    /// <inheritdoc />
+    public Task<bool> CopyTextAsync(string text) => _desktop.CopyTextAsync(text);
 
     /// <inheritdoc />
     public void OpenSettings()
@@ -167,8 +159,6 @@ internal sealed class AvaloniaMainWindowShell : IMainWindowShell
     {
         var owner = Owner;
         var dlgVm = _createModuleSetup(context);
-        // The Done step opens the config's GitHub Actions page.
-        dlgVm.OpenUrl = _hostActions.Launch;
         // The check step reads (and for GitHub fetches) the config straight away.
         _ = dlgVm.StartAsync();
         var dlg = new ModuleSetupWindow
@@ -185,9 +175,6 @@ internal sealed class AvaloniaMainWindowShell : IMainWindowShell
     {
         var owner = Owner;
         var dlgVm = _createFlash(context);
-        dlgVm.OpenUrl = _hostActions.Launch;
-        dlgVm.CopyToClipboard = async text => await CopyTextAsync(text);
-        dlgVm.PickUf2File = PickUf2FileAsync;
         // The source step reads the config and looks the build up straight away.
         _ = dlgVm.StartAsync();
         var dlg = new FlashWindow
@@ -200,35 +187,14 @@ internal sealed class AvaloniaMainWindowShell : IMainWindowShell
     }
 
     /// <inheritdoc />
-    public async Task<string?> PickUf2FileAsync()
-    {
-        var file = await Owner.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-        {
-            Title = Loc.Instance["Flash_PickFileTitle"],
-            AllowMultiple = false,
-            FileTypeFilter =
-            [
-                new FilePickerFileType(Loc.Instance["Flash_FileTypeUf2"])
-                {
-                    // .uf2 has no registered UTI on macOS, so a bare
-                    // extension filter greys the file out. The image is
-                    // plain binary data — tell the OS to treat it as such.
-                    Patterns = ["*.uf2"],
-                    MimeTypes = ["application/octet-stream"],
-                    AppleUniformTypeIdentifiers = ["public.data"],
-                },
-            ],
-        });
-        return file.Count > 0 ? file[0].TryGetLocalPath() : null;
-    }
+    public Task<string?> PickUf2FileAsync() => _desktop.PickUf2FileAsync();
 
     /// <inheritdoc />
     public async Task<GitHubOpenSelection?> PickGitHubKeymapAsync(Func<IReadOnlyCollection<string>> attachedHidNames)
     {
         var owner = Owner;
-        var ghVm = new GitHubOpenViewModel(_gitHub)
+        var ghVm = new GitHubOpenViewModel(_gitHub, _desktop, _profiles)
         {
-            OpenUrl = _hostActions.Launch,
             AttachedHidNames = attachedHidNames,
         };
         var dlg = new GitHubOpenWindow

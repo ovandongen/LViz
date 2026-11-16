@@ -265,6 +265,18 @@
     <value>Diagnostics copied to clipboard</value>
     <comment/>
   </data>
+  <data name="Status_OpenLogFolderFailedFormat" xml:space="preserve">
+    <value>Couldn't open the log folder: {0}</value>
+    <comment/>
+  </data>
+  <data name="Status_CopyDiagnosticsFailedFormat" xml:space="preserve">
+    <value>Couldn't copy the diagnostics: {0}</value>
+    <comment/>
+  </data>
+  <data name="GitHub_NotAvailable" xml:space="preserve">
+    <value>GitHub isn't available</value>
+    <comment/>
+  </data>
   <data name="Status_KeyboardSwitched" xml:space="preserve">
     <value>Keyboard switched to {0}</value>
     <comment/>

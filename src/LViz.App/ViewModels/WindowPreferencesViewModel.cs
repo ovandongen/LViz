@@ -27,11 +27,7 @@ public partial class WindowPreferencesViewModel : ObservableObject
         _backgroundOpacity = Math.Clamp(seed.BackgroundOpacity, 0.0, 1.0);
         if (!string.IsNullOrWhiteSpace(seed.HotkeyKey))
             _hotkeyKey = seed.HotkeyKey;
-        _isWindowsModifierStyle = string.Equals(seed.ModifierStyle, "Windows", StringComparison.OrdinalIgnoreCase);
-        // Seed the static *before* the first key render so the initial paint
-        // already uses the persisted glyph set (the partial change handler is
-        // not invoked when the backing field is assigned directly).
-        ZmkKeycodeLabel.CurrentModifierStyle = _isWindowsModifierStyle ? ModifierStyle.Windows : ModifierStyle.Mac;
+        _isWindowsModifierStyle = ModifierStyles.FromSetting(seed.ModifierStyle) == ModifierStyle.Windows;
     }
 
     [ObservableProperty] private bool _isAlwaysOnTop;
@@ -79,17 +75,16 @@ public partial class WindowPreferencesViewModel : ObservableObject
     /// <summary>
     /// True when the board renders Windows-style modifier glyphs (⊞ Alt Ctrl ⇧)
     /// instead of the default Mac set (⌘ ⌥ ⌃ ⇪). User-controlled via the
-    /// toolbar; persisted across launches as <see cref="UserSettings.ModifierStyle"/>.
-    /// Backed by the static <see cref="ZmkKeycodeLabel.CurrentModifierStyle"/>
-    /// which every label-builder reads at render time.
+    /// toolbar; persisted across launches as <see cref="UserSettings.ModifierStyle"/>,
+    /// which every label-builder reads from the settings at paint time.
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ModifierStyleIconData))]
     private bool _isWindowsModifierStyle;
 
     /// <summary>
-    /// Raised after the glyph style changed (and the static was updated), so
-    /// the owner can relabel the keys it shows.
+    /// Raised after the style was persisted, so the owner can relabel the
+    /// keys it shows — the repaint then reads the new value from settings.
     /// </summary>
     public event Action? ModifierStyleChanged;
 
@@ -123,7 +118,6 @@ public partial class WindowPreferencesViewModel : ObservableObject
 
     partial void OnIsWindowsModifierStyleChanged(bool value)
     {
-        ZmkKeycodeLabel.CurrentModifierStyle = value ? ModifierStyle.Windows : ModifierStyle.Mac;
         Persist(s => s with { ModifierStyle = value ? "Windows" : "Mac" });
         ModifierStyleChanged?.Invoke();
     }

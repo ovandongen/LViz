@@ -51,13 +51,13 @@
                        FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource Text}" />
             <Button Classes="accent"
                     Content="{Binding [GitHub_SignInButton], Source={StaticResource Loc}}"
-                    Command="{Binding SignInCommand}"
+                    Command="{Binding SignIn.StartCommand}"
                     HorizontalAlignment="Left"
-                    IsVisible="{Binding !IsWaitingForSignIn}" />
-            <StackPanel Spacing="8" IsVisible="{Binding IsWaitingForSignIn}">
+                    IsVisible="{Binding !SignIn.IsWaitingForSignIn}" />
+            <StackPanel Spacing="8" IsVisible="{Binding SignIn.IsWaitingForSignIn}">
                 <TextBlock Text="{Binding [GitHub_EnterCode], Source={StaticResource Loc}}"
                            FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource Text}" />
-                <SelectableTextBlock Text="{Binding UserCode}"
+                <SelectableTextBlock Text="{Binding SignIn.UserCode}"
                                      FontSize="28"
                                      FontFamily="Menlo, Consolas, monospace"
                                      HorizontalAlignment="Center"
@@ -65,10 +65,10 @@
                 <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
                     <Button Classes="link"
                             Content="{Binding [GitHub_CopyCode], Source={StaticResource Loc}}"
-                            Command="{Binding CopyCodeCommand}" />
+                            Command="{Binding SignIn.CopyCodeCommand}" />
                     <Button Classes="link"
                             Content="{Binding [GitHub_OpenPage], Source={StaticResource Loc}}"
-                            Command="{Binding OpenVerificationPageCommand}" />
+                            Command="{Binding SignIn.OpenVerificationPageCommand}" />
                 </StackPanel>
                 <TextBlock Text="{Binding [GitHub_Waiting], Source={StaticResource Loc}}"
                            FontSize="12" Foreground="{StaticResource TextSubtle}"

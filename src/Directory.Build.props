@@ -1,0 +1,10 @@
+<Project>
+  <!-- Build checks for every project under src/: unused usings (IDE0005)
+       and broken doc comments (CS1570–CS1574 and friends). Missing doc
+       comments (CS1591) are not reported. -->
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+</Project>

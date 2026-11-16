@@ -1,5 +1,4 @@
 using LViz.App.Services;
-using LViz.App.Services.GitHub;
 using LViz.App.ViewModels;
 using LViz.Core.Layout;
 using LViz.Core.Settings;
@@ -15,7 +14,10 @@ namespace LViz.Tests;
 /// The live-features entry points on the main window: the flyout item and the
 /// status-bar hint follow the loaded keymap's zmk-config — shown for a stock
 /// config, hidden for a set-up or blocked one, dismissed per config through
-/// settings, and hidden while editing. The wizard itself is exercised by the
+/// settings, and hidden while editing. The config's files are read on a
+/// worker thread, so a test that reads the hint first awaits
+/// <c>vm.Firmware.InspectionTask</c>; the flyout item is decided
+/// synchronously by the path checks. The wizard itself is exercised by the
 /// module-setup tests; here the shell just records the context it was handed.
 /// </summary>
 public sealed class MainWindowViewModelLiveFeaturesTests : IDisposable
@@ -38,6 +40,8 @@ public sealed class MainWindowViewModelLiveFeaturesTests : IDisposable
         public Task<bool> RunFlashAsync(FlashContext context) => _inner.RunFlashAsync(context);
 
         public Task<string?> PickUf2FileAsync() => _inner.PickUf2FileAsync();
+
+        public void OpenUrl(string url) => _inner.OpenUrl(url);
 
         public void Quit() => _inner.Quit();
         public void ShowWindow() => _inner.ShowWindow();
@@ -121,11 +125,12 @@ public sealed class MainWindowViewModelLiveFeaturesTests : IDisposable
         var (root, path) = KeymapCopy("cosmos82");
 
         vm.LoadLayoutFromPath(path);
+        await vm.Firmware.InspectionTask;
 
-        Assert.True(vm.CanSetUpLiveFeatures);
-        Assert.True(vm.ShowLiveFeaturesHint);
+        Assert.True(vm.Firmware.CanSetUpLiveFeatures);
+        Assert.True(vm.Firmware.ShowLiveFeaturesHint);
 
-        await vm.SetUpLiveFeaturesCommand.ExecuteAsync(null);
+        await vm.Firmware.SetUpLiveFeaturesCommand.ExecuteAsync(null);
 
         var context = Assert.Single(shell.ModuleSetupContexts);
         Assert.Equal(root, context.LocalRoot);
@@ -133,27 +138,29 @@ public sealed class MainWindowViewModelLiveFeaturesTests : IDisposable
     }
 
     [Fact]
-    public void Glove80Copy_ItemAtCommand_HintHiddenBecauseSetUp()
+    public async Task Glove80Copy_ItemAtCommand_HintHiddenBecauseSetUp()
     {
         var vm = TestMainVm.Create(new InMemorySettingsService(), shell: new FakeMainWindowShell());
         var (_, path) = KeymapCopy("glove80");
 
         vm.LoadLayoutFromPath(path);
+        await vm.Firmware.InspectionTask;
 
-        Assert.True(vm.CanSetUpLiveFeatures);
-        Assert.False(vm.ShowLiveFeaturesHint);
+        Assert.True(vm.Firmware.CanSetUpLiveFeatures);
+        Assert.False(vm.Firmware.ShowLiveFeaturesHint);
     }
 
     [Fact]
-    public void DongleCopy_HintHiddenBecauseBlocked()
+    public async Task DongleCopy_HintHiddenBecauseBlocked()
     {
         var vm = TestMainVm.Create(new InMemorySettingsService(), shell: new FakeMainWindowShell());
         var (_, path) = KeymapCopy("dongle");
 
         vm.LoadLayoutFromPath(path);
+        await vm.Firmware.InspectionTask;
 
-        Assert.True(vm.CanSetUpLiveFeatures);
-        Assert.False(vm.ShowLiveFeaturesHint);
+        Assert.True(vm.Firmware.CanSetUpLiveFeatures);
+        Assert.False(vm.Firmware.ShowLiveFeaturesHint);
     }
 
     [Fact]
@@ -168,30 +175,33 @@ public sealed class MainWindowViewModelLiveFeaturesTests : IDisposable
         var vm = TestMainVm.Create(new InMemorySettingsService(), shell: new FakeMainWindowShell());
         vm.LoadLayoutFromPath(path);
 
-        Assert.False(vm.CanSetUpLiveFeatures);
-        Assert.False(vm.ShowLiveFeaturesHint);
-        Assert.False(vm.SetUpLiveFeaturesCommand.CanExecute(null));
+        Assert.False(vm.Firmware.CanSetUpLiveFeatures);
+        Assert.False(vm.Firmware.ShowLiveFeaturesHint);
+        Assert.False(vm.Firmware.SetUpLiveFeaturesCommand.CanExecute(null));
     }
 
     [Fact]
-    public void Dismiss_HidesHintAndStoresKey_FreshVmOnSameSettingsKeepsItHidden()
+    public async Task Dismiss_HidesHintAndStoresKey_FreshVmOnSameSettingsKeepsItHidden()
     {
         var settings = new InMemorySettingsService();
         var vm = TestMainVm.Create(settings, shell: new FakeMainWindowShell());
         var (root, path) = KeymapCopy("cosmos82");
         vm.LoadLayoutFromPath(path);
-        Assert.True(vm.ShowLiveFeaturesHint);
+        await vm.Firmware.InspectionTask;
+        Assert.True(vm.Firmware.ShowLiveFeaturesHint);
 
-        vm.DismissLiveFeaturesHintCommand.Execute(null);
+        vm.Firmware.DismissLiveFeaturesHintCommand.Execute(null);
+        await vm.Firmware.InspectionTask; // the dismissal re-reads the config
 
-        Assert.False(vm.ShowLiveFeaturesHint);
-        Assert.True(vm.CanSetUpLiveFeatures);
+        Assert.False(vm.Firmware.ShowLiveFeaturesHint);
+        Assert.True(vm.Firmware.CanSetUpLiveFeatures);
         Assert.Equal(new[] { root }, settings.Current.DismissedLiveFeatureHints);
 
         var vm2 = TestMainVm.Create(settings, shell: new FakeMainWindowShell());
         vm2.LoadLayoutFromPath(path);
-        Assert.True(vm2.CanSetUpLiveFeatures);
-        Assert.False(vm2.ShowLiveFeaturesHint);
+        await vm2.Firmware.InspectionTask;
+        Assert.True(vm2.Firmware.CanSetUpLiveFeatures);
+        Assert.False(vm2.Firmware.ShowLiveFeaturesHint);
     }
 
     [Fact]
@@ -201,13 +211,15 @@ public sealed class MainWindowViewModelLiveFeaturesTests : IDisposable
         var vm = TestMainVm.Create(new InMemorySettingsService(), shell: shell);
         var (root, path) = KeymapCopy("cosmos82");
         vm.LoadLayoutFromPath(path);
-        Assert.True(vm.ShowLiveFeaturesHint);
+        await vm.Firmware.InspectionTask;
+        Assert.True(vm.Firmware.ShowLiveFeaturesHint);
 
-        await vm.SetUpLiveFeaturesCommand.ExecuteAsync(null);
+        await vm.Firmware.SetUpLiveFeaturesCommand.ExecuteAsync(null);
+        await vm.Firmware.InspectionTask; // the saved wizard re-reads the config
 
         Assert.Equal(root, Assert.Single(shell.Contexts).LocalRoot);
-        Assert.True(vm.CanSetUpLiveFeatures);
-        Assert.False(vm.ShowLiveFeaturesHint);
+        Assert.True(vm.Firmware.CanSetUpLiveFeatures);
+        Assert.False(vm.Firmware.ShowLiveFeaturesHint);
     }
 
     [Fact]
@@ -223,7 +235,7 @@ public sealed class MainWindowViewModelLiveFeaturesTests : IDisposable
 
         vm.LoadLayoutFromPath(cached, entry);
 
-        await vm.SetUpLiveFeaturesCommand.ExecuteAsync(null);
+        await vm.Firmware.SetUpLiveFeaturesCommand.ExecuteAsync(null);
 
         var context = Assert.Single(shell.ModuleSetupContexts);
         Assert.Null(context.LocalRoot);
@@ -231,36 +243,151 @@ public sealed class MainWindowViewModelLiveFeaturesTests : IDisposable
     }
 
     [Fact]
-    public void BoardSwitch_UnloadsTheKeymapAndClearsBoth()
+    public async Task BoardSwitch_UnloadsTheKeymapAndClearsBoth()
     {
         var vm = TestMainVm.Create(new InMemorySettingsService(), shell: new FakeMainWindowShell());
         var (_, path) = KeymapCopy("cosmos82");
         vm.LoadLayoutFromPath(path);
-        Assert.True(vm.CanSetUpLiveFeatures);
-        Assert.True(vm.ShowLiveFeaturesHint);
+        await vm.Firmware.InspectionTask;
+        Assert.True(vm.Firmware.CanSetUpLiveFeatures);
+        Assert.True(vm.Firmware.ShowLiveFeaturesHint);
 
-        vm.SelectKeyboardCommand.Execute(KeyboardProfileRegistry.All.First(p => p.Id == "GO60"));
+        vm.SelectKeyboardCommand.Execute(KeyboardProfileRegistry.Bundled.First(p => p.Id == "GO60"));
 
-        Assert.False(vm.CanSetUpLiveFeatures);
-        Assert.False(vm.ShowLiveFeaturesHint);
+        Assert.False(vm.Firmware.CanSetUpLiveFeatures);
+        Assert.False(vm.Firmware.ShowLiveFeaturesHint);
     }
 
     [Fact]
-    public void StartingEdit_HidesBoth_LeavingTheEditShowsThemAgain()
+    public async Task StartingEdit_HidesBoth_LeavingTheEditShowsThemAgain()
     {
         var vm = TestMainVm.Create(new InMemorySettingsService(), shell: new FakeMainWindowShell());
         var (_, path) = KeymapCopy("cosmos82");
         vm.LoadLayoutFromPath(path);
-        Assert.True(vm.ShowLiveFeaturesHint);
+        await vm.Firmware.InspectionTask;
+        Assert.True(vm.Firmware.ShowLiveFeaturesHint);
 
         vm.StartEditCommand.Execute(null);
         Assert.True(vm.IsEditing);
-        Assert.False(vm.CanSetUpLiveFeatures);
-        Assert.False(vm.ShowLiveFeaturesHint);
+        Assert.False(vm.Firmware.CanSetUpLiveFeatures);
+        Assert.False(vm.Firmware.ShowLiveFeaturesHint);
 
         vm.DiscardEditCommand.Execute(null);
         Assert.False(vm.IsEditing);
-        Assert.True(vm.CanSetUpLiveFeatures);
-        Assert.True(vm.ShowLiveFeaturesHint);
+        Assert.True(vm.Firmware.CanSetUpLiveFeatures);
+        Assert.True(vm.Firmware.ShowLiveFeaturesHint);
+    }
+
+    /// <summary>The one edit lifecycle over all three affordances (the setup
+    /// item, the hint and the flash item) and their commands' enable state —
+    /// the child VM's <c>SetEditing</c> drives the whole set, not just the
+    /// half each sibling test covers.</summary>
+    [Fact]
+    public async Task Editing_HidesBothAffordances_AndLeavingShowsThemAgain()
+    {
+        var vm = TestMainVm.Create(new InMemorySettingsService(), shell: new FakeMainWindowShell());
+        var (_, path) = KeymapCopy("cosmos82");
+        vm.LoadLayoutFromPath(path);
+        await vm.Firmware.InspectionTask;
+        Assert.True(vm.Firmware.CanSetUpLiveFeatures);
+        Assert.True(vm.Firmware.ShowLiveFeaturesHint);
+        Assert.True(vm.Firmware.CanFlashKeyboard);
+
+        vm.StartEditCommand.Execute(null);
+        Assert.True(vm.IsEditing);
+        Assert.False(vm.Firmware.CanSetUpLiveFeatures);
+        Assert.False(vm.Firmware.ShowLiveFeaturesHint);
+        Assert.False(vm.Firmware.CanFlashKeyboard);
+        Assert.False(vm.Firmware.SetUpLiveFeaturesCommand.CanExecute(null));
+        Assert.False(vm.Firmware.FlashKeyboardCommand.CanExecute(null));
+
+        vm.DiscardEditCommand.Execute(null);
+        Assert.False(vm.IsEditing);
+        Assert.True(vm.Firmware.CanSetUpLiveFeatures);
+        Assert.True(vm.Firmware.ShowLiveFeaturesHint);
+        Assert.True(vm.Firmware.CanFlashKeyboard);
+        Assert.True(vm.Firmware.SetUpLiveFeaturesCommand.CanExecute(null));
+        Assert.True(vm.Firmware.FlashKeyboardCommand.CanExecute(null));
+    }
+
+    /// <summary>The flyout item comes from the path checks and is there the
+    /// moment the keymap is loaded; the hint is only decided once the
+    /// background config check is in.</summary>
+    [Fact]
+    public async Task Load_HintIsOffUntilTheCheckFinishes_ThenOn()
+    {
+        var vm = TestMainVm.Create(new InMemorySettingsService(), shell: new FakeMainWindowShell());
+        var (_, path) = KeymapCopy("cosmos82");
+
+        vm.LoadLayoutFromPath(path);
+
+        // Synchronously after the load: the flyout item is in, the check is
+        // still running.
+        Assert.True(vm.Firmware.CanSetUpLiveFeatures);
+
+        await vm.Firmware.InspectionTask;
+
+        Assert.True(vm.Firmware.ShowLiveFeaturesHint);
+    }
+
+    /// <summary>Two loads started back to back let both checks run at once;
+    /// only the newest one may set the hint, whatever order they finish in.</summary>
+    [Fact]
+    public async Task TwoLoadsInARow_OnlyTheSecondDecidesTheHint()
+    {
+        var vm = TestMainVm.Create(new InMemorySettingsService(), shell: new FakeMainWindowShell());
+        var (_, needsSetup) = KeymapCopy("cosmos82");
+        var (_, isSetUp) = KeymapCopy("glove80");
+
+        vm.LoadLayoutFromPath(needsSetup);
+        vm.LoadLayoutFromPath(isSetUp);
+
+        await vm.Firmware.InspectionTask;
+
+        // The set-up config is shown, so its result holds — the first
+        // config's check (which would set the hint) is dropped.
+        Assert.True(vm.Firmware.CanSetUpLiveFeatures);
+        Assert.False(vm.Firmware.ShowLiveFeaturesHint);
+    }
+
+    /// <summary>No zmk-config: there is nothing to check, so the task the
+    /// tests await is already completed.</summary>
+    [Fact]
+    public void Load_WithoutAConfig_InspectionTaskIsCompleted()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"lviz-livefeatures-notask-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        _tempDirs.Add(dir);
+        var path = Path.Combine(dir, "cosmos82.keymap");
+        File.WriteAllText(path, KeymapFixtures.Read("cosmos82.keymap"));
+
+        var vm = TestMainVm.Create(new InMemorySettingsService(), shell: new FakeMainWindowShell());
+        vm.LoadLayoutFromPath(path);
+
+        Assert.True(vm.Firmware.InspectionTask.IsCompleted);
+        Assert.False(vm.Firmware.CanSetUpLiveFeatures);
+        Assert.False(vm.Firmware.ShowLiveFeaturesHint);
+    }
+
+    /// <summary>A config whose files cannot be read: the check logs and
+    /// leaves the hint off, while the flyout item — decided by the path
+    /// checks alone — stays.</summary>
+    [Fact]
+    public async Task UnreadableConfig_HintOff_FlyoutItemStays()
+    {
+        var (root, path) = KeymapCopy("cosmos82");
+        // Hold the manifest with no sharing: the lookup's read meets an
+        // IO error, while the path checks (existence only) stay unaffected.
+        using var hold = new FileStream(
+            Path.Combine(root, "config", "west.yml"), FileMode.Open, FileAccess.Read, FileShare.None);
+
+        var vm = TestMainVm.Create(new InMemorySettingsService(), shell: new FakeMainWindowShell());
+        vm.LoadLayoutFromPath(path);
+
+        await vm.Firmware.InspectionTask;
+
+        Assert.False(vm.Firmware.ShowLiveFeaturesHint);
+        Assert.True(vm.Firmware.CanSetUpLiveFeatures);
+        Assert.True(vm.Firmware.SetUpLiveFeaturesCommand.CanExecute(null));
     }
 }

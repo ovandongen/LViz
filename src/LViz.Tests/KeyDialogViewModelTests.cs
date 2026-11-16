@@ -1,5 +1,6 @@
 using LViz.App.Localization;
 using LViz.App.ViewModels;
+using LViz.Core.Keymap;
 using LViz.Core.Keymap.Catalog;
 using LViz.Core.Keymap.Parser;
 using LViz.Core.Keymap.Writer;
@@ -720,6 +721,23 @@ public class KeyDialogViewModelTests
             Binding = binding,
             Caption = caption,
         });
+
+    [Theory]
+    [InlineData(ModifierStyle.Windows, "⊞")]
+    [InlineData(ModifierStyle.Mac, "⌘")]
+    public void RequestModifierStyle_ReachesThePickerItems(ModifierStyle style, string expected)
+    {
+        var vm = new KeyDialogViewModel(new KeyDialogRequest(Config, Defines, 0, -1)
+        {
+            Binding = new KeyBinding("&kp", ["A"]),
+            ModifierStyle = style,
+        });
+        var picker = Picker(vm, 0);
+
+        picker.SearchText = "LGUI";
+
+        Assert.Equal(expected, picker.Items.First(i => i.Keycode.Name == "LEFT_GUI").Glyph);
+    }
 
     private static KeyBehaviorChoice Choice(KeyDialogViewModel vm, string code) =>
         vm.QuickBehaviors.Concat(vm.AllOtherBehaviors).First(choice => choice.Code == code);

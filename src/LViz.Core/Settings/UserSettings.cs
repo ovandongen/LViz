@@ -7,7 +7,7 @@ public record UserSettings
 {
     /// <summary>
     /// Bumped on any breaking schema change (rename, type change, removed
-    /// required field). <see cref="Settings.SettingsService.Load"/> uses this
+    /// required field). <see cref="Settings.SettingsService.Read"/> uses this
     /// to dispatch migrations and to refuse files written by a newer version
     /// rather than silently nuking them.
     /// </summary>
@@ -18,8 +18,8 @@ public record UserSettings
 
     /// <summary>
     /// Which keyboard profile to render. Matches an
-    /// <see cref="Layout.IKeyboardProfile.Id"/> in
-    /// <see cref="Layout.KeyboardProfileRegistry.All"/>. Unresolved ids fall
+    /// <see cref="Layout.IKeyboardProfile.Id"/> offered by the
+    /// <see cref="Layout.KeyboardProfileRegistry"/>. Unresolved ids fall
     /// back to Corne so a stale id from a removed board doesn't brick startup.
     /// </summary>
     public string Keyboard { get; init; } = "Corne";

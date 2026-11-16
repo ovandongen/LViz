@@ -1,4 +1,3 @@
-using System.IO;
 using System.Text;
 using LViz.App.Localization;
 using LViz.App.Services.GitHub;

@@ -9,10 +9,14 @@ namespace LViz.Tests;
 /// Covers <see cref="SignalDispatcher"/>: a bound signal.fire id runs its
 /// pipeline, an unbound id runs nothing, and a non-signal report is ignored.
 /// Dispatch happens off the read thread (Task.Run), so the bound case waits on
-/// the runner's signal.
+/// the runner's signal. The positive waits are generous: under the parallel
+/// suite on a CPU-quota-limited runner (where <c>Environment.ProcessorCount</c>
+/// is 1) the dispatch item can start seconds late; the negative waits stay at
+/// 150 ms because "nothing ran" does not get slower on a slow machine.
 /// </summary>
 public class SignalDispatcherTests
 {
+    private static readonly TimeSpan RunTimeout = TimeSpan.FromSeconds(10);
     private sealed class RecordingRunner : IPipelineRunner
     {
         public List<string> Ran { get; } = new();
@@ -70,7 +74,7 @@ public class SignalDispatcherTests
 
         device.RaiseReport(SignalFire(7));
 
-        Assert.True(runner.Fired.Wait(TimeSpan.FromSeconds(2)), "bound signal should run a pipeline");
+        Assert.True(runner.Fired.Wait(RunTimeout), "bound signal should run a pipeline");
         Assert.Equal("flash", Assert.Single(runner.Ran));
         dispatcher.Dispose();
     }
@@ -132,7 +136,7 @@ public class SignalDispatcherTests
 
         bean.RaiseReport(SignalFire(0));
 
-        Assert.True(runner.Fired.Wait(TimeSpan.FromSeconds(2)));
+        Assert.True(runner.Fired.Wait(RunTimeout));
         Assert.Equal("bean", Assert.Single(runner.Ran));
         dispatcher.Dispose();
     }

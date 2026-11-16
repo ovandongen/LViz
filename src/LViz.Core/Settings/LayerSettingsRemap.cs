@@ -34,7 +34,7 @@ public sealed record LayerSettingsRemapResult(UserSettings Settings, IReadOnlyLi
 /// layers were added, deleted or moved, so colours, hidden flags, key labels,
 /// app→layer rules and the mouse layer travel with their layer.
 ///
-/// <para><paramref name="map"/> has one entry per old layer: <c>map[i]</c> is
+/// <para><c>map</c> has one entry per old layer: <c>map[i]</c> is
 /// layer i's new index, <c>null</c> when it was deleted (see
 /// <c>KeymapEditSession.BaselineLayerMap()</c>). An index outside the map's
 /// range keeps its setting where it is — a layer the map doesn't mention is

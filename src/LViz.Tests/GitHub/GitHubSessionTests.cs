@@ -1,3 +1,4 @@
+using System.Net;
 using LViz.Core.GitHub;
 using LViz.Core.Persistence;
 using Xunit;
@@ -5,7 +6,8 @@ using Xunit;
 namespace LViz.Tests.GitHub;
 
 /// <summary>
-/// <see cref="GitHubSession"/>: restoring the stored login, handing out a
+/// <see cref="GitHubSession"/>: restoring the stored login at most once,
+/// completing the device flow, handing out a
 /// valid access token (refreshing near expiry, single-flight), signing out,
 /// and keeping two sessions under different secret keys apart. Runs on
 /// <see cref="InMemorySecretStore"/> and a real
@@ -111,6 +113,41 @@ public class GitHubSessionTests
         Assert.True(_session.IsSignedIn);
         Assert.True(_session.IsPersisted);
         Assert.Empty(_handler.Requests);
+    }
+
+    // ---- EnsureRestoredAsync ----
+
+    [Fact]
+    public async Task EnsureRestored_ConcurrentAndLaterCalls_ReadStoreOnce()
+    {
+        // Empty store on purpose: an unsigned-in session re-reads on every
+        // RestoreAsync call, so the single read pins THIS session's task
+        // cache, not its signed-in short-circuit.
+        var counting = new CountingSecretStore(_store);
+        var session = SessionOver(counting);
+
+        await Task.WhenAll(session.EnsureRestoredAsync(), session.EnsureRestoredAsync());
+        await session.EnsureRestoredAsync();
+
+        Assert.Equal(1, counting.Reads);
+        Assert.False(session.IsSignedIn);
+    }
+
+    [Fact]
+    public async Task EnsureRestored_AfterFaultedRestore_RetriesOnNextCall()
+    {
+        // A first read that throws must not stay dead: the faulted attempt is
+        // dropped and the next call restores the login the store holds.
+        await Store(Tokens(Base.AddHours(8)));
+        var session = SessionOver(new ThrowingOnceSecretStore(_store));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => session.EnsureRestoredAsync());
+
+        Assert.False(session.IsSignedIn);
+        await session.EnsureRestoredAsync();
+
+        Assert.True(session.IsSignedIn);
+        Assert.Equal(Login, session.Login);
     }
 
     // ---- GetAccessTokenAsync ----
@@ -272,6 +309,41 @@ public class GitHubSessionTests
         Assert.Equal(0, changes);
     }
 
+    // ---- Device flow ----
+
+    [Fact]
+    public async Task CompleteSignIn_AdoptsTheLoginAndStoresIt()
+    {
+        // pending once, then the grant; the session's delay returns instantly.
+        var polls = new Queue<Func<HttpResponseMessage>>([
+            () => FakeHttpHandler.Json("{\"error\":\"authorization_pending\"}"),
+            () => FakeHttpHandler.Json(GrantJson()),
+        ]);
+        _handler.Respond = request => request.RequestUri!.AbsolutePath switch
+        {
+            "/login/device/code" => FakeHttpHandler.Json(DeviceCodeJson()),
+            "/login/oauth/access_token" => polls.Dequeue()(),
+            "/user" => FakeHttpHandler.Json($$"""{"login":"{{Login}}"}"""),
+            _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+        };
+        var session = new GitHubSession(
+            new GitHubClient(new HttpClient(_handler), ClientId, UserAgent, () => _now),
+            _store,
+            () => _now,
+            delay: static (_, _) => Task.CompletedTask);
+
+        var code = await session.StartSignInAsync();
+        await session.CompleteSignInAsync(code);
+
+        Assert.True(session.IsSignedIn);
+        Assert.Equal(Login, session.Login);
+
+        var stored = GitHubTokens.TryFromJson(await _store.ReadAsync(GitHubAppInfo.SecretKey));
+        Assert.NotNull(stored);
+        Assert.Equal("ghu_fresh", stored.AccessToken);
+        Assert.Equal(Login, stored.Login);
+    }
+
     // ---- A second App under its own secret key ----
 
     [Fact]
@@ -349,6 +421,18 @@ public class GitHubSessionTests
             () => _now,
             GitHubBuildsAppInfo.SecretKey);
 
+    /// <summary>A session on this test's client and clock, reading through <paramref name="store"/>.</summary>
+    private GitHubSession SessionOver(ISecretStore store) =>
+        new(new GitHubClient(new HttpClient(_handler), ClientId, UserAgent, () => _now), store, () => _now);
+
+    private static string DeviceCodeJson() =>
+        "{\"device_code\":\"dc-1\",\"user_code\":\"ABCD-1234\","
+        + "\"verification_uri\":\"https://github.com/login/device\",\"expires_in\":900,\"interval\":5}";
+
+    private static string GrantJson() =>
+        "{\"access_token\":\"ghu_fresh\",\"expires_in\":28800,"
+        + "\"refresh_token\":\"ghr_fresh\",\"refresh_token_expires_in\":15897600}";
+
     private static string RefreshedJson() =>
         "{\"access_token\":\"" + NewAccessToken + "\",\"expires_in\":28800,"
         + "\"refresh_token\":\"" + NewRefreshToken + "\",\"refresh_token_expires_in\":15897600}";
@@ -396,5 +480,40 @@ public class GitHubSessionTests
             Task.FromResult(false);
 
         public Task DeleteAsync(string key, CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    /// <summary>Wraps a store and counts reads, to prove the restore ran once.</summary>
+    private sealed class CountingSecretStore(ISecretStore inner) : ISecretStore
+    {
+        private int _reads;
+
+        public int Reads => Volatile.Read(ref _reads);
+
+        public Task<string?> ReadAsync(string key, CancellationToken ct = default)
+        {
+            Interlocked.Increment(ref _reads);
+            return inner.ReadAsync(key, ct);
+        }
+
+        public Task<bool> WriteAsync(string key, string value, CancellationToken ct = default) =>
+            inner.WriteAsync(key, value, ct);
+
+        public Task DeleteAsync(string key, CancellationToken ct = default) => inner.DeleteAsync(key, ct);
+    }
+
+    /// <summary>A store whose first read throws — a keychain that loses the startup race.</summary>
+    private sealed class ThrowingOnceSecretStore(ISecretStore inner) : ISecretStore
+    {
+        private int _reads;
+
+        public Task<string?> ReadAsync(string key, CancellationToken ct = default) =>
+            Interlocked.Increment(ref _reads) == 1
+                ? Task.FromException<string?>(new InvalidOperationException("keychain unavailable"))
+                : inner.ReadAsync(key, ct);
+
+        public Task<bool> WriteAsync(string key, string value, CancellationToken ct = default) =>
+            inner.WriteAsync(key, value, ct);
+
+        public Task DeleteAsync(string key, CancellationToken ct = default) => inner.DeleteAsync(key, ct);
     }
 }

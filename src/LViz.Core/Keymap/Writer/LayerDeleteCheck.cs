@@ -32,6 +32,7 @@ public enum LayerDeleteBlockerKind
 /// <summary>
 /// One reason a layer cannot be deleted.
 /// </summary>
+/// <param name="Kind">What kind of reason this blocker reports.</param>
 /// <param name="Name">The combo name, the conditional-layer node name, the
 /// define name, or the name of the node the reference sits in (<c>""</c> when it
 /// sits outside any named node). For <see cref="LayerDeleteBlockerKind.LastLayer"/>
@@ -44,7 +45,7 @@ public enum LayerDeleteBlockerKind
 public sealed record LayerDeleteBlocker(LayerDeleteBlockerKind Kind, string Name, int Line);
 
 /// <summary>
-/// What <see cref="KeymapLayerWriter.CheckDelete"/> answers: whether the delete
+/// What <see cref="KeymapLayerWriter.CheckDelete(string, int)"/> answers: whether the delete
 /// is possible and what it would do to the keys.
 /// </summary>
 /// <param name="Blockers">Every reason the delete is refused, empty when it is

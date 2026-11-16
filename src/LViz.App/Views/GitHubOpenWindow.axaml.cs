@@ -10,11 +10,12 @@ namespace LViz.App.Views;
 /// VM closes the dialog by raising <see cref="GitHubOpenViewModel.CloseRequested"/>
 /// (null = cancel, a <see cref="GitHubOpenSelection"/> = chosen keymap),
 /// which this code-behind turns into <c>Close(result)</c> — so
-/// <c>ShowDialog</c> returns exactly that. The window supplies the clipboard
-/// hook and starts the VM's restore on <see cref="Window.Opened"/>;
-/// closing the window via its chrome runs the VM's Cancel so a pending
-/// sign-in wait does not outlive the window. The browser hook
-/// (<c>OpenUrl</c>) is wired by App.axaml.cs, not here.
+/// <c>ShowDialog</c> returns exactly that. The window starts the VM's
+/// restore on <see cref="Avalonia.Controls.TopLevel.Opened"/>; the browser
+/// and clipboard are the <see cref="LViz.App.Services.IDesktopInteraction"/>
+/// the shell built the VM with, not hooks this window plugs in; closing the
+/// window via its chrome runs the VM's Cancel so a pending sign-in wait does
+/// not outlive the window.
 /// </summary>
 public partial class GitHubOpenWindow : Window
 {
@@ -48,7 +49,6 @@ public partial class GitHubOpenWindow : Window
         if (DataContext is not GitHubOpenViewModel vm)
             return;
 
-        vm.CopyToClipboard = text => TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(text) ?? Task.CompletedTask;
         vm.CloseRequested += OnCloseRequested;
         _boundVm = vm;
     }

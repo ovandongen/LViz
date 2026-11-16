@@ -3,15 +3,18 @@ namespace LViz.Core.Layout;
 /// <summary>
 /// Resolves a <see cref="IKeyboardProfile"/> by string id
 /// (matching <see cref="Settings.UserSettings.Keyboard"/>). Bundled boards are
-/// compiled in; user layouts join at startup via <see cref="SetUserProfiles"/>.
+/// compiled in (<see cref="Bundled"/>); user layouts join through the
+/// constructor or <see cref="SetUserProfiles"/>. The app has one instance,
+/// built by the container (AppServices) with the layouts on disk; the
+/// view-models receive it.
 /// </summary>
-public static class KeyboardProfileRegistry
+public sealed class KeyboardProfileRegistry
 {
     // Order matters: when no plugged-in keyboard breaks the tie, the key-count
     // auto-switch (FindByKeyCount) accepts the first bundled profile whose key
     // count matches the loaded keymap. Corne stays first so the as-shipped
     // default resolves without scanning.
-    private static readonly IKeyboardProfile[] Profiles =
+    public static IReadOnlyList<IKeyboardProfile> Bundled { get; } =
     [
         new CorneProfile(),
         new ADuxProfile(),
@@ -22,22 +25,33 @@ public static class KeyboardProfileRegistry
         new Glove80Profile(),
     ];
 
-    // User layouts loaded from UserLayoutStore at startup (App.axaml.cs),
-    // ids "user:<id>" so they can never collide with the bundled ids above.
-    // SetUserProfiles swaps the whole array; it is never mutated in place.
-    private static IKeyboardProfile[] UserProfiles = [];
+    // User layouts from UserLayoutStore (loaded where the registry is built,
+    // in AppServices), ids "user:<id>" so they can never collide with the
+    // bundled ids above. SetUserProfiles swaps the whole array; it is never
+    // mutated in place, so a reader on another thread sees the old or the
+    // new list.
+    private IKeyboardProfile[] _userProfiles = [];
+
+    /// <summary>Only the bundled boards.</summary>
+    public KeyboardProfileRegistry()
+    {
+    }
+
+    /// <summary>The bundled boards plus these user layouts.</summary>
+    public KeyboardProfileRegistry(IEnumerable<IKeyboardProfile> userProfiles) =>
+        _userProfiles = [.. userProfiles];
 
     /// <summary>Replaces the user layouts offered alongside the bundled boards.</summary>
-    public static void SetUserProfiles(IEnumerable<IKeyboardProfile> profiles) =>
-        UserProfiles = [.. profiles];
+    public void SetUserProfiles(IEnumerable<IKeyboardProfile> profiles) =>
+        _userProfiles = [.. profiles];
 
     /// <summary>Bundled boards first, then user layouts — the picker order.</summary>
-    public static IReadOnlyList<IKeyboardProfile> All => [.. Profiles, .. UserProfiles];
+    public IReadOnlyList<IKeyboardProfile> All => [.. Bundled, .. _userProfiles];
 
-    public static IKeyboardProfile Resolve(string id) =>
+    public IKeyboardProfile Resolve(string id) =>
         FindById(id) ?? throw new ArgumentException($"Unknown keyboard id '{id}'", nameof(id));
 
-    public static bool TryResolve(string id, out IKeyboardProfile profile)
+    public bool TryResolve(string id, out IKeyboardProfile profile)
     {
         var found = FindById(id);
         profile = found!;
@@ -46,7 +60,7 @@ public static class KeyboardProfileRegistry
 
     /// <summary>The profile with this id, or the Corne when the id is unknown,
     /// null or empty: the board the app starts on.</summary>
-    public static IKeyboardProfile ResolveOrDefault(string? id) =>
+    public IKeyboardProfile ResolveOrDefault(string? id) =>
         !string.IsNullOrEmpty(id) && TryResolve(id, out var profile) ? profile : new CorneProfile();
 
     /// <summary>
@@ -58,11 +72,11 @@ public static class KeyboardProfileRegistry
     /// bundled board — if the user installed a layout for a board, that's the
     /// one they mean — and bundled boards go in registry order.
     /// </summary>
-    public static IKeyboardProfile? FindByKeyCount(
+    public IKeyboardProfile? FindByKeyCount(
         int keyCount, IReadOnlyCollection<string>? attachedHidNames = null)
     {
         IKeyboardProfile[] candidates =
-            [.. UserProfiles.Where(p => p.KeyCount == keyCount), .. Profiles.Where(p => p.KeyCount == keyCount)];
+            [.. _userProfiles.Where(p => p.KeyCount == keyCount), .. Bundled.Where(p => p.KeyCount == keyCount)];
         if (attachedHidNames is { Count: > 0 })
         {
             var attached = candidates.FirstOrDefault(p => attachedHidNames.Any(p.NameMatches));
@@ -72,6 +86,6 @@ public static class KeyboardProfileRegistry
         return candidates.FirstOrDefault();
     }
 
-    private static IKeyboardProfile? FindById(string id) =>
+    private IKeyboardProfile? FindById(string id) =>
         All.FirstOrDefault(p => p.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
 }

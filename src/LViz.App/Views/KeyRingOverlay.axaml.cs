@@ -1,12 +1,7 @@
-using System;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.VisualTree;
-using LViz.App.Ring;
 using LViz.App.ViewModels;
 // Avalonia.Input also declares a KeyBinding, so the model type is aliased.
 using ZmkKeyBinding = LViz.Core.Models.KeyBinding;

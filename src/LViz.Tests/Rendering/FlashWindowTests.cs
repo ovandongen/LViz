@@ -10,7 +10,6 @@ using LViz.App.ViewModels;
 using LViz.App.Views;
 using LViz.Core.Firmware;
 using LViz.Core.GitHub;
-using LViz.Core.ZmkConfig;
 using LViz.Tests.ZmkConfig;
 using Xunit;
 
@@ -82,7 +81,7 @@ public class FlashWindowTests
             new NullBuilds(),
             new FirmwareFlashHistory(Path.Combine(Path.GetTempPath(), $"lviz-flashwin-{Guid.NewGuid():N}.json")),
             keyboard,
-            new FlashRun(keyboard, new Uf2DriveWatcher(new NoDrives())));
+            new FlashRun(keyboard, new Uf2DriveWatcher(new NoDrives())), new FakeDesktopInteraction());
     }
 
     /// <summary>Shows the window on the VM and lets the first layout and

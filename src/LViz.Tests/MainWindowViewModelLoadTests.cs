@@ -221,7 +221,7 @@ public class MainWindowViewModelLoadTests
     private static FakeKeymapStateService SlabKeymap(string path) =>
         new(new KeymapLoadResult.Success(SampleKeymap(), path, LayerCount: 2, FirstLayerBindingCount: 42));
 
-    private static string Go60DisplayName => KeyboardProfileRegistry.Resolve("GO60").DisplayName;
+    private static string Go60DisplayName => new KeyboardProfileRegistry().Resolve("GO60").DisplayName;
 
     [Fact]
     public void LoadLayoutFromPath_KeepBoard_Mismatch_StaysAndDropsBooking()
@@ -407,7 +407,7 @@ public class MainWindowViewModelLoadTests
         var ok = new FakeKeymapStateService(
             new KeymapLoadResult.Success(SampleKeymap(), "ok.keymap", LayerCount: 2, FirstLayerBindingCount: 42));
         var vm = TestMainVm.Create(settings, keymapState: ok);
-        var glove80 = KeyboardProfileRegistry.All.First(p => p.Id == "Glove80");
+        var glove80 = KeyboardProfileRegistry.Bundled.First(p => p.Id == "Glove80");
 
         var raised = new List<string?>();
         vm.Recents.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
@@ -740,7 +740,7 @@ public class MainWindowViewModelLoadTests
             Assert.Equal("Sofle", vm.SelectedKeyboard.Id);
             Assert.False(vm.LayerTabs.Layers[1].IsShown);
 
-            vm.SelectKeyboardCommand.Execute(KeyboardProfileRegistry.All.First(p => p.Id == "GO60"));
+            vm.SelectKeyboardCommand.Execute(KeyboardProfileRegistry.Bundled.First(p => p.Id == "GO60"));
 
             Assert.True(vm.HasLayoutLoaded);
             Assert.True(vm.LayerTabs.Layers[1].IsShown);
@@ -762,7 +762,7 @@ public class MainWindowViewModelLoadTests
         vm.LoadLayoutFromPath("sixty.keymap");
         Assert.Equal("Sofle", vm.SelectedKeyboard.Id);
 
-        vm.SelectKeyboardCommand.Execute(KeyboardProfileRegistry.All.First(p => p.Id == "GO60"));
+        vm.SelectKeyboardCommand.Execute(KeyboardProfileRegistry.Bundled.First(p => p.Id == "GO60"));
 
         Assert.Equal("GO60", vm.SelectedKeyboard.Id);
         Assert.False(vm.HasLayoutLoaded);
@@ -793,7 +793,7 @@ public class MainWindowViewModelLoadTests
             var fake = SlabKeymap(path);
             var vm = TestMainVm.Create(settings, keymapState: fake);
 
-            vm.SelectKeyboardCommand.Execute(KeyboardProfileRegistry.All.First(p => p.Id == "GO60"));
+            vm.SelectKeyboardCommand.Execute(KeyboardProfileRegistry.Bundled.First(p => p.Id == "GO60"));
 
             Assert.Equal("GO60", vm.SelectedKeyboard.Id);
             Assert.Equal("GO60", settings.Current.Keyboard);
@@ -827,7 +827,7 @@ public class MainWindowViewModelLoadTests
             var ok = SixtyKeymap(path);
             var vm = TestMainVm.Create(settings, keymapState: ok);
 
-            vm.SelectKeyboardCommand.Execute(KeyboardProfileRegistry.All.First(p => p.Id == "GO60"));
+            vm.SelectKeyboardCommand.Execute(KeyboardProfileRegistry.Bundled.First(p => p.Id == "GO60"));
 
             Assert.True(vm.HasLayoutLoaded);
             Assert.Equal(path, vm.LoadedLayoutPath);

@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Text;
-using LViz.Core.Keymap;
 using LViz.Core.Keymap.Editing;
 using LViz.Core.Keymap.Parser;
 using LViz.Core.Layout.Dtsi;
@@ -22,11 +21,11 @@ namespace LViz.Core.Keymap.Writer;
 /// A layer that is deleted takes its block, its own <c>#define</c> line and the
 /// layer references pointing at it out of the file — and refuses, before
 /// touching anything, a layer something outside the layer blocks still uses
-/// (see <see cref="CheckDelete"/>).
+/// (see <see cref="CheckDelete(string, int)"/>).
 /// The result is re-parsed and compared with <see cref="LayerReferenceRemapper.Apply"/>
 /// on the original config; any difference throws and returns nothing, so a
 /// keymap is never written out pointing at the wrong layer.
-/// Pure function: no I/O, <paramref name="source"/> is never modified.
+/// Pure function: no I/O, <c>source</c> is never modified.
 /// </summary>
 public static class KeymapLayerWriter
 {
@@ -43,7 +42,7 @@ public static class KeymapLayerWriter
     /// </exception>
     /// <exception cref="InvalidOperationException">
     /// A <see cref="LayerStructureEdit.Delete"/> is refused by
-    /// <see cref="CheckDelete"/> — the blockers are named in the message — or
+    /// <see cref="CheckDelete(string, int)"/> — the blockers are named in the message — or
     /// the written text does not re-parse to the expected model.
     /// </exception>
     public static string Apply(string source, LayerStructureEdit edit)

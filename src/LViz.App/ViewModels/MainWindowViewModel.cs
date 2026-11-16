@@ -8,7 +8,6 @@ using LViz.App.Services.GitHub;
 using LViz.Core.Diagnostics;
 using LViz.Core.Keymap;
 using LViz.Core.Layout;
-using LViz.Core.Models;
 using LViz.Core.Persistence;
 using LViz.Core.Settings;
 
@@ -53,14 +52,9 @@ public partial class MainWindowViewModel : ObservableObject
 
     // GitHub keymap opener (sign-in, repo refresh, open). Null in tests that
     // don't wire it — GitHub entries then only ever load from nothing and a
-    // click on one toasts "GitHub is not available".
+    // click on one toasts "GitHub isn't available".
     private readonly IGitHubKeymapService? _gitHub;
 
-    // Follows the Actions build of the commit LViz just saved to a GitHub
-    // zmk-config so the status bar can offer the firmware. Null in tests that
-    // don't wire it; its Changed event fires on a background thread and is
-    // marshalled in the constructor.
-    private readonly FirmwareBuildWatcher? _firmwareWatcher;
     private readonly IKeymapEditDialogs _editDialogs;
     private readonly IMainWindowShell _shell;
 
@@ -68,6 +62,10 @@ public partial class MainWindowViewModel : ObservableObject
     // the shared one; tests point it at a temp folder. Only ever written by a
     // part-6 save, never by entering or leaving edit mode.
     private readonly KeymapBackupStore _keymapBackups;
+
+    // The one profile registry (bundled boards + user layouts), from the
+    // container. Every profile resolution and the picker list go through it.
+    private readonly KeyboardProfileRegistry _profiles;
 
     private IKeyboardProfile _profile;
     // Last successful load's status text. Null when the current StatusMessage
@@ -186,6 +184,12 @@ public partial class MainWindowViewModel : ObservableObject
     /// <summary>The layer tab strip: tabs, colours, hidden layers, edit-mode tab actions.</summary>
     public LayerTabsViewModel LayerTabs { get; }
 
+    /// <summary>The loaded config's live-features and flashing entry points
+    /// (the flyout's setup/flash items, the status-bar hint and firmware
+    /// build line); bound directly as <c>Firmware.X</c>. It owns the config
+    /// lookup, the firmware build watch and the flash window hand-off.</summary>
+    public FirmwareViewModel Firmware { get; }
+
     /// <summary>
     /// Sets or clears a per-(layer, key) label override for the currently
     /// active keyboard profile. Persists to
@@ -197,8 +201,11 @@ public partial class MainWindowViewModel : ObservableObject
     /// </summary>
     public void SetKeyLabelOverride(int layerIndex, int keyIndex, KeyLabelOverride? value)
     {
-        KeyLabelOverrides.Set(_profile.Id, layerIndex, keyIndex, value);
-        PersistSetting(s => s with { KeyLabelOverrides = KeyLabelOverrides.Snapshot() });
+        var profileId = _profile.Id;
+        PersistSetting(s => s with
+        {
+            KeyLabelOverrides = KeyLabelOverrides.With(s.KeyLabelOverrides, profileId, layerIndex, keyIndex, value),
+        });
 
         if (_keymap.HasLayout && layerIndex == ActiveLayerIndex)
             ApplyActiveLayer(ActiveLayerIndex);
@@ -219,19 +226,21 @@ public partial class MainWindowViewModel : ObservableObject
         if (keyIndex < 0 || keyIndex >= Board.Keys.Count) return null;
 
         var r = km.Resolve(layerIndex, keyIndex);
-        var (label, sub, top) = KeyLabelFormatter.FormatBinding(r.Binding, r.TargetLayerName, r.HoldTap, km.MacrosByName);
+        var (label, sub, top) = KeyLabelFormatter.FormatBinding(
+            r.Binding, ModifierStyles.FromSetting(_settingsService.Current.ModifierStyle),
+            r.TargetLayerName, r.HoldTap, km.MacrosByName);
         var parts = new List<string>();
         if (!string.IsNullOrEmpty(top)) parts.Add($"[{top}]");
         if (!string.IsNullOrEmpty(label)) parts.Add(label);
         if (!string.IsNullOrEmpty(sub)) parts.Add($"({sub})");
         var hint = parts.Count > 0 ? string.Join(" ", parts) : r.Binding.Display;
 
-        var existing = KeyLabelOverrides.Get(_profile.Id, layerIndex, keyIndex);
+        var existing = KeyLabelOverrides.Get(_settingsService.Current, _profile.Id, layerIndex, keyIndex);
         return (hint, existing);
     }
 
     /// <summary>All keyboard profiles the user can switch between, for the picker flyout.</summary>
-    public IReadOnlyList<IKeyboardProfile> AvailableKeyboards => KeyboardProfileRegistry.All;
+    public IReadOnlyList<IKeyboardProfile> AvailableKeyboards => _profiles.All;
 
     /// <summary>
     /// Currently selected profile. Bound to the picker button label and drives
@@ -313,7 +322,8 @@ public partial class MainWindowViewModel : ObservableObject
         IGitHubKeymapService? gitHub,
         FirmwareBuildWatcher? firmwareWatcher,
         DeviceStack devices,
-        ShownLayer shownLayer)
+        ShownLayer shownLayer,
+        KeyboardProfileRegistry profiles)
     {
         _settingsService = settingsService;
         Library = new KeymapLibrary(settingsService, gitHub);
@@ -321,12 +331,10 @@ public partial class MainWindowViewModel : ObservableObject
         _shell = shell;
         _keymap = keymapState;
         _gitHub = gitHub;
-        _firmwareWatcher = firmwareWatcher;
-        if (_firmwareWatcher is not null)
-            _firmwareWatcher.Changed += () => Avalonia.Threading.Dispatcher.UIThread.Post(RefreshFirmwareStatus);
         _keymapBackups = keymapBackups;
+        _profiles = profiles;
         var s = settingsService.Current;
-        _profile = KeyboardProfileRegistry.ResolveOrDefault(s.Keyboard);
+        _profile = _profiles.ResolveOrDefault(s.Keyboard);
         Recents = new RecentKeymapsViewModel(
             Library,
             () => _profile.Id,
@@ -344,7 +352,7 @@ public partial class MainWindowViewModel : ObservableObject
         Preferences = new WindowPreferencesViewModel(settingsService, s);
         Preferences.ModifierStyleChanged += () =>
         {
-            // Rebuilds every key's labels against the freshly-set static.
+            // Rebuilds every key's labels; the paint reads the new style from settings.
             if (_keymap.HasLayout) ApplyActiveLayer(ActiveLayerIndex);
         };
 
@@ -364,16 +372,19 @@ public partial class MainWindowViewModel : ObservableObject
         Board = new BoardSurfaceViewModel(
             _profile, boardLayout, boardStyle,
             keys => new ComboLegendViewModel(
-                keys, boardStyle, s.ComboOverlayVisible, () => _profile.Id, settingsService, _shell));
+                keys, boardStyle, s.ComboOverlayVisible, () => _profile.Id,
+                () => ModifierStyles.FromSetting(settingsService.Current.ModifierStyle),
+                settingsService, _shell));
         SyncKeyCallbacks();
         LayerTabs = new LayerTabsViewModel(() => _profile.Id, settingsService);
         LayerTabs.LayerPicked += OnLayerPicked;
         LayerTabs.ColorsChanged += OnLayerColorsChanged;
-        // Seed the static palette with persisted per-keyboard, per-layer overrides
-        // so the very first paint already reflects the user's customization.
-        LayerColorPalette.SetOverrides(s.LayerColors);
-        KeyLabelOverrides.SetOverrides(s.KeyLabelOverrides);
-        ComboLabelOverrides.SetOverrides(s.ComboLabelOverrides);
+        // The live-features + flashing child VM; it marshals the watcher's
+        // Changed event itself. WithKeyTrackingAsync hands it the rule for
+        // running the device stack around a flash window.
+        Firmware = new FirmwareViewModel(
+            settingsService, shell, gitHub, firmwareWatcher, devices,
+            WithKeyTrackingAsync);
 
         _hostActionExecutor = hostActionExecutor;
         Devices = devices;
@@ -426,7 +437,7 @@ public partial class MainWindowViewModel : ObservableObject
             catch (Exception ex)
             {
                 SetLoadStatusBase(null);
-                StatusMessage = $"Could not open log folder: {ex.Message}";
+                StatusMessage = Loc.Instance.Format("Status_OpenLogFolderFailedFormat", ex.Message);
             }
         });
         CopyDiagnosticsCommand = new AsyncRelayCommand(CopyDiagnosticsAsync);
@@ -494,57 +505,10 @@ public partial class MainWindowViewModel : ObservableObject
 
         ActiveLayerIndex = index;
 
-        for (int i = 0; i < Board.Keys.Count; i++)
-        {
-            if (edit is null)
-            {
-                // Resolution (including &trans fall-through) lives on LoadedKeymap;
-                // here we just paint the resolved binding onto the key VM.
-                var r = km.Resolve(index, i);
-                Board.Keys[i].ApplyBinding(
-                    r.Binding,
-                    activeLayerIndex: index,
-                    targetLayer: r.TargetLayer,
-                    targetLayerName: r.TargetLayerName,
-                    profileId: _profile.Id,
-                    holdTap: r.HoldTap,
-                    macros: km.MacrosByName);
-                Board.Keys[i].IsEditChanged = false;
-                Board.Keys[i].IsEditSelected = false;
-                continue;
-            }
-
-            // Edit mode shows the layer's OWN binding — &trans paints ▽ and
-            // &none empty, no fall-through — and ignores per-key label
-            // overrides, so the user sees exactly what a save will write.
-            var bindings = km.Layers[index].Bindings;
-            var literal = i < bindings.Count ? bindings[i] : KeyBinding.Transparent;
-            if (literal.Behavior is "&trans" or "&none")
-            {
-                Board.Keys[i].ApplyBinding(
-                    literal,
-                    activeLayerIndex: index,
-                    targetLayer: null,
-                    targetLayerName: null,
-                    profileId: _profile.Id,
-                    ignoreLabelOverride: true);
-            }
-            else
-            {
-                var r = km.Resolve(index, i);
-                Board.Keys[i].ApplyBinding(
-                    r.Binding,
-                    activeLayerIndex: index,
-                    targetLayer: r.TargetLayer,
-                    targetLayerName: r.TargetLayerName,
-                    profileId: _profile.Id,
-                    holdTap: r.HoldTap,
-                    macros: km.MacrosByName,
-                    ignoreLabelOverride: true);
-            }
-            Board.Keys[i].IsEditChanged = edit.Session.IsKeyChanged(index, i);
-            Board.Keys[i].IsEditSelected = edit.SelectedKeyIndex == i;
-        }
+        // One paint context for the whole board: the profile and the settings
+        // as they stand, so every key resolves layer colours identically.
+        var paint = new KeyPaintContext(_profile.Id, _settingsService.Current);
+        Board.Paint(km, index, edit, paint);
 
         LayerTabs.SetActive(index);
     }
@@ -590,6 +554,29 @@ public partial class MainWindowViewModel : ObservableObject
         // Initial label sync — the source may already have settled the
         // active state before our subscription was attached above.
         OnActiveSourceChanged();
+    }
+
+    /// <summary>
+    /// Runs the flash window's job with the keyboard connection it needs
+    /// (the bootloader command, the central's report in), which live
+    /// highlighting owns: with highlighting off, the device stack runs for
+    /// the job's lifetime only — stopped again in <c>finally</c> unless the
+    /// user enabled highlighting in the meantime. No layer reset as the
+    /// toggle does: with highlighting off the board view never followed the
+    /// keyboard, so there is nothing to undo.
+    /// </summary>
+    private async Task<bool> WithKeyTrackingAsync(Func<Task<bool>> run)
+    {
+        var startedForFlash = !IsLiveHighlightingEnabled;
+        if (startedForFlash) StartKeyEventTracking();
+        try
+        {
+            return await run();
+        }
+        finally
+        {
+            if (startedForFlash && !IsLiveHighlightingEnabled) StopKeyEventTracking();
+        }
     }
 
     private void StopKeyEventTracking(bool isAppExit = false)

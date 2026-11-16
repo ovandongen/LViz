@@ -1,5 +1,4 @@
 using LViz.Core.Keymap.Parser;
-using LViz.Core.Models;
 using Xunit;
 
 namespace LViz.Tests.Keymap;

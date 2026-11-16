@@ -74,6 +74,7 @@ public sealed partial class GitHubClient
     /// </summary>
     /// <param name="code">What <see cref="StartDeviceFlowAsync"/> returned.</param>
     /// <param name="delay">How to wait: called with the interval and the token.</param>
+    /// <param name="ct">Cancels the polling.</param>
     public async Task<GitHubTokens> WaitForDeviceAuthorizationAsync(
         GitHubDeviceCode code,
         Func<TimeSpan, CancellationToken, Task> delay,

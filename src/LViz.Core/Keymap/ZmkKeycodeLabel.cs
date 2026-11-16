@@ -3,8 +3,8 @@ namespace LViz.Core.Keymap;
 /// <summary>
 /// Which set of modifier glyphs <see cref="ZmkKeycodeLabel"/> renders for
 /// Shift / Ctrl / Alt / Gui. User-controlled, independent of the host OS —
-/// the toolbar toggle in the app writes <see cref="ZmkKeycodeLabel.CurrentModifierStyle"/>
-/// and then refreshes every key label.
+/// persisted as <c>UserSettings.ModifierStyle</c> and passed into every
+/// label call that can show a modifier glyph.
 /// </summary>
 public enum ModifierStyle
 {
@@ -12,6 +12,20 @@ public enum ModifierStyle
     Mac,
     /// <summary>⇧ Ctrl Alt ⊞ — hybrid: universal Shift arrow and the Microsoft monochrome Windows-key glyph; text for Ctrl/Alt.</summary>
     Windows,
+}
+
+/// <summary>
+/// The one mapping between the persisted <c>UserSettings.ModifierStyle</c>
+/// string and the <see cref="ModifierStyle"/> enum the label formatters take.
+/// </summary>
+public static class ModifierStyles
+{
+    /// <summary><c>"Windows"</c> in any casing means the Windows set;
+    /// everything else — null, empty, <c>"Mac"</c>, garbage — is Mac.</summary>
+    public static ModifierStyle FromSetting(string? value) =>
+        string.Equals(value, "Windows", StringComparison.OrdinalIgnoreCase)
+            ? ModifierStyle.Windows
+            : ModifierStyle.Mac;
 }
 
 /// <summary>
@@ -25,12 +39,6 @@ public enum ModifierStyle
 /// </summary>
 public static class ZmkKeycodeLabel
 {
-    /// <summary>
-    /// Active modifier glyph set. Mutated by the UI when the user toggles the
-    /// Mac/Windows toolbar button; reads are unsynchronised because writes
-    /// happen on the UI thread and label rebuilds are also UI-dispatched.
-    /// </summary>
-    public static ModifierStyle CurrentModifierStyle { get; set; } = ModifierStyle.Mac;
     private static readonly Dictionary<string, string> DisplayMap = new(StringComparer.Ordinal)
     {
         // Punctuation — ZMK short abbreviations + long-form aliases the Moergo
@@ -112,8 +120,8 @@ public static class ZmkKeycodeLabel
         ["RIGHT"] = "→",     ["RIGHT_ARROW"] = "→",
 
         // Modifier glyphs (LSHFT/LCTRL/LALT/LGUI etc.) are *not* in DisplayMap —
-        // they're style-dependent and resolved through CurrentModifierStyle via
-        // ModifierGlyphForDisplay/ModifierSubscript/ShortModifierGlyph.
+        // they're style-dependent and resolved from the caller's ModifierStyle
+        // via GlyphFor in Display/ModifierSubscript/ShortModifierGlyph.
     };
 
     /// <summary>
@@ -182,8 +190,8 @@ public static class ZmkKeycodeLabel
         [Mod.Gui]   = "⊞",
     };
 
-    private static string GlyphFor(Mod m) =>
-        CurrentModifierStyle == ModifierStyle.Windows
+    private static string GlyphFor(Mod m, ModifierStyle style) =>
+        style == ModifierStyle.Windows
             ? WindowsModifierGlyphs[m]
             : MacModifierGlyphs[m];
 
@@ -191,20 +199,21 @@ public static class ZmkKeycodeLabel
     /// Returns a short display glyph for a ZMK keycode. Falls through to the
     /// raw input (with underscores converted to spaces so long labels can
     /// wrap) for anything not in the map — e.g. TAB, ESC, F1..F24, letters,
-    /// and rarities like <c>PG_UP</c>.
+    /// and rarities like <c>PG_UP</c>. Modifier keycodes render per
+    /// <paramref name="style"/>.
     /// </summary>
-    public static string Display(string zmkKeycode)
+    public static string Display(string zmkKeycode, ModifierStyle style)
     {
         if (string.IsNullOrEmpty(zmkKeycode)) return "";
 
         if (DisplayMap.TryGetValue(zmkKeycode, out var mapped)) return mapped;
-        if (ModifierKeycodes.TryGetValue(zmkKeycode, out var mod)) return GlyphFor(mod);
+        if (ModifierKeycodes.TryGetValue(zmkKeycode, out var mod)) return GlyphFor(mod, style);
 
         // Numpad keycodes share the same glyphs as their main-row counterparts.
         // Strip the `KP_` prefix and retry so `KP_N1`, `KP_PLUS`, `KP_DIVIDE`,
         // etc. all route through the existing logic.
         if (zmkKeycode.StartsWith("KP_", StringComparison.Ordinal))
-            return Display(zmkKeycode.Substring(3));
+            return Display(zmkKeycode.Substring(3), style);
 
         // N0..N9 and NUMBER_0..NUMBER_9 both map to the underlying digit.
         if (zmkKeycode.Length == 2 && zmkKeycode[0] == 'N' && zmkKeycode[1] >= '0' && zmkKeycode[1] <= '9')
@@ -227,8 +236,8 @@ public static class ZmkKeycodeLabel
     /// rarely what the user is checking when glancing at a key. Returns null
     /// for non-modifier keycodes so callers can fall back to the raw param.
     /// </summary>
-    public static string? ModifierSubscript(string zmkKeycode) =>
-        ModifierKeycodes.TryGetValue(zmkKeycode, out var mod) ? GlyphFor(mod) : null;
+    public static string? ModifierSubscript(string zmkKeycode, ModifierStyle style) =>
+        ModifierKeycodes.TryGetValue(zmkKeycode, out var mod) ? GlyphFor(mod, style) : null;
 
     /// <summary>
     /// ZMK modifier-function shorthands used when wrapping another keycode:
@@ -237,8 +246,8 @@ public static class ZmkKeycodeLabel
     public static bool IsShortModifier(string s) => ShortModifierCategories.ContainsKey(s);
 
     /// <summary>Short-modifier glyph (e.g. LS / RS → Shift, LC / RC → Ctrl), style-aware.</summary>
-    public static string ShortModifierGlyph(string s) =>
-        ShortModifierCategories.TryGetValue(s, out var mod) ? GlyphFor(mod) : s;
+    public static string ShortModifierGlyph(string s, ModifierStyle style) =>
+        ShortModifierCategories.TryGetValue(s, out var mod) ? GlyphFor(mod, style) : s;
 
     /// <summary>
     /// US-QWERTY shifted symbol for a keycode — e.g. LBKT → "{", N1 → "!".
@@ -276,10 +285,10 @@ public static class ZmkKeycodeLabel
     /// (e.g. LS + LBKT → "{"), other modifier chains render as base-key label
     /// with the modifier glyphs as subscript.
     /// </summary>
-    public static (string Label, string Subscript) FormatKpParams(IReadOnlyList<string> paramList)
+    public static (string Label, string Subscript) FormatKpParams(IReadOnlyList<string> paramList, ModifierStyle style)
     {
         if (paramList.Count == 0) return ("", "");
-        if (paramList.Count == 1) return (Display(paramList[0]), "");
+        if (paramList.Count == 1) return (Display(paramList[0], style), "");
 
         // Strip leading short-modifier wrappers.
         int i = 0;
@@ -288,7 +297,7 @@ public static class ZmkKeycodeLabel
         var modCount = i;
 
         if (modCount == 0)
-            return (Display(baseKc), "");
+            return (Display(baseKc, style), "");
 
         // Single shift over a shiftable key → use the shifted glyph.
         if (modCount == 1 && (paramList[0] == "LS" || paramList[0] == "RS"))
@@ -299,7 +308,7 @@ public static class ZmkKeycodeLabel
 
         // Otherwise: base keycode as main, modifier glyphs concatenated as subscript.
         var modGlyphs = new System.Text.StringBuilder();
-        for (int m = 0; m < modCount; m++) modGlyphs.Append(ShortModifierGlyph(paramList[m]));
-        return (Display(baseKc), modGlyphs.ToString());
+        for (int m = 0; m < modCount; m++) modGlyphs.Append(ShortModifierGlyph(paramList[m], style));
+        return (Display(baseKc, style), modGlyphs.ToString());
     }
 }

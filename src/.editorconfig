@@ -1,0 +1,5 @@
+root = true
+
+[*.cs]
+# Unused usings are a build warning (needs GenerateDocumentationFile, set in Directory.Build.props).
+dotnet_diagnostic.IDE0005.severity = warning
