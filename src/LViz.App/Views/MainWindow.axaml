@@ -190,9 +190,9 @@
                                             </Button>
                                             <!-- Module setup wizard; shown whenever the loaded
                                                  keymap comes from a zmk-config. -->
-                                            <Button Command="{Binding SetUpLiveFeaturesCommand}"
+                                            <Button Command="{Binding Firmware.SetUpLiveFeaturesCommand}"
                                                     Click="OnKeymapMenuItemClick"
-                                                    IsVisible="{Binding CanSetUpLiveFeatures}"
+                                                    IsVisible="{Binding Firmware.CanSetUpLiveFeatures}"
                                                     Padding="10,6"
                                                     HorizontalAlignment="Stretch"
                                                     HorizontalContentAlignment="Left"
@@ -207,9 +207,9 @@
                                             <!-- Flash this config's firmware; shown whenever the
                                                  loaded keymap comes from a zmk-config (a local
                                                  one opens the window in file mode). -->
-                                            <Button Command="{Binding FlashKeyboardCommand}"
+                                            <Button Command="{Binding Firmware.FlashKeyboardCommand}"
                                                     Click="OnKeymapMenuItemClick"
-                                                    IsVisible="{Binding CanFlashKeyboard}"
+                                                    IsVisible="{Binding Firmware.CanFlashKeyboard}"
                                                     Padding="10,6"
                                                     HorizontalAlignment="Stretch"
                                                     HorizontalContentAlignment="Left"
@@ -445,18 +445,18 @@
                          Right-docked before the live-features hint. -->
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2"
                                 Margin="0,0,8,0" VerticalAlignment="Center"
-                                IsVisible="{Binding ShowFirmwareStatus}">
-                        <Button Command="{Binding FirmwareStatusCommand}"
+                                IsVisible="{Binding Firmware.ShowFirmwareStatus}">
+                        <Button Command="{Binding Firmware.FirmwareStatusCommand}"
                                 Classes="link"
                                 Padding="6,2"
-                                IsVisible="{Binding IsFirmwareStatusLink}">
-                            <TextBlock Text="{Binding FirmwareStatusText}"
+                                IsVisible="{Binding Firmware.IsFirmwareStatusLink}">
+                            <TextBlock Text="{Binding Firmware.FirmwareStatusText}"
                                        FontSize="12" TextDecorations="Underline" />
                         </Button>
-                        <TextBlock Text="{Binding FirmwareStatusText}"
+                        <TextBlock Text="{Binding Firmware.FirmwareStatusText}"
                                    FontSize="12" Opacity="0.75" VerticalAlignment="Center"
-                                   IsVisible="{Binding !IsFirmwareStatusLink}" />
-                        <Button Command="{Binding DismissFirmwareStatusCommand}"
+                                   IsVisible="{Binding !Firmware.IsFirmwareStatusLink}" />
+                        <Button Command="{Binding Firmware.DismissFirmwareStatusCommand}"
                                 Classes="link"
                                 Padding="4,2"
                                 ToolTip.Tip="{Binding [Status_FirmwareDismiss], Source={StaticResource Loc}}">
@@ -468,14 +468,14 @@
                          ✕ dismisses it for this config (persisted). -->
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2"
                                 Margin="0,0,8,0" VerticalAlignment="Center"
-                                IsVisible="{Binding ShowLiveFeaturesHint}">
-                        <Button Command="{Binding SetUpLiveFeaturesCommand}"
+                                IsVisible="{Binding Firmware.ShowLiveFeaturesHint}">
+                        <Button Command="{Binding Firmware.SetUpLiveFeaturesCommand}"
                                 Classes="link"
                                 Padding="6,2">
                             <TextBlock Text="{Binding [Status_LiveFeaturesLink], Source={StaticResource Loc}}"
                                        FontSize="12" TextDecorations="Underline" />
                         </Button>
-                        <Button Command="{Binding DismissLiveFeaturesHintCommand}"
+                        <Button Command="{Binding Firmware.DismissLiveFeaturesHintCommand}"
                                 Classes="link"
                                 Padding="4,2"
                                 ToolTip.Tip="{Binding [Status_LiveFeaturesDismiss], Source={StaticResource Loc}}">

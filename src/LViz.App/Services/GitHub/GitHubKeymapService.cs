@@ -7,36 +7,20 @@ namespace LViz.App.Services.GitHub;
 /// The <see cref="IGitHubKeymapService"/> wiring. It adds no knowledge of its
 /// own: <see cref="GitHubSession"/> owns the login, <see cref="GitHubClient"/>
 /// owns HTTP, <see cref="GitHubRepoCache"/> owns the local copies — this class
-/// only ties them together and enforces the house rules: restore at most once,
-/// fetch the access token right before every refresh (never hold it), wipe the
-/// repo cache on sign-out, fall back to the cached copy of a keymap when
-/// GitHub is unreachable, and hand a committed file to the cache so it does
+/// only ties them together and enforces the house rules: fetch the access
+/// token right before every refresh (never hold it), wipe the repo cache on
+/// sign-out, fall back to the cached copy of a keymap when GitHub is
+/// unreachable, and hand a committed file to the cache so it does
 /// not need re-downloading.
-///
-/// <para>
-/// The access-token lifetime is why <see cref="EnsureRestoredAsync"/> caches
-/// its <see cref="Task"/> rather than a result: concurrent first calls must
-/// not read the secret store twice, but a failed attempt must not poison the
-/// service for good.
-/// </para>
 /// </summary>
 /// <param name="client">The GitHub HTTP client.</param>
 /// <param name="session">The stored login.</param>
 /// <param name="cache">The local repo copies.</param>
-/// <param name="delay">
-/// How the device-flow polling waits; defaults to <see cref="Task.Delay"/>.
-/// Tests pass one that returns instantly.
-/// </param>
 public sealed class GitHubKeymapService(
     GitHubClient client,
     GitHubSession session,
-    GitHubRepoCache cache,
-    Func<TimeSpan, CancellationToken, Task>? delay = null) : IGitHubKeymapService
+    GitHubRepoCache cache) : IGitHubKeymapService
 {
-    private readonly Lock _restoreLock = new();
-    private readonly Func<TimeSpan, CancellationToken, Task> _delay = delay ?? Task.Delay;
-    private Task<bool>? _restoreTask;
-
     /// <inheritdoc/>
     public string? Login => session.Login;
 
@@ -47,33 +31,16 @@ public sealed class GitHubKeymapService(
     public bool IsLoginPersisted => session.IsPersisted;
 
     /// <inheritdoc/>
-    public Task EnsureRestoredAsync(CancellationToken ct = default)
-    {
-        lock (_restoreLock)
-        {
-            // In flight and succeeded are shared as-is; a faulted or cancelled
-            // attempt is replaced so the next call retries — a store read that
-            // lost the startup race must not stay dead.
-            if (_restoreTask is { IsFaulted: false, IsCanceled: false } shared)
-            {
-                return shared;
-            }
-
-            _restoreTask = shared = session.RestoreAsync(ct);
-            return shared;
-        }
-    }
+    public Task EnsureRestoredAsync(CancellationToken ct = default) =>
+        session.EnsureRestoredAsync(ct);
 
     /// <inheritdoc/>
     public Task<GitHubDeviceCode> StartSignInAsync(CancellationToken ct = default) =>
-        client.StartDeviceFlowAsync(ct);
+        session.StartSignInAsync(ct);
 
     /// <inheritdoc/>
-    public async Task CompleteSignInAsync(GitHubDeviceCode code, CancellationToken ct = default)
-    {
-        var tokens = await client.WaitForDeviceAuthorizationAsync(code, _delay, ct);
-        await session.SignInAsync(tokens, ct);
-    }
+    public Task CompleteSignInAsync(GitHubDeviceCode code, CancellationToken ct = default) =>
+        session.CompleteSignInAsync(code, ct);
 
     /// <inheritdoc/>
     public async Task SignOutAsync(CancellationToken ct = default)

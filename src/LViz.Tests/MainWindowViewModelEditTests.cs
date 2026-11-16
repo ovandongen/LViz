@@ -1,8 +1,8 @@
-using System.IO;
 using LViz.App.Localization;
 using LViz.App.Services;
 using LViz.App.ViewModels;
 using LViz.Core.Keymap;
+using LViz.Core.Keymap.Editing;
 using LViz.Core.Keymap.Parser;
 using LViz.Core.Keymap.Writer;
 using LViz.Core.Layout;
@@ -897,7 +897,7 @@ public class MainWindowViewModelEditTests : IDisposable
         var settingsVm = TestMainVm.CreateSettings(settings, vm);
 
         var active = vm.SelectedKeyboard!;
-        var other = KeyboardProfileRegistry.All.First(p => p.Id != active.Id);
+        var other = KeyboardProfileRegistry.Bundled.First(p => p.Id != active.Id);
 
         settingsVm.SelectedKeyboardProfile = other;
 
@@ -1326,6 +1326,17 @@ public class MainWindowViewModelEditTests : IDisposable
     private static ZmkCombo EscCombo(IReadOnlyList<int> keys) =>
         new("ESC", "", keys, [-1], new KeyBinding("&kp", ["ESC"])) { NodeName = "combo_ESC" };
 
+    /// <summary>A combo legend on the test settings, addressing overrides as Corne.</summary>
+    private static ComboLegendViewModel NewLegend(InMemorySettingsService settings) =>
+        new(new List<KeyViewModel>(), new BoardStyleViewModel("#FFD60A"), overlayVisible: false,
+            profileId: () => "Corne", modifierStyle: () => ModifierStyle.Mac, settings: settings);
+
+    /// <summary>The stored Corne label override for a combo, straight from
+    /// the test's settings service.</summary>
+    private static ComboLabelOverride? CorneOverride(UserSettings settings, string keyPositionsKey) =>
+        settings.ComboLabelOverrides.TryGetValue("Corne", out var perCombo)
+        && perCombo.TryGetValue(keyPositionsKey, out var value) ? value : null;
+
     /// <summary>A review callback answering go-ahead, so the save proceeds.</summary>
     private static Task<KeymapReviewAnswer?> GoAhead(KeymapReviewRequest _) =>
         Task.FromResult<KeymapReviewAnswer?>(new KeymapReviewAnswer(null));
@@ -1548,7 +1559,7 @@ public class MainWindowViewModelEditTests : IDisposable
         await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
         vm.Board.ComboLegend.SetLabelOverride("0,1", new ComboLabelOverride { MainLabel = "Esc" });
-        Assert.NotNull(ComboLabelOverrides.Get("Corne", "0,1"));
+        Assert.NotNull(CorneOverride(settings.Current, "0,1"));
 
         // Move it to keys 0+2 — the label follows the combo to the new key.
         vm.StartEditCommand.Execute(null);
@@ -1556,8 +1567,8 @@ public class MainWindowViewModelEditTests : IDisposable
         await vm.Edit!.EditComboCommand.ExecuteAsync(1);
         await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
-        Assert.NotNull(ComboLabelOverrides.Get("Corne", "0,2"));
-        Assert.Null(ComboLabelOverrides.Get("Corne", "0,1"));
+        Assert.NotNull(CorneOverride(settings.Current, "0,2"));
+        Assert.Null(CorneOverride(settings.Current, "0,1"));
         Assert.True(settings.Current.ComboLabelOverrides.TryGetValue("Corne", out var stored)
             && stored.ContainsKey("0,2") && !stored.ContainsKey("0,1"));
 
@@ -1566,8 +1577,51 @@ public class MainWindowViewModelEditTests : IDisposable
         vm.Edit!.DeleteComboCommand.Execute(1);
         await vm.Edit!.SaveEditCommand.ExecuteAsync(null);
 
-        Assert.Null(ComboLabelOverrides.Get("Corne", "0,2"));
+        Assert.Null(CorneOverride(settings.Current, "0,2"));
         Assert.False(settings.Current.ComboLabelOverrides.TryGetValue("Corne", out var left)
             && left.ContainsKey("0,2"));
+    }
+
+    [Fact]
+    public void MoveLabelOverrides_ChangeToATakenKey_DropsTheOldOneOnly()
+    {
+        var settings = NewSettings();
+        var legend = NewLegend(settings);
+        legend.SetLabelOverride("0,1", new ComboLabelOverride { MainLabel = "Old" });
+        legend.SetLabelOverride("2,3", new ComboLabelOverride { MainLabel = "Taken" });
+        var savesBefore = settings.SaveCount;
+
+        legend.MoveLabelOverrides(new[]
+        {
+            new KeymapComboChange(new ComboEdit.Change("combo_ESC", EscCombo([2, 3])),
+                EscCombo([0, 1]), EscCombo([2, 3])),
+        });
+
+        // The target keeps its own label; only the source's goes. One persist
+        // for the whole move.
+        Assert.Equal("Taken", CorneOverride(settings.Current, "2,3")!.MainLabel);
+        Assert.Null(CorneOverride(settings.Current, "0,1"));
+        Assert.Equal(savesBefore + 1, settings.SaveCount);
+    }
+
+    [Fact]
+    public void MoveLabelOverrides_NothingMoved_DoesNotWrite()
+    {
+        var settings = NewSettings();
+        var legend = NewLegend(settings);
+        legend.SetLabelOverride("0,1", new ComboLabelOverride { MainLabel = "Kept" });
+        var savesBefore = settings.SaveCount;
+
+        legend.MoveLabelOverrides(new[]
+        {
+            // The combo stays on the same keys — nothing to carry. And a
+            // delete of a combo that never had a label.
+            new KeymapComboChange(new ComboEdit.Change("combo_ESC", EscCombo([0, 1])),
+                EscCombo([0, 1]), EscCombo([0, 1])),
+            new KeymapComboChange(new ComboEdit.Delete("combo_C"), EscCombo([4, 5]), null),
+        });
+
+        Assert.Equal(savesBefore, settings.SaveCount);
+        Assert.Equal("Kept", CorneOverride(settings.Current, "0,1")!.MainLabel);
     }
 }

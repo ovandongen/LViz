@@ -24,7 +24,7 @@ public sealed record LayerRename(int LayerIndex, string Name);
 /// be done safely (unmappable layers via <see cref="KeymapSourceMap"/>,
 /// invalid indices/names, a result that does not re-parse to exactly the
 /// expected bindings and names) throws and returns nothing.
-/// Pure function: no I/O, <paramref name="source"/> is never modified.
+/// Pure function: no I/O, <c>source</c> is never modified.
 /// </summary>
 public static class KeymapWriter
 {
@@ -39,7 +39,7 @@ public static class KeymapWriter
     /// <exception cref="ArgumentException">
     /// Two edits target the same (layer, key), two renames target the same
     /// layer, or a rename name is blank or contains a control character.
-    /// (The inner <see cref="ZmkBindingFormatter.Format"/> also throws this
+    /// (The inner <see cref="ZmkBindingFormatter.Format(KeyBinding, IReadOnlyList&lt;KeyValuePair&lt;string, string&gt;&gt;, IReadOnlyList&lt;HoldTap&gt;)"/> also throws this
     /// for a malformed behavior.)
     /// </exception>
     public static string Apply(

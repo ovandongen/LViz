@@ -1,6 +1,5 @@
 using Xunit;
 using LViz.App.Services;
-using LViz.Core.Settings;
 
 namespace LViz.Tests;
 

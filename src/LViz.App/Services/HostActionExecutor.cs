@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.IO;
 using LViz.Core.Diagnostics;
 
 namespace LViz.App.Services;

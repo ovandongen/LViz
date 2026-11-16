@@ -5,7 +5,7 @@ using Avalonia.Interactivity;
 namespace LViz.App.Views;
 
 /// <summary>
-/// Modal "pick one" dialog driven by <see cref="ChoiceDialogViewModel"/>. Its
+/// Modal "pick one" dialog driven by <see cref="LViz.App.ViewModels.ChoiceDialogViewModel"/>. Its
 /// result is the clicked option's id; <c>null</c> means the user declined —
 /// Esc or the window's close button. Callers map <c>null</c> to the safe
 /// choice (keep editing, don't quit).

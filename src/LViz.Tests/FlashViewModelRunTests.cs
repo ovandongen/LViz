@@ -35,7 +35,7 @@ public sealed class FlashViewModelRunTests : IDisposable
 
     private readonly string _tempDir = Path.Combine(Path.GetTempPath(), $"lviz-flashrun-{Guid.NewGuid():N}");
     private readonly FakeBuilds _builds = new();
-    private readonly Queue<string?> _picks = new();
+    private readonly FakeDesktopInteraction _desktop = new();
 
     public FlashViewModelRunTests()
     {
@@ -452,7 +452,7 @@ public sealed class FlashViewModelRunTests : IDisposable
     private async Task<FlashViewModel> StartFileAsync(FlashViewModel vm)
     {
         await vm.StartAsync();
-        _picks.Enqueue(WithMarker());
+        _desktop.Uf2Path = WithMarker();
         await vm.PickFileCommand.ExecuteAsync(null);
         await vm.NextCommand.ExecuteAsync(null);
         Assert.True(vm.IsFlashStep);
@@ -493,14 +493,13 @@ public sealed class FlashViewModelRunTests : IDisposable
     {
         var run = new FlashRun(kb, new Uf2DriveWatcher(drives, FastDelay), copy ?? CopyOk, FastDelay);
         var root = ZmkConfigFixtures.Root("cosmos82");
-        var vm = new FlashViewModel(
+        return new FlashViewModel(
             new FlashContext(root, root, null, null),
             _builds,
             history ?? NewHistory("local"),
             kb,
-            run);
-        vm.PickUf2File = () => Task.FromResult(_picks.Dequeue());
-        return vm;
+            run,
+            _desktop);
     }
 
     private FlashViewModel GitHubVm(
@@ -516,7 +515,8 @@ public sealed class FlashViewModelRunTests : IDisposable
             _builds,
             history ?? NewHistory("github"),
             kb,
-            run);
+            run,
+            _desktop);
     }
 
     /// <summary>One run as the API reports it (as in FlashViewModelTests).</summary>

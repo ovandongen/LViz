@@ -11,7 +11,7 @@ namespace LViz.App.Services.Hotkeys;
 /// the claimed set.
 ///
 /// The probe sees our own live registration too. Callers pass the name of
-/// the key we currently own via <paramref name="ignoreKey"/> so the picker
+/// the key we currently own via <c>ignoreKey</c> so the picker
 /// keeps the user's own current pick selectable.
 /// </summary>
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]

@@ -11,7 +11,7 @@ namespace LViz.Tests;
 public class AllProfilesGeometryTheory
 {
     public static IEnumerable<object[]> AllProfiles =>
-        KeyboardProfileRegistry.All.Select(p => new object[] { p });
+        KeyboardProfileRegistry.Bundled.Select(p => new object[] { p });
 
     [Theory]
     [MemberData(nameof(AllProfiles))]

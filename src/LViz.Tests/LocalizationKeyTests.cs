@@ -95,7 +95,7 @@ public class LocalizationKeyTests
             + string.Join(Environment.NewLine, Sorted(missing)));
     }
 
-    /// <summary>Every (key, file name) literal <see cref="Loc"/> use in the matching source files.</summary>
+    /// <summary>Every (key, file name) literal <see cref="LViz.App.Localization.Loc"/> use in the matching source files.</summary>
     private static List<(string Key, string File)> LocKeyUses(string searchPattern, Regex regex)
     {
         var uses = new List<(string Key, string File)>();

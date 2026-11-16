@@ -11,7 +11,7 @@ namespace LViz.App.Services;
 /// is the implementation's business. A <see langword="null"/> answer always
 /// means the user backed out.
 /// </summary>
-public interface IMainWindowShell
+public interface IMainWindowShell : IDesktopInteraction
 {
     /// <summary>Quit the application (after the unsaved-edits prompt).</summary>
     void Quit();
@@ -21,9 +21,6 @@ public interface IMainWindowShell
 
     /// <summary>Let the user pick a keymap file; its local path, or null.</summary>
     Task<string?> PickKeymapFileAsync();
-
-    /// <summary>Put text on the clipboard; false when no clipboard is available.</summary>
-    Task<bool> CopyTextAsync(string text);
 
     /// <summary>Open the single Settings window, or bring the open one to the front.</summary>
     void OpenSettings();
@@ -39,9 +36,6 @@ public interface IMainWindowShell
 
     /// <summary>Opens the modal flash window on the context; true when at least one half was flashed.</summary>
     Task<bool> RunFlashAsync(FlashContext context);
-
-    /// <summary>File picker for a .uf2 firmware file; null when cancelled.</summary>
-    Task<string?> PickUf2FileAsync();
 
     /// <summary>Run the GitHub sign-in / repo / keymap picker; the chosen keymap, or null.</summary>
     Task<GitHubOpenSelection?> PickGitHubKeymapAsync(Func<IReadOnlyCollection<string>> attachedHidNames);

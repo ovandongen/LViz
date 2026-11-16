@@ -15,9 +15,8 @@ public class KeyLabelFormatterModTapTests
     public void Mt_RaltGrave_ShowsBacktickWithAltSubscript()
     {
         // From docs/corne.keymap line 90: `&mt RALT GRAVE`.
-        ZmkKeycodeLabel.CurrentModifierStyle = ModifierStyle.Mac;
         var (label, sub, top) = KeyLabelFormatter.FormatBinding(
-            new KeyBinding("&mt", new[] { "RALT", "GRAVE" }), targetLayerName: null);
+            new KeyBinding("&mt", new[] { "RALT", "GRAVE" }), ModifierStyle.Mac, targetLayerName: null);
         Assert.Equal("`", label);
         Assert.Equal("⌥", sub);
         Assert.Equal("Mod-Tap", top);
@@ -26,9 +25,8 @@ public class KeyLabelFormatterModTapTests
     [Fact]
     public void Mt_LshiftD_ShowsDWithShiftSubscript()
     {
-        ZmkKeycodeLabel.CurrentModifierStyle = ModifierStyle.Mac;
         var (label, sub, top) = KeyLabelFormatter.FormatBinding(
-            new KeyBinding("&mt", new[] { "LSHFT", "D" }), targetLayerName: null);
+            new KeyBinding("&mt", new[] { "LSHFT", "D" }), ModifierStyle.Mac, targetLayerName: null);
         Assert.Equal("D", label);
         Assert.Equal("⇪", sub);
         Assert.Equal("Mod-Tap", top);
@@ -40,25 +38,16 @@ public class KeyLabelFormatterModTapTests
         // LSHIFT (vs LSHFT) appears in many real-world keymaps including the
         // corne file shipped in docs/. Both spellings must collapse to the
         // shift glyph in the subscript.
-        ZmkKeycodeLabel.CurrentModifierStyle = ModifierStyle.Mac;
         var (_, sub, _) = KeyLabelFormatter.FormatBinding(
-            new KeyBinding("&mt", new[] { "LSHIFT", "F" }), targetLayerName: null);
+            new KeyBinding("&mt", new[] { "LSHIFT", "F" }), ModifierStyle.Mac, targetLayerName: null);
         Assert.Equal("⇪", sub);
     }
 
     [Fact]
     public void Mt_WindowsStyle_ShowsAltText()
     {
-        ZmkKeycodeLabel.CurrentModifierStyle = ModifierStyle.Windows;
-        try
-        {
-            var (_, sub, _) = KeyLabelFormatter.FormatBinding(
-                new KeyBinding("&mt", new[] { "RALT", "GRAVE" }), targetLayerName: null);
-            Assert.Equal("Alt", sub);
-        }
-        finally
-        {
-            ZmkKeycodeLabel.CurrentModifierStyle = ModifierStyle.Mac;
-        }
+        var (_, sub, _) = KeyLabelFormatter.FormatBinding(
+            new KeyBinding("&mt", new[] { "RALT", "GRAVE" }), ModifierStyle.Windows, targetLayerName: null);
+        Assert.Equal("Alt", sub);
     }
 }

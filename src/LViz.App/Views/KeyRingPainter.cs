@@ -65,9 +65,12 @@ internal sealed class KeyRingPainter
     /// <summary>Horizontal text padding inside the hint and explanation pills.</summary>
     private const double PillPad = 12;
 
+    /// <param name="vm">The ring view-model to draw.</param>
+    /// <param name="layout">The ring geometry — the segment slots.</param>
     /// <param name="amounts">Hover amount (0 to 1) per segment key; absent is 0.</param>
     /// <param name="pointed">The segment the centre describes, or null.</param>
     /// <param name="bandOpacity">Fade-in of the open band, 0 to 1.</param>
+    /// <param name="hideHint">True to leave the hint line out.</param>
     /// <param name="explanation">What the pointed thing does, for the line
     /// under the hint; null draws no line.</param>
     public KeyRingPainter(
@@ -526,7 +529,7 @@ internal sealed class KeyRingPainter
         return geometry;
     }
 
-    /// <summary>Draws <paramref name="text"/> centred on <paramref name="centreX"/>
+    /// <summary>Draws <paramref name="text"/> centred on x 0
     /// (control-local, ring-centre-relative), top-aligned inside the line box
     /// starting at <paramref name="y"/>.</summary>
     private static void DrawLineBox(DrawingContext context, TextLayout text, double y, double halfWidth)

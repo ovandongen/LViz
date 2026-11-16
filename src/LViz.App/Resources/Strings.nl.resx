@@ -265,6 +265,18 @@
     <value>Diagnose naar klembord gekopieerd</value>
     <comment/>
   </data>
+  <data name="Status_OpenLogFolderFailedFormat" xml:space="preserve">
+    <value>Kon de logmap niet openen: {0}</value>
+    <comment/>
+  </data>
+  <data name="Status_CopyDiagnosticsFailedFormat" xml:space="preserve">
+    <value>Kon de diagnose niet kopiëren: {0}</value>
+    <comment/>
+  </data>
+  <data name="GitHub_NotAvailable" xml:space="preserve">
+    <value>GitHub is niet beschikbaar</value>
+    <comment/>
+  </data>
   <data name="Status_KeyboardSwitched" xml:space="preserve">
     <value>Toetsenbord gewisseld naar {0}</value>
     <comment/>

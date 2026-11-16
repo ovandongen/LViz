@@ -1,9 +1,7 @@
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using LViz.App.Localization;
-using LViz.App.Services;
 using LViz.App.Services.Flashing;
-using LViz.App.Services.GitHub;
 using LViz.App.ViewModels;
 using LViz.Core.GitHub;
 using LViz.Core.Settings;
@@ -24,7 +22,7 @@ namespace LViz.Tests;
 /// over a fake <see cref="IFirmwareBuildService"/> whose answers arrive
 /// instantly, so the dispatcher-marshalled refresh runs on the headless
 /// dispatcher the <c>[AvaloniaFact]</c> tests pump with
-/// <see cref="Dispatcher.UIThread.RunJobs"/>.
+/// <c>Dispatcher.UIThread.RunJobs</c>.
 /// </summary>
 public sealed class MainWindowViewModelFlashingTests : IDisposable
 {
@@ -35,15 +33,6 @@ public sealed class MainWindowViewModelFlashingTests : IDisposable
     private const string Sha = "aa11aa22aa33aa44aa55aa66aa77aa88aa99aa00";
     private const string OtherSha = "bb11bb22bb33bb44bb55bb66bb77bb88bb99bb00";
     private const string RunUrl = $"https://github.com/{Owner}/{Repo}/actions/runs/101";
-
-    private sealed class RecordingHostExecutor : IHostActionExecutor
-    {
-        public List<string> Launches { get; } = [];
-
-        public void Launch(string target) => Launches.Add(target);
-
-        public void Shell(string command) => throw new NotSupportedException();
-    }
 
     private readonly List<string> _tempDirs = [];
     private readonly List<FirmwareBuildWatcher> _watchers = [];
@@ -107,9 +96,9 @@ public sealed class MainWindowViewModelFlashingTests : IDisposable
         var (root, path) = LocalCopy();
         vm.LoadLayoutFromPath(path);
 
-        Assert.True(vm.CanFlashKeyboard);
+        Assert.True(vm.Firmware.CanFlashKeyboard);
 
-        await vm.FlashKeyboardCommand.ExecuteAsync(null);
+        await vm.Firmware.FlashKeyboardCommand.ExecuteAsync(null);
 
         var context = Assert.Single(shell.FlashContexts);
         Assert.Null(context.GitHub);
@@ -127,9 +116,9 @@ public sealed class MainWindowViewModelFlashingTests : IDisposable
 
         vm.LoadLayoutFromPath(Path.Combine(copy, "config", "slabwing.keymap"), entry);
 
-        Assert.True(vm.CanFlashKeyboard);
+        Assert.True(vm.Firmware.CanFlashKeyboard);
 
-        await vm.FlashKeyboardCommand.ExecuteAsync(null);
+        await vm.Firmware.FlashKeyboardCommand.ExecuteAsync(null);
 
         var context = Assert.Single(shell.FlashContexts);
         Assert.Equal(new FlashGitHubTarget(Owner, Repo, Branch), context.GitHub);
@@ -143,14 +132,14 @@ public sealed class MainWindowViewModelFlashingTests : IDisposable
         var vm = TestMainVm.Create(new InMemorySettingsService(), shell: new FakeMainWindowShell());
         var (_, path) = LocalCopy();
         vm.LoadLayoutFromPath(path);
-        Assert.True(vm.CanFlashKeyboard);
+        Assert.True(vm.Firmware.CanFlashKeyboard);
 
         vm.StartEditCommand.Execute(null);
         Assert.True(vm.IsEditing);
-        Assert.False(vm.CanFlashKeyboard);
+        Assert.False(vm.Firmware.CanFlashKeyboard);
 
         vm.DiscardEditCommand.Execute(null);
-        Assert.True(vm.CanFlashKeyboard);
+        Assert.True(vm.Firmware.CanFlashKeyboard);
     }
 
     // ---- the status-bar firmware line ----
@@ -170,11 +159,11 @@ public sealed class MainWindowViewModelFlashingTests : IDisposable
         watcher.Watch(GitHubKey, Owner, Repo, Branch, Sha);
         FlushDispatcher();
 
-        Assert.True(vm.ShowFirmwareStatus);
-        Assert.True(vm.IsFirmwareStatusLink);
-        Assert.Equal(Loc.Instance["Status_FirmwareReady"], vm.FirmwareStatusText);
+        Assert.True(vm.Firmware.ShowFirmwareStatus);
+        Assert.True(vm.Firmware.IsFirmwareStatusLink);
+        Assert.Equal(Loc.Instance["Status_FirmwareReady"], vm.Firmware.FirmwareStatusText);
 
-        await vm.FirmwareStatusCommand.ExecuteAsync(null);
+        await vm.Firmware.FirmwareStatusCommand.ExecuteAsync(null);
 
         var context = Assert.Single(shell.FlashContexts);
         Assert.Equal(Sha, context.Sha);
@@ -182,7 +171,7 @@ public sealed class MainWindowViewModelFlashingTests : IDisposable
         // The window closed as flashed: the watch is cleared and the line hides.
         Assert.Null(watcher.Current);
         FlushDispatcher();
-        Assert.False(vm.ShowFirmwareStatus);
+        Assert.False(vm.Firmware.ShowFirmwareStatus);
     }
 
     [AvaloniaFact]
@@ -199,9 +188,9 @@ public sealed class MainWindowViewModelFlashingTests : IDisposable
         watcher.Watch(GitHubKey, Owner, Repo, Branch, Sha);
         FlushDispatcher();
 
-        Assert.True(vm.ShowFirmwareStatus);
-        Assert.False(vm.IsFirmwareStatusLink);
-        Assert.Equal(Loc.Instance["Status_FirmwareBuilding"], vm.FirmwareStatusText);
+        Assert.True(vm.Firmware.ShowFirmwareStatus);
+        Assert.False(vm.Firmware.IsFirmwareStatusLink);
+        Assert.Equal(Loc.Instance["Status_FirmwareBuilding"], vm.Firmware.FirmwareStatusText);
     }
 
     [AvaloniaFact]
@@ -211,22 +200,22 @@ public sealed class MainWindowViewModelFlashingTests : IDisposable
         var watcher = NewWatcher(builds);
         var copy = GitHubCopy(out var entry);
         var gitHub = new FakeGitHubKeymapService { OnCacheFolderFor = (_, _, _) => copy };
-        var host = new RecordingHostExecutor();
+        var shell = new FakeMainWindowShell();
         var vm = TestMainVm.Create(
-            new InMemorySettingsService(), gitHub: gitHub, hostActionExecutor: host,
+            new InMemorySettingsService(), gitHub: gitHub, shell: shell,
             firmwareWatcher: watcher);
         vm.LoadLayoutFromPath(Path.Combine(copy, "config", "slabwing.keymap"), entry);
 
         watcher.Watch(GitHubKey, Owner, Repo, Branch, Sha);
         FlushDispatcher();
 
-        Assert.True(vm.ShowFirmwareStatus);
-        Assert.True(vm.IsFirmwareStatusLink);
-        Assert.Equal(Loc.Instance["Status_FirmwareFailed"], vm.FirmwareStatusText);
+        Assert.True(vm.Firmware.ShowFirmwareStatus);
+        Assert.True(vm.Firmware.IsFirmwareStatusLink);
+        Assert.Equal(Loc.Instance["Status_FirmwareFailed"], vm.Firmware.FirmwareStatusText);
 
-        await vm.FirmwareStatusCommand.ExecuteAsync(null);
+        await vm.Firmware.FirmwareStatusCommand.ExecuteAsync(null);
 
-        Assert.Equal(RunUrl, Assert.Single(host.Launches));
+        Assert.Equal(RunUrl, Assert.Single(shell.OpenedUrls));
     }
 
     [AvaloniaFact]
@@ -244,9 +233,9 @@ public sealed class MainWindowViewModelFlashingTests : IDisposable
 
         // A watch that belongs to another config never shows on this one.
         Assert.NotNull(watcher.Current);
-        Assert.False(vm.ShowFirmwareStatus);
+        Assert.False(vm.Firmware.ShowFirmwareStatus);
 
-        // Reloading re-runs RefreshLiveFeatures, which drops a foreign watch.
+        // Reloading re-runs the config lookup, which drops a foreign watch.
         vm.LoadLayoutFromPath(path);
         Assert.Null(watcher.Current);
     }
@@ -264,13 +253,13 @@ public sealed class MainWindowViewModelFlashingTests : IDisposable
 
         watcher.Watch(GitHubKey, Owner, Repo, Branch, Sha);
         FlushDispatcher();
-        Assert.True(vm.ShowFirmwareStatus);
+        Assert.True(vm.Firmware.ShowFirmwareStatus);
 
-        vm.DismissFirmwareStatusCommand.Execute(null);
+        vm.Firmware.DismissFirmwareStatusCommand.Execute(null);
         FlushDispatcher();
 
         Assert.Null(watcher.Current);
-        Assert.False(vm.ShowFirmwareStatus);
+        Assert.False(vm.Firmware.ShowFirmwareStatus);
     }
 
     [AvaloniaFact]
@@ -287,21 +276,21 @@ public sealed class MainWindowViewModelFlashingTests : IDisposable
         watcher.Watch(GitHubKey, Owner, Repo, Branch, Sha);
         FlushDispatcher();
 
-        Assert.True(vm.ShowFirmwareStatus);
-        Assert.True(vm.IsFirmwareStatusLink);
-        Assert.Equal(Loc.Instance["Status_FirmwareFlash"], vm.FirmwareStatusText);
+        Assert.True(vm.Firmware.ShowFirmwareStatus);
+        Assert.True(vm.Firmware.IsFirmwareStatusLink);
+        Assert.Equal(Loc.Instance["Status_FirmwareFlash"], vm.Firmware.FirmwareStatusText);
         Assert.Equal([GitHubKey], settings.Current.FirmwareSignInHintsShown);
 
         // A repaint of the same watch keeps it (an edit opening and closing).
         vm.LoadLayoutFromPath(Path.Combine(copy, "config", "slabwing.keymap"), entry);
         FlushDispatcher();
-        Assert.True(vm.ShowFirmwareStatus);
+        Assert.True(vm.Firmware.ShowFirmwareStatus);
 
         // The next save's watch stays quiet: the config has never been flashed from LViz.
         watcher.Watch(GitHubKey, Owner, Repo, Branch, OtherSha);
         FlushDispatcher();
         Assert.Equal(FirmwareWatchState.SignInNeeded, watcher.Current?.State);
-        Assert.False(vm.ShowFirmwareStatus);
+        Assert.False(vm.Firmware.ShowFirmwareStatus);
         Assert.Equal([GitHubKey], settings.Current.FirmwareSignInHintsShown);
     }
 
@@ -321,11 +310,11 @@ public sealed class MainWindowViewModelFlashingTests : IDisposable
 
         watcher.Watch(GitHubKey, Owner, Repo, Branch, Sha);
         FlushDispatcher();
-        Assert.True(vm.ShowFirmwareStatus);
+        Assert.True(vm.Firmware.ShowFirmwareStatus);
 
         watcher.Watch(GitHubKey, Owner, Repo, Branch, OtherSha);
         FlushDispatcher();
-        Assert.True(vm.ShowFirmwareStatus);
+        Assert.True(vm.Firmware.ShowFirmwareStatus);
     }
 
     [AvaloniaFact]
@@ -338,12 +327,12 @@ public sealed class MainWindowViewModelFlashingTests : IDisposable
         var vm = TestMainVm.Create(settings, gitHub: gitHub, shell: shell);
         vm.LoadLayoutFromPath(Path.Combine(copy, "config", "slabwing.keymap"), entry);
 
-        await vm.FlashKeyboardCommand.ExecuteAsync(null);
+        await vm.Firmware.FlashKeyboardCommand.ExecuteAsync(null);
         Assert.Empty(settings.Current.FlashedConfigs);
 
         shell.FlashAnswer = true;
-        await vm.FlashKeyboardCommand.ExecuteAsync(null);
-        await vm.FlashKeyboardCommand.ExecuteAsync(null);
+        await vm.Firmware.FlashKeyboardCommand.ExecuteAsync(null);
+        await vm.Firmware.FlashKeyboardCommand.ExecuteAsync(null);
         Assert.Equal([GitHubKey], settings.Current.FlashedConfigs);
     }
 

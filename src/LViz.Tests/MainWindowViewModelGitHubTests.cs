@@ -1,6 +1,5 @@
 using LViz.App.Services;
 using LViz.App.Services.GitHub;
-using LViz.App.ViewModels;
 using LViz.Core.GitHub;
 using LViz.Core.Keymap;
 using LViz.Core.Keymap.Parser;
@@ -539,7 +538,7 @@ public sealed class MainWindowViewModelGitHubTests : IDisposable
         Assert.False(vm.HasLayoutLoaded);
         Assert.True(vm.Toast.IsVisible);
         Assert.Equal(
-            "Couldn't open cosmos82.keymap from GitHub: GitHub is not available",
+            "Couldn't open cosmos82.keymap from GitHub: GitHub isn't available",
             vm.Toast.Message);
     }
 }

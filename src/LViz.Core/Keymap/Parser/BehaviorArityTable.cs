@@ -56,11 +56,11 @@ public static class BehaviorArityTable
         return UnknownArity;
     }
 
-    /// <summary>&bt commands followed by a 0-based profile number.</summary>
+    /// <summary>&amp;bt commands followed by a 0-based profile number.</summary>
     public static IReadOnlySet<string> BtCommandsWithProfile { get; } =
         new HashSet<string>(StringComparer.Ordinal) { "BT_SEL", "BT_DISC" };
 
-    /// <summary>Number of logical params &bt takes when its first param is
+    /// <summary>Number of logical params &amp;bt takes when its first param is
     /// <paramref name="command"/>: 2 for a command in
     /// <see cref="BtCommandsWithProfile"/>, else 1 (also for null).</summary>
     public static int BtArity(string? command) =>

@@ -36,7 +36,7 @@ public class UserMacroLabelTests
         var macros = config.Macros.ToDictionary(m => m.Name, StringComparer.Ordinal);
         var binding = config.Layers[0].Bindings[0];
 
-        var (label, sub, top) = KeyLabelFormatter.FormatBinding(binding, null, holdTap: null, macros: macros);
+        var (label, sub, top) = KeyLabelFormatter.FormatBinding(binding, ModifierStyle.Mac, null, holdTap: null, macros: macros);
 
         Assert.Equal("[]←", label);
         Assert.Equal("", sub);
@@ -64,7 +64,7 @@ public class UserMacroLabelTests
         var macros = config.Macros.ToDictionary(m => m.Name, StringComparer.Ordinal);
         var binding = config.Layers[0].Bindings[0];
 
-        var (label, _, top) = KeyLabelFormatter.FormatBinding(binding, null, holdTap: null, macros: macros);
+        var (label, _, top) = KeyLabelFormatter.FormatBinding(binding, ModifierStyle.Mac, null, holdTap: null, macros: macros);
 
         Assert.Equal("{}←", label);
         Assert.Equal("Macro", top);
@@ -93,7 +93,7 @@ public class UserMacroLabelTests
         var macros = config.Macros.ToDictionary(m => m.Name, StringComparer.Ordinal);
         var binding = config.Layers[0].Bindings[0];
 
-        var (label, _, top) = KeyLabelFormatter.FormatBinding(binding, null, holdTap: null, macros: macros);
+        var (label, _, top) = KeyLabelFormatter.FormatBinding(binding, ModifierStyle.Mac, null, holdTap: null, macros: macros);
 
         Assert.Equal("pair phone", label);  // fallback formatter splits underscores
         Assert.Equal("", top);
@@ -123,7 +123,7 @@ public class UserMacroLabelTests
         var macros = config.Macros.ToDictionary(m => m.Name, StringComparer.Ordinal);
         var binding = config.Layers[0].Bindings[0];
 
-        var (label, _, top) = KeyLabelFormatter.FormatBinding(binding, null, holdTap: null, macros: macros);
+        var (label, _, top) = KeyLabelFormatter.FormatBinding(binding, ModifierStyle.Mac, null, holdTap: null, macros: macros);
 
         Assert.Equal("Status", label);
         Assert.Equal("Macro", top);
@@ -133,7 +133,7 @@ public class UserMacroLabelTests
     public void NoMacrosArgument_DoesNotChangeFallbackBehavior()
     {
         var binding = new KeyBinding("&BracketC", Array.Empty<string>());
-        var (label, _, top) = KeyLabelFormatter.FormatBinding(binding, null);
+        var (label, _, top) = KeyLabelFormatter.FormatBinding(binding, ModifierStyle.Mac, null);
         Assert.Equal("BracketC", label);
         Assert.Equal("", top);
     }

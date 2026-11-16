@@ -63,6 +63,11 @@ class Program
             {
                 try
                 {
+                    // This instance exists only to read RenderingMode before the
+                    // container is built; settings.json is read twice at startup
+                    // because of it. It must stay read-only — the container's
+                    // SettingsService owns writes, and a write here would be
+                    // overwritten by it.
                     renderMode = new SettingsService().Current.RenderingMode;
                     source = "settings.json";
                 }

@@ -14,9 +14,14 @@ namespace LViz.Tests;
 /// engine's ActiveWindow setter; the run itself is off-thread (Task.Run), so the
 /// positive cases wait on the runner's semaphore. Exit/Re-enter go through
 /// Dispatcher.UIThread.Post (unavailable in xUnit) and aren't covered here.
+/// The positive waits are generous: under the parallel suite on a
+/// CPU-quota-limited runner (where <c>Environment.ProcessorCount</c> is 1) the
+/// dispatch item can start seconds late; the negative waits stay at 150 ms
+/// because "nothing ran" does not get slower on a slow machine.
 /// </summary>
 public class AppLayerPipelineDispatcherTests
 {
+    private static readonly TimeSpan RunTimeout = TimeSpan.FromSeconds(10);
     private sealed class RecordingRunner : IPipelineRunner
     {
         private readonly object _lock = new();
@@ -73,7 +78,7 @@ public class AppLayerPipelineDispatcherTests
 
         engine.ActiveWindow = Window("Code");
 
-        Assert.True(runner.Ran1.Wait(TimeSpan.FromSeconds(2)), "enter should run the bound pipeline");
+        Assert.True(runner.Ran1.Wait(RunTimeout), "enter should run the bound pipeline");
         Assert.Equal("flash", Assert.Single(runner.Snapshot()));
         dispatcher.Dispose();
     }
@@ -88,7 +93,7 @@ public class AppLayerPipelineDispatcherTests
 
         engine.ActiveWindow = Window("Firefox");
 
-        Assert.True(runner.Ran1.Wait(TimeSpan.FromSeconds(2)), "empty filter should fire for any matched app");
+        Assert.True(runner.Ran1.Wait(RunTimeout), "empty filter should fire for any matched app");
         Assert.Equal("any", Assert.Single(runner.Snapshot()));
         dispatcher.Dispose();
     }
@@ -119,7 +124,7 @@ public class AppLayerPipelineDispatcherTests
         engine.ActiveWindow = Window("Code");      // Enter — no enter binding, runs nothing
         engine.ActiveWindow = Window("firefox");   // focus leaves the rule → Leave
 
-        Assert.True(runner.Ran1.Wait(TimeSpan.FromSeconds(2)), "leave should run the bound pipeline");
+        Assert.True(runner.Ran1.Wait(RunTimeout), "leave should run the bound pipeline");
         Assert.Equal("onLeave", Assert.Single(runner.Snapshot()));
         dispatcher.Dispose();
     }
@@ -153,8 +158,8 @@ public class AppLayerPipelineDispatcherTests
 
         engine.ActiveWindow = Window("Code");
 
-        Assert.True(runner.Ran1.Wait(TimeSpan.FromSeconds(2)));
-        Assert.True(runner.Ran1.Wait(TimeSpan.FromSeconds(2)));
+        Assert.True(runner.Ran1.Wait(RunTimeout));
+        Assert.True(runner.Ran1.Wait(RunTimeout));
         var ran = runner.Snapshot();
         Assert.Equal(2, ran.Count);
         Assert.Contains("a", ran);

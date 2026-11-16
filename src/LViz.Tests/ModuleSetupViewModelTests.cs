@@ -27,7 +27,7 @@ public class ModuleSetupViewModelTests
         new(Path.Combine(Path.GetTempPath(), $"lviz-modsetup-backups-{Guid.NewGuid():N}"));
 
     private static ModuleSetupViewModel LocalVm(string root) =>
-        new(new ModuleSetupContext(root, null, _ => Task.FromResult<string?>(null)), gitHub: null, FreshBackups(), () => FixedGuid);
+        new(new ModuleSetupContext(root, null, _ => Task.FromResult<string?>(null)), gitHub: null, FreshBackups(), () => FixedGuid, new FakeDesktopInteraction());
 
     [Fact]
     public async Task Cosmos82_CheckReportsTheFacts_ThenWalksChooseToReview()
@@ -347,7 +347,7 @@ public class ModuleSetupViewModelTests
                 new ModuleSetupContext(null, new ModuleSetupGitHubTarget("od", "my-config", "main"), _ => Task.FromResult<string?>(null)),
                 gitHub,
                 FreshBackups(),
-                () => FixedGuid);
+                () => FixedGuid, new FakeDesktopInteraction());
             await vm.StartAsync();
 
             Assert.Equal("od/my-config/main", fetched);
@@ -384,11 +384,11 @@ public class ModuleSetupViewModelTests
             new ModuleSetupContext(null, new ModuleSetupGitHubTarget("od", "my-config", "main"), _ => Task.FromResult<string?>(null)),
             gitHub,
             FreshBackups(),
-            () => FixedGuid);
+            () => FixedGuid, new FakeDesktopInteraction());
         await vm.StartAsync();
 
         Assert.Equal(
-            GitHubOpenViewModel.MessageFor(new GitHubApiException(GitHubErrorKind.Network, "no route")),
+            GitHubErrorText.For(new GitHubApiException(GitHubErrorKind.Network, "no route")),
             vm.ErrorMessage);
         Assert.False(vm.CanSetUp);
         Assert.Empty(vm.FactLines);
@@ -410,7 +410,7 @@ public class ModuleSetupViewModelTests
                 _ => Task.FromResult<string?>(null)),
             gitHub,
             FreshBackups(),
-            () => FixedGuid);
+            () => FixedGuid, new FakeDesktopInteraction());
         await vm.StartAsync();
 
         Assert.Equal(Loc.Instance.Format("ModuleSetup_ErrorRead", "disk full"), vm.ErrorMessage);
@@ -422,15 +422,15 @@ public class ModuleSetupViewModelTests
     public void Ctor_RejectsMissingOrDoubleContextAndGitHubWithoutService()
     {
         Assert.Throws<ArgumentException>(() => new ModuleSetupViewModel(
-            new ModuleSetupContext(null, null, _ => Task.FromResult<string?>(null)), gitHub: null, FreshBackups(), () => FixedGuid));
+            new ModuleSetupContext(null, null, _ => Task.FromResult<string?>(null)), gitHub: null, FreshBackups(), () => FixedGuid, new FakeDesktopInteraction()));
 
         var target = new ModuleSetupGitHubTarget("od", "my-config", "main");
         Assert.Throws<ArgumentException>(() => new ModuleSetupViewModel(
             new ModuleSetupContext("/tmp/whatever", target, _ => Task.FromResult<string?>(null)),
-            new FakeGitHubKeymapService(), FreshBackups(), () => FixedGuid));
+            new FakeGitHubKeymapService(), FreshBackups(), () => FixedGuid, new FakeDesktopInteraction()));
 
         Assert.Throws<ArgumentException>(() => new ModuleSetupViewModel(
-            new ModuleSetupContext(null, target, _ => Task.FromResult<string?>(null)), gitHub: null, FreshBackups(), () => FixedGuid));
+            new ModuleSetupContext(null, target, _ => Task.FromResult<string?>(null)), gitHub: null, FreshBackups(), () => FixedGuid, new FakeDesktopInteraction()));
     }
 
     [Fact]
@@ -657,17 +657,17 @@ public class ModuleSetupViewModelTests
                     return Task.FromResult<GitHubSaveResult>(new GitHubSaveResult.Saved("def"));
                 },
             };
+            var desktop = new FakeDesktopInteraction();
             var vm = new ModuleSetupViewModel(
                 new ModuleSetupContext(null, new ModuleSetupGitHubTarget("od", "my-config", "main"), _ => Task.FromResult<string?>(null)),
                 gitHub,
                 FreshBackups(),
-                () => FixedGuid);
+                () => FixedGuid,
+                desktop);
             await vm.StartAsync();
             vm.NextCommand.Execute(null);
             vm.NextCommand.Execute(null);
 
-            string? opened = null;
-            vm.OpenUrl = url => opened = url;
             await vm.SaveCommand.ExecuteAsync(null);
 
             Assert.Equal("od", savedOwner);
@@ -684,7 +684,7 @@ public class ModuleSetupViewModelTests
             Assert.Equal("https://github.com/od/my-config/actions", vm.ActionsUrl);
 
             vm.OpenActionsCommand.Execute(null);
-            Assert.Equal("https://github.com/od/my-config/actions", opened);
+            Assert.Equal(["https://github.com/od/my-config/actions"], desktop.OpenedUrls);
         }
         finally
         {
@@ -708,7 +708,7 @@ public class ModuleSetupViewModelTests
                 new ModuleSetupContext(null, new ModuleSetupGitHubTarget("od", "my-config", "main"), _ => Task.FromResult<string?>(null)),
                 gitHub,
                 FreshBackups(),
-                () => FixedGuid);
+                () => FixedGuid, new FakeDesktopInteraction());
             await vm.StartAsync();
             vm.NextCommand.Execute(null);
             vm.NextCommand.Execute(null);
@@ -742,7 +742,7 @@ public class ModuleSetupViewModelTests
                 new ModuleSetupContext(null, new ModuleSetupGitHubTarget("od", "my-config", "main"), _ => Task.FromResult<string?>(null)),
                 gitHub,
                 FreshBackups(),
-                () => FixedGuid);
+                () => FixedGuid, new FakeDesktopInteraction());
             await vm.StartAsync();
             vm.NextCommand.Execute(null);
             vm.NextCommand.Execute(null);
@@ -752,7 +752,7 @@ public class ModuleSetupViewModelTests
             Assert.Equal(ModuleSetupStep.Review, vm.Step);
             Assert.False(vm.Saved);
             Assert.Equal(
-                GitHubOpenViewModel.MessageFor(new GitHubApiException(GitHubErrorKind.Network, "x")),
+                GitHubErrorText.For(new GitHubApiException(GitHubErrorKind.Network, "x")),
                 vm.ErrorMessage);
             Assert.False(vm.ShowReload);
             Assert.False(vm.IsBusy);
@@ -776,7 +776,7 @@ public class ModuleSetupViewModelTests
                 new ModuleSetupContext(root, null, _ => Task.FromResult(reported)),
                 gitHub: null,
                 FreshBackups(),
-                () => FixedGuid);
+                () => FixedGuid, new FakeDesktopInteraction());
             await vm.StartAsync();
             vm.NextCommand.Execute(null); // -> Choose
             vm.NextCommand.Execute(null); // -> Review
@@ -826,7 +826,7 @@ public class ModuleSetupViewModelTests
                 }),
                 gitHub: null,
                 FreshBackups(),
-                () => FixedGuid);
+                () => FixedGuid, new FakeDesktopInteraction());
             await vm.StartAsync();
             vm.NextCommand.Execute(null); // -> Choose
             vm.System = true;
@@ -856,7 +856,7 @@ public class ModuleSetupViewModelTests
                     _ => throw new InvalidOperationException("no transport")),
                 gitHub: null,
                 FreshBackups(),
-                () => FixedGuid);
+                () => FixedGuid, new FakeDesktopInteraction());
             await vm.StartAsync();
             vm.NextCommand.Execute(null);
             vm.NextCommand.Execute(null);

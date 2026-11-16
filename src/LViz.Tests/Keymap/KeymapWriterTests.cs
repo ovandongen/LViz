@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
 using LViz.Core.Keymap.Parser;
 using LViz.Core.Keymap.Writer;
 using LViz.Core.Models;

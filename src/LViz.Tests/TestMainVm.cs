@@ -30,14 +30,17 @@ internal static class TestMainVm
         ICapabilityControl? capabilityControl = null,
         IHostActionExecutor? hostActionExecutor = null,
         Func<string, bool>? fileExists = null,
-        FirmwareBuildWatcher? firmwareWatcher = null)
+        FirmwareBuildWatcher? firmwareWatcher = null,
+        KeyboardProfileRegistry? profiles = null)
     {
         // The stack is built here exactly as the container builds it, so a
-        // test's monitors/control land inside the engines.
+        // test's monitors/control land inside the engines; the registry
+        // defaults to bundled boards only.
+        var registry = profiles ?? new KeyboardProfileRegistry();
         var shownLayer = new ShownLayer();
         var executor = hostActionExecutor ?? new HostActionExecutor();
         var devices = DeviceStack.Create(
-            KeyboardProfileRegistry.ResolveOrDefault(settings.Current.Keyboard),
+            registry.ResolveOrDefault(settings.Current.Keyboard),
             settings, shownLayer, activeWindowMonitor, mouseIdleMonitor,
             capabilityControl ?? new CapabilityControl(), executor);
         var vm = new MainWindowViewModel(
@@ -51,7 +54,8 @@ internal static class TestMainVm
             gitHub,
             firmwareWatcher,
             devices,
-            shownLayer);
+            shownLayer,
+            registry);
         if (fileExists is not null)
             vm.Library.FileExists = fileExists;
         return vm;

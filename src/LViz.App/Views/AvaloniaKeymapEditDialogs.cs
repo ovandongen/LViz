@@ -1,5 +1,6 @@
 using LViz.App.Services;
 using LViz.App.ViewModels;
+using LViz.Core.Keymap;
 using LViz.Core.Settings;
 // Avalonia.Input also declares a KeyBinding, so the model type is aliased.
 using ZmkCombo = LViz.Core.Models.ZmkCombo;
@@ -24,9 +25,13 @@ internal sealed class AvaloniaKeymapEditDialogs : IKeymapEditDialogs
 
     private bool UseRing => _settings.Current.RingKeyEditor;
 
+    /// <summary>The user's persisted modifier glyph style, stamped onto every
+    /// key/combo dialog request so the dialog paints what the board paints.</summary>
+    private ModifierStyle CurrentModifierStyle => ModifierStyles.FromSetting(_settings.Current.ModifierStyle);
+
     /// <inheritdoc />
     public Task<ZmkKeyBinding?> EditKeyAsync(KeyDialogRequest request) =>
-        Owner.EditKeyAsync(request, UseRing);
+        Owner.EditKeyAsync(request with { ModifierStyle = CurrentModifierStyle }, UseRing);
 
     /// <inheritdoc />
     /// <remarks>The dialog's Binding button opens the user's key editor
@@ -34,7 +39,7 @@ internal sealed class AvaloniaKeymapEditDialogs : IKeymapEditDialogs
     public async Task<ZmkCombo?> EditComboAsync(ComboDialogRequest request)
     {
         var owner = Owner;
-        var comboVm = new ComboDialogViewModel(request);
+        var comboVm = new ComboDialogViewModel(request with { ModifierStyle = CurrentModifierStyle });
         var dlg = new ComboDialog { DataContext = comboVm };
         comboVm.BindingEditorRequested =
             r => KeyEditorHost.EditAsync(dlg, dlg.BindingAnchor, r, UseRing);

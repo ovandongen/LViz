@@ -25,8 +25,8 @@ public sealed record CliToolResult(bool Success, string Message);
 /// Creates (or removes) the <c>lviz</c> command on PATH by symlinking it to the
 /// running executable — the in-app half of the single-binary CLI's PATH story
 /// (see <c>lviz-host-agent-cli-spec.md</c> §8), the pattern VS Code uses for its
-/// <c>code</c> command. macOS/Linux only: it links <see cref="CommandName"/> into
-/// <see cref="LinkDirectory"/>. Windows PATH registration is the installer's job, and
+/// <c>code</c> command. macOS/Linux only: it links <see cref="CliToolInstaller.CommandName"/> into
+/// <see cref="CliToolInstaller.DefaultLinkDirectory"/>. Windows PATH registration is the installer's job, and
 /// a dev launch (under the <c>dotnet</c> host or a <c>bin/Debug|Release</c> output)
 /// is refused — that's what the dev shim is for, since there's no stable single
 /// binary to point at. Stateless and platform-branching, so it lives in the DI

@@ -24,6 +24,11 @@ public enum LayoutSource
 /// not know; <see cref="Warnings"/> codes anything the importer had to assume
 /// or could not carry over — the App formats them into localized text.
 /// </summary>
+/// <param name="Name">Display name of the candidate.</param>
+/// <param name="Source">Which importer produced it.</param>
+/// <param name="Keys">The physical keys in keymap binding order.</param>
+/// <param name="Warnings">What the importer had to assume or could not carry
+/// over.</param>
 /// <param name="Hands">
 /// One hand per key in <see cref="Keys"/> order, or null. Only a saved user
 /// layout carries hands (the wizard asked for them); every importer leaves it

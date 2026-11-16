@@ -1,5 +1,4 @@
 using LViz.App.ViewModels;
-using LViz.Core.Layout;
 using LViz.Core.Settings;
 using Xunit;
 

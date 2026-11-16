@@ -87,7 +87,7 @@ public interface IKeyboardFlashAccess
 /// <para>The bus lookup enumerates hidapi devices (read-only — it never opens a
 /// handle, the keyboard must never be opened twice) under
 /// <see cref="HidGlobalLock.Gate"/>, the gate the transport's discovery loops
-/// hold: two concurrent <see cref="Hid.Enumerate()"/> calls abort the process
+/// hold: two concurrent <c>Hid.Enumerate()</c> calls abort the process
 /// on macOS.</para>
 /// </summary>
 public sealed class KeyboardFlashAccess(

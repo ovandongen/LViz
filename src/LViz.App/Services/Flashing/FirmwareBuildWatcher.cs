@@ -58,14 +58,14 @@ public sealed record FirmwareWatchStatus(
 /// waited for. Every poll goes through
 /// <see cref="IFirmwareBuildService.FindBuildAsync"/> by sha only (branch is
 /// part of the status for display, never of the lookup). The watcher only ever
-/// <see cref="IFirmwareBuildService.EnsureRestoredAsync"/> the builds login —
+/// <see cref="GitHub.IGitHubLogin.EnsureRestoredAsync"/> the builds login —
 /// it never starts a sign-in; without a login it settles at
 /// <see cref="FirmwareWatchState.SignInNeeded"/> and stops.
 /// </para>
 /// </summary>
 /// <param name="builds">The builds login and the run/artifact lookups.</param>
 /// <param name="delay">
-/// How the poll interval is waited; defaults to <see cref="Task.Delay"/>.
+/// How the poll interval is waited; defaults to <see cref="Task.Delay(TimeSpan, CancellationToken)"/>.
 /// Tests pass one that returns (almost) instantly.
 /// </param>
 public sealed class FirmwareBuildWatcher(

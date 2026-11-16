@@ -29,7 +29,8 @@ public class ModuleSetupWindowTests
             new ModuleSetupContext(root, null, _ => Task.FromResult<string?>(null)),
             gitHub: null,
             new KeymapBackupStore(Path.Combine(Path.GetTempPath(), $"lviz-modsetup-win-{Guid.NewGuid():N}")),
-            () => FixedGuid);
+            () => FixedGuid,
+            new FakeDesktopInteraction());
 
     [AvaloniaFact]
     public async Task CheckStep_Renders_AndShowsTheFactLines()

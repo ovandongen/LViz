@@ -23,7 +23,7 @@ public sealed class FlashViewModelFileTests : IDisposable
     private readonly string _tempDir = Path.Combine(Path.GetTempPath(), $"lviz-flashfile-{Guid.NewGuid():N}");
     private readonly FakeBuilds _builds = new();
     private readonly FirmwareFlashHistory _history;
-    private readonly Queue<string?> _picks = new();
+    private readonly FakeDesktopInteraction _desktop = new();
 
     public FlashViewModelFileTests()
     {
@@ -87,7 +87,7 @@ public sealed class FlashViewModelFileTests : IDisposable
     {
         var vm = LocalVm();
         await vm.StartAsync();
-        _picks.Enqueue(Write("junk.uf2", "definitely not a UF2 file"u8.ToArray()));
+        _desktop.Uf2Path = Write("junk.uf2", "definitely not a UF2 file"u8.ToArray());
 
         await vm.PickFileCommand.ExecuteAsync(null);
 
@@ -102,7 +102,7 @@ public sealed class FlashViewModelFileTests : IDisposable
     {
         var vm = LocalVm();
         await vm.StartAsync();
-        _picks.Enqueue(_tempDir); // reading a directory throws (IOException/UnauthorizedAccessException)
+        _desktop.Uf2Path = _tempDir; // reading a directory throws (IOException/UnauthorizedAccessException)
 
         await vm.PickFileCommand.ExecuteAsync(null);
 
@@ -113,13 +113,29 @@ public sealed class FlashViewModelFileTests : IDisposable
     }
 
     [Fact]
+    public async Task PickFile_UsesTheDesktopFilePicker()
+    {
+        // The picked file comes from the desktop interaction the VM was
+        // built with — no window hook involved.
+        var vm = LocalVm();
+        await vm.StartAsync();
+        _desktop.Uf2Path = WithMarker();
+
+        await vm.PickFileCommand.ExecuteAsync(null);
+
+        Assert.Equal("support.uf2", vm.FileName);
+        Assert.Null(vm.ErrorMessage);
+        Assert.True(vm.NextCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task CancelledPick_ChangesNothing()
     {
         var vm = LocalVm();
         await vm.StartAsync();
-        _picks.Enqueue(WithMarker());
+        _desktop.Uf2Path = WithMarker();
         await vm.PickFileCommand.ExecuteAsync(null);
-        _picks.Enqueue(null);
+        _desktop.Uf2Path = null;
 
         await vm.PickFileCommand.ExecuteAsync(null);
 
@@ -133,7 +149,7 @@ public sealed class FlashViewModelFileTests : IDisposable
     {
         var vm = LocalVm();
         await vm.StartAsync();
-        _picks.Enqueue(NoMarker("one.uf2"));
+        _desktop.Uf2Path = NoMarker("one.uf2");
         await vm.PickFileCommand.ExecuteAsync(null);
 
         Assert.Equal("one.uf2", vm.FileName);
@@ -144,7 +160,7 @@ public sealed class FlashViewModelFileTests : IDisposable
         vm.FileWarningAccepted = true;
         Assert.True(vm.NextCommand.CanExecute(null));
 
-        _picks.Enqueue(NoMarker("two.uf2"));
+        _desktop.Uf2Path = NoMarker("two.uf2");
         await vm.PickFileCommand.ExecuteAsync(null);
 
         Assert.False(vm.FileWarningAccepted); // a new file is a new warning to tick
@@ -157,7 +173,7 @@ public sealed class FlashViewModelFileTests : IDisposable
     {
         var vm = LocalVm();
         await vm.StartAsync();
-        _picks.Enqueue(NoMarker());
+        _desktop.Uf2Path = NoMarker();
         await vm.PickFileCommand.ExecuteAsync(null);
         vm.FileWarningAccepted = true; // accepted while the central was selected
 
@@ -173,7 +189,7 @@ public sealed class FlashViewModelFileTests : IDisposable
     {
         var vm = LocalVm();
         await vm.StartAsync();
-        _picks.Enqueue(WithMarker());
+        _desktop.Uf2Path = WithMarker();
         await vm.PickFileCommand.ExecuteAsync(null);
 
         Assert.Equal(FirmwareHalfRole.Central, vm.SelectedFileHalf!.Half.Role);
@@ -186,7 +202,7 @@ public sealed class FlashViewModelFileTests : IDisposable
     {
         var vm = LocalVm();
         await vm.StartAsync();
-        _picks.Enqueue(WithMarker());
+        _desktop.Uf2Path = WithMarker();
         await vm.PickFileCommand.ExecuteAsync(null);
         Assert.True(vm.IsSourceStep);
 
@@ -232,14 +248,13 @@ public sealed class FlashViewModelFileTests : IDisposable
     {
         var keyboard = new FakeKeyboard();
         var root = ZmkConfigFixtures.Root("cosmos82");
-        var vm = new FlashViewModel(
+        return new FlashViewModel(
             new FlashContext(root, root, null, null),
             _builds,
             _history,
             keyboard,
-            new FlashRun(keyboard, new Uf2DriveWatcher(new NoDrives())));
-        vm.PickUf2File = () => Task.FromResult(_picks.Dequeue());
-        return vm;
+            new FlashRun(keyboard, new Uf2DriveWatcher(new NoDrives())),
+            _desktop);
     }
 
     private sealed class NoDrives : IUf2DriveSource

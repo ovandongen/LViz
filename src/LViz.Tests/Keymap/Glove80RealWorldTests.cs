@@ -51,7 +51,7 @@ public class Glove80RealWorldTests
         var r = km.Resolve(0, idx);
 
         var (label, sub, top) = KeyLabelFormatter.FormatBinding(
-            r.Binding, r.TargetLayerName, r.HoldTap, km.MacrosByName);
+            r.Binding, ModifierStyle.Mac, r.TargetLayerName, r.HoldTap, km.MacrosByName);
 
         Assert.Equal("Status", label);
         Assert.Equal("Magic", sub);
@@ -68,9 +68,9 @@ public class Glove80RealWorldTests
         var move = mouse.First(b => b.Behavior == "&mmv" && b.Params.SequenceEqual(new[] { "MOVE_LEFT" }));
         var click = mouse.First(b => b.Behavior == "&mkp" && b.Params.SequenceEqual(new[] { "LCLK" }));
 
-        Assert.Equal(("↑", "", "Scroll"), KeyLabelFormatter.FormatBinding(scroll, null));
-        Assert.Equal(("←", "", "Mouse"), KeyLabelFormatter.FormatBinding(move, null));
-        Assert.Equal(("L Clk", "", "Click"), KeyLabelFormatter.FormatBinding(click, null));
+        Assert.Equal(("↑", "", "Scroll"), KeyLabelFormatter.FormatBinding(scroll, ModifierStyle.Mac, null));
+        Assert.Equal(("←", "", "Mouse"), KeyLabelFormatter.FormatBinding(move, ModifierStyle.Mac, null));
+        Assert.Equal(("L Clk", "", "Click"), KeyLabelFormatter.FormatBinding(click, ModifierStyle.Mac, null));
     }
 
     [Fact]

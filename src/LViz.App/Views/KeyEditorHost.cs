@@ -1,9 +1,5 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.VisualTree;
 using LViz.App.Ring;
 using LViz.App.ViewModels;
 using LViz.Core.Diagnostics;
@@ -18,7 +14,7 @@ namespace LViz.App.Views;
 /// <see cref="KeyDialog"/>. <see cref="MainWindow"/> hosts the ring through
 /// this (keeping its scrim, gold outline and resize cancel for itself), and
 /// any other window — e.g. the combo dialog — opens the same editor on one of
-/// its own controls via <see cref="EditAsync"/>.
+/// its own controls via <see cref="EditAsync(Window, Control, KeyDialogRequest, bool)"/>.
 /// </summary>
 public static class KeyEditorHost
 {

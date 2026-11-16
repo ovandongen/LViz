@@ -63,11 +63,14 @@ public sealed class FirmwareBuildServiceTests : IDisposable
 
         _service = new FirmwareBuildService(
             buildsClient,
-            new GitHubSession(buildsClient, _store, secretKey: GitHubBuildsAppInfo.SecretKey),
+            new GitHubSession(
+                buildsClient,
+                _store,
+                secretKey: GitHubBuildsAppInfo.SecretKey,
+                delay: static (_, _) => Task.CompletedTask),
             mainClient,
             new GitHubSession(mainClient, _store),
-            _cache,
-            static (_, _) => Task.CompletedTask);
+            _cache);
     }
 
     public void Dispose()

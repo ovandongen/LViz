@@ -3,6 +3,7 @@ using LViz.App.ViewModels;
 using LViz.Core.Keymap;
 using LViz.Core.Keymap.Parser;
 using LViz.Core.Layout;
+using LViz.Core.Settings;
 using Xunit;
 
 namespace LViz.Tests;
@@ -1118,22 +1119,22 @@ public sealed class LayoutEditorViewModelTests : IDisposable
 
     [Fact]
     public void EditorLabels_WithoutAKeymap_AreIndices() =>
-        Assert.Equal(["0", "1", "2"], EditorLabels.For(null, 3, "p"));
+        Assert.Equal(["0", "1", "2"], EditorLabels.For(null, 3, new KeyPaintContext("p", new UserSettings())));
 
     [Fact]
     public void EditorLabels_WithoutAKeymap_AndNoKeys_AreEmpty() =>
-        Assert.Empty(EditorLabels.For(null, 0, "p"));
+        Assert.Empty(EditorLabels.For(null, 0, new KeyPaintContext("p", new UserSettings())));
 
     [Fact]
     public void EditorLabels_UseTheBaseLayerBindingAndFallBackToTheIndex()
     {
-        Assert.Equal(["A", "A", "2"], EditorLabels.For(KeymapWithBindings(2), 3, "p"));
+        Assert.Equal(["A", "A", "2"], EditorLabels.For(KeymapWithBindings(2), 3, new KeyPaintContext("p", new UserSettings())));
     }
 
     [Fact]
     public void EditorLabels_StopAtKeyCount()
     {
-        Assert.Equal(["A"], EditorLabels.For(KeymapWithBindings(2), 1, "p"));
+        Assert.Equal(["A"], EditorLabels.For(KeymapWithBindings(2), 1, new KeyPaintContext("p", new UserSettings())));
     }
 
     /// <summary>Round-trips a two-layer-free base keymap through the real

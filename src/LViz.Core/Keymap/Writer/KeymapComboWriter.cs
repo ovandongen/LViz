@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using LViz.Core.Keymap.Editing;
 using LViz.Core.Keymap.Parser;
 using LViz.Core.Layout.Dtsi;

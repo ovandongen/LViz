@@ -67,7 +67,7 @@ public partial class MainWindowViewModel
         IKeyboardProfile? autoSwitchedTo = null;
         if (keyCountMismatch)
         {
-            var matching = KeyboardProfileRegistry.FindByKeyCount(bindingCount, Devices.AttachedHidNames());
+            var matching = _profiles.FindByKeyCount(bindingCount, Devices.AttachedHidNames());
             if (matching is not null)
             {
                 UseProfile(matching);
@@ -125,7 +125,7 @@ public partial class MainWindowViewModel
 
         // The live-features item and hint follow the newly loaded keymap's
         // zmk-config (or its absence).
-        RefreshLiveFeatures();
+        Firmware.SetLoadedKeymap(_loadedEntry, LoadedLayoutPath);
     }
 
     /// <summary>
@@ -142,7 +142,7 @@ public partial class MainWindowViewModel
         ActiveLayerIndex = 0;
         HasLayoutLoaded = false;
         HasUnmatchedKeymap = false;
-        RefreshLiveFeatures();
+        Firmware.SetLoadedKeymap(_loadedEntry, LoadedLayoutPath);
     }
 
     /// <summary>
@@ -193,7 +193,7 @@ public partial class MainWindowViewModel
 
         if (_gitHub is null)
         {
-            Toast.Show(Loc.Instance.Format("Toast_GitHubFailedFormat", keymap.FileName, "GitHub is not available"));
+            Toast.Show(Loc.Instance.Format("Toast_GitHubFailedFormat", keymap.FileName, Loc.Instance["GitHub_NotAvailable"]));
             return;
         }
 
@@ -290,7 +290,7 @@ public partial class MainWindowViewModel
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Could not copy diagnostics: {ex.Message}";
+            StatusMessage = Loc.Instance.Format("Status_CopyDiagnosticsFailedFormat", ex.Message);
         }
     }
 

@@ -34,8 +34,7 @@ public sealed class FlashViewModelTests : IDisposable
     private readonly string _tempDir = Path.Combine(Path.GetTempPath(), $"lviz-flashvm-{Guid.NewGuid():N}");
     private readonly FakeBuilds _builds = new();
     private readonly FirmwareFlashHistory _history;
-    private readonly List<string> _opened = [];
-    private readonly List<string> _clipboard = [];
+    private readonly FakeDesktopInteraction _desktop = new();
 
     public FlashViewModelTests()
     {
@@ -75,7 +74,7 @@ public sealed class FlashViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task SignInCommand_CopiesCodeOpensPageThenLoadstheBuild()
+    public async Task SignIn_StartCommand_CopiesCodeOpensPageThenLoadstheBuild()
     {
         _builds.SignedIn = false;
         _builds.Build = ReadyBuild(pending: false);
@@ -84,18 +83,18 @@ public sealed class FlashViewModelTests : IDisposable
         var vm = GitHubVm();
         await vm.StartAsync();
 
-        var running = vm.SignInCommand.ExecuteAsync(null);
-        await WaitUntil(() => vm.IsWaitingForSignIn);
+        var running = vm.SignIn.StartCommand.ExecuteAsync(null);
+        await WaitUntil(() => vm.SignIn.IsWaitingForSignIn);
 
-        Assert.Equal("WFDS-MQNM", vm.UserCode);
-        Assert.Equal(["WFDS-MQNM"], _clipboard); // auto-copied once
-        Assert.Equal(["https://github.com/login/device"], _opened);
+        Assert.Equal("WFDS-MQNM", vm.SignIn.UserCode);
+        Assert.Equal(["WFDS-MQNM"], _desktop.CopiedTexts); // auto-copied once
+        Assert.Equal(["https://github.com/login/device"], _desktop.OpenedUrls);
 
         gate.SetResult();
         await running;
 
-        Assert.False(vm.IsWaitingForSignIn);
-        Assert.Null(vm.UserCode);
+        Assert.False(vm.SignIn.IsWaitingForSignIn);
+        Assert.Null(vm.SignIn.UserCode);
         Assert.False(vm.IsSignInNeeded);
         Assert.Equal(T("Flash_SignedInAs").Replace("{0}", "build-user"), vm.LoginText);
         Assert.Contains(Sha[..7], vm.BuildText);
@@ -103,7 +102,7 @@ public sealed class FlashViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task CancelSignInCommand_StopsTheWaitAndKeepsTheStep()
+    public async Task SignIn_CancelCommand_StopsTheWaitAndKeepsTheStep()
     {
         _builds.SignedIn = false;
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -115,14 +114,41 @@ public sealed class FlashViewModelTests : IDisposable
         var vm = GitHubVm();
         await vm.StartAsync();
 
-        var running = vm.SignInCommand.ExecuteAsync(null);
-        await WaitUntil(() => vm.IsWaitingForSignIn);
+        var running = vm.SignIn.StartCommand.ExecuteAsync(null);
+        await WaitUntil(() => vm.SignIn.IsWaitingForSignIn);
 
-        vm.CancelSignInCommand.Execute(null);
+        vm.SignIn.CancelCommand.Execute(null);
         await running;
 
-        Assert.False(vm.IsWaitingForSignIn);
-        Assert.Null(vm.UserCode);
+        Assert.False(vm.SignIn.IsWaitingForSignIn);
+        Assert.Null(vm.SignIn.UserCode);
+        Assert.True(vm.IsSignInNeeded);
+        Assert.Empty(_builds.FindCalls);
+    }
+
+    [Fact]
+    public async Task CancelWork_StopsAPendingSignIn()
+    {
+        // The window closing mid-wait: CancelWork aborts the sign-in the way
+        // the sign-in's own Cancel button does — no build lookup follows.
+        _builds.SignedIn = false;
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _builds.OnCompleteSignIn = ct =>
+        {
+            ct.Register(() => gate.TrySetCanceled(ct));
+            return gate.Task;
+        };
+        var vm = GitHubVm();
+        await vm.StartAsync();
+
+        var running = vm.SignIn.StartCommand.ExecuteAsync(null);
+        await WaitUntil(() => vm.SignIn.IsWaitingForSignIn);
+
+        vm.CancelWork();
+        await running;
+
+        Assert.False(vm.SignIn.IsWaitingForSignIn);
+        Assert.Null(vm.SignIn.UserCode);
         Assert.True(vm.IsSignInNeeded);
         Assert.Empty(_builds.FindCalls);
     }
@@ -188,7 +214,7 @@ public sealed class FlashViewModelTests : IDisposable
         Assert.False(vm.NextCommand.CanExecute(null));
 
         vm.InstallCommand.Execute(null);
-        Assert.Equal([GitHubBuildsAppInfo.InstallUrl], _opened);
+        Assert.Equal([GitHubBuildsAppInfo.InstallUrl], _desktop.OpenedUrls);
     }
 
     [Fact]
@@ -507,15 +533,9 @@ public sealed class FlashViewModelTests : IDisposable
             ZmkConfigFixtures.Root("cosmos82"),
             target,
             sha);
-        var vm = new FlashViewModel(
-            context, _builds, _history, keyboard, new FlashRun(keyboard, new Uf2DriveWatcher(new NoDrives())));
-        vm.OpenUrl = _opened.Add;
-        vm.CopyToClipboard = c =>
-        {
-            _clipboard.Add(c);
-            return Task.CompletedTask;
-        };
-        return vm;
+        return new FlashViewModel(
+            context, _builds, _history, keyboard,
+            new FlashRun(keyboard, new Uf2DriveWatcher(new NoDrives())), _desktop);
     }
 
     private static async Task WaitUntil(Func<bool> condition)

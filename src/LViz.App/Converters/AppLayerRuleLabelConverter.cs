@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
 using System.Globalization;
 using Avalonia.Data.Converters;
 using LViz.App.Localization;

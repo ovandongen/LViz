@@ -32,6 +32,11 @@
     <EmbeddedResource Include="Layout\Fixtures\*" />
     <!-- zmk-config folders (batch 024): read from disk by ZmkConfigInspector, so copied, not embedded. -->
     <None Include="ZmkConfig\Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Class-level parallelization with a fixed worker count. Without it xUnit
+         sizes its workers to Environment.ProcessorCount, which is 1 on a
+         CPU-quota-limited runner (a container) — the suite silently serializes
+         there. 4 workers also hide the I/O and headless-render waits on dev boxes. -->
+    <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

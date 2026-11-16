@@ -10,7 +10,7 @@ namespace LViz.Tests.Layout;
 /// centres and corners, bounds, hit-testing, snap/normalisation maths, snapping a
 /// move-drag to neighbouring keys, the move/rotate/hand operations on key lists,
 /// mirroring one half onto the other, and the normalisation saved drafts go
-/// through. <see cref="K"/> is a 100×100 key in centi-u.
+/// through. <see cref="K(int, int, int, int, int)"/> is a 100×100 key in centi-u.
 /// </summary>
 public sealed class UserLayoutGeometryTests
 {

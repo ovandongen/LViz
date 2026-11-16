@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using Avalonia.Threading;
-using LViz.Core.Diagnostics;
 
 namespace LViz.App.Services.Hotkeys;
 

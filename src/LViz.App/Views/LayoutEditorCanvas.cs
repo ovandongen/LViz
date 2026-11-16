@@ -16,7 +16,7 @@ namespace LViz.App.Views;
 /// (<see cref="ToCentiU"/>), paints the state, and forwards input.
 ///
 /// <para>The mapping fits <see cref="LayoutEditorViewModel.ViewBounds"/> into
-/// <see cref="Bounds"/> with padding, centred, never zooming past
+/// <see cref="Avalonia.Visual.Bounds"/> with padding, centred, never zooming past
 /// <see cref="MaxScale"/> px per centi-u — the same density the main board
 /// uses. Grab tolerances are converted from a constant pixel size
 /// (<see cref="GrabPixels"/>) through the current scale, so grabbing the

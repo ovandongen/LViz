@@ -31,6 +31,7 @@ internal sealed class FakeMainWindowShell : IMainWindowShell
     public LabelEditAnswer<ComboLabelOverride>? ComboLabelAnswer { get; set; }
 
     public List<string> CopiedTexts { get; } = [];
+    public List<string> OpenedUrls { get; } = [];
     public List<LayoutWizardContext> WizardContexts { get; } = [];
     public List<ModuleSetupContext> ModuleSetupContexts { get; } = [];
     public List<FlashContext> FlashContexts { get; } = [];
@@ -41,6 +42,8 @@ internal sealed class FakeMainWindowShell : IMainWindowShell
     public void Quit() => QuitCount++;
 
     public void ShowWindow() => ShowWindowCount++;
+
+    public void OpenUrl(string url) => OpenedUrls.Add(url);
 
     public Task<string?> PickKeymapFileAsync() => Task.FromResult(PickedKeymapPath);
 

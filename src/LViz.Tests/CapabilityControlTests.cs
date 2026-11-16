@@ -1,7 +1,6 @@
 using System.Buffers.Binary;
 using LViz.App.Services;
 using LViz.Core.Firmware;
-using ZmkHidProtocol.Capabilities;
 using ZmkHidProtocol.Protocol;
 using Xunit;
 

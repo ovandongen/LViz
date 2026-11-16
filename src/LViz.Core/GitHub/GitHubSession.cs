@@ -29,20 +29,31 @@ namespace LViz.Core.GitHub;
 /// Only one refresh runs at a time — concurrent callers share its result.
 /// Nothing here ever logs a token; diagnostics carry the login only.
 /// </para>
+///
+/// <para>
+/// The access-token lifetime is why <see cref="EnsureRestoredAsync"/> caches
+/// its <see cref="Task"/> rather than a result: concurrent first calls must
+/// not read the secret store twice, but a failed attempt must not poison the
+/// login for good.
+/// </para>
 /// </summary>
 public sealed class GitHubSession(
     GitHubClient client,
     ISecretStore store,
     Func<DateTimeOffset>? now = null,
-    string? secretKey = null)
+    string? secretKey = null,
+    Func<TimeSpan, CancellationToken, Task>? delay = null)
 {
     /// <summary>An access token with less than this left is refreshed instead of returned.</summary>
     private static readonly TimeSpan RefreshMargin = TimeSpan.FromMinutes(5);
 
+    private readonly Lock _restoreLock = new();
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly Func<DateTimeOffset> _now = now ?? UtcNow;
+    private readonly Func<TimeSpan, CancellationToken, Task> _delay = delay ?? Task.Delay;
     private readonly string _secretKey = secretKey ?? GitHubAppInfo.SecretKey;
     private GitHubTokens? _tokens;
+    private Task<bool>? _restoreTask;
 
     /// <summary>True while a login is held (persisted or session-only).</summary>
     public bool IsSignedIn => _tokens is not null;
@@ -96,6 +107,28 @@ public sealed class GitHubSession(
     }
 
     /// <summary>
+    /// Restores the stored login at most once — later and concurrent calls
+    /// await the same call. A failed attempt is dropped, so the next call
+    /// retries.
+    /// </summary>
+    public Task EnsureRestoredAsync(CancellationToken ct = default)
+    {
+        lock (_restoreLock)
+        {
+            // In flight and succeeded are shared as-is; a faulted or cancelled
+            // attempt is replaced so the next call retries — a store read that
+            // lost the startup race must not stay dead.
+            if (_restoreTask is { IsFaulted: false, IsCanceled: false } shared)
+            {
+                return shared;
+            }
+
+            _restoreTask = shared = RestoreAsync(ct);
+            return shared;
+        }
+    }
+
+    /// <summary>
     /// Adopts a fresh login and stores it. When the store refuses the write,
     /// the login is still active for this process and <see cref="IsPersisted"/>
     /// says false.
@@ -107,6 +140,17 @@ public sealed class GitHubSession(
 
         DiagnosticLog.Info("GitHub", $"Signed in as {tokens.Login} (persisted: {IsPersisted})");
         Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Opens the device flow; show the returned code and URL to the user.</summary>
+    public Task<GitHubDeviceCode> StartSignInAsync(CancellationToken ct = default) =>
+        client.StartDeviceFlowAsync(ct);
+
+    /// <summary>Polls until the user authorizes the code, then adopts the login.</summary>
+    public async Task CompleteSignInAsync(GitHubDeviceCode code, CancellationToken ct = default)
+    {
+        var tokens = await client.WaitForDeviceAuthorizationAsync(code, _delay, ct);
+        await SignInAsync(tokens, ct);
     }
 
     /// <summary>

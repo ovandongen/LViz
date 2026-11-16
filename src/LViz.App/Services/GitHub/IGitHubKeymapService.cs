@@ -20,36 +20,12 @@ namespace LViz.App.Services.GitHub;
 /// <see cref="CacheFolderFor"/> (no I/O beyond a file check).
 /// </para>
 /// </summary>
-public interface IGitHubKeymapService
+/// <remarks>
+/// Signing out (<see cref="IGitHubLogin.SignOutAsync"/>) wipes the repo cache
+/// so private repo contents do not linger.
+/// </remarks>
+public interface IGitHubKeymapService : IGitHubLogin
 {
-    /// <summary>The logged-in user's handle, or null when signed out.</summary>
-    string? Login { get; }
-
-    /// <summary>True while a login is held (persisted or session-only).</summary>
-    bool IsSignedIn { get; }
-
-    /// <summary>True when the login would survive a restart; false when it only lives in this process.</summary>
-    bool IsLoginPersisted { get; }
-
-    /// <summary>
-    /// Restores the stored login at most once — later and concurrent calls
-    /// await the same call. A failed attempt is dropped, so the next call
-    /// retries.
-    /// </summary>
-    Task EnsureRestoredAsync(CancellationToken ct = default);
-
-    /// <summary>Opens the device flow; show the returned code and URL to the user.</summary>
-    Task<GitHubDeviceCode> StartSignInAsync(CancellationToken ct = default);
-
-    /// <summary>Polls until the user authorizes the code, then adopts the login.</summary>
-    Task CompleteSignInAsync(GitHubDeviceCode code, CancellationToken ct = default);
-
-    /// <summary>
-    /// Signs out, forgetting the tokens and wiping the repo cache so private
-    /// repo contents do not linger.
-    /// </summary>
-    Task SignOutAsync(CancellationToken ct = default);
-
     /// <summary>The repositories the current login's App installation can see.</summary>
     Task<IReadOnlyList<GitHubRepo>> ListReposAsync(CancellationToken ct = default);
 
@@ -75,6 +51,8 @@ public interface IGitHubKeymapService
     /// <see cref="GitHubSaveResult"/>, and — after a commit — brings the local
     /// cache copy of the branch in step with what was saved.
     /// </summary>
+    /// <param name="keymap">Which GitHub keymap to save to.</param>
+    /// <param name="content">The file's new bytes.</param>
     /// <param name="baseBlobSha">
     /// The <see cref="GitBlobSha"/> of the bytes the editor loaded. GitHub
     /// refuses the commit when the file on the branch no longer matches it,
@@ -85,6 +63,8 @@ public interface IGitHubKeymapService
     /// file's <i>current</i> blob SHA is fetched from GitHub and committed
     /// against, so <paramref name="baseBlobSha"/> is ignored.
     /// </param>
+    /// <param name="message">Commit message.</param>
+    /// <param name="ct">Cancels the save.</param>
     Task<GitHubSaveResult> SaveAsync(
         GitHubKeymapRef keymap,
         byte[] content,
@@ -107,9 +87,13 @@ public interface IGitHubKeymapService
     /// again.
     /// </para>
     /// </summary>
+    /// <param name="owner">Repository owner.</param>
+    /// <param name="repo">Repository name.</param>
+    /// <param name="branch">Branch to commit to.</param>
     /// <param name="baseCommitSha">The commit the branch must still point at.</param>
     /// <param name="files">Files to write, in order; at least one, no path twice.</param>
     /// <param name="message">Commit message.</param>
+    /// <param name="ct">Cancels the save.</param>
     Task<GitHubSaveResult> SaveFilesAsync(
         string owner,
         string repo,

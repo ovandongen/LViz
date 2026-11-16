@@ -37,7 +37,7 @@ public class PhysicalLayoutImporterTests
     // ── bundled boards must behave exactly as before ────────────────────
 
     public static IEnumerable<object[]> BundledBoards =>
-        KeyboardProfileRegistry.All.Select(p =>
+        KeyboardProfileRegistry.Bundled.Select(p =>
             new object[] { p, $"LViz.Core.Resources.{p.Id.ToLowerInvariant()}.dtsi" });
 
     [Theory]

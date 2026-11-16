@@ -7,7 +7,7 @@ namespace LViz.Core.Keymap;
 /// Pure string-formatting helpers for rendering a <see cref="KeyBinding"/>
 /// into label / subscript / badge triples, the per-section tooltip lines,
 /// and the param-formatters for ZMK behaviors. No view-model state — every
-/// method here is static and side-effect-free. <see cref="KeyViewModel"/>
+/// method here is static and side-effect-free. <c>KeyViewModel</c>
 /// composes these into its observable display properties.
 /// </summary>
 public static class KeyLabelFormatter
@@ -16,7 +16,8 @@ public static class KeyLabelFormatter
 
     /// <summary>
     /// Picks the (label, subscript, top-left-badge) triple for a binding in
-    /// strict precedence order:
+    /// strict precedence order; <paramref name="style"/> decides which
+    /// modifier glyph set renders:
     /// <list type="number">
     /// <item>User-authored <c>decoration.label</c> — overrides everything.</item>
     /// <item>Hold-tap — tap-side keycode as main label, hold-side layer or keycode as subscript.</item>
@@ -26,7 +27,7 @@ public static class KeyLabelFormatter
     /// </list>
     /// </summary>
     public static (string Label, string Subscript, string TopLeft) FormatBinding(
-        KeyBinding b, string? targetLayerName, HoldTap? holdTap = null,
+        KeyBinding b, ModifierStyle style, string? targetLayerName, HoldTap? holdTap = null,
         IReadOnlyDictionary<string, ZmkMacro>? macros = null)
     {
         if (!string.IsNullOrEmpty(b.DecorationLabel))
@@ -37,11 +38,11 @@ public static class KeyLabelFormatter
         var layerName = targetLayerName is null ? null : FormatLayerName(targetLayerName);
 
         if (holdTap is not null)
-            return FormatHoldTap(b, holdTap, targetLayerName, layerName, macros);
+            return FormatHoldTap(b, style, holdTap, targetLayerName, layerName, macros);
 
-        return TryFormatStandardBehavior(b, layerName)
-            ?? TryFormatMacroConvention(b)
-            ?? TryFormatUserMacro(b, macros)
+        return TryFormatStandardBehavior(b, style, layerName)
+            ?? TryFormatMacroConvention(b, style)
+            ?? TryFormatUserMacro(b, style, macros)
             ?? FormatFallback(b);
     }
 
@@ -54,18 +55,18 @@ public static class KeyLabelFormatter
     /// consistently here.
     /// </summary>
     private static (string Label, string Subscript, string TopLeft) FormatHoldTap(
-        KeyBinding b, HoldTap holdTap, string? rawLayerName, string? formattedLayerName,
+        KeyBinding b, ModifierStyle style, HoldTap holdTap, string? rawLayerName, string? formattedLayerName,
         IReadOnlyDictionary<string, ZmkMacro>? macros)
     {
         var (holdParams, tapParams) = SplitHoldTapParams(b.Params, holdTap);
-        var tap = FormatBinding(new KeyBinding(holdTap.TapBinding, tapParams), null, macros: macros);
-        var hold = FormatBinding(new KeyBinding(holdTap.HoldBinding, holdParams), rawLayerName, macros: macros);
+        var tap = FormatBinding(new KeyBinding(holdTap.TapBinding, tapParams), style, null, macros: macros);
+        var hold = FormatBinding(new KeyBinding(holdTap.HoldBinding, holdParams), style, rawLayerName, macros: macros);
         var sub = !string.IsNullOrEmpty(formattedLayerName) ? formattedLayerName : hold.Label;
         return (tap.Label, sub, "Hold-Tap");
     }
 
     private static (string Label, string Subscript, string TopLeft)? TryFormatStandardBehavior(
-        KeyBinding b, string? layerName)
+        KeyBinding b, ModifierStyle style, string? layerName)
     {
         string LayerOrIndex(string idxParam) => layerName ?? ("L" + idxParam);
 
@@ -74,21 +75,21 @@ public static class KeyLabelFormatter
             "&trans" => ("▽", "", ""),
             "&none"  => ("", "", ""),
 
-            "&kp" when b.Params.Count >= 1 => FormatKp(b.Params),
+            "&kp" when b.Params.Count >= 1 => FormatKp(b.Params, style),
 
             "&to"  when b.Params.Count >= 1 => (LayerOrIndex(b.Params[0]), "", "To Layer"),
             "&mo"  when b.Params.Count >= 1 => (LayerOrIndex(b.Params[0]), "", "Momentary"),
             "&tog" when b.Params.Count >= 1 => (LayerOrIndex(b.Params[0]), "", "Toggle Layer"),
             "&sl"  when b.Params.Count >= 1 => (LayerOrIndex(b.Params[0]), "", "Sticky Layer"),
             "&lt"  when b.Params.Count == 2 && int.TryParse(b.Params[0], out _)
-                => (ZmkKeycodeLabel.Display(b.Params[1]), LayerOrIndex(b.Params[0]), "Layer Tap"),
+                => (ZmkKeycodeLabel.Display(b.Params[1], style), LayerOrIndex(b.Params[0]), "Layer Tap"),
 
             // &mt is ZMK's built-in mod-tap — first param is a modifier
             // keycode, second is the tap keycode. Route through the same
             // modifier-glyph machinery user-defined hold-taps use.
             "&mt" when b.Params.Count == 2
-                => (ZmkKeycodeLabel.Display(b.Params[1]),
-                    ZmkKeycodeLabel.ModifierSubscript(b.Params[0]) ?? b.Params[0],
+                => (ZmkKeycodeLabel.Display(b.Params[1], style),
+                    ZmkKeycodeLabel.ModifierSubscript(b.Params[0], style) ?? b.Params[0],
                     "Mod-Tap"),
 
             "&bt"        when b.Params.Count >= 1 => (FormatBtParams(b.Params),        "", "Bluetooth"),
@@ -109,9 +110,9 @@ public static class KeyLabelFormatter
         };
     }
 
-    private static (string Label, string Subscript, string TopLeft) FormatKp(IReadOnlyList<string> p)
+    private static (string Label, string Subscript, string TopLeft) FormatKp(IReadOnlyList<string> p, ModifierStyle style)
     {
-        var (label, sub) = ZmkKeycodeLabel.FormatKpParams(p);
+        var (label, sub) = ZmkKeycodeLabel.FormatKpParams(p, style);
         return (label, sub, "");
     }
 
@@ -120,13 +121,13 @@ public static class KeyLabelFormatter
     /// home-row mods (<c>&amp;HRM_*</c>) and the magic-layer Bluetooth
     /// wrappers (<c>&amp;bt_*</c>).
     /// </summary>
-    private static (string Label, string Subscript, string TopLeft)? TryFormatMacroConvention(KeyBinding b)
+    private static (string Label, string Subscript, string TopLeft)? TryFormatMacroConvention(KeyBinding b, ModifierStyle style)
     {
         // &HRM_<name> <modifier-keycode> <base-keycode>
         if (b.Behavior.StartsWith("&HRM_", StringComparison.Ordinal) && b.Params.Count == 2)
         {
-            var mod = ZmkKeycodeLabel.ModifierSubscript(b.Params[0]) ?? b.Params[0];
-            return (ZmkKeycodeLabel.Display(b.Params[1]), mod, "");
+            var mod = ZmkKeycodeLabel.ModifierSubscript(b.Params[0], style) ?? b.Params[0];
+            return (ZmkKeycodeLabel.Display(b.Params[1], style), mod, "");
         }
 
         // &bt_0..4, &bt_clr, … — Moergo magic-layer wrappers.
@@ -148,7 +149,7 @@ public static class KeyLabelFormatter
     /// chain so things like Bluetooth-pairing macros keep their name.
     /// </summary>
     private static (string Label, string Subscript, string TopLeft)? TryFormatUserMacro(
-        KeyBinding b, IReadOnlyDictionary<string, ZmkMacro>? macros)
+        KeyBinding b, ModifierStyle style, IReadOnlyDictionary<string, ZmkMacro>? macros)
     {
         if (macros is null || !macros.TryGetValue(b.Behavior, out var macro)) return null;
 
@@ -157,7 +158,7 @@ public static class KeyLabelFormatter
         foreach (var inner in macro.Bindings)
         {
             if (inner.Behavior != "&kp" || inner.Params.Count == 0) continue;
-            var (lbl, _) = ZmkKeycodeLabel.FormatKpParams(inner.Params);
+            var (lbl, _) = ZmkKeycodeLabel.FormatKpParams(inner.Params, style);
             label.Append(lbl);
             // Cap at 4 keycodes — a macro that types a whole word shouldn't
             // monopolize the key cap. Tooltip already shows the raw body.
@@ -172,7 +173,7 @@ public static class KeyLabelFormatter
             // the recursion so a self-referencing macro can't loop.
             if (macro.Bindings.Count == 1)
             {
-                var inner = FormatBinding(macro.Bindings[0], null);
+                var inner = FormatBinding(macro.Bindings[0], style, null);
                 if (!string.IsNullOrEmpty(inner.Label)) return (inner.Label, "", "Macro");
             }
             return null;

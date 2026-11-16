@@ -1,3 +1,4 @@
+using LViz.App.Services.GitHub;
 using LViz.Core.Diagnostics;
 using LViz.Core.Firmware;
 using LViz.Core.GitHub;
@@ -102,38 +103,14 @@ public enum PeripheralAdvice
 /// <see cref="PeripheralAdvice.Unknown"/>. Cancellation always propagates.
 /// </para>
 /// </summary>
-public interface IFirmwareBuildService
+/// <remarks>
+/// Signing out (<see cref="IGitHubLogin.SignOutAsync"/>) wipes the firmware
+/// cache so private builds do not linger.
+/// </remarks>
+public interface IFirmwareBuildService : IGitHubLogin
 {
-    /// <summary>The builds login's handle, or null when signed out.</summary>
-    string? Login { get; }
-
-    /// <summary>True while a builds login is held (persisted or session-only).</summary>
-    bool IsSignedIn { get; }
-
-    /// <summary>True when the builds login would survive a restart.</summary>
-    bool IsLoginPersisted { get; }
-
     /// <summary>Raised after a builds sign-in, sign-out, or a restore that signed in.</summary>
     event EventHandler? Changed;
-
-    /// <summary>
-    /// Restores the stored builds login at most once — later and concurrent
-    /// calls await the same call. A failed attempt is dropped, so the next
-    /// call retries.
-    /// </summary>
-    Task EnsureRestoredAsync(CancellationToken ct = default);
-
-    /// <summary>Opens the device flow for the builds App; show the code to the user.</summary>
-    Task<GitHubDeviceCode> StartSignInAsync(CancellationToken ct = default);
-
-    /// <summary>Polls until the user authorizes the code, then adopts the login.</summary>
-    Task CompleteSignInAsync(GitHubDeviceCode code, CancellationToken ct = default);
-
-    /// <summary>
-    /// Signs out of the builds App and wipes the firmware cache so private
-    /// builds do not linger.
-    /// </summary>
-    Task SignOutAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Which build exists for <c>owner/repo</c>: pass exactly one of
@@ -175,9 +152,9 @@ public interface IFirmwareBuildService
 /// <see cref="GitHub.GitHubKeymapService"/>: <see cref="GitHubSession"/> owns
 /// the builds login, <see cref="GitHubClient"/> owns HTTP,
 /// <see cref="FirmwareCache"/> owns the local copies — this class ties them
-/// together, enforces the house rules (restore at most once, fetch the token
-/// right before every call and never hold it, wipe the cache on sign-out),
-/// and turns raw runs and artifacts into a
+/// together, enforces the house rules (fetch the token right before every
+/// call and never hold it, wipe the cache on sign-out), and turns raw runs
+/// and artifacts into a
 /// <see cref="FirmwareBuildState"/>.
 ///
 /// <para>
@@ -195,17 +172,12 @@ public interface IFirmwareBuildService
 /// <param name="mainClient">GitHub HTTP client of the main App.</param>
 /// <param name="mainSession">The stored main login (for the compare).</param>
 /// <param name="cache">The local firmware copies.</param>
-/// <param name="delay">
-/// How the device-flow polling waits; defaults to <see cref="Task.Delay"/>.
-/// Tests pass one that returns instantly.
-/// </param>
 public sealed class FirmwareBuildService(
     GitHubClient buildsClient,
     GitHubSession buildsSession,
     GitHubClient mainClient,
     GitHubSession mainSession,
-    FirmwareCache cache,
-    Func<TimeSpan, CancellationToken, Task>? delay = null) : IFirmwareBuildService
+    FirmwareCache cache) : IFirmwareBuildService
 {
     /// <summary>
     /// The name of the merged artifact the stock ZMK workflow uploads; the
@@ -221,10 +193,6 @@ public sealed class FirmwareBuildService(
     /// checked — a build older than these is not worth flashing.
     /// </summary>
     private const int BranchArtifactScan = 5;
-
-    private readonly Lock _restoreLock = new();
-    private readonly Func<TimeSpan, CancellationToken, Task> _delay = delay ?? Task.Delay;
-    private Task<bool>? _restoreTask;
 
     /// <inheritdoc/>
     public string? Login => buildsSession.Login;
@@ -247,33 +215,16 @@ public sealed class FirmwareBuildService(
     }
 
     /// <inheritdoc/>
-    public Task EnsureRestoredAsync(CancellationToken ct = default)
-    {
-        lock (_restoreLock)
-        {
-            // In flight and succeeded are shared as-is; a faulted or cancelled
-            // attempt is replaced so the next call retries — a store read that
-            // lost the startup race must not stay dead.
-            if (_restoreTask is { IsFaulted: false, IsCanceled: false } shared)
-            {
-                return shared;
-            }
-
-            _restoreTask = shared = buildsSession.RestoreAsync(ct);
-            return shared;
-        }
-    }
+    public Task EnsureRestoredAsync(CancellationToken ct = default) =>
+        buildsSession.EnsureRestoredAsync(ct);
 
     /// <inheritdoc/>
     public Task<GitHubDeviceCode> StartSignInAsync(CancellationToken ct = default) =>
-        buildsClient.StartDeviceFlowAsync(ct);
+        buildsSession.StartSignInAsync(ct);
 
     /// <inheritdoc/>
-    public async Task CompleteSignInAsync(GitHubDeviceCode code, CancellationToken ct = default)
-    {
-        var tokens = await buildsClient.WaitForDeviceAuthorizationAsync(code, _delay, ct);
-        await buildsSession.SignInAsync(tokens, ct);
-    }
+    public Task CompleteSignInAsync(GitHubDeviceCode code, CancellationToken ct = default) =>
+        buildsSession.CompleteSignInAsync(code, ct);
 
     /// <inheritdoc/>
     public async Task SignOutAsync(CancellationToken ct = default)

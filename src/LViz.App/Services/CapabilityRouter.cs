@@ -98,6 +98,10 @@ public sealed class CapabilityRouter : ICapabilityRouter
 
     public event Action? RoutesChanged;
 
+    /// <param name="keyboard">The keyboard as a capability device — the route target.</param>
+    /// <param name="bus">Bus the router watches for hot-plugged devices.</param>
+    /// <param name="settings">Where the routing rules are read and persisted.</param>
+    /// <param name="manifestTimeout">How long a manifest read may take; default 2 s.</param>
     /// <param name="manifestReader">
     /// Override for the manifest acquisition (tests inject canned manifests);
     /// defaults to <see cref="ManifestReader.ReadAsync"/> over the wire.

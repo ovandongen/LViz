@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using LViz.App.Localization;
 using LViz.App.Services;
 using LViz.App.Services.Flashing;
 using LViz.App.Services.GitHub;
@@ -20,18 +19,27 @@ namespace LViz.App;
 
 /// <summary>
 /// Composition root for App-level services. Anything new gets registered
-/// here as the canonical pattern; no inline <c>new</c> in <c>App.axaml.cs</c>.
+/// here as the canonical pattern; <c>App.axaml.cs</c> builds only windows
+/// and startup glue.
 ///
-/// <para>Every service the app uses is registered here, including
-/// <see cref="ShownLayer"/> and the <see cref="DeviceStack"/> built once as
-/// a singleton through <see cref="DeviceStack.Create"/> (nothing is started
-/// at registration: <c>App.axaml.cs</c> calls
-/// <see cref="DeviceStack.StartIpc"/> once on the resolved stack).
-/// <see cref="MainWindowViewModel"/> is registered as a singleton and
-/// <see cref="SettingsViewModel"/> as transient;
-/// <see cref="AvaloniaMainWindowShell"/> gets its services by name and the
+/// <para>Every service the app uses is registered here: the hotkey registry
+/// and monitors, the desktop helpers the dialogs' view-models talk to
+/// (<see cref="IDesktopInteraction"/>, <see cref="IHostActionExecutor"/>),
+/// the one <see cref="KeyboardProfileRegistry"/> — built with the user
+/// layouts on disk, so nothing else loads them — <see cref="ShownLayer"/>
+/// and the <see cref="DeviceStack"/> built once as a singleton through
+/// <see cref="DeviceStack.Create"/> (nothing is started at registration:
+/// <c>App.axaml.cs</c> calls <see cref="DeviceStack.StartIpc"/> once on the
+/// resolved stack), the GitHub and flashing services, and
+/// <see cref="MainWindowViewModel"/> as a singleton.
+/// <see cref="AvaloniaMainWindowShell"/> takes its services and the
 /// view-models of the windows it opens as factories, each running only when
-/// its window opens.</para>
+/// its window opens — <see cref="SettingsViewModel"/> among them, built by
+/// the shell's factory and disposed when its window closes rather than
+/// registered, so the provider never holds a Settings view-model. Label,
+/// colour and modifier-style lookups are stateless helpers over
+/// <see cref="UserSettings"/>, not services, so nothing is registered for
+/// them.</para>
 ///
 /// <para>Disposal: the provider owns the singletons it constructs.
 /// App.axaml disposes the provider on <c>desktop.Exit</c>; individual
@@ -62,6 +70,12 @@ internal static class AppServices
         // Stateless and platform-branching, so it lives in the container.
         services.AddSingleton<IHostActionExecutor, HostActionExecutor>();
 
+        // What the dialogs' view-models ask of the desktop: the browser (the
+        // host executor above), the clipboard and the .uf2 file dialog, both
+        // over the main window looked up at call time.
+        services.AddSingleton<IDesktopInteraction>(
+            sp => new AvaloniaDesktopInteraction(sp.GetRequiredService<IHostActionExecutor>()));
+
         // Installs the `lviz` CLI symlink onto PATH (Settings button). Stateless +
         // platform-branching, same rationale as the host executor above.
         services.AddSingleton<ICliToolInstaller, CliToolInstaller>();
@@ -82,20 +96,31 @@ internal static class AppServices
         if (activeWindowMonitor is not null)
             services.AddSingleton(activeWindowMonitor);
 
+        // The one profile registry: bundled boards plus the user layouts on
+        // disk, read once when the container first resolves it. Everything
+        // that resolves a profile or builds the picker list gets this
+        // instance — there is no static registry state.
+        services.AddSingleton(_ =>
+        {
+            var userLayouts = UserLayoutStore.LoadAll(UserLayoutStore.DefaultDirectory);
+            DiagnosticLog.Info("Layouts", $"Loaded {userLayouts.Count} user layout(s)");
+            return new KeyboardProfileRegistry(userLayouts.Select(f => new UserLayoutProfile(f)));
+        });
+
         // The device stack: HID pipeline, capability bus + router, action
         // pipelines, push coordinators and IPC. The container builds it once;
         // the main view-model receives it and keeps disposing it on quit
         // (Dispose is idempotent, so the provider's Exit disposal is a
         // no-op after that). Nothing is started here — App.axaml calls
         // StartIpc explicitly, so a stack built in a test never listens.
-        // The start profile is resolved with the same expression the view-
-        // model uses, so both begin on the same board.
+        // The start profile is resolved through the registry with the same
+        // expression the view-model uses, so both begin on the same board.
         services.AddSingleton<ShownLayer>();
         services.AddSingleton(sp =>
         {
             var settings = sp.GetRequiredService<ISettingsService>();
             return DeviceStack.Create(
-                KeyboardProfileRegistry.ResolveOrDefault(settings.Current.Keyboard),
+                sp.GetRequiredService<KeyboardProfileRegistry>().ResolveOrDefault(settings.Current.Keyboard),
                 settings,
                 sp.GetRequiredService<ShownLayer>(),
                 sp.GetService<IActiveWindowMonitor>(),
@@ -104,18 +129,12 @@ internal static class AppServices
                 sp.GetRequiredService<IHostActionExecutor>());
         });
 
-        // Both registered against the same instance the static facade
-        // delegates to, so DI consumers and the existing XAML / converter
-        // call sites see identical state.
-        services.AddSingleton<ILocalization>(Loc.Instance);
-        services.AddSingleton<ILayerColorService>(LayerColorPalette.Service);
-        services.AddSingleton<IKeyLabelOverrideService>(KeyLabelOverrides.Service);
-        services.AddSingleton<IComboLabelOverrideService>(ComboLabelOverrides.Service);
-
-        // GitHub zmk-config: device-flow sign-in, repo browsing and the local
-        // repo cache, tied into the one service the windows talk to. The
-        // secret store is the platform credential store, falling back to
-        // in-memory where none exists.
+        // GitHub zmk-config: the session owns the stored login and the
+        // device flow (restore-once, start, complete); IGitHubKeymapService
+        // shares IGitHubLogin with the builds service, and the shared
+        // GitHubSignInViewModel drives the flow in the windows. The secret
+        // store is the platform credential store, falling back to in-memory
+        // where none exists.
         services.AddSingleton<ISecretStore>(_ => SecretStoreFactory.Create());
         services.AddSingleton(_ => new HttpClient());
         services.AddSingleton(sp => new GitHubClient(
@@ -174,9 +193,13 @@ internal static class AppServices
 
         // Window lifecycle + the shell the view-model opens windows through.
         // The lifecycle looks the main window and view-model up at call time;
-        // the shell takes named services, and the Settings, module-setup and
-        // flash view-models as factories — each runs only when its window
-        // opens, and Settings must stay lazy because it needs the main
+        // the shell takes its services (lifecycle, GitHub, profiles,
+        // desktop) and the Settings, module-setup and flash view-models as
+        // factories — each runs only when its window
+        // opens. Settings is built here, never registered: it is IDisposable,
+        // so a container registration would keep every view-model ever
+        // opened alive until exit, while the shell disposes it when its
+        // window closes. It stays lazy anyway, because it needs the main
         // view-model, which needs the shell.
         services.AddSingleton(sp => new MainWindowLifecycle(
             sp.GetRequiredService<ISettingsService>(),
@@ -184,22 +207,32 @@ internal static class AppServices
         services.AddSingleton<IMainWindowShell>(sp => new AvaloniaMainWindowShell(
             sp.GetRequiredService<MainWindowLifecycle>(),
             sp.GetRequiredService<IGitHubKeymapService>(),
-            sp.GetRequiredService<IHostActionExecutor>(),
-            () => sp.GetRequiredService<SettingsViewModel>(),
+            sp.GetRequiredService<KeyboardProfileRegistry>(),
+            sp.GetRequiredService<IDesktopInteraction>(),
+            () => new SettingsViewModel(
+                sp.GetRequiredService<ISettingsService>(),
+                sp.GetRequiredService<MainWindowViewModel>(),
+                sp.GetRequiredService<DeviceStack>(),
+                sp.GetRequiredService<UpdateService>(),
+                sp.GetRequiredService<ICapabilityControl>(),
+                sp.GetRequiredService<ICliToolInstaller>()),
             context => new ModuleSetupViewModel(
                 context,
                 sp.GetRequiredService<IGitHubKeymapService>(),
                 sp.GetRequiredService<KeymapBackupStore>(),
-                Guid.NewGuid),
+                Guid.NewGuid,
+                sp.GetRequiredService<IDesktopInteraction>()),
             context => new FlashViewModel(
                 context,
                 sp.GetRequiredService<IFirmwareBuildService>(),
                 sp.GetRequiredService<FirmwareFlashHistory>(),
                 sp.GetRequiredService<IKeyboardFlashAccess>(),
-                sp.GetRequiredService<FlashRun>())));
+                sp.GetRequiredService<FlashRun>(),
+                sp.GetRequiredService<IDesktopInteraction>())));
 
-        // Every dependency is passed explicitly; the device stack and the
-        // shown layer come from the container. The monitors are genuinely
+        // Every dependency is passed explicitly; the device stack, the
+        // shown layer and the profile registry come from the container.
+        // The monitors are genuinely
         // optional and are resolved by the stack's factory: no active-window
         // monitor disables app-focus switching, no mouse-idle monitor leaves
         // MouseLayer null.
@@ -214,16 +247,8 @@ internal static class AppServices
                 sp.GetRequiredService<IGitHubKeymapService>(),
                 sp.GetRequiredService<FirmwareBuildWatcher>(),
                 sp.GetRequiredService<DeviceStack>(),
-                sp.GetRequiredService<ShownLayer>()));
-
-        services.AddTransient<SettingsViewModel>(sp =>
-            new SettingsViewModel(
-                sp.GetRequiredService<ISettingsService>(),
-                sp.GetRequiredService<MainWindowViewModel>(),
-                sp.GetRequiredService<DeviceStack>(),
-                sp.GetRequiredService<UpdateService>(),
-                sp.GetRequiredService<ICapabilityControl>(),
-                sp.GetRequiredService<ICliToolInstaller>()));
+                sp.GetRequiredService<ShownLayer>(),
+                sp.GetRequiredService<KeyboardProfileRegistry>()));
 
         return services.BuildServiceProvider();
     }
