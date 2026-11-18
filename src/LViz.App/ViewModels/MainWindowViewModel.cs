@@ -84,7 +84,6 @@ public partial class MainWindowViewModel : ObservableObject
     /// assembled and torn down. Bind to its parts directly.
     /// </summary>
     internal DeviceStack Devices { get; }
-    private readonly IHostActionExecutor _hostActionExecutor;
 
     // Press-highlight pipeline: per-layer (mod-set + keycode) → KeyViewModel
     // lookup, held-modifier set, modifier-grace deferral, per-key pulse.
@@ -318,7 +317,6 @@ public partial class MainWindowViewModel : ObservableObject
         KeymapBackupStore keymapBackups,
         IKeymapEditDialogs editDialogs,
         IMainWindowShell shell,
-        IHostActionExecutor hostActionExecutor,
         IGitHubKeymapService? gitHub,
         FirmwareBuildWatcher? firmwareWatcher,
         DeviceStack devices,
@@ -350,11 +348,6 @@ public partial class MainWindowViewModel : ObservableObject
         _isLiveHighlightingEnabled = s.LiveKeyHighlighting;
         _isAutoLayerSwitchEnabled = s.AutoLayerSwitch;
         Preferences = new WindowPreferencesViewModel(settingsService, s);
-        Preferences.ModifierStyleChanged += () =>
-        {
-            // Rebuilds every key's labels; the paint reads the new style from settings.
-            if (_keymap.HasLayout) ApplyActiveLayer(ActiveLayerIndex);
-        };
 
         // Board geometry + press-style live in their own VMs now; seed them from
         // the same settings load. Each owns its own persistence (StackedLayout /
@@ -376,6 +369,14 @@ public partial class MainWindowViewModel : ObservableObject
                 () => ModifierStyles.FromSetting(settingsService.Current.ModifierStyle),
                 settingsService, _shell));
         SyncKeyCallbacks();
+        Preferences.ModifierStyleChanged += () =>
+        {
+            // Rebuilds every key's labels; the paint reads the new style from settings.
+            // The combo tiles format their label once, so the legend is rebuilt too.
+            if (!_keymap.HasLayout) return;
+            ApplyActiveLayer(ActiveLayerIndex);
+            Board.ComboLegend.Rebuild(_keymap.Current);
+        };
         LayerTabs = new LayerTabsViewModel(() => _profile.Id, settingsService);
         LayerTabs.LayerPicked += OnLayerPicked;
         LayerTabs.ColorsChanged += OnLayerColorsChanged;
@@ -386,7 +387,6 @@ public partial class MainWindowViewModel : ObservableObject
             settingsService, shell, gitHub, firmwareWatcher, devices,
             WithKeyTrackingAsync);
 
-        _hostActionExecutor = hostActionExecutor;
         Devices = devices;
         _shownLayer = shownLayer;
         _shownLayer.Index = ActiveLayerIndex;
@@ -443,7 +443,7 @@ public partial class MainWindowViewModel : ObservableObject
         CopyDiagnosticsCommand = new AsyncRelayCommand(CopyDiagnosticsAsync);
         SelectKeyboardCommand = new RelayCommand<IKeyboardProfile>(SelectKeyboard);
         OpenSettingsCommand = new RelayCommand(() => _shell.OpenSettings());
-        OpenHelpCommand = new RelayCommand(() => _hostActionExecutor.Launch(UpdateService.WikiUrl));
+        OpenHelpCommand = new RelayCommand(() => _shell.OpenUrl(UpdateService.WikiUrl));
         OpenShortcutsCommand = new AsyncRelayCommand(_shell.ShowShortcutsAsync);
 
     }

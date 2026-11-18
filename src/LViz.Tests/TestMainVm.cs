@@ -50,7 +50,6 @@ internal static class TestMainVm
                 Path.Combine(Path.GetTempPath(), $"lviz-test-backups-{Guid.NewGuid():N}")),
             editDialogs ?? new FakeKeymapEditDialogs(),
             shell ?? new FakeMainWindowShell(),
-            executor,
             gitHub,
             firmwareWatcher,
             devices,

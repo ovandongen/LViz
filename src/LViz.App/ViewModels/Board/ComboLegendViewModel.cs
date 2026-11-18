@@ -33,12 +33,6 @@ public partial class ComboLegendViewModel : ObservableObject
     // in the settings — a legend without a settings service has none, ever.
     private string ProfileId => _profileIdSource();
 
-    private static ComboLabelOverride? Lookup(
-        Dictionary<string, Dictionary<string, ComboLabelOverride>> overrides,
-        string profileId, string keyPositionsKey)
-        => overrides.TryGetValue(profileId, out var perCombo)
-            && perCombo.TryGetValue(keyPositionsKey, out var value) ? value : null;
-
     private ComboLabelOverride? OverrideFor(string keyPositionsKey)
     {
         var settings = _settings;
@@ -291,9 +285,9 @@ public partial class ComboLegendViewModel : ObservableObject
                     var newKey = ComboLabelOverrides.KeyPositionsToKey(combo.KeyPositions);
                     if (oldKey == newKey) continue;
 
-                    var existing = Lookup(result, ProfileId, oldKey);
+                    var existing = ComboLabelOverrides.Get(result, ProfileId, oldKey);
                     if (existing is null) continue; // nothing to carry, and clearing an absent key is a no-op
-                    if (Lookup(result, ProfileId, newKey) is null)
+                    if (ComboLabelOverrides.Get(result, ProfileId, newKey) is null)
                         result = ComboLabelOverrides.With(result, ProfileId, newKey, existing);
                     result = ComboLabelOverrides.With(result, ProfileId, oldKey, null);
                     moved = true;
@@ -303,7 +297,7 @@ public partial class ComboLegendViewModel : ObservableObject
                 {
                     if (change.Old is not { } old) continue;
                     var oldKey = ComboLabelOverrides.KeyPositionsToKey(old.KeyPositions);
-                    if (Lookup(result, ProfileId, oldKey) is null) continue;
+                    if (ComboLabelOverrides.Get(result, ProfileId, oldKey) is null) continue;
 
                     result = ComboLabelOverrides.With(result, ProfileId, oldKey, null);
                     moved = true;

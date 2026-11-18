@@ -243,7 +243,6 @@ internal static class AppServices
                 sp.GetRequiredService<KeymapBackupStore>(),
                 sp.GetRequiredService<IKeymapEditDialogs>(),
                 sp.GetRequiredService<IMainWindowShell>(),
-                sp.GetRequiredService<IHostActionExecutor>(),
                 sp.GetRequiredService<IGitHubKeymapService>(),
                 sp.GetRequiredService<FirmwareBuildWatcher>(),
                 sp.GetRequiredService<DeviceStack>(),

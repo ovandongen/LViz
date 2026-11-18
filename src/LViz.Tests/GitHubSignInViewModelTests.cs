@@ -117,6 +117,29 @@ public sealed class GitHubSignInViewModelTests
     }
 
     [Fact]
+    public async Task Cancel_WhileTheCodeIsFetched_NeitherCopiesNorOpensNorWaits()
+    {
+        var codeGate = new TaskCompletionSource<GitHubDeviceCode>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var login = new FakeGitHubLogin { OnStart = () => codeGate.Task };
+        var desktop = new FakeDesktopInteraction();
+        var vm = Wire(login, desktop);
+
+        var running = vm.StartCommand.ExecuteAsync(null);
+        await WaitUntil(() => login.StartCalls == 1);
+        vm.Cancel();
+        codeGate.SetResult(new GitHubDeviceCode(
+            "device-secret", Code, VerifyUrl, TimeSpan.FromMinutes(15), TimeSpan.FromSeconds(5)));
+        await running;
+
+        Assert.False(vm.IsWaitingForSignIn);
+        Assert.Null(vm.UserCode);
+        Assert.Empty(desktop.CopiedTexts);
+        Assert.Empty(desktop.OpenedUrls);
+        Assert.Equal(0, login.CompleteCalls);
+        Assert.Equal(0, _signedInCalls);
+    }
+
+    [Fact]
     public async Task Start_ClearsAnOldErrorFirst()
     {
         var log = new List<string>();

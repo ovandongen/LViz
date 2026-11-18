@@ -1387,6 +1387,21 @@ public class MainWindowViewModelEditTests : IDisposable
     }
 
     [Fact]
+    public async Task ToggleModifierStyle_RelabelsTheComboTiles()
+    {
+        var vm = StartEditing(out _);
+        _dialogs.Combo = _ => Task.FromResult<ZmkCombo?>(
+            new ZmkCombo("GUI", "", [0, 1], [-1], new KeyBinding("&kp", ["LGUI"])) { NodeName = "combo_gui" });
+        await vm.Edit!.NewComboCommand.ExecuteAsync(null);
+        var before = Assert.Single(vm.Board.ComboLegend.Combos).Label;
+
+        vm.Preferences.ToggleWindowsModifierStyleCommand.Execute(null);
+
+        // The tile formats its label once, so it must be a new tile.
+        Assert.NotEqual(before, Assert.Single(vm.Board.ComboLegend.Combos).Label);
+    }
+
+    [Fact]
     public async Task ComboCommands_AfterTheEditClosed_DoNothing()
     {
         var vm = StartEditing(out _);

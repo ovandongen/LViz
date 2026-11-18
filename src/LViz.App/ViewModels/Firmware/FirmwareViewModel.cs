@@ -30,16 +30,15 @@ namespace LViz.App.ViewModels;
 public sealed partial class FirmwareViewModel : ObservableObject
 {
     // What the last config lookup found: the config's identity key
-    // (dismissal is stored per key), the context to hand the wizard, its
-    // facts (null until the background check is in, and for an unreadable
-    // config), whether the hint shows, and what the flash window needs —
+    // (dismissal is stored per key), the context to hand the wizard, whether
+    // the hint shows (false until the background check is in, and for an
+    // unreadable config), and what the flash window needs —
     // the folder to inspect and, for a GitHub config, the owner/repo/branch
     // to build from (null for a local one).
     // Null = no zmk-config was found for the loaded keymap.
     private sealed record LiveFeaturesState(
         string Key,
         ModuleSetupContext Context,
-        ZmkConfigFacts? Facts,
         bool Hint,
         string Root,
         FlashGitHubTarget? FlashTarget);
@@ -222,8 +221,8 @@ public sealed partial class FirmwareViewModel : ObservableObject
         LiveFeaturesState? state = null;
         if (context is not null)
         {
-            // The facts — and with them the hint — come from the check below.
-            state = new LiveFeaturesState(key!, context, Facts: null, Hint: false, root!, flashTarget);
+            // The hint comes from the check below.
+            state = new LiveFeaturesState(key!, context, Hint: false, root!, flashTarget);
             _liveFeatures = state;
         }
 
@@ -281,7 +280,7 @@ public sealed partial class FirmwareViewModel : ObservableObject
                 && f.Blockers.Count == 0
                 && f.Status is ZmkModuleStatus.NotSetUp or ZmkModuleStatus.NeedsFork
                 && !_settings.Current.DismissedLiveFeatureHints.Contains(state.Key);
-            _liveFeatures = state with { Facts = facts, Hint = hint };
+            _liveFeatures = state with { Hint = hint };
             OnPropertyChanged(nameof(ShowLiveFeaturesHint));
         }
         catch (Exception ex)

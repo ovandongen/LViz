@@ -65,6 +65,7 @@ public sealed partial class GitHubSignInViewModel : ObservableObject
 
         _signInCts?.Dispose();
         _signInCts = new CancellationTokenSource();
+        var token = _signInCts.Token;
 
         GitHubDeviceCode code;
         try
@@ -77,6 +78,10 @@ public sealed partial class GitHubSignInViewModel : ObservableObject
             return;
         }
 
+        // A Cancel (the window closed) while the code was being fetched ends
+        // the flow here: no clipboard, no browser, no code on screen.
+        if (token.IsCancellationRequested) return;
+
         UserCode = code.UserCode;
         VerificationUri = code.VerificationUri;
         IsWaitingForSignIn = true;
@@ -85,7 +90,7 @@ public sealed partial class GitHubSignInViewModel : ObservableObject
         {
             await _desktop.CopyTextAsync(code.UserCode);
             _desktop.OpenUrl(code.VerificationUri);
-            await _login.CompleteSignInAsync(code, _signInCts.Token);
+            await _login.CompleteSignInAsync(code, token);
         }
         catch (OperationCanceledException)
         {

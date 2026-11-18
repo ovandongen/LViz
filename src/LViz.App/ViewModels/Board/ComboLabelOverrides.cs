@@ -17,12 +17,17 @@ namespace LViz.App.ViewModels;
 public static class ComboLabelOverrides
 {
     public static ComboLabelOverride? Get(UserSettings settings, string profileId, string keyPositionsKey)
-    {
-        if (settings.ComboLabelOverrides.TryGetValue(profileId, out var perCombo)
-            && perCombo.TryGetValue(keyPositionsKey, out var value))
-            return value;
-        return null;
-    }
+        => Get(settings.ComboLabelOverrides, profileId, keyPositionsKey);
+
+    /// <summary>
+    /// <see cref="Get(UserSettings, string, string)"/> over a dictionary being
+    /// built with <see cref="With"/>, before it is stored in the settings.
+    /// </summary>
+    public static ComboLabelOverride? Get(
+        Dictionary<string, Dictionary<string, ComboLabelOverride>> overrides,
+        string profileId, string keyPositionsKey)
+        => overrides.TryGetValue(profileId, out var perCombo)
+            && perCombo.TryGetValue(keyPositionsKey, out var value) ? value : null;
 
     public static Dictionary<string, Dictionary<string, ComboLabelOverride>> With(
         Dictionary<string, Dictionary<string, ComboLabelOverride>> current,
